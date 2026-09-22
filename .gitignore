@@ -3,14 +3,11 @@
 Thumbs.db
 *.log
 
-# Claude Code local overrides
-.claude/settings.local.json
-
-# graphify: keep graph.json, GRAPH_REPORT.md, manifest.json, graph.html;
-# ignore cache and machine-specific pointers
-graphify-out/cache/
-graphify-out/.graphify_python
-graphify-out/.graphify_root
+# Local planning docs and AI tooling (not part of the deliverable)
+plan/
+CLAUDE.md
+.claude/
+graphify-out/
 
 # Secrets are never committed
 .env
