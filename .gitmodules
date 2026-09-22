@@ -1,0 +1,3 @@
+[submodule "ikn-fe"]
+	path = ikn-fe
+	url = https://github.com/KurniawanPra/ikn-fe.git
