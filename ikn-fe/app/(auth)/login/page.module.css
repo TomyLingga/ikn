@@ -1,0 +1,366 @@
+.page {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 5vw, 56px);
+  background:
+    radial-gradient(circle at 15% 15%, rgba(31, 81, 52, 0.06), transparent 34%),
+    radial-gradient(circle at 85% 85%, rgba(214, 143, 78, 0.06), transparent 30%),
+    #d5d0c8;
+}
+
+:global([data-theme='dark']) .page {
+  background:
+    radial-gradient(circle at 15% 15%, var(--green-tint), transparent 34%),
+    radial-gradient(circle at 85% 85%, var(--amber-tint), transparent 30%),
+    var(--paper);
+}
+
+.backLink {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color 0.3s var(--ease);
+}
+
+.backLink svg {
+  transform: rotate(180deg);
+}
+
+.backLink:hover {
+  color: var(--green);
+}
+
+.themeCorner {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  z-index: 10;
+}
+
+.themeCorner button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow:
+    6px 6px 12px rgba(0, 0, 0, 0.1),
+    -6px -6px 12px rgba(255, 255, 255, 0.3);
+  transition: box-shadow 0.3s var(--ease), transform 0.2s var(--ease);
+}
+
+.themeCorner button:hover {
+  transform: scale(1.08);
+}
+
+:global([data-theme='dark']) .themeCorner button {
+  background: var(--surface);
+  box-shadow:
+    6px 6px 12px rgba(0, 0, 0, 0.4),
+    -6px -6px 12px rgba(255, 255, 255, 0.02);
+}
+
+.card {
+  position: relative;
+  width: min(100%, 520px);
+  padding: clamp(26px, 5vw, 46px);
+  border: none;
+  border-radius: 56px 0 56px 0;
+  background: var(--paper);
+  /* Neumorphism — kedalaman dalam */
+  box-shadow:
+    20px 20px 40px rgba(0, 0, 0, 0.15),
+    -20px -20px 40px rgba(255, 255, 255, 0.35),
+    8px 8px 16px rgba(0, 0, 0, 0.08),
+    -8px -8px 16px rgba(255, 255, 255, 0.25),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.3),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.05);
+}
+
+:global([data-theme='dark']) .card {
+  background: var(--surface);
+  box-shadow:
+    20px 20px 40px rgba(0, 0, 0, 0.6),
+    -20px -20px 40px rgba(255, 255, 255, 0.02),
+    8px 8px 16px rgba(0, 0, 0, 0.4),
+    -8px -8px 16px rgba(255, 255, 255, 0.01),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.04),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 34px;
+}
+
+.brand strong,
+.brand span {
+  display: block;
+}
+
+.brand strong {
+  font-size: 0.95rem;
+}
+
+.brand span,
+.eyebrow {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.heading {
+  margin-bottom: 28px;
+}
+
+.heading h1 {
+  margin: 7px 0 10px;
+  font-size: clamp(2rem, 7vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.heading p {
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field > span:first-child {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  /* Motif daun khas IKN — senada dengan card */
+  border-radius: 14px 0 14px 0;
+  outline: none;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), border-radius 0.3s var(--ease);
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-tint);
+  border-radius: 0 14px 0 14px;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.passwordField {
+  position: relative;
+  display: block;
+}
+
+.passwordField input {
+  padding-right: 104px;
+}
+
+.passwordField button {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  cursor: pointer;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.primaryButton {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border: 1px solid var(--green);
+  background: var(--green-tint);
+  color: var(--ink);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  /* Motif daun */
+  border-radius: 18px 0 18px 0;
+  transition: background 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: transparent;
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 2px 12px rgba(31, 81, 52, 0.15);
+}
+
+.primaryButton:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 0.1s;
+}
+
+.loggedIn {
+  display: grid;
+  gap: 20px;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.loggedIn p {
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+
+.loggedIn strong {
+  color: var(--ink);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  border-radius: 0;
+  background: rgba(178, 60, 50, 0.12);
+  color: #b23c32;
+  font-size: 0.84rem;
+}
+
+.demo {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 0;
+  background: var(--paper-2);
+}
+
+.demo span {
+  margin-bottom: 2px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.demo code {
+  overflow-wrap: anywhere;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.modeSwitch {
+  margin-top: 26px;
+  color: var(--ink-soft);
+  text-align: center;
+  font-size: 0.86rem;
+}
+
+.modeSwitch button {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: var(--green);
+  cursor: pointer;
+  font: inherit;
+}
+
+.success {
+  padding: 20px 0 8px;
+  color: var(--green);
+  text-align: center;
+}
+
+.success h2 {
+  margin: 12px 0 8px;
+  color: var(--ink);
+}
+
+.success p {
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+
+.loading {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 520px) {
+  .page {
+    align-items: start;
+    padding: 14px;
+  }
+
+  .card {
+    min-height: calc(100svh - 28px);
+    padding: 24px 20px;
+    border-radius: 0;
+  }
+
+  .brand {
+    margin-bottom: 28px;
+  }
+}
+
+.redirectNote {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--amber-tint);
+  border: 1px solid var(--amber);
+  color: var(--ink);
+  font-size: 0.84rem;
+  margin-bottom: 16px;
+}

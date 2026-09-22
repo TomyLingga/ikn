@@ -1,0 +1,305 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-archivo: 'Archivo', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-plex-mono: 'IBM Plex Mono', 'Cascadia Mono', ui-monospace, monospace;
+  --font-sans: 'Archivo', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Cascadia Mono', ui-monospace, 'Courier New', monospace;
+
+  /* Palet kertas hangat + hijau karet + oker getah */
+  --paper: #f2efe6;
+  --paper-2: #eae6d9;
+  --surface: #fbfaf5;
+  --ink: #16130d;
+  --ink-soft: #5b544a;
+  --line: #d7d1c2;
+  --line-strong: #b9b2a0;
+
+  --green: #1f5134;
+  --green-deep: #123423;
+  --green-tint: #e5ede4;
+  --amber: #b9722a;
+  --amber-tint: #f2e4cf;
+  --red: #b3452f;
+  --red-tint: #f4e0da;
+
+  /* Elevasi datar & tenang — pengganti neumorphism.
+     Token --neu-* dipertahankan namanya agar CSS lama tetap valid,
+     nilainya kini elevasi biasa (bayangan tunggal, sorotan mati). */
+  --neu-bg: var(--surface);
+  --neu-bg-strong: var(--surface);
+  --neu-dark: rgba(22, 19, 13, 0.07);
+  --neu-light: transparent;
+  --neu-dark-strong: rgba(22, 19, 13, 0.1);
+  --neu-light-strong: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(22, 19, 13, 0.05);
+  --shadow-md: 0 8px 28px rgba(22, 19, 13, 0.08);
+  --shadow-lg: 0 18px 50px rgba(22, 19, 13, 0.12);
+
+  --maxw: 1200px;
+  --gutter: 28px;
+  --nav-h: 64px;
+  --nav-gap: 18px;
+  /* Motif "daun": kiri-atas & kanan-bawah membulat, dua sudut lain lancip */
+  --nav-round: 999px;
+  --leaf: 18px 0 18px 0;
+  --leaf-sm: 10px 0 10px 0;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------- Mode gelap ---------- */
+[data-theme='dark'] {
+  --paper: #171410;
+  --paper-2: #1e1a15;
+  --surface: #211d17;
+  --ink: #f2efe6;
+  --ink-soft: #b7ae9e;
+  --line: #35302a;
+  --line-strong: #4a4335;
+
+  --green: #74b389;
+  --green-deep: #0d1f15;
+  --green-tint: #1c2a20;
+  --amber: #d68f4e;
+  --amber-tint: #33271a;
+  --red: #d3705b;
+  --red-tint: #33201b;
+
+  --neu-bg: var(--surface);
+  --neu-bg-strong: var(--surface);
+  --neu-dark: rgba(0, 0, 0, 0.35);
+  --neu-light: transparent;
+  --neu-dark-strong: rgba(0, 0, 0, 0.45);
+  --neu-light-strong: transparent;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.45);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-h) + 32px);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.55;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  transition: background 0.35s var(--ease), color 0.35s var(--ease);
+}
+
+::selection {
+  background: var(--green);
+  color: #fff;
+}
+
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+
+.container {
+  width: 100%;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+/* ---------- Tipografi ---------- */
+h1, h2, h3, h4 {
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+
+.display {
+  font-size: clamp(2.6rem, 6.5vw, 5rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+.h2 {
+  font-size: clamp(1.8rem, 3.6vw, 2.8rem);
+  letter-spacing: -0.03em;
+}
+
+.h3 {
+  font-size: clamp(1.15rem, 2vw, 1.4rem);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.lead {
+  font-size: clamp(1.02rem, 1.4vw, 1.2rem);
+  color: var(--ink-soft);
+  line-height: 1.65;
+  max-width: 56ch;
+  font-weight: 400;
+}
+
+p { color: var(--ink-soft); }
+
+/* Label teknis monospace — kunci rasa industrial */
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.label-green { color: var(--green); }
+.label-amber { color: var(--amber); }
+
+.index {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  color: var(--amber);
+  font-weight: 500;
+}
+
+/* ---------- Link teks ---------- */
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--ink);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--ink);
+  transition: gap 0.25s var(--ease), color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.link:hover {
+  gap: 14px;
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.link svg { width: 15px; height: 15px; }
+
+/* ---------- Tombol ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 15px 26px;
+  border: 1px solid var(--ink);
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink);
+  transition: background 0.25s var(--ease), color 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn svg { width: 15px; height: 15px; transition: transform 0.25s var(--ease); }
+.btn:hover:not(:disabled) svg { transform: translateX(4px); }
+
+.btn-solid {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn-solid:hover:not(:disabled) { background: var(--green); border-color: var(--green); color: #fff; }
+
+.btn-line:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn-amber {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #fff;
+}
+.btn-amber:hover:not(:disabled) { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+
+/* ---------- Form dasar ---------- */
+.form-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 11px 14px;
+  border: 1px solid var(--red);
+  background: var(--red-tint);
+  color: var(--ink);
+  font-size: 0.86rem;
+}
+
+.form-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 11px 14px;
+  border: 1px solid var(--green);
+  background: var(--green-tint);
+  color: var(--ink);
+  font-size: 0.86rem;
+}
+
+/* ---------- Reveal ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+  will-change: opacity, transform;
+}
+.reveal.is-visible { opacity: 1; transform: none; }
+
+/* ---------- Transisi halaman (fade sederhana, tanpa blur) ---------- */
+.page-fade {
+  transition: opacity 0.28s var(--ease);
+}
+.page-fade.is-in { opacity: 1; }
+.page-fade.is-out { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .page-fade { transition: none; }
+  .page-fade.is-out { opacity: 1; }
+  html { scroll-behavior: auto; }
+  .marquee-track { animation: none !important; }
+}
+
+/* ---------- Util ---------- */
+.section { padding: clamp(72px, 10vw, 140px) 0; }
+.section-tight { padding: clamp(48px, 7vw, 90px) 0; }
+.rule { height: 1px; background: var(--line); border: 0; }
+.center { text-align: center; }
+.mx-auto { margin-left: auto; margin-right: auto; }

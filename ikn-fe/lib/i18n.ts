@@ -1,0 +1,263 @@
+// ================= i18n =================
+// Dua bahasa: Indonesia (id) & English (en).
+// Kamus ini menampung teks "chrome" situs (navbar, dropdown, hero, footer, CTA)
+// plus struktur navigasi bertingkat (mega-dropdown) yang dipakai Navbar.
+
+import type { Lang } from '@/lib/types';
+
+export interface NavChild {
+  label: string;
+  href: string;
+  desc?: string;
+}
+
+export interface NavNode {
+  label: string;
+  href: string;
+  children?: NavChild[];
+}
+
+export interface UIStrings {
+  login: string;
+  themeDark: string;
+  themeLight: string;
+  menu: string;
+  heroTitle: string[];
+  heroSub: string;
+  heroButtons: {
+    viewProducts: string;
+    companyProfile: string;
+  };
+  footer: {
+    headline: string;
+    startConvo: string;
+    nav: string;
+    contact: string;
+    follow: string;
+    subsidiary: string;
+  };
+  dash: {
+    title: string;
+    welcome: string;
+    subtitle: string;
+    shop: string;
+    stats: {
+      total: string;
+      unpaid: string;
+      inProgress: string;
+      completed: string;
+      value: string;
+    };
+    alerts: {
+      title: string;
+      unpaid: string;
+      shipped: string;
+      reviewed: string;
+    };
+    recent: {
+      title: string;
+      all: string;
+      emptyTitle: string;
+      emptyBody: string;
+      catalog: string;
+    };
+    quick: {
+      title: string;
+      catalog: string;
+      catalogDesc: string;
+      orders: string;
+      ordersDesc: string;
+      address: string;
+      addressDesc: string;
+      profile: string;
+      profileDesc: string;
+    };
+  };
+  navAccount: {
+    shop: string;
+    dashboard: string;
+    orders: string;
+    settings: string;
+    profile: string;
+    company: string;
+    address: string;
+    logout: string;
+  };
+}
+
+export const languages: { code: Lang; label: string; name: string }[] = [
+  { code: 'id', label: 'ID', name: 'Indonesia' },
+  { code: 'en', label: 'EN', name: 'English' },
+];
+
+export const defaultLang: Lang = 'id';
+
+// Struktur navigasi dengan dropdown.
+export const navTree: Record<Lang, NavNode[]> = {
+  id: [
+    { label: 'Beranda', href: '/' },
+    {
+      label: 'Tentang Kami',
+      href: '/tentang',
+      children: [
+        { label: 'Sejarah', href: '/tentang#sejarah', desc: 'Perjalanan sejak 1965' },
+        { label: 'Visi & Misi', href: '/tentang#visi-misi', desc: 'Arah dan tujuan kami' },
+        { label: 'Nilai AKHLAK', href: '/tentang#nilai', desc: 'Cara kami bekerja' },
+        { label: 'Hubungi Kami', href: '/kontak', desc: 'Lokasi & kontak' },
+      ],
+    },
+    {
+      label: 'Bisnis',
+      href: '/produk',
+      children: [
+        { label: 'Katalog Produk', href: '/catalog', desc: 'Belanja & lihat semua produk' },
+        { label: 'Resiprene 35', href: '/produk#resiprene-35', desc: 'Cyclised natural rubber' },
+        { label: 'Aneka Barang Karet', href: '/produk#barang-karet', desc: 'Rubber article products' },
+        { label: 'Unduhan', href: '/unduhan', desc: 'Brosur produk (PDF)' },
+      ],
+    },
+    {
+      label: 'Media',
+      href: '/berita',
+      children: [
+        { label: 'Berita Terbaru', href: '/berita', desc: 'Kabar & rilis terkini' },
+        { label: 'Galeri', href: '/galeri', desc: 'Foto & video' },
+      ],
+    },
+    {
+      label: 'Keberlanjutan',
+      href: '/keberlanjutan',
+      children: [
+        { label: 'Lingkungan, Sosial, Tata Kelola', href: '/keberlanjutan', desc: 'Komitmen ESG kami' },
+        { label: 'Sertifikat', href: '/keberlanjutan/sertifikat', desc: 'ISO 37001 & REACH' },
+        { label: 'Pelanggan Kami', href: '/keberlanjutan/pelanggan', desc: 'Mitra lintas industri' },
+      ],
+    },
+    { label: 'Kontak', href: '/kontak' },
+  ],
+  en: [
+    { label: 'Home', href: '/' },
+    {
+      label: 'About Us',
+      href: '/tentang',
+      children: [
+        { label: 'History', href: '/tentang#sejarah', desc: 'Our journey since 1965' },
+        { label: 'Vision & Mission', href: '/tentang#visi-misi', desc: 'Our direction and goals' },
+        { label: 'AKHLAK Values', href: '/tentang#nilai', desc: 'How we work' },
+        { label: 'Contact Us', href: '/kontak', desc: 'Locations & contact' },
+      ],
+    },
+    {
+      label: 'Business',
+      href: '/produk',
+      children: [
+        { label: 'Product Catalog', href: '/catalog', desc: 'Shop & browse all products' },
+        { label: 'Resiprene 35', href: '/produk#resiprene-35', desc: 'Cyclised natural rubber' },
+        { label: 'Rubber Articles', href: '/produk#barang-karet', desc: 'Rubber article products' },
+        { label: 'Downloads', href: '/unduhan', desc: 'Product brochures (PDF)' },
+      ],
+    },
+    {
+      label: 'Media',
+      href: '/berita',
+      children: [
+        { label: 'Latest News', href: '/berita', desc: 'Recent updates & releases' },
+        { label: 'Gallery', href: '/galeri', desc: 'Photos & videos' },
+      ],
+    },
+    {
+      label: 'Sustainability',
+      href: '/keberlanjutan',
+      children: [
+        { label: 'Environment, Social, Governance', href: '/keberlanjutan', desc: 'Our ESG commitment' },
+        { label: 'Certificates', href: '/keberlanjutan/sertifikat', desc: 'ISO 37001 & REACH' },
+        { label: 'Our Customers', href: '/keberlanjutan/pelanggan', desc: 'Partners across industries' },
+      ],
+    },
+    { label: 'Contact', href: '/kontak' },
+  ],
+};
+
+// Teks UI umum.
+export const t: Record<Lang, UIStrings> = {
+  id: {
+    login: 'Login',
+    themeDark: 'Mode gelap',
+    themeLight: 'Mode terang',
+    menu: 'Menu',
+    heroTitle: ['Menghadirkan', 'Produk Karet Berkualitas', 'untuk Industri Global'],
+    heroSub: 'PT Industri Karet Nusantara adalah perusahaan mapan yang berspesialisasi dalam produk hilir karet.',
+    heroButtons: {
+      viewProducts: 'Lihat produk',
+      companyProfile: 'Profil perusahaan',
+    },
+    footer: {
+      headline: 'Karet hilir Nusantara, diproses untuk dunia.',
+      startConvo: 'Mulai percakapan',
+      nav: 'Navigasi',
+      contact: 'Kontak',
+      follow: 'Ikuti',
+      subsidiary: 'Anak perusahaan PTPN III (Persero)',
+    },
+    dash: {
+      title: 'Dashboard Customer',
+      welcome: 'Selamat datang,',
+      subtitle: 'Semua aktivitas akun Anda tersedia di satu tempat.',
+      shop: 'Belanja produk',
+      stats: { total: 'Total pesanan', unpaid: 'Perlu pembayaran', inProgress: 'Sedang berjalan', completed: 'Selesai', value: 'Nilai transaksi' },
+      alerts: { title: 'Perlu perhatian', unpaid: 'Pembayaran {num} perlu diselesaikan atau diperbarui.', shipped: 'Pesanan {num} sedang dikirim.', reviewed: 'Pesanan {num} sudah selesai dan dapat diulas.' },
+      recent: { title: 'Pesanan terbaru', all: 'Semua pesanan', emptyTitle: 'Belum ada pesanan', emptyBody: 'Pesanan pertama Anda akan tampil di sini.', catalog: 'Lihat katalog' },
+      quick: { title: 'Menu Utama', catalog: 'Buka katalog', catalogDesc: 'Cari produk dan mulai pemesanan.', orders: 'Pesanan saya', ordersDesc: 'Lihat pembayaran dan pengiriman.', address: 'Kelola alamat', addressDesc: 'Atur tujuan pengiriman utama.', profile: 'Perbarui profil', profileDesc: 'Pastikan data PIC selalu terbaru.' }
+    },
+    navAccount: {
+      shop: 'Belanja Produk',
+      dashboard: 'Dashboard',
+      orders: 'Pesanan saya',
+      settings: 'Pengaturan',
+      profile: 'Profil saya',
+      company: 'Perusahaan',
+      address: 'Alamat',
+      logout: 'Keluar',
+    }
+  },
+  en: {
+    login: 'Login',
+    themeDark: 'Dark mode',
+    themeLight: 'Light mode',
+    menu: 'Menu',
+    heroTitle: ['Delivering', 'Quality Rubber Products', 'for Global Industries'],
+    heroSub: 'PT Industri Karet Nusantara is a well-established company specializing in downstream rubber products.',
+    heroButtons: {
+      viewProducts: 'View products',
+      companyProfile: 'Company profile',
+    },
+    footer: {
+      headline: 'Nusantara downstream rubber, processed for the world.',
+      startConvo: 'Start a conversation',
+      nav: 'Navigation',
+      contact: 'Contact',
+      follow: 'Follow Us',
+      subsidiary: 'Subsidiary of PTPN III (Persero)',
+    },
+    dash: {
+      title: 'Customer Dashboard',
+      welcome: 'Welcome,',
+      subtitle: 'All your account activities are available in one place.',
+      shop: 'Shop products',
+      stats: { total: 'Total orders', unpaid: 'Awaiting payment', inProgress: 'In progress', completed: 'Completed', value: 'Transaction value' },
+      alerts: { title: 'Needs attention', unpaid: 'Payment for {num} needs to be completed or updated.', shipped: 'Order {num} is being shipped.', reviewed: 'Order {num} is completed and ready for review.' },
+      recent: { title: 'Recent orders', all: 'All orders', emptyTitle: 'No orders yet', emptyBody: 'Your first order will appear here.', catalog: 'View catalog' },
+      quick: { title: 'Main Menu', catalog: 'Open catalog', catalogDesc: 'Find products and start ordering.', orders: 'My orders', ordersDesc: 'View payments and shipments.', address: 'Manage address', addressDesc: 'Set primary shipping destination.', profile: 'Update profile', profileDesc: 'Ensure PIC data is up to date.' }
+    },
+    navAccount: {
+      shop: 'Shop Products',
+      dashboard: 'Dashboard',
+      orders: 'My Orders',
+      settings: 'Settings',
+      profile: 'My Profile',
+      company: 'Company',
+      address: 'Address',
+      logout: 'Logout',
+    }
+  },
+};

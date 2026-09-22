@@ -1,0 +1,31 @@
+import Breadcrumb from '@/components/Breadcrumb';
+import CatalogBrowser from '@/components/CatalogBrowser';
+import { fetchCategories, fetchProducts } from '@/lib/server-data';
+
+export const metadata = {
+  title: 'Katalog Produk',
+  description:
+    'Katalog produk hilir karet PT Industri Karet Nusantara — Resiprene 35 dan aneka barang karet industri.',
+};
+
+export default async function CatalogPage() {
+  const [products, categories] = await Promise.all([fetchProducts(), fetchCategories()]);
+
+  return (
+    <>
+      <section className="pagehead commerce-head">
+        <div className="container">
+          <Breadcrumb items={[{ label: 'Beranda', href: '/' }, { label: 'Katalog' }]} />
+          <span className="label label-amber">/ Katalog</span>
+          <h1 className="display pagehead-title">Produk karet hilir.</h1>
+        </div>
+      </section>
+
+      <section className="section-tight">
+        <div className="container">
+          <CatalogBrowser products={products} categories={categories} />
+        </div>
+      </section>
+    </>
+  );
+}
