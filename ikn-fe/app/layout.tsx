@@ -4,7 +4,8 @@ import { Archivo, IBM_Plex_Mono } from 'next/font/google';
 import { LanguageProvider } from '@/components/LanguageProvider';
 import { CartProvider } from '@/components/CartProvider';
 import { AuthProvider } from '@/components/AuthProvider';
-import { TransactionProvider } from '@/components/TransactionProvider';
+import Script from 'next/script';
+import { fetchSite } from '@/lib/server-data';
 
 // Pasangan huruf industrial: Archivo (grotesque) untuk teks & display,
 // IBM Plex Mono untuk label teknis — identitas "lembar data pabrik".
@@ -34,10 +35,16 @@ export const metadata = {
   keywords: ['karet', 'rubber', 'Resiprene', 'PT IKN', 'Medan', 'hilir karet'],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Analitik dari Pengaturan Situs (kosong = tidak dipasang). fetchSite di-cache per request (React cache).
+  const { settings } = await fetchSite();
+  const gaId = settings.analytics?.ga_measurement_id?.trim() || '';
+  const gscToken = settings.analytics?.gsc_verification?.trim() || '';
+
   return (
     <html lang="id" className={`${archivo.variable} ${plexMono.variable}`}>
       <head>
+        {gscToken && <meta name="google-site-verification" content={gscToken} />}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -52,11 +59,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
+        {gaId && (
+          <>
+            <Script src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} strategy="afterInteractive" />
+            <Script id="ga4-init" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${gaId}', { anonymize_ip: true });`}
+            </Script>
+          </>
+        )}
         <LanguageProvider>
           <AuthProvider>
-            <TransactionProvider>
-              <CartProvider>{children}</CartProvider>
-            </TransactionProvider>
+            <CartProvider>{children}</CartProvider>
           </AuthProvider>
         </LanguageProvider>
       </body>

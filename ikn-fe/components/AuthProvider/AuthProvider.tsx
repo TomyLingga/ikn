@@ -1,45 +1,37 @@
 'use client';
 
 // Provider auth berbasis sesi backend (Laravel Sanctum, cookie httpOnly).
-// Sesi customer dan admin memakai guard terpisah di server sehingga
-// keduanya bisa hidup berdampingan. Tanpa sesi, pengunjung tetap viewer.
+// Satu sesi per browser: `user` dari GET /auth/me; `customer` / `admin` diturunkan dari role.
+// Tanpa sesi (401), pengunjung tetap viewer. Tidak ada mock.
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError, toAdminAccount, type AdminAccountShape } from '@/lib/api';
+import type { AuthUser, RegisterPayload, RegisterResult } from '@/lib/types';
 
-export interface CustomerAccount {
+export interface CustomerAccount extends AuthUser {
   role: 'customer';
-  id: string;
-  name: string;
-  email: string;
+  /** Nama perusahaan dari profil (kosong bila belum diisi). */
   company: string;
 }
 
-export interface AdminAccount {
-  role: 'super_admin' | 'admin';
-  id: string;
-  name: string;
-  email: string;
-  permissions: string[];
-}
+export type AdminAccount = AdminAccountShape;
 
-export interface RegisterPayload {
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  company: string;
-  phone?: string;
-}
+export type { RegisterPayload, RegisterResult };
 
 interface AuthContextValue {
+  /** User mentah dari API (customer maupun admin). */
+  user: AuthUser | null;
   customer: CustomerAccount | null;
   admin: AdminAccount | null;
   ready: boolean;
   loginCustomer: (email: string, password: string) => Promise<CustomerAccount>;
-  registerCustomer: (payload: RegisterPayload) => Promise<CustomerAccount>;
   loginAdmin: (email: string, password: string) => Promise<AdminAccount>;
+  /** POST /auth/register — tidak login otomatis; customer harus verifikasi email dulu. */
+  registerCustomer: (payload: RegisterPayload) => Promise<RegisterResult>;
+  /** POST /auth/logout — satu sesi, menghapus customer maupun admin. */
+  logout: () => Promise<void>;
+  /** Alias kompatibilitas (AccountNav / AdminShell). */
   logoutCustomer: () => Promise<void>;
   logoutAdmin: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -47,24 +39,30 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-interface MeResponse {
-  customer: CustomerAccount | null;
-  admin: AdminAccount | null;
+function toCustomerAccount(user: AuthUser): CustomerAccount {
+  return { ...user, role: 'customer', company: user.profile?.company || '' };
+}
+
+function splitUser(user: AuthUser | null): { customer: CustomerAccount | null; admin: AdminAccount | null } {
+  if (!user) return { customer: null, admin: null };
+  if (user.role === 'customer') return { customer: toCustomerAccount(user), admin: null };
+  return { customer: null, admin: toAdminAccount(user) };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [customer, setCustomer] = useState<CustomerAccount | null>(null);
-  const [admin, setAdmin] = useState<AdminAccount | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
-      const me = await api<MeResponse>('/auth/me');
-      setCustomer(me.customer);
-      setAdmin(me.admin);
-    } catch {
-      setCustomer(null);
-      setAdmin(null);
+      const me = await api<{ user: AuthUser }>('/auth/me');
+      setUser(me.user ?? null);
+    } catch (err) {
+      // 401 = tamu; error lain (jaringan) juga dianggap tanpa sesi agar UI tidak menggantung.
+      if (err instanceof ApiError && err.status !== 401 && err.status !== 0) {
+        console.error('[auth] /auth/me:', err.message);
+      }
+      setUser(null);
     }
   }, []);
 
@@ -72,73 +70,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().finally(() => setReady(true));
   }, [refresh]);
 
-  async function loginCustomer(email: string, password: string): Promise<CustomerAccount> {
-    const result = await api<{ account: CustomerAccount }>('/auth/login', {
+  const loginCustomer = useCallback(async (email: string, password: string): Promise<CustomerAccount> => {
+    const result = await api<{ user: AuthUser }>('/auth/login', {
       method: 'POST',
       body: { email, password },
     });
-    setCustomer(result.account);
-    return result.account;
-  }
+    setUser(result.user);
+    return toCustomerAccount(result.user);
+  }, []);
 
-  async function registerCustomer(payload: RegisterPayload): Promise<CustomerAccount> {
-    const result = await api<{ account: CustomerAccount }>('/auth/register', {
-      method: 'POST',
-      body: payload,
-    });
-    setCustomer(result.account);
-    return result.account;
-  }
-
-  async function loginAdmin(email: string, password: string): Promise<AdminAccount> {
+  const loginAdmin = useCallback(async (email: string, password: string): Promise<AdminAccount> => {
     const result = await api<{ account: AdminAccount }>('/auth/admin/login', {
       method: 'POST',
       body: { email, password },
     });
-    setAdmin(result.account);
+    // Ambil user lengkap agar `user` konsisten dengan /auth/me.
+    await refresh();
     return result.account;
-  }
+  }, [refresh]);
 
-  async function logoutCustomer() {
-    await api('/auth/logout', { method: 'POST', body: { scope: 'customer' } });
-    setCustomer(null);
-  }
+  const registerCustomer = useCallback(async (payload: RegisterPayload): Promise<RegisterResult> => {
+    return api<RegisterResult>('/auth/register', { method: 'POST', body: payload });
+  }, []);
 
-  async function logoutAdmin() {
-    await api('/auth/logout', { method: 'POST', body: { scope: 'admin' } });
-    setAdmin(null);
-  }
+  const logout = useCallback(async () => {
+    try {
+      await api('/auth/logout', { method: 'POST' });
+    } finally {
+      setUser(null);
+    }
+  }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        customer,
-        admin,
-        ready,
-        loginCustomer,
-        registerCustomer,
-        loginAdmin,
-        logoutCustomer,
-        logoutAdmin,
-        refresh,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = useMemo<AuthContextValue>(() => {
+    const { customer, admin } = splitUser(user);
+    return {
+      user,
+      customer,
+      admin,
+      ready,
+      loginCustomer,
+      loginAdmin,
+      registerCustomer,
+      logout,
+      logoutCustomer: logout,
+      logoutAdmin: logout,
+      refresh,
+    };
+  }, [user, ready, loginCustomer, loginAdmin, registerCustomer, logout, refresh]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+const notReady = () => Promise.reject(new Error('Auth belum siap.'));
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) {
     // Fallback aman bila dipakai di luar provider (mis. saat prerender).
     return {
+      user: null,
       customer: null,
       admin: null,
       ready: false,
-      loginCustomer: async () => Promise.reject(new Error('Auth belum siap.')),
-      registerCustomer: async () => Promise.reject(new Error('Auth belum siap.')),
-      loginAdmin: async () => Promise.reject(new Error('Auth belum siap.')),
+      loginCustomer: notReady,
+      loginAdmin: notReady,
+      registerCustomer: notReady,
+      logout: async () => {},
       logoutCustomer: async () => {},
       logoutAdmin: async () => {},
       refresh: async () => {},

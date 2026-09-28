@@ -99,6 +99,17 @@
   transform: translate(-50%, 0);
 }
 
+/* Kisi menu utama: maksimal 6 per baris; item ke-7 dst. turun ke baris berikutnya
+   tepat di bawah kolom yang sama (Beranda, Tentang Kami, ...). */
+.menuGrid {
+  display: grid;
+  grid-template-columns: repeat(6, max-content);
+  align-items: center;
+  justify-items: start;
+  column-gap: 2px;
+  row-gap: 0;
+}
+
 .dropdownInner {
   display: flex;
   flex-direction: column;
@@ -276,6 +287,8 @@
   .scrolled .inner { padding-inline: 18px; }
   .brand { min-width: 0; gap: 9px; }
   .brand img { width: 36px; height: 36px; flex-shrink: 0; }
+
+  .menuGrid { display: contents; }
 
   .links {
     position: absolute;

@@ -1,19 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/StatusBadge';
 import { useAuth } from '@/components/AuthProvider';
-import { useTransactions } from '@/components/TransactionProvider';
-import { orderStatus, paymentStatus } from '@/lib/commerce';
-import { formatDate, formatIDR } from '@/lib/format';
-import type { IconName, Order } from '@/lib/types';
+import { useLang } from '@/components/LanguageProvider';
+import { apiPaged, errorMessage } from '@/lib/api';
+import { tr } from '@/lib/cms';
+import type { PagedMeta } from '@/lib/cms';
+import { orderLabel, orderStatus, paymentLabel } from '@/lib/commerce';
+import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
+import type { IconName, OrderStatusKey, OrderSummary } from '@/lib/types';
 import styles from './CustomerOrders.module.css';
-
-type OrderTab = 'all' | 'to-pay' | 'verification' | 'to-ship' | 'to-receive' | 'completed' | 'cancelled';
 
 interface OrderCardAction {
   label: string;
@@ -22,187 +22,197 @@ interface OrderCardAction {
   primary?: boolean;
 }
 
-const orderTabs: { id: OrderTab; label: string; icon: IconName }[] = [
-  { id: 'all', label: 'Semua', icon: 'orders' },
-  { id: 'to-pay', label: 'Perlu Bayar', icon: 'wallet' },
-  { id: 'verification', label: 'Verifikasi', icon: 'shieldCheck' },
-  { id: 'to-ship', label: 'Diproses', icon: 'package' },
-  { id: 'to-receive', label: 'Dikirim', icon: 'truck' },
-  { id: 'completed', label: 'Selesai', icon: 'checkCircle' },
-  { id: 'cancelled', label: 'Dibatalkan', icon: 'cancelCircle' },
-];
+const PER_PAGE = 10;
 
-function matchesTab(order: Order, tab: OrderTab): boolean {
-  switch (tab) {
-    case 'to-pay':
-      return order.status === 'awaiting_payment' && ['unpaid', 'rejected', 'expired'].includes(order.payment);
-    case 'verification':
-      return order.status === 'awaiting_verification' || order.payment === 'awaiting_confirmation';
-    case 'to-ship':
-      return order.status === 'processing' || order.status === 'packing';
-    case 'to-receive':
-      return order.status === 'shipped' || order.status === 'delivered';
-    case 'completed':
-      return order.status === 'completed';
-    case 'cancelled':
-      return order.status === 'cancelled';
-    default:
-      return true;
-  }
-}
-
-function getOrderAction(order: Order): OrderCardAction {
-  const detailHref = `/dashboard/pesanan/${order.number}`;
-  const firstProductHref = order.items[0] ? `/catalog/${order.items[0].slug}` : '/catalog';
-
-  switch (order.status) {
-    case 'awaiting_payment':
-      return { label: 'Bayar sekarang', href: `${detailHref}#payment`, icon: 'wallet', primary: true };
-    case 'awaiting_verification':
-      return { label: 'Lihat pembayaran', href: `${detailHref}#payment`, icon: 'shieldCheck' };
-    case 'processing':
-    case 'packing':
-      return { label: 'Lihat proses', href: `${detailHref}#tracking`, icon: 'package' };
-    case 'shipped':
-      return { label: 'Konfirmasi diterima', href: `${detailHref}#tracking`, icon: 'checkCircle', primary: true };
-    case 'delivered':
-      return { label: 'Lihat pesanan', href: `${detailHref}#tracking`, icon: 'checkCircle' };
-    case 'completed':
-      return { label: 'Beli lagi', href: firstProductHref, icon: 'bag', primary: true };
-    case 'cancelled':
-      return { label: 'Pesan ulang', href: firstProductHref, icon: 'bag', primary: true };
-    default:
-      return { label: 'Lihat detail', href: detailHref, icon: 'arrow' };
-  }
-}
-
+// Daftar pesanan: GET /customer/orders?status&page&perPage (OrderSummaryResource — tanpa flag can*,
+// sehingga tombol aksi diturunkan dari status dan keputusan final tetap di halaman detail).
 export default function CustomerOrders() {
   const { customer } = useAuth();
-  const { orders } = useTransactions();
-  const [query, setQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<OrderTab>('all');
-  // Provider hanya memuat pesanan milik customer yang sedang login.
-  const customerOrders = orders;
-  const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return customerOrders.filter((order) => {
-      const matchesQuery = !normalized
-        || order.number.toLowerCase().includes(normalized)
-        || order.items.some((item) => item.name.toLowerCase().includes(normalized));
-      return matchesQuery && matchesTab(order, activeTab);
-    });
-  }, [activeTab, customerOrders, query]);
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
-  const activeTabLabel = orderTabs.find((tab) => tab.id === activeTab)?.label ?? 'Semua';
+  const [status, setStatus] = useState<OrderStatusKey | ''>('');
+  const [page, setPage] = useState(1);
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [meta, setMeta] = useState<PagedMeta>({ page: 1, perPage: PER_PAGE, total: 0, lastPage: 1 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (!customer) return;
+    let active = true;
+    setLoading(true);
+    setError('');
+    const qs = new URLSearchParams({ page: String(page), perPage: String(PER_PAGE) });
+    if (status) qs.set('status', status);
+    apiPaged<OrderSummary>(`/customer/orders?${qs.toString()}`)
+      .then((res) => {
+        if (!active) return;
+        setOrders(res.items);
+        setMeta(res.meta);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setOrders([]);
+        setError(errorMessage(err, t('Gagal memuat pesanan.', 'Failed to load orders.')));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer?.id, status, page]);
+
+  function getOrderAction(order: OrderSummary): OrderCardAction {
+    const detailHref = `/dashboard/pesanan/${order.number}`;
+    const firstProductHref = order.items[0] ? `/catalog/${order.items[0].productSlug}` : '/dashboard/katalog';
+    switch (order.status) {
+      case 'pending_payment':
+        return { label: t('Bayar sekarang', 'Pay now'), href: `${detailHref}#payment`, icon: 'wallet', primary: true };
+      case 'payment_review':
+        return { label: t('Lihat pembayaran', 'View payment'), href: `${detailHref}#payment`, icon: 'shieldCheck' };
+      case 'paid':
+      case 'processing':
+        return { label: t('Lacak pesanan', 'Track order'), href: `${detailHref}#tracking`, icon: 'package' };
+      case 'shipped':
+        return { label: t('Konfirmasi diterima', 'Confirm received'), href: `${detailHref}#tracking`, icon: 'truck', primary: true };
+      case 'delivered':
+        return { label: t('Lihat pesanan', 'View order'), href: `${detailHref}#tracking`, icon: 'checkCircle' };
+      case 'completed':
+        return { label: t('Beri ulasan', 'Write a review'), href: `${detailHref}#review`, icon: 'check', primary: true };
+      case 'cancelled':
+      case 'expired':
+        return { label: t('Pesan lagi', 'Order again'), href: firstProductHref, icon: 'bag' };
+      default:
+        return { label: t('Lihat detail', 'View details'), href: detailHref, icon: 'arrow' };
+    }
+  }
 
   if (!customer) return null;
+
+  const normalized = query.trim().toLowerCase();
+  const visible = normalized
+    ? orders.filter((o) => o.number.toLowerCase().includes(normalized) || o.items.some((i) => tr(i.name, lang).toLowerCase().includes(normalized)))
+    : orders;
 
   return (
     <div>
       <div className="acct-section-head">
         <div>
-          <h2 className={styles.heading}>Pesanan saya</h2>
-          <p className={styles.intro}>Hanya pesanan milik {customer.company} yang ditampilkan.</p>
+          <h2 className={styles.heading}>{t('Pesanan saya', 'My orders')}</h2>
+          <p className={styles.intro}>{t('Hanya pesanan milik', 'Only orders from')} {customer.company || customer.name} {t('yang ditampilkan.', 'are shown.')}</p>
         </div>
-        <span className={styles.orderCount}>{customerOrders.length} pesanan</span>
+        <span className={styles.orderCount}>{meta.total} {t('pesanan', 'orders')}</span>
       </div>
 
-      <div className={styles.tabs} role="tablist" aria-label="Status pesanan">
-        {orderTabs.map((tab) => {
-          const count = customerOrders.filter((order) => matchesTab(order, tab.id)).length;
-          return (
-            <button
-              key={tab.id}
-              id={`order-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              aria-controls="customer-order-list"
-              className={`${styles.tab} ${activeTab === tab.id ? styles.active : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className={styles.tabIcon}><Icon name={tab.icon} size={21} strokeWidth={1.8} /></span>
-              <span className={styles.tabLabel}>{tab.label}</span>
-              {count > 0 && <span className={styles.count}>{count}</span>}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className={styles.searchRow}>
+      <div className="orders-toolbar">
         <label className={`cat-search ${styles.search}`}>
           <Icon name="compass" size={20} strokeWidth={1.8} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nomor atau nama produk" aria-label="Cari pesanan" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Cari nomor atau nama produk di halaman ini', 'Search order number or product on this page')} aria-label={t('Cari pesanan', 'Search orders')} />
         </label>
+        <select
+          className="cat-sort"
+          value={status}
+          onChange={(e) => { setStatus(e.target.value as OrderStatusKey | ''); setPage(1); }}
+          aria-label={t('Filter status', 'Status filter')}
+        >
+          <option value="">{t('Semua status', 'All statuses')}</option>
+          {(Object.keys(orderStatus) as OrderStatusKey[]).map((key) => (
+            <option key={key} value={key}>{orderStatus[key][lang]}</option>
+          ))}
+        </select>
       </div>
 
-      <section id="customer-order-list" role="tabpanel" aria-labelledby={`order-tab-${activeTab}`}>
-        {filtered.length === 0 ? (
-          <EmptyState
-            title="Pesanan tidak ditemukan"
-            body={`Belum ada pesanan pada tab ${activeTabLabel}. Ubah pencarian atau mulai pesanan baru dari katalog.`}
-            action={{ href: '/catalog', label: 'Lihat katalog' }}
-          />
-        ) : (
-          <div className="acct-order-list">
-            {filtered.map((order) => {
-              const status = orderStatus[order.status];
-              const payment = paymentStatus[order.payment];
-              const detailHref = `/dashboard/pesanan/${order.number}`;
-              const action = getOrderAction(order);
+      {error && <p className="form-error" role="alert">{error}</p>}
 
-              return (
-                <article key={order.number} className={`acct-order-card ${styles.orderCard}`}>
-                  <div className={styles.orderHeader}>
-                    <div>
-                      <Link href={detailHref} className={styles.orderNumber}>{order.number}</Link>
-                      <span className={styles.orderDate}>{formatDate(order.date)}</span>
-                    </div>
-                    <div className={styles.badges}>
-                      <StatusBadge label={status.id} tone={status.tone} />
-                      <StatusBadge label={payment.id} tone={payment.tone} />
-                    </div>
-                  </div>
+      {loading ? (
+        <p className="form-note">{t('Memuat pesanan…', 'Loading orders…')}</p>
+      ) : visible.length === 0 ? (
+        <EmptyState
+          title={t('Pesanan tidak ditemukan', 'No orders found')}
+          body={t('Belum ada pesanan untuk filter ini. Mulai pesanan baru dari katalog.', 'No orders match this filter. Start a new order from the catalog.')}
+          action={{ href: '/dashboard/katalog', label: t('Lihat katalog', 'View catalog') }}
+        />
+      ) : (
+        <div className="acct-order-list">
+          {visible.map((order) => {
+            const st = orderLabel(order.status);
+            const pay = paymentLabel(order.paymentStatus);
+            const detailHref = `/dashboard/pesanan/${order.number}`;
+            const action = getOrderAction(order);
 
-                  <div className={styles.orderContent}>
-                    <div className={styles.productList}>
-                      {order.items.map((item) => (
-                        <div key={`${order.number}-${item.slug}`} className={styles.productItem}>
-                          <span className={styles.productImage}>
-                            <Icon name="package" size={28} strokeWidth={1.6} />
-                          </span>
-                          <span className={styles.productInfo}>
-                            <strong>{item.name}</strong>
-                            <span>{item.code} · {item.qty} {item.unit}</span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <span className={styles.totalBlock}>
-                      <span>Total pesanan</span>
-                      <strong>{formatIDR(order.total)}</strong>
+            return (
+              <article key={order.number} className={`acct-order-card ${styles.orderCard}`}>
+                <div className={styles.orderHeader}>
+                  <div>
+                    <Link href={detailHref} className={styles.orderNumber}>{order.number}</Link>
+                    <span className={styles.orderDate}>
+                      {formatDate(order.date, lang)}
+                      {order.status === 'pending_payment' && order.paymentDueAt && (
+                        <> · {t('bayar sebelum', 'pay before')} {formatDateTime(order.paymentDueAt, lang)}</>
+                      )}
+                      {order.trackingNumber && <> · {order.courier ? `${order.courier} ` : ''}{order.trackingNumber}</>}
                     </span>
                   </div>
-
-                  <div className={styles.cardFooter}>
-                    <Link href={detailHref} className={styles.more}>
-                      Lihat detail pesanan <Icon name="arrow" size={18} strokeWidth={1.8} />
-                    </Link>
-                    <Link
-                      href={action.href}
-                      className={`${styles.actionButton} ${action.primary ? styles.actionPrimary : styles.actionSecondary}`}
-                      aria-label={`${action.label} untuk pesanan ${order.number}`}
-                    >
-                      <Icon name={action.icon} size={19} strokeWidth={1.8} /> {action.label}
-                    </Link>
+                  <div className={styles.badges}>
+                    <StatusBadge label={st[lang]} tone={st.tone} />
+                    <StatusBadge label={pay[lang]} tone={pay.tone} />
                   </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                </div>
+
+                <div className={styles.orderContent}>
+                  <div className={styles.productList}>
+                    {order.items.map((item) => (
+                      <div key={`${order.number}-${item.productSlug}`} className={styles.productItem}>
+                        <span className={styles.productImage}>
+                          <Icon name="package" size={28} strokeWidth={1.6} />
+                        </span>
+                        <span className={styles.productInfo}>
+                          <strong>{tr(item.name, lang)}</strong>
+                          <span>{item.code ? `${item.code} · ` : ''}{item.qty} {item.unit || ''}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <span className={styles.totalBlock}>
+                    <span>{t('Total pesanan', 'Order total')}</span>
+                    <strong>{formatIDR(order.grandTotal)}</strong>
+                  </span>
+                </div>
+
+                <div className={styles.cardFooter}>
+                  <Link href={detailHref} className={styles.more}>
+                    {t('Lihat detail pesanan', 'View order details')} <Icon name="arrow" size={18} strokeWidth={1.8} />
+                  </Link>
+                  <Link
+                    href={action.href}
+                    className={`${styles.actionButton} ${action.primary ? styles.actionPrimary : styles.actionSecondary}`}
+                    aria-label={`${action.label} — ${order.number}`}
+                  >
+                    <Icon name={action.icon} size={19} strokeWidth={1.8} /> {action.label}
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {meta.lastPage > 1 && (
+        <nav className="cat-pagination" aria-label={t('Navigasi halaman', 'Pagination')}>
+          <button type="button" className="btn btn-line btn-sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+            <Icon name="chevronLeft" size={16} />
+          </button>
+          <span className="cat-count">{t('Halaman', 'Page')} {meta.page} / {meta.lastPage}</span>
+          <button type="button" className="btn btn-line btn-sm" onClick={() => setPage((p) => Math.min(meta.lastPage, p + 1))} disabled={page >= meta.lastPage}>
+            <Icon name="chevronRight" size={16} />
+          </button>
+        </nav>
+      )}
     </div>
   );
 }

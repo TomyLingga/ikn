@@ -1,0 +1,28 @@
+<?php
+
+return [
+    'validation_error' => 'Data yang dikirim tidak valid.',
+    'unauthenticated' => 'Anda belum login.',
+    'forbidden' => 'Anda tidak memiliki akses.',
+    'module_forbidden' => 'Anda tidak memiliki akses ke modul :module.',
+    'not_found' => 'Data tidak ditemukan.',
+    'method_not_allowed' => 'Metode tidak diizinkan.',
+    'csrf_mismatch' => 'Sesi tidak valid, muat ulang halaman.',
+    'too_many_requests' => 'Terlalu banyak permintaan. Coba lagi nanti.',
+    'file_too_large' => 'Ukuran berkas melebihi batas.',
+    'unsupported_media' => 'Jenis berkas tidak diizinkan.',
+    'server_error' => 'Terjadi kesalahan pada server.',
+    'login_failed' => 'Email atau kata sandi salah.',
+    'account_inactive' => 'Akun Anda tidak aktif.',
+    'account_not_approved' => 'Akun Anda belum disetujui admin.',
+    'email_not_verified' => 'Email belum diverifikasi.',
+    'not_admin' => 'Akun ini bukan akun admin.',
+    'logged_out' => 'Anda telah keluar.',
+    'media_in_use' => 'Berkas masih dipakai oleh konten lain.',
+    'section_type_unknown' => 'Tipe section tidak dikenal.',
+    'wbs_received' => 'Laporan Anda telah kami terima.',
+    'contact_received' => 'Pesan Anda telah kami terima.',
+    'settings_saved' => 'Pengaturan tersimpan.',
+    'cannot_deactivate_self' => 'Anda tidak dapat menonaktifkan akun sendiri.',
+    'menu_location_unknown' => 'Lokasi menu tidak dikenal.',
+];

@@ -13,5 +13,9 @@ graphify-out/
 .env
 .env.*
 !.env.example
+!.env.docker.example
 *.pem
 *.key
+
+# Dokumen klien, manual book, dan aset mentah: tidak ikut repo
+doc/

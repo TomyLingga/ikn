@@ -1,0 +1,28 @@
+<?php
+
+return [
+    'validation_error' => 'The given data is invalid.',
+    'unauthenticated' => 'You are not logged in.',
+    'forbidden' => 'You do not have access.',
+    'module_forbidden' => 'You do not have access to the :module module.',
+    'not_found' => 'Data not found.',
+    'method_not_allowed' => 'Method not allowed.',
+    'csrf_mismatch' => 'Invalid session, please reload the page.',
+    'too_many_requests' => 'Too many requests. Please try again later.',
+    'file_too_large' => 'The file exceeds the size limit.',
+    'unsupported_media' => 'This file type is not allowed.',
+    'server_error' => 'An unexpected server error occurred.',
+    'login_failed' => 'Email or password is incorrect.',
+    'account_inactive' => 'Your account is inactive.',
+    'account_not_approved' => 'Your account has not been approved yet.',
+    'email_not_verified' => 'Email has not been verified.',
+    'not_admin' => 'This account is not an admin account.',
+    'logged_out' => 'You have been logged out.',
+    'media_in_use' => 'The file is still used by other content.',
+    'section_type_unknown' => 'Unknown section type.',
+    'wbs_received' => 'Your report has been received.',
+    'contact_received' => 'Your message has been received.',
+    'settings_saved' => 'Settings saved.',
+    'cannot_deactivate_self' => 'You cannot deactivate your own account.',
+    'menu_location_unknown' => 'Unknown menu location.',
+];

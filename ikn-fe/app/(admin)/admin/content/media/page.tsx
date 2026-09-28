@@ -1,45 +1,48 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import StatusBadge from '@/components/StatusBadge';
-import { AdminPageHead, AdminCard, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
-import { api, errorMessage } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
+import FileUploadDropzone from '@/components/admin/FileUploadDropzone/FileUploadDropzone';
+import { MediaGrid, Pager } from '@/components/admin/cms';
+import { useLang } from '@/components/LanguageProvider';
+import { api, apiPaged, ApiError, errorMessage, uploadMedia } from '@/lib/api';
+import type { MediaItem, PagedMeta } from '@/lib/cms';
 
-type GalleryType = 'image' | 'video';
+type MediaFilter = '' | 'image' | 'document';
 
-interface GalleryRow {
-  id: string;
-  title: string;
-  type: GalleryType;
-  src: string;
-  published: boolean;
-}
-
-export default function AdminMedia() {
-  const [rows, setRows] = useState<GalleryRow[]>([]);
+// Media library: paginated grid of uploaded files (GET /admin/media), upload, delete, copy URL.
+export default function AdminMediaLibrary() {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
+  const [filter, setFilter] = useState<MediaFilter>('');
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [items, setItems] = useState<MediaItem[]>([]);
+  const [meta, setMeta] = useState<PagedMeta>({ page: 1, perPage: 30, total: 0, lastPage: 1 });
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
-  const [title, setTitle] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [fileKey, setFileKey] = useState(0);
 
-  const refresh = useCallback(async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     setError('');
     try {
-      setRows(await api<GalleryRow[]>('/admin/gallery'));
+      const q = query ? `&q=${encodeURIComponent(query)}` : '';
+      const result = await apiPaged<MediaItem>(`/admin/media?type=${filter}&page=${page}&perPage=30${q}`);
+      setItems(result.items);
+      setMeta(result.meta);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filter, page, query]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (!notice) return;
@@ -47,135 +50,150 @@ export default function AdminMedia() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (saving) return;
-    if (!file) {
-      setFormError('Pilih berkas gambar terlebih dahulu.');
-      return;
-    }
-    setSaving(true);
-    setFormError('');
+  async function upload(file: File) {
+    setUploading(true);
+    setError('');
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const uploaded = await api<{ url: string; name: string }>('/admin/media', { method: 'POST', formData });
-      await api('/admin/gallery', {
-        method: 'POST',
-        body: {
-          title: title.trim() || uploaded.name,
-          type: 'image',
-          src: uploaded.url,
-          published: true,
-        },
-      });
-      setTitle('');
-      setFile(null);
-      setFileKey((key) => key + 1);
-      setNotice('Gambar berhasil diunggah dan disimpan ke galeri.');
-      await refresh();
+      const collection = file.type.startsWith('image/') ? 'general' : 'documents';
+      const media = await uploadMedia(file, collection);
+      setNotice(`${media.originalName} ${t('berhasil diunggah.', 'uploaded successfully.')}`);
+      if (page !== 1) setPage(1);
+      else await load();
     } catch (err) {
-      setFormError(errorMessage(err));
+      setError(errorMessage(err));
     } finally {
-      setSaving(false);
+      setUploading(false);
     }
   }
 
-  async function togglePublished(row: GalleryRow) {
+  async function remove(item: MediaItem) {
+    if (!window.confirm(t(`Hapus berkas "${item.originalName}"?`, `Delete file "${item.originalName}"?`))) return;
     setError('');
     try {
-      await api(`/admin/gallery/${encodeURIComponent(row.id)}`, {
-        method: 'PUT',
-        body: { title: row.title, type: row.type, src: row.src, published: !row.published },
-      });
-      await refresh();
+      await api(`/admin/media/${item.id}`, { method: 'DELETE' });
+      setNotice(t('Berkas dihapus.', 'File deleted.'));
+      await load();
     } catch (err) {
-      setError(errorMessage(err));
+      if (err instanceof ApiError && err.status === 409 && err.code === 'MEDIA_IN_USE') {
+        setError(
+          `${err.message} ${t(
+            'Lepaskan berkas dari halaman/berita/galeri yang memakainya sebelum menghapus.',
+            'Detach the file from the pages/posts/gallery items that use it before deleting.',
+          )}`,
+        );
+      } else {
+        setError(errorMessage(err));
+      }
     }
   }
 
-  async function remove(row: GalleryRow) {
-    if (!window.confirm(`Hapus media "${row.title}"?`)) return;
-    setError('');
+  async function copyUrl(item: MediaItem) {
     try {
-      await api(`/admin/gallery/${encodeURIComponent(row.id)}`, { method: 'DELETE' });
-      await refresh();
-    } catch (err) {
-      setError(errorMessage(err));
+      await navigator.clipboard.writeText(item.url);
+      setNotice(t('URL disalin ke clipboard.', 'URL copied to clipboard.'));
+    } catch {
+      setError(t('Tidak dapat menyalin URL. Salin manual dari tombol Buka.', 'Could not copy the URL. Copy it manually from the Open button.'));
     }
   }
 
-  const columns: Column<GalleryRow>[] = [
-    { key: 'title', label: 'Judul' },
-    { key: 'type', label: 'Tipe', render: (g) => (g.type === 'video' ? 'Video' : 'Gambar') },
-    {
-      key: 'src',
-      label: 'Sumber',
-      render: (g) => <span className="mono">{g.type === 'video' ? `youtu.be/${g.src}` : g.src}</span>,
-    },
-    {
-      key: 'published',
-      label: 'Status',
-      render: (g) => <StatusBadge label={g.published ? 'Tampil' : 'Draf'} tone={g.published ? 'ok' : 'warn'} small />,
-    },
-    {
-      key: 'act',
-      label: 'Aksi',
-      render: (g) => (
-        <RowActions
-          actions={[
-            g.published
-              ? { label: 'Sembunyikan', tone: 'danger', onClick: () => void togglePublished(g) }
-              : { label: 'Tampilkan', tone: 'success', onClick: () => void togglePublished(g) },
-            { label: 'Hapus', tone: 'danger', onClick: () => void remove(g) },
-          ]}
-        />
-      ),
-    },
+  const filters: Array<{ value: MediaFilter; label: string }> = [
+    { value: '', label: t('Semua', 'All') },
+    { value: 'image', label: t('Gambar', 'Images') },
+    { value: 'document', label: t('Dokumen', 'Documents') },
   ];
 
   return (
     <div>
-      <AdminPageHead title="Video & Gambar" desc="Unggah gambar dan kelola aset media yang tampil di beranda dan galeri." />
+      <AdminPageHead
+        title={t('Video & Gambar', 'Media Library')}
+        desc={t(
+          'Semua berkas yang dipakai halaman, berita, galeri, sertifikat, dan brosur.',
+          'All files used by pages, posts, gallery, certificates, and brochures.',
+        )}
+      />
 
-      {notice && <div className="admin-toast" role="status">{notice}</div>}
+      {notice && (
+        <div className="admin-toast" role="status">
+          {notice}
+        </div>
+      )}
       {error && <p className="form-error">{error}</p>}
 
       <div style={{ marginBottom: 22 }}>
-        <AdminCard title="Unggah gambar baru">
-          <form className="admin-form" onSubmit={(event) => void submit(event)}>
-            {formError && <p className="form-error" role="alert">{formError}</p>}
-            <div className="admin-form-row">
-              <label>
-                <span className="field-label">Judul media</span>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Contoh: Fasilitas produksi" />
-              </label>
-              <label>
-                <span className="field-label">Berkas gambar</span>
-                <input
-                  key={fileKey}
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => setFile(event.target.files?.[0] || null)}
-                  required
-                />
-              </label>
-            </div>
-            <p className="admin-note">Berkas diunggah ke server lalu otomatis tercatat sebagai item galeri bertipe gambar. Untuk video YouTube, tambahkan lewat halaman Gallery.</p>
-            <div className="row-actions">
-              <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>
-                {saving ? 'Mengunggah...' : 'Unggah & simpan'}
-              </button>
-            </div>
-          </form>
+        <AdminCard title={t('Unggah berkas baru', 'Upload a new file')}>
+          <FileUploadDropzone
+            label=""
+            accept="image/*,.pdf,application/pdf"
+            selectedFile={null}
+            onFileSelect={(file) => {
+              if (file && !uploading) void upload(file);
+            }}
+            helperText={
+              uploading
+                ? t('Mengunggah...', 'Uploading...')
+                : t('Gambar (JPG, PNG, WebP, GIF, SVG) atau dokumen PDF.', 'Images (JPG, PNG, WebP, GIF, SVG) or PDF documents.')
+            }
+          />
         </AdminCard>
       </div>
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        empty={loading ? 'Memuat media...' : 'Belum ada media.'}
-      />
+      <div className="admin-toolbar">
+        <div className="filter-pill-group" style={{ marginBottom: 0 }}>
+          {filters.map((f) => (
+            <button
+              key={f.value || 'all'}
+              type="button"
+              className={`filter-pill${filter === f.value ? ' is-active' : ''}`}
+              onClick={() => {
+                setFilter(f.value);
+                setPage(1);
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="admin-search">
+          <input
+            value={search}
+            placeholder={t('Cari nama berkas...', 'Search file name...')}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setPage(1);
+                setQuery(search.trim());
+              }
+            }}
+          />
+        </div>
+        <span className="admin-result-count">
+          {meta.total} {t('berkas', 'files')}
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="admin-empty">{t('Memuat media...', 'Loading media...')}</div>
+      ) : (
+        <MediaGrid
+          items={items}
+          empty={t('Belum ada berkas.', 'No files yet.')}
+          actions={(item) => (
+            <>
+              <button type="button" className="row-act" onClick={() => void copyUrl(item)}>
+                {t('Salin URL', 'Copy URL')}
+              </button>
+              <a href={item.url} target="_blank" rel="noopener noreferrer" className="row-act">
+                {t('Buka', 'Open')}
+              </a>
+              <button type="button" className="row-act row-act-danger" onClick={() => void remove(item)}>
+                {t('Hapus', 'Delete')}
+              </button>
+            </>
+          )}
+        />
+      )}
+
+      <Pager meta={meta} onPage={setPage} disabled={loading} />
     </div>
   );
 }

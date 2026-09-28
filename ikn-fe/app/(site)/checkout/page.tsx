@@ -1,110 +1,233 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+// Checkout customer (hanya akun `active`): alamat → ongkir (POST /cart/quote dengan addressId)
+// → metode bayar (GET /commerce/config) → voucher/catatan → ringkasan → POST /customer/orders
+// dengan header Idempotency-Key (UUID sekali per sesi checkout).
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import Icon from '@/components/Icon';
 import Breadcrumb from '@/components/Breadcrumb';
 import EmptyState from '@/components/EmptyState';
+import AddressForm from '@/components/customer/AddressForm';
+import AccountStatusBanner from '@/components/customer/AccountStatusBanner';
+import { formatAddressLines } from '@/components/customer/CustomerAddresses';
 import { useCart } from '@/components/CartProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { useTransactions } from '@/components/TransactionProvider';
-import { api, errorMessage } from '@/lib/api';
-import { formatIDR, formatDateTime } from '@/lib/format';
-import type { CommerceConfig } from '@/lib/server-data';
-import type { CustomerProfile, Order } from '@/lib/types';
+import { useLang } from '@/components/LanguageProvider';
+import { api, ApiError, errorMessage } from '@/lib/api';
+import { tr } from '@/lib/cms';
+import { formatIDR } from '@/lib/format';
+import type { CommerceConfig, CustomerAddress, InsufficientStockItem, Order, QuoteResult } from '@/lib/types';
+
+type Step = 'address' | 'shipping' | 'payment' | 'review';
+const STEPS: Step[] = ['address', 'shipping', 'payment', 'review'];
+
+function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+const voucherReasons: Record<string, { id: string; en: string }> = {
+  not_found: { id: 'Kode voucher tidak ditemukan.', en: 'Voucher code not found.' },
+  inactive: { id: 'Voucher tidak aktif.', en: 'Voucher is inactive.' },
+  expired: { id: 'Voucher sudah kedaluwarsa.', en: 'Voucher has expired.' },
+  not_started: { id: 'Voucher belum berlaku.', en: 'Voucher is not valid yet.' },
+  quota_exceeded: { id: 'Kuota voucher sudah habis.', en: 'Voucher quota is exhausted.' },
+  per_user_limit: { id: 'Batas pemakaian voucher untuk akun Anda sudah tercapai.', en: 'You have reached the usage limit for this voucher.' },
+  min_subtotal: { id: 'Subtotal belum memenuhi minimum belanja voucher.', en: 'Subtotal does not meet the voucher minimum.' },
+  scope: { id: 'Voucher tidak berlaku untuk produk di keranjang.', en: 'Voucher does not apply to the products in your cart.' },
+};
+
+function PageHead({ title, t }: { title: string; t: (id: string, en: string) => string }) {
+  return (
+    <section className="pagehead commerce-head">
+      <div className="container">
+        <Breadcrumb items={[{ label: t('Beranda', 'Home'), href: '/' }, { label: t('Keranjang', 'Cart'), href: '/cart' }, { label: 'Checkout' }]} />
+        <span className="label label-amber">/ Checkout</span>
+        <h1 className="display pagehead-title">{title}</h1>
+      </div>
+    </section>
+  );
+}
 
 export default function CheckoutPage() {
-  const { items, subtotal, count, clear, ready } = useCart();
+  const router = useRouter();
+  const { items, clear, ready } = useCart();
   const { customer, ready: authReady } = useAuth();
-  const { checkout } = useTransactions();
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
+  const [step, setStep] = useState<Step>('address');
+  const [addresses, setAddresses] = useState<CustomerAddress[] | null>(null);
   const [config, setConfig] = useState<CommerceConfig | null>(null);
-  const [profile, setProfile] = useState<CustomerProfile | null>(null);
-  const [ship, setShip] = useState('');
-  const [bankId, setBankId] = useState('');
-  const [placed, setPlaced] = useState<Order | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [showAddressForm, setShowAddressForm] = useState(false);
+
+  const [addressId, setAddressId] = useState<number | null>(null);
+  const [shippingRateId, setShippingRateId] = useState<number | null>(null);
+  const [paymentMethodCode, setPaymentMethodCode] = useState('');
+  const [bankAccountId, setBankAccountId] = useState<number | null>(null);
+  const [voucherInput, setVoucherInput] = useState('');
+  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherError, setVoucherError] = useState('');
+  const [note, setNote] = useState('');
+
+  const [quote, setQuote] = useState<QuoteResult | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
+
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [stockIssues, setStockIssues] = useState<InsufficientStockItem[]>([]);
+  const idempotencyKey = useRef<string>(newIdempotencyKey());
 
-  // Konfigurasi commerce (rekening, ongkir, biaya) datang dari admin — bukan hardcode.
+  const isActive = customer?.status === 'active';
+  const itemsKey = items.map((i) => `${i.slug}:${i.qty}`).join('|');
+
+  // Data awal: alamat + konfigurasi commerce.
   useEffect(() => {
-    api<CommerceConfig>('/commerce/config')
-      .then((data) => {
-        setConfig(data);
-        setShip((current) => current || data.shippingMethods[0]?.id || '');
-        setBankId((current) => current || data.bankAccounts[0]?.id || '');
+    if (!customer || !isActive) return;
+    let active = true;
+    Promise.all([api<CustomerAddress[]>('/customer/addresses'), api<CommerceConfig>('/commerce/config')])
+      .then(([addr, cfg]) => {
+        if (!active) return;
+        setAddresses(addr);
+        setConfig(cfg);
+        setAddressId((current) => current ?? (addr.find((a) => a.isDefault) || addr[0])?.id ?? null);
+        setPaymentMethodCode((current) => current || cfg.paymentMethods[0]?.code || '');
+        setBankAccountId((current) => current ?? cfg.bankAccounts[0]?.id ?? null);
       })
-      .catch(() => setConfig(null));
-  }, []);
-
-  // Prefill alamat utama dari profil customer.
-  useEffect(() => {
-    if (!customer) return;
-    api<CustomerProfile>('/customer/profile')
-      .then(setProfile)
-      .catch(() => setProfile(null));
-  }, [customer]);
-
-  const shipping = useMemo(
-    () => config?.shippingMethods.find((method) => method.id === ship) || null,
-    [config, ship],
-  );
-  const adminFee = useMemo(
-    () =>
-      (config?.additionalFees || [])
-        .filter((fee) => fee.type === 'admin')
-        .reduce((total, fee) => total + fee.amount, 0),
-    [config],
-  );
-  const total = subtotal + (shipping?.amount || 0) + adminFee;
-  const primaryAddress = profile?.addresses.find((address) => address.primary) || profile?.addresses[0];
-
-  async function placeOrder(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!shipping || !bankId || submitting) return;
-    setSubmitting(true);
-    setError('');
-    const form = new FormData(event.currentTarget);
-    try {
-      const order = await checkout({
-        items: items.map((item) => ({ slug: item.slug, qty: item.qty })),
-        bankId,
-        shippingMethodId: shipping.id,
-        address: {
-          label: String(form.get('label') || 'Alamat checkout'),
-          recipient: String(form.get('recipient') || ''),
-          phone: String(form.get('phone') || ''),
-          line: String(form.get('address') || ''),
-        },
-        note: String(form.get('note') || ''),
+      .catch((err) => {
+        if (active) setLoadError(errorMessage(err));
       });
-      setPlaced(order);
+    return () => {
+      active = false;
+    };
+  }, [customer, isActive]);
+
+  // Quote ulang setiap kali item/alamat/tarif/metode/voucher berubah.
+  useEffect(() => {
+    if (!customer || !isActive || !ready || items.length === 0 || !addressId) return;
+    let active = true;
+    setQuoting(true);
+    setQuoteError('');
+    api<QuoteResult>('/cart/quote', {
+      method: 'POST',
+      body: {
+        items: items.map((i) => ({ productSlug: i.slug, qty: i.qty })),
+        addressId,
+        shippingRateId: shippingRateId || undefined,
+        paymentMethodCode: paymentMethodCode || undefined,
+        bankAccountId: bankAccountId || undefined,
+        voucherCode: voucherCode || undefined,
+      },
+    })
+      .then((res) => {
+        if (!active) return;
+        setQuote(res);
+        setVoucherError('');
+        // Tarif yang dipilih tidak lagi tersedia (mis. alamat berubah) → reset.
+        if (shippingRateId && !res.availableShippingRates.some((r) => r.rateId === shippingRateId)) setShippingRateId(null);
+        const only = res.availableShippingRates.length === 1 ? res.availableShippingRates[0] : undefined;
+        if (!shippingRateId && only) setShippingRateId(only.rateId);
+      })
+      .catch((err) => {
+        if (!active) return;
+        if (err instanceof ApiError && err.code === 'VOUCHER_INVALID') {
+          const reason = String(err.meta?.reason || '');
+          const mapped = voucherReasons[reason];
+          setVoucherError(mapped ? mapped[lang] : err.message);
+          setVoucherCode('');
+          return;
+        }
+        setQuote(null);
+        setQuoteError(errorMessage(err));
+      })
+      .finally(() => {
+        if (active) setQuoting(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsKey, addressId, shippingRateId, paymentMethodCode, bankAccountId, voucherCode, customer?.id, isActive, ready]);
+
+  const selectedAddress = useMemo(() => addresses?.find((a) => a.id === addressId) || null, [addresses, addressId]);
+  const selectedMethod = useMemo(() => config?.paymentMethods.find((m) => m.code === paymentMethodCode) || null, [config, paymentMethodCode]);
+  const rates = quote?.availableShippingRates || [];
+  const selectedRate = rates.find((r) => r.rateId === shippingRateId) || null;
+  const needsBank = selectedMethod?.type === 'manual_transfer';
+  const canReview = !!addressId && !!shippingRateId && !!paymentMethodCode && (!needsBank || !!bankAccountId) && !!quote;
+
+  function applyVoucher() {
+    setVoucherError('');
+    setVoucherCode(voucherInput.trim().toUpperCase());
+  }
+
+  async function placeOrder() {
+    if (!canReview || submitting || !addressId) return;
+    setSubmitting(true);
+    setSubmitError('');
+    setStockIssues([]);
+    try {
+      const order = await api<Order>('/customer/orders', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey.current },
+        body: {
+          items: items.map((i) => ({ productSlug: i.slug, qty: i.qty })),
+          addressId,
+          shippingRateId,
+          paymentMethodCode,
+          bankAccountId: needsBank ? bankAccountId : undefined,
+          voucherCode: voucherCode || undefined,
+          note: note.trim() || undefined,
+        },
+      });
       clear();
+      idempotencyKey.current = newIdempotencyKey();
+      router.push(`/checkout/success/${encodeURIComponent(order.number)}`);
     } catch (err) {
-      setError(errorMessage(err));
-    } finally {
+      if (err instanceof ApiError && err.code === 'INSUFFICIENT_STOCK') {
+        const list = (err.meta?.items as InsufficientStockItem[] | undefined) || [];
+        setStockIssues(list);
+        setSubmitError(err.message || t('Stok tidak mencukupi.', 'Insufficient stock.'));
+      } else if (err instanceof ApiError && err.code === 'VOUCHER_INVALID') {
+        const reason = String(err.meta?.reason || '');
+        setVoucherError(voucherReasons[reason]?.[lang] || err.message);
+        setVoucherCode('');
+        setSubmitError(err.message);
+      } else if (err instanceof ApiError && err.code === 'ACCOUNT_NOT_APPROVED') {
+        setSubmitError(t('Akun Anda belum disetujui untuk melakukan checkout.', 'Your account is not yet approved for checkout.'));
+      } else {
+        setSubmitError(errorMessage(err));
+      }
       setSubmitting(false);
     }
   }
 
-  // Checkout hanya untuk customer terautentikasi.
-  if (authReady && !customer && !placed) {
+  // ---- Guard & state kosong ----
+  if (!authReady || !ready) {
     return (
       <>
-        <section className="pagehead commerce-head">
-          <div className="container">
-            <Breadcrumb items={[{ label: 'Beranda', href: '/' }, { label: 'Checkout' }]} />
-            <h1 className="display pagehead-title">Checkout.</h1>
-          </div>
-        </section>
+        <PageHead title="Checkout." t={t} />
+        <section className="section-tight"><div className="container"><p className="form-note">{t('Memuat…', 'Loading…')}</p></div></section>
+      </>
+    );
+  }
+
+  if (!customer) {
+    return (
+      <>
+        <PageHead title="Checkout." t={t} />
         <section className="section-tight">
           <div className="container">
             <EmptyState
               icon="bag"
-              title="Login diperlukan"
-              body="Masuk atau daftar sebagai customer untuk menyelesaikan pemesanan. Keranjang Anda tetap tersimpan."
-              action={{ href: '/login?next=/checkout', label: 'Login / Daftar' }}
+              title={t('Login diperlukan', 'Login required')}
+              body={t('Masuk atau daftar sebagai customer untuk menyelesaikan pemesanan. Keranjang Anda tetap tersimpan.', 'Log in or register as a customer to complete your order. Your cart is kept.')}
+              action={{ href: '/login?next=/checkout', label: t('Login / Daftar', 'Login / Register') }}
             />
           </div>
         </section>
@@ -112,22 +235,34 @@ export default function CheckoutPage() {
     );
   }
 
-  if (ready && items.length === 0 && !placed) {
+  if (!isActive) {
     return (
       <>
-        <section className="pagehead commerce-head">
-          <div className="container">
-            <Breadcrumb items={[{ label: 'Beranda', href: '/' }, { label: 'Checkout' }]} />
-            <h1 className="display pagehead-title">Checkout.</h1>
+        <PageHead title="Checkout." t={t} />
+        <section className="section-tight">
+          <div className="container" style={{ maxWidth: 720 }}>
+            <AccountStatusBanner context="checkout" />
+            <div className="co-done-actions" style={{ marginTop: 22, justifyContent: 'flex-start' }}>
+              <Link href="/cart" className="btn btn-line">{t('Kembali ke keranjang', 'Back to cart')}</Link>
+              <Link href="/dashboard" className="btn btn-solid">{t('Ke dashboard', 'Go to dashboard')} <Icon name="arrow" /></Link>
+            </div>
           </div>
         </section>
+      </>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <>
+        <PageHead title="Checkout." t={t} />
         <section className="section-tight">
           <div className="container">
             <EmptyState
               icon="drop"
-              title="Tidak ada yang di-checkout"
-              body="Keranjang Anda kosong."
-              action={{ href: '/catalog', label: 'Lihat katalog' }}
+              title={t('Tidak ada yang di-checkout', 'Nothing to check out')}
+              body={t('Keranjang Anda kosong.', 'Your cart is empty.')}
+              action={{ href: '/catalog', label: t('Lihat katalog', 'View catalog') }}
             />
           </div>
         </section>
@@ -135,151 +270,319 @@ export default function CheckoutPage() {
     );
   }
 
-  if (placed) {
-    const bank = config?.bankAccounts.find((item) => item.id === placed.bank);
-    return (
-      <>
-        <section className="pagehead commerce-head">
-          <div className="container">
-            <Breadcrumb items={[{ label: 'Beranda', href: '/' }, { label: 'Checkout' }, { label: 'Selesai' }]} />
-          </div>
-        </section>
-        <section className="section-tight" style={{ paddingTop: 0 }}>
-          <div className="container">
-            <div className="co-done">
-              <div className="vm-icon co-done-icon"><Icon name="check" size={40} /></div>
-              <h1 className="h2">Pesanan dibuat</h1>
-              <p className="co-done-num">No. Pesanan: <strong>{placed.number}</strong></p>
-              <p>
-                Transfer <strong>{formatIDR(placed.total)}</strong> ke rekening tujuan berikut,
-                lalu unggah bukti transfer dari halaman pesanan.
-                {placed.dueAt && (
-                  <> Batas waktu pembayaran: <strong>{formatDateTime(placed.dueAt)}</strong>.</>
-                )}
-              </p>
-
-              <div className="co-banks">
-                {(bank ? [bank] : config?.bankAccounts || []).map((item) => (
-                  <div key={item.id} className="co-bank">
-                    <span className="co-bank-name">{item.bank}</span>
-                    <span className="co-bank-no">{item.number}</span>
-                    <span className="co-bank-holder">a.n. {item.holder}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="co-done-actions">
-                <Link href={`/dashboard/pesanan/${placed.number}`} className="btn btn-solid">
-                  Unggah bukti pembayaran <Icon name="arrow" />
-                </Link>
-                <Link href="/dashboard/pesanan" className="btn btn-line">Semua pesanan</Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      </>
-    );
-  }
+  const stepLabels: Record<Step, string> = {
+    address: t('Alamat', 'Address'),
+    shipping: t('Pengiriman', 'Shipping'),
+    payment: t('Pembayaran', 'Payment'),
+    review: t('Konfirmasi', 'Review'),
+  };
+  const stepIdx = STEPS.indexOf(step);
+  const stepDone: Record<Step, boolean> = {
+    address: !!addressId,
+    shipping: !!shippingRateId,
+    payment: !!paymentMethodCode && (!needsBank || !!bankAccountId),
+    review: false,
+  };
 
   return (
     <>
-      <section className="pagehead commerce-head">
-        <div className="container">
-          <Breadcrumb items={[{ label: 'Beranda', href: '/' }, { label: 'Keranjang', href: '/cart' }, { label: 'Checkout' }]} />
-          <span className="label label-amber">/ Checkout</span>
-          <h1 className="display pagehead-title">Selesaikan pesanan.</h1>
-        </div>
-      </section>
+      <PageHead title={t('Selesaikan pesanan.', 'Complete your order.')} t={t} />
 
       <section className="section-tight">
         <div className="container">
-          <form className="co-grid" onSubmit={placeOrder}>
+          <ol className="stepper co-stepper" aria-label={t('Langkah checkout', 'Checkout steps')}>
+            {STEPS.map((s, i) => (
+              <li key={s} className={`step ${s === step ? 'is-active' : ''} ${stepDone[s] && i < stepIdx ? 'is-done' : ''}`}>
+                <button type="button" className="step-btn" onClick={() => i <= stepIdx && setStep(s)} disabled={i > stepIdx && !STEPS.slice(0, i).every((p) => stepDone[p])}>
+                  <span className="step-num">{stepDone[s] && i < stepIdx ? <Icon name="check" size={14} /> : i + 1}</span>
+                  <span className="step-label">{stepLabels[s]}</span>
+                </button>
+                {i < STEPS.length - 1 && <span className="step-line" />}
+              </li>
+            ))}
+          </ol>
+
+          {loadError && <p className="form-error" role="alert">{loadError}</p>}
+
+          <div className="co-grid">
             <div className="co-main">
-              <div className="co-block">
-                <h2 className="h3 pd-sec-title">Alamat pengiriman</h2>
-                <div className="co-fields">
-                  <label>
-                    <span className="label">Label alamat</span>
-                    <input name="label" defaultValue={primaryAddress?.label || 'Alamat utama'} placeholder="Gudang / kantor" />
-                  </label>
-                  <label>
-                    <span className="label">Nama penerima</span>
-                    <input name="recipient" required defaultValue={primaryAddress?.recipient || customer?.name || ''} placeholder="Nama lengkap / PIC" />
-                  </label>
-                  <label>
-                    <span className="label">Telepon</span>
-                    <input name="phone" required defaultValue={primaryAddress?.phone || profile?.phone || ''} placeholder="+62 ..." />
-                  </label>
-                  <label className="co-full">
-                    <span className="label">Alamat lengkap</span>
-                    <textarea name="address" rows={3} required defaultValue={primaryAddress?.line || ''} placeholder="Jalan, kota, provinsi, kode pos" />
-                  </label>
-                  <label className="co-full">
-                    <span className="label">Catatan (opsional)</span>
-                    <input name="note" placeholder="Catatan untuk tim kami" />
-                  </label>
-                </div>
-              </div>
-
-              <div className="co-block">
-                <h2 className="h3 pd-sec-title">Metode pengiriman</h2>
-                <div className="co-ship">
-                  {(config?.shippingMethods || []).map((method) => (
-                    <label key={method.id} className={`co-ship-opt ${ship === method.id ? 'is-active' : ''}`}>
-                      <input type="radio" name="ship" value={method.id} checked={ship === method.id} onChange={() => setShip(method.id)} />
-                      <span className="co-ship-label">{method.label}</span>
-                      <span className="co-ship-price">{formatIDR(method.amount)}</span>
-                    </label>
-                  ))}
-                  {config && config.shippingMethods.length === 0 && (
-                    <p className="pd-quote-note">Metode pengiriman belum dikonfigurasi admin.</p>
+              {/* 1. Alamat */}
+              {step === 'address' && (
+                <div className="co-block">
+                  <h2 className="h3 pd-sec-title">{t('Alamat pengiriman', 'Shipping address')}</h2>
+                  {addresses === null ? (
+                    <p className="form-note">{t('Memuat alamat…', 'Loading addresses…')}</p>
+                  ) : (
+                    <>
+                      <div className="co-address-list">
+                        {addresses.map((a) => (
+                          <label key={a.id} className={`co-addr-card ${addressId === a.id ? 'is-active' : ''}`}>
+                            <input type="radio" name="address" value={a.id} checked={addressId === a.id} onChange={() => { setAddressId(a.id); setShippingRateId(null); }} />
+                            <span>
+                              <strong>{a.label}</strong>{a.isDefault && <span className="badge badge-ok badge-sm" style={{ marginLeft: 8 }}>{t('Utama', 'Default')}</span>}<br />
+                              {a.recipientName} · {a.phone}<br />
+                              <small>{formatAddressLines(a).join(', ')}</small>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      {addresses.length === 0 && !showAddressForm && (
+                        <p className="form-note">{t('Belum ada alamat tersimpan. Tambahkan alamat untuk melanjutkan.', 'No saved address yet. Add one to continue.')}</p>
+                      )}
+                      {showAddressForm ? (
+                        <AddressForm
+                          defaults={{ recipientName: customer.name, phone: customer.profile?.phone || '' }}
+                          onSaved={(saved) => {
+                            setAddresses((prev) => [...(prev || []).filter((a) => a.id !== saved.id), saved].map((a) => (saved.isDefault && a.id !== saved.id ? { ...a, isDefault: false } : a)));
+                            setAddressId(saved.id);
+                            setShippingRateId(null);
+                            setShowAddressForm(false);
+                          }}
+                          onCancel={() => setShowAddressForm(false)}
+                          submitLabel={t('Simpan & pakai alamat ini', 'Save & use this address')}
+                        />
+                      ) : (
+                        <button type="button" className="btn btn-line btn-sm" style={{ marginTop: 14 }} onClick={() => setShowAddressForm(true)}>
+                          <Icon name="plus" size={16} /> {t('Tambah alamat baru', 'Add a new address')}
+                        </button>
+                      )}
+                    </>
                   )}
+                  <div className="co-nav">
+                    <button type="button" className="btn btn-solid" disabled={!addressId} onClick={() => setStep('shipping')}>
+                      {t('Lanjut: pengiriman', 'Next: shipping')} <Icon name="arrow" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="co-block">
-                <h2 className="h3 pd-sec-title">Rekening tujuan</h2>
-                <div className="co-ship">
-                  {(config?.bankAccounts || []).map((bank) => (
-                    <label key={bank.id} className={`co-ship-opt ${bankId === bank.id ? 'is-active' : ''}`}>
-                      <input type="radio" name="bank" value={bank.id} checked={bankId === bank.id} onChange={() => setBankId(bank.id)} />
-                      <span className="co-ship-label">{bank.bank} · {bank.number}</span>
-                      <span className="co-ship-price">a.n. {bank.holder}</span>
-                    </label>
-                  ))}
+              {/* 2. Ongkir */}
+              {step === 'shipping' && (
+                <div className="co-block">
+                  <h2 className="h3 pd-sec-title">{t('Metode pengiriman', 'Shipping method')}</h2>
+                  {selectedAddress && (
+                    <p className="form-note" style={{ marginBottom: 14 }}>
+                      {t('Dikirim ke', 'Ship to')}: <strong>{selectedAddress.label}</strong> — {formatAddressLines(selectedAddress).join(', ')}
+                      {quote?.weightGram ? <> · {t('Berat', 'Weight')} {(quote.weightGram / 1000).toLocaleString('id-ID')} kg</> : null}
+                    </p>
+                  )}
+                  {quoting && rates.length === 0 && <p className="form-note">{t('Menghitung ongkir…', 'Calculating shipping…')}</p>}
+                  {quoteError && <p className="form-error" role="alert">{quoteError}</p>}
+                  <div className="co-ship">
+                    {rates.map((rate) => (
+                      <label key={rate.rateId} className={`co-ship-opt ${shippingRateId === rate.rateId ? 'is-active' : ''}`}>
+                        <input type="radio" name="ship" value={rate.rateId} checked={shippingRateId === rate.rateId} onChange={() => setShippingRateId(rate.rateId)} />
+                        <span className="co-ship-label">
+                          {tr(rate.label, lang)}
+                          {rate.eta && <small className="co-ship-eta"> · {tr(rate.eta, lang)}</small>}
+                        </span>
+                        <span className="co-ship-price">{rate.amount === 0 ? t('Gratis', 'Free') : formatIDR(rate.amount)}</span>
+                      </label>
+                    ))}
+                    {!quoting && quote && rates.length === 0 && (
+                      <p className="form-error">{t('Belum ada tarif pengiriman untuk alamat ini. Pilih alamat lain atau hubungi kami.', 'No shipping rate is available for this address. Choose another address or contact us.')}</p>
+                    )}
+                  </div>
+                  <div className="co-nav">
+                    <button type="button" className="btn btn-line" onClick={() => setStep('address')}><Icon name="chevronLeft" size={16} /> {t('Kembali', 'Back')}</button>
+                    <button type="button" className="btn btn-solid" disabled={!shippingRateId} onClick={() => setStep('payment')}>
+                      {t('Lanjut: pembayaran', 'Next: payment')} <Icon name="arrow" />
+                    </button>
+                  </div>
                 </div>
-                <p className="pd-quote-note" style={{ marginTop: 12 }}>
-                  Pembayaran via transfer bank manual. Unggah bukti transfer setelah pesanan dibuat;
-                  tim kami memverifikasi sebelum pesanan diproses.
-                </p>
-              </div>
+              )}
+
+              {/* 3. Pembayaran + voucher + catatan */}
+              {step === 'payment' && (
+                <>
+                  <div className="co-block">
+                    <h2 className="h3 pd-sec-title">{t('Metode pembayaran', 'Payment method')}</h2>
+                    <div className="co-ship">
+                      {(config?.paymentMethods || []).map((m) => (
+                        <label key={m.code} className={`co-ship-opt ${paymentMethodCode === m.code ? 'is-active' : ''}`}>
+                          <input type="radio" name="method" value={m.code} checked={paymentMethodCode === m.code} onChange={() => setPaymentMethodCode(m.code)} />
+                          <span className="co-ship-label">
+                            {tr(m.name, lang)}
+                            <small className="co-ship-eta"> · {tr(m.instructions, lang)}</small>
+                          </span>
+                        </label>
+                      ))}
+                      {config && config.paymentMethods.length === 0 && <p className="form-error">{t('Metode pembayaran belum dikonfigurasi.', 'No payment method configured.')}</p>}
+                    </div>
+
+                    {needsBank && (
+                      <>
+                        <h3 className="h3 pd-sec-title" style={{ marginTop: 22, fontSize: '1rem' }}>{t('Rekening tujuan', 'Destination bank account')}</h3>
+                        <div className="co-ship">
+                          {(config?.bankAccounts || []).map((bank) => (
+                            <label key={bank.id} className={`co-ship-opt ${bankAccountId === bank.id ? 'is-active' : ''}`}>
+                              <input type="radio" name="bank" value={bank.id} checked={bankAccountId === bank.id} onChange={() => setBankAccountId(bank.id)} />
+                              <span className="co-ship-label">{bank.bankName} · {bank.accountNumber}</span>
+                              <span className="co-ship-price">a.n. {bank.accountHolder}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {selectedMethod?.type === 'qris_static' && selectedMethod.qrisImageUrl && (
+                      <div className="co-qris">
+                        <Image src={selectedMethod.qrisImageUrl} alt="QRIS" width={200} height={200} unoptimized />
+                        <span className="qty-moq">{t('Kode QRIS ditampilkan lagi setelah pesanan dibuat.', 'The QRIS code is shown again after the order is placed.')}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="co-block">
+                    <h2 className="h3 pd-sec-title">{t('Voucher & catatan', 'Voucher & note')}</h2>
+                    <div className="co-voucher">
+                      <input
+                        value={voucherInput}
+                        onChange={(e) => setVoucherInput(e.target.value)}
+                        placeholder={t('Kode voucher (opsional)', 'Voucher code (optional)')}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyVoucher(); } }}
+                        aria-label="Voucher"
+                      />
+                      {quote?.voucher ? (
+                        <button type="button" className="btn btn-line btn-sm" onClick={() => { setVoucherCode(''); setVoucherInput(''); }}>
+                          <Icon name="close" size={14} /> {t('Hapus', 'Remove')}
+                        </button>
+                      ) : (
+                        <button type="button" className="btn btn-line btn-sm" onClick={applyVoucher} disabled={!voucherInput.trim() || quoting}>
+                          {t('Pakai', 'Apply')}
+                        </button>
+                      )}
+                    </div>
+                    {voucherError && <p className="form-error" role="alert">{voucherError}</p>}
+                    {quote?.voucher && (
+                      <p className="proof-done">
+                        <Icon name="check" size={16} /> {t('Voucher', 'Voucher')} <strong>{quote.voucher.code}</strong> {t('dipakai', 'applied')}: −{formatIDR(quote.discountTotal)}
+                      </p>
+                    )}
+                    <label className="co-full" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 16 }}>
+                      <span className="label">{t('Catatan pesanan (opsional)', 'Order note (optional)')}</span>
+                      <textarea className="co-textarea" rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('Jam kirim, instruksi bongkar, dsb.', 'Delivery hours, unloading instructions, etc.')} />
+                    </label>
+                    <div className="co-nav">
+                      <button type="button" className="btn btn-line" onClick={() => setStep('shipping')}><Icon name="chevronLeft" size={16} /> {t('Kembali', 'Back')}</button>
+                      <button type="button" className="btn btn-solid" disabled={!stepDone.payment} onClick={() => setStep('review')}>
+                        {t('Lanjut: konfirmasi', 'Next: review')} <Icon name="arrow" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* 4. Konfirmasi */}
+              {step === 'review' && (
+                <div className="co-block">
+                  <h2 className="h3 pd-sec-title">{t('Periksa pesanan Anda', 'Review your order')}</h2>
+                  <dl className="co-review">
+                    <div>
+                      <dt>{t('Alamat', 'Address')}</dt>
+                      <dd>{selectedAddress ? <>{selectedAddress.recipientName} · {selectedAddress.phone}<br />{formatAddressLines(selectedAddress).join(', ')}</> : '—'} <button type="button" className="link" onClick={() => setStep('address')}>{t('ubah', 'change')}</button></dd>
+                    </div>
+                    <div>
+                      <dt>{t('Pengiriman', 'Shipping')}</dt>
+                      <dd>{selectedRate ? <>{tr(selectedRate.label, lang)}{selectedRate.eta ? ` · ${tr(selectedRate.eta, lang)}` : ''} · {formatIDR(selectedRate.amount)}</> : '—'} <button type="button" className="link" onClick={() => setStep('shipping')}>{t('ubah', 'change')}</button></dd>
+                    </div>
+                    <div>
+                      <dt>{t('Pembayaran', 'Payment')}</dt>
+                      <dd>
+                        {selectedMethod ? tr(selectedMethod.name, lang) : '—'}
+                        {needsBank && bankAccountId && config && (() => { const b = config.bankAccounts.find((x) => x.id === bankAccountId); return b ? ` · ${b.bankName} ${b.accountNumber}` : ''; })()}
+                        {' '}<button type="button" className="link" onClick={() => setStep('payment')}>{t('ubah', 'change')}</button>
+                      </dd>
+                    </div>
+                    {note.trim() && (
+                      <div>
+                        <dt>{t('Catatan', 'Note')}</dt>
+                        <dd>{note}</dd>
+                      </div>
+                    )}
+                  </dl>
+                  {quote?.warnings.includes('no_shipping_rate') && (
+                    <p className="form-error">{t('Tarif pengiriman belum dipilih.', 'Shipping rate not selected.')}</p>
+                  )}
+                  {stockIssues.length > 0 && (
+                    <div className="form-error co-stock-issues" role="alert">
+                      <strong>{t('Stok tidak mencukupi', 'Insufficient stock')}:</strong>
+                      <ul>
+                        {stockIssues.map((s) => {
+                          const item = items.find((i) => i.slug === s.productSlug);
+                          return (
+                            <li key={s.productSlug}>
+                              {item ? tr(item.name, lang) : s.productSlug}: {t('diminta', 'requested')} {s.requested}, {t('tersedia', 'available')} {s.available}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <Link href="/cart" className="link">{t('Sesuaikan keranjang', 'Adjust cart')}</Link>
+                    </div>
+                  )}
+                  {submitError && stockIssues.length === 0 && <p className="form-error" role="alert">{submitError}</p>}
+                  <p className="qty-moq" style={{ marginTop: 14 }}>
+                    {t(
+                      `Dengan membuat pesanan, stok direservasi untuk Anda dan pembayaran harus diselesaikan dalam ${config?.paymentDueHours ?? 24} jam.`,
+                      `By placing the order, stock is reserved for you and payment must be completed within ${config?.paymentDueHours ?? 24} hours.`,
+                    )}
+                  </p>
+                  <div className="co-nav">
+                    <button type="button" className="btn btn-line" onClick={() => setStep('payment')}><Icon name="chevronLeft" size={16} /> {t('Kembali', 'Back')}</button>
+                    <button type="button" className="btn btn-solid" disabled={!canReview || submitting || quoting} onClick={placeOrder}>
+                      {submitting ? t('Memproses…', 'Processing…') : t('Buat pesanan', 'Place order')} <Icon name="arrow" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <aside className="summary">
-              <h2 className="summary-title">Ringkasan pesanan</h2>
+              <h2 className="summary-title">{t('Ringkasan pesanan', 'Order summary')}</h2>
               <div className="co-items">
-                {items.map((item) => (
-                  <div key={item.slug} className="co-item">
-                    <span className="co-item-name">{item.name} <small>×{item.qty}</small></span>
-                    <span>{formatIDR((item.price || 0) * item.qty)}</span>
+                {(quote?.items.length ? quote.items : items.map((i) => ({ productSlug: i.slug, name: i.name, qty: i.qty, unit: i.unit, lineTotal: (i.unitPrice || 0) * i.qty, promoApplied: false }))).map((item) => (
+                  <div key={item.productSlug} className="co-item">
+                    <span className="co-item-name">
+                      {tr(item.name, lang)} <small>×{item.qty} {item.unit}</small>
+                      {item.promoApplied && <span className="pcard-promo-inline">{t('Promo', 'Promo')}</span>}
+                    </span>
+                    <span>{formatIDR(item.lineTotal)}</span>
                   </div>
                 ))}
               </div>
-              <div className="summary-row"><span>Subtotal ({count})</span><span>{formatIDR(subtotal)}</span></div>
-              <div className="summary-row"><span>Ongkir</span><span>{shipping ? formatIDR(shipping.amount) : '—'}</span></div>
-              <div className="summary-row"><span>Biaya admin</span><span>{formatIDR(adminFee)}</span></div>
-              <div className="summary-row summary-total"><span>Total</span><span>{formatIDR(total)}</span></div>
-              {error && <p className="form-error" role="alert">{error}</p>}
-              <button
-                type="submit"
-                className="btn btn-solid btn-block"
-                style={{ marginTop: 18 }}
-                disabled={submitting || !shipping || !bankId}
-              >
-                {submitting ? 'Memproses…' : 'Buat pesanan'} <Icon name="arrow" />
-              </button>
+              <div className="summary-row"><span>Subtotal</span><span>{formatIDR(quote?.subtotal ?? items.reduce((n, i) => n + (i.unitPrice || 0) * i.qty, 0))}</span></div>
+              {quote && quote.discountTotal > 0 && <div className="summary-row"><span>{t('Diskon', 'Discount')}{quote.voucher ? ` (${quote.voucher.code})` : ''}</span><span>−{formatIDR(quote.discountTotal)}</span></div>}
+              <div className="summary-row"><span>{t('Ongkir', 'Shipping')}</span><span>{selectedRate ? (selectedRate.amount === 0 ? t('Gratis', 'Free') : formatIDR(quote?.shippingTotal ?? selectedRate.amount)) : '—'}</span></div>
+              {(quote?.fees || []).map((fee) => (
+                <div key={fee.id} className="summary-row"><span>{tr(fee.name, lang)}</span><span>{formatIDR(fee.amount)}</span></div>
+              ))}
+              {quote && (
+                <div className="summary-row summary-muted">
+                  <span>{quote.priceIncludesTax ? t(`Termasuk PPN ${quote.taxRate}%`, `Includes VAT ${quote.taxRate}%`) : `PPN ${quote.taxRate}%`}</span>
+                  <span>{formatIDR(quote.taxTotal)}</span>
+                </div>
+              )}
+              {quote && quote.uniqueCodeRequired && (
+                <div className="summary-row co-summary-unique">
+                  <span>{t('Kode unik transfer', 'Transfer unique code')}</span>
+                  <span>{quote.uniqueCode > 0 ? `+${quote.uniqueCode}` : '—'}</span>
+                </div>
+              )}
+              <div className="summary-row summary-total">
+                <span>Total{quote?.uniqueCodeRequired ? '*' : ''}</span>
+                <span>{quoting ? '…' : formatIDR(quote?.grandTotal ?? 0)}</span>
+              </div>
+              {quote?.uniqueCodeRequired && (
+                <p className="qty-moq">* {t('Kode unik final (≤ 999) ditetapkan saat pesanan dibuat.', 'The final unique code (≤ 999) is assigned when the order is placed.')}</p>
+              )}
+              {quoteError && <p className="form-error" role="alert">{quoteError}</p>}
+              {step !== 'review' && (
+                <button type="button" className="btn btn-solid btn-block" style={{ marginTop: 18 }} disabled={!canReview} onClick={() => setStep('review')}>
+                  {t('Ke konfirmasi', 'Go to review')} <Icon name="arrow" />
+                </button>
+              )}
             </aside>
-          </form>
+          </div>
         </div>
       </section>
     </>

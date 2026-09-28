@@ -1,41 +1,23 @@
-import Reveal from '@/components/Reveal';
-import Breadcrumb from '@/components/Breadcrumb';
-import { fetchCustomerLogos } from '@/lib/server-data';
+import SectionRenderer from '@/components/cms/SectionRenderer';
+import PageFallback from '@/components/cms/PageFallback';
+import { pageMetadata } from '@/components/cms/utils';
+import { fetchCustomerLogos, fetchPage } from '@/lib/server-data';
 
-export const metadata = {
-  title: 'Pelanggan Kami',
-  description: 'Mitra dan pelanggan PT Industri Karet Nusantara di dalam dan luar negeri.',
-};
+const SLUG = 'pelanggan';
+
+export async function generateMetadata() {
+  return pageMetadata(await fetchPage(SLUG), 'Pelanggan Kami');
+}
 
 export default async function Pelanggan() {
-  const customerLogos = await fetchCustomerLogos();
+  const [page, customerLogos] = await Promise.all([fetchPage(SLUG), fetchCustomerLogos()]);
+  if (!page) return <PageFallback />;
 
   return (
-    <>
-      <section className="pagehead commerce-head">
-        <div className="container">
-          <Breadcrumb items={[{ label: 'Beranda', href: '/' }, { label: 'Keberlanjutan', href: '/keberlanjutan' }, { label: 'Pelanggan' }]} />
-          <span className="label label-amber">/ Pelanggan Kami</span>
-          <h1 className="display pagehead-title">Dipercaya lintas industri.</h1>
-        </div>
-      </section>
-
-      <section className="section-tight">
-        <div className="container">
-          <p className="lead" style={{ maxWidth: '52ch', marginBottom: 36 }}>
-            Produk Resiprene 35 dan barang karet kami digunakan oleh mitra di
-            industri coating, marine, semen, dan kelapa sawit — di dalam maupun
-            luar negeri.
-          </p>
-          <div className="logo-grid">
-            {customerLogos.map((c, i) => (
-              <Reveal key={c.id} className="logo-cell" delay={i * 60}>
-                <span>{c.name}</span>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-    </>
+    <SectionRenderer
+      sections={page.sections}
+      extra={{ customerLogos }}
+      page={{ slug: page.slug, title: page.title }}
+    />
   );
 }

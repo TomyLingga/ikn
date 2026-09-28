@@ -2,39 +2,53 @@
 
 import { useState } from 'react';
 import Icon from '@/components/Icon';
+import { useLang } from '@/components/LanguageProvider';
 import { errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
-import type { Order } from '@/lib/types';
+import type { Order, Payment } from '@/lib/types';
 import styles from './PaymentProof.module.css';
 
-// Unggah bukti transfer ke backend. Menangani seluruh state pembayaran:
-// belum bayar, menunggu konfirmasi, ditolak (+alasan, bisa unggah ulang),
-// dan kedaluwarsa.
+// Unggah bukti bayar (POST /customer/orders/{number}/proof, multipart `file`). Tombol hanya tampil
+// bila API memberi flag `canUploadProof`; state lain (menunggu verifikasi, ditolak, kedaluwarsa) dibaca dari payment.
 export default function PaymentProof({
   order,
+  payment,
   onUpload,
 }: {
   order: Order;
+  payment: Payment | null;
   onUpload: (file: File) => Promise<unknown>;
 }) {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  if (order.payment === 'awaiting_confirmation') {
+  const rejected = payment?.status === 'rejected' ? payment : (order.payments || []).find((p) => p.status === 'rejected') || null;
+
+  if (payment?.status === 'awaiting_verification' || order.status === 'payment_review') {
     return (
       <div className={styles.done}>
-        <Icon name="check" size={18} /> Bukti transfer sudah diunggah. Menunggu verifikasi admin.
+        <Icon name="check" size={18} />
+        <span>
+          {t('Bukti pembayaran sudah diunggah. Menunggu verifikasi admin.', 'Payment proof uploaded. Awaiting admin verification.')}
+          {payment?.proof?.uploadedAt && <> ({formatDateTime(payment.proof.uploadedAt, lang)})</>}
+        </span>
       </div>
     );
   }
 
-  if (order.payment === 'expired') {
+  if (order.status === 'expired' || payment?.status === 'expired') {
     return (
       <div className={styles.rejected}>
-        <Icon name="cancelCircle" size={18} /> Batas waktu pembayaran terlewati dan pesanan dibatalkan.
+        <Icon name="cancelCircle" size={18} /> {t('Batas waktu pembayaran terlewati dan pesanan kedaluwarsa.', 'The payment deadline has passed and the order expired.')}
       </div>
     );
+  }
+
+  if (!order.canUploadProof) {
+    return null;
   }
 
   async function submit() {
@@ -45,7 +59,7 @@ export default function PaymentProof({
       await onUpload(file);
       setFile(null);
     } catch (err) {
-      setError(errorMessage(err, 'Gagal mengunggah bukti. Coba lagi.'));
+      setError(errorMessage(err, t('Gagal mengunggah bukti. Coba lagi.', 'Upload failed. Please try again.')));
     } finally {
       setBusy(false);
     }
@@ -53,32 +67,33 @@ export default function PaymentProof({
 
   return (
     <div className={styles.proof}>
-      {order.payment === 'rejected' && (
+      {rejected && (
         <div className={styles.rejected}>
           <Icon name="cancelCircle" size={18} />
           <span>
-            Bukti sebelumnya ditolak{order.rejectReason ? `: ${order.rejectReason}` : '.'}{' '}
-            Silakan unggah ulang bukti yang benar.
+            {t('Bukti sebelumnya ditolak', 'Previous proof was rejected')}
+            {rejected.rejectReason ? `: ${rejected.rejectReason}` : '.'}{' '}
+            {t('Silakan unggah ulang bukti yang benar.', 'Please upload the correct proof again.')}
           </span>
         </div>
       )}
 
-      {order.dueAt && order.payment === 'unpaid' && (
+      {order.paymentDueAt && (
         <p className={styles.due}>
-          Batas waktu pembayaran: <strong>{formatDateTime(order.dueAt)}</strong>
+          {t('Batas waktu pembayaran', 'Payment deadline')}: <strong>{formatDateTime(order.paymentDueAt, lang)}</strong>
         </p>
       )}
 
       <p className={styles.note}>
-        Unggah bukti transfer (JPG/PNG/WEBP/PDF, maks. 5 MB) untuk mempercepat verifikasi.
+        {t('Unggah bukti transfer / pembayaran (JPG, PNG, atau PDF, maks. 5 MB) untuk verifikasi admin.', 'Upload the transfer / payment receipt (JPG, PNG or PDF, max 5 MB) for admin verification.')}
       </p>
 
       <label className={styles.dropzone}>
         <Icon name="arrowDown" size={22} />
-        <span>{file ? file.name : 'Pilih berkas bukti transfer'}</span>
+        <span>{file ? file.name : t('Pilih berkas bukti pembayaran', 'Choose payment proof file')}</span>
         <input
           type="file"
-          accept="image/jpeg,image/png,image/webp,.pdf"
+          accept="image/jpeg,image/png,application/pdf,.pdf"
           hidden
           onChange={(event) => setFile(event.target.files?.[0] || null)}
         />
@@ -86,13 +101,8 @@ export default function PaymentProof({
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
-      <button
-        type="button"
-        className="btn btn-solid btn-sm btn-block"
-        disabled={!file || busy}
-        onClick={submit}
-      >
-        {busy ? 'Mengunggah…' : 'Kirim bukti'} <Icon name="arrow" />
+      <button type="button" className="btn btn-solid btn-sm btn-block" disabled={!file || busy} onClick={submit}>
+        {busy ? t('Mengunggah…', 'Uploading…') : t('Kirim bukti', 'Submit proof')} <Icon name="arrow" />
       </button>
     </div>
   );

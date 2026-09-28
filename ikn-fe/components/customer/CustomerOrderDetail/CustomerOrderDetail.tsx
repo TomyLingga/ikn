@@ -1,64 +1,78 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
 import EmptyState from '@/components/EmptyState';
 import OrderTracking from '@/components/OrderTracking';
 import PaymentProof from '@/components/PaymentProof';
+import PaymentInstructions from '@/components/PaymentInstructions';
 import StatusBadge from '@/components/StatusBadge';
 import SessionLoader from '@/components/SessionLoader';
 import { useAuth } from '@/components/AuthProvider';
-import { useTransactions } from '@/components/TransactionProvider';
 import { useLang } from '@/components/LanguageProvider';
-import { orderStatus, paymentStatus } from '@/lib/commerce';
-import { errorMessage } from '@/lib/api';
-import { formatDate, formatIDR } from '@/lib/format';
+import { api, apiUpload, ApiError, errorMessage } from '@/lib/api';
+import { tr } from '@/lib/cms';
+import { activePayment, canCancel, canChangePaymentMethod, canComplete, canConfirmReceived, canReview, orderLabel, paymentLabel } from '@/lib/commerce';
+import { formatAddressLines } from '@/components/customer/CustomerAddresses';
+import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
+import type { CommerceConfig, Order, Payment, ReviewInput } from '@/lib/types';
 import styles from './CustomerOrderDetail.module.css';
 
+// Detail pesanan customer: GET /customer/orders/{number}. Semua aksi memanggil API lalu memuat ulang
+// order sehingga status dan flag (canX) selalu mengikuti state machine server.
 export default function CustomerOrderDetail({ number }: { number: string }) {
   const { customer } = useAuth();
-  const { ready, getOrder, uploadProof, confirmReceived, submitReview, cancelOrder } = useTransactions();
   const { lang } = useLang();
-  const order = getOrder(number);
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
+
+  const [order, setOrder] = useState<Order | null>(null);
+  const [config, setConfig] = useState<CommerceConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [actionOk, setActionOk] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (!customer) return null;
-  if (!ready) {
-    return <SessionLoader message={lang === 'en' ? 'Loading order…' : 'Memuat pesanan…'} />;
-  }
-  if (!order) {
-    return (
-      <EmptyState
-        icon="close"
-        title={lang === 'en' ? 'Order not found' : 'Pesanan tidak ditemukan'}
-        body={
-          lang === 'en'
-            ? 'Order is unavailable or does not belong to your account.'
-            : 'Pesanan tidak tersedia atau bukan milik akun Anda.'
-        }
-        action={{
-          href: '/dashboard/pesanan',
-          label: lang === 'en' ? 'Back to orders' : 'Kembali ke pesanan',
-        }}
-      />
-    );
-  }
+  const [payments, setPayments] = useState<Payment[] | null>(null);
+  const [showPayments, setShowPayments] = useState(false);
+  const [changeMethod, setChangeMethod] = useState(false);
+  const [newMethod, setNewMethod] = useState('');
+  const [newBank, setNewBank] = useState<number | ''>('');
 
-  const statusLabel = orderStatus[order.status]?.[lang] || orderStatus[order.status]?.id || order.status;
-  const paymentLabel = paymentStatus[order.payment]?.[lang] || paymentStatus[order.payment]?.id || order.payment;
-  const canConfirm = order.status === 'shipped';
-  const canReview = ['delivered', 'completed'].includes(order.status) && !order.reviewed;
-  const canCancel = order.status === 'awaiting_payment' && ['unpaid', 'rejected'].includes(order.payment);
+  const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [bodies, setBodies] = useState<Record<string, string>>({});
 
-  async function run(action: () => Promise<unknown>) {
+  const load = useCallback(async () => {
+    try {
+      const data = await api<Order>(`/customer/orders/${encodeURIComponent(number)}`);
+      setOrder(data);
+      setLoadError('');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) setNotFound(true);
+      else setLoadError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [number]);
+
+  useEffect(() => {
+    if (!customer) return;
+    void load();
+    api<CommerceConfig>('/commerce/config').then(setConfig).catch(() => setConfig(null));
+  }, [customer, load]);
+
+  async function run(action: () => Promise<unknown>, okMessage?: string) {
     if (busy) return;
     setBusy(true);
     setActionError('');
+    setActionOk('');
     try {
       await action();
+      await load();
+      if (okMessage) setActionOk(okMessage);
     } catch (err) {
       setActionError(errorMessage(err));
     } finally {
@@ -66,254 +80,351 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
     }
   }
 
-  function onSubmitReview(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    void run(() =>
-      submitReview(order!.number, Number(form.get('rating') || 5), String(form.get('review') || '')),
+  const path = (suffix: string) => `/customer/orders/${encodeURIComponent(number)}${suffix}`;
+
+  async function loadPayments() {
+    setShowPayments((v) => !v);
+    if (payments) return;
+    try {
+      setPayments(await api<Payment[]>(path('/payments')));
+    } catch (err) {
+      setActionError(errorMessage(err));
+    }
+  }
+
+  function submitReviews(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!order) return;
+    const reviews: ReviewInput[] = order.items
+      .filter((item) => item.reviewed !== true)
+      .map((item) => ({ productSlug: item.productSlug, rating: ratings[item.productSlug] || 5, body: (bodies[item.productSlug] || '').trim() }))
+      .filter((r) => r.body.length > 0);
+    if (reviews.length === 0) {
+      setActionError(t('Tulis ulasan minimal untuk satu produk.', 'Write a review for at least one product.'));
+      return;
+    }
+    void run(() => api(path('/reviews'), { method: 'POST', body: reviews }), t('Terima kasih, ulasan Anda sudah dikirim.', 'Thank you, your review has been submitted.'));
+  }
+
+  if (!customer) return null;
+  if (loading) return <SessionLoader message={t('Memuat pesanan…', 'Loading order…')} />;
+  if (notFound || !order) {
+    return (
+      <EmptyState
+        icon="close"
+        title={t('Pesanan tidak ditemukan', 'Order not found')}
+        body={loadError || t('Pesanan tidak tersedia atau bukan milik akun Anda.', 'Order is unavailable or does not belong to your account.')}
+        action={{ href: '/dashboard/pesanan', label: t('Kembali ke pesanan', 'Back to orders') }}
+      />
     );
   }
 
+  const st = orderLabel(order.status);
+  const pay = paymentLabel(order.paymentStatus);
+  const payment = activePayment(order);
+  const address = order.shippingAddress;
+  const reviewable = order.items.filter((item) => item.reviewed !== true);
+  const showInvoice = !!order.invoiceNumber || !!order.paidAt;
+  const paymentMethods = config?.paymentMethods || [];
+  const selectedMethod = paymentMethods.find((m) => m.code === newMethod) || null;
+
   return (
     <div>
-      <Link href="/dashboard/pesanan" className="link acct-back-link">
-        <Icon name="chevronLeft" size={16} /> {lang === 'en' ? 'Back to list' : 'Kembali ke daftar'}
+      <Link href="/dashboard/pesanan" className="link acct-back-link no-print">
+        <Icon name="chevronLeft" size={16} /> {t('Kembali ke daftar', 'Back to list')}
       </Link>
 
-      <div className="acct-detail-head">
+      <div className="acct-detail-head no-print">
         <div>
           <span className="acct-order-no">{order.number}</span>
-          <span className="acct-order-date">
-            {lang === 'en' ? 'Created on' : 'Dibuat'} {formatDate(order.date)}
-          </span>
+          <span className="acct-order-date">{t('Dibuat', 'Created')} {formatDateTime(order.date, lang)}</span>
         </div>
         <div className="acct-order-badges">
-          <StatusBadge label={statusLabel} tone={orderStatus[order.status]?.tone} />
-          <StatusBadge label={paymentLabel} tone={paymentStatus[order.payment]?.tone} />
+          <StatusBadge label={st[lang]} tone={st.tone} />
+          <StatusBadge label={pay[lang]} tone={pay.tone} />
         </div>
       </div>
 
-      {actionError && <p className="form-error" role="alert">{actionError}</p>}
+      {actionError && <p className="form-error no-print" role="alert">{actionError}</p>}
+      {actionOk && <p className="proof-done no-print" role="status"><Icon name="check" size={18} /> {actionOk}</p>}
 
       <div className="acct-detail-grid">
         <div className="acct-detail-main">
           <section className={styles.card}>
-            <h2 className={styles.cardTitle}>{lang === 'en' ? 'Order Items' : 'Item pesanan'}</h2>
+            <h2 className={styles.cardTitle}>{t('Item pesanan', 'Order items')}</h2>
             <div className={styles.cardBody}>
               {order.items.map((item) => (
-                <div key={item.slug} className="co-item">
+                <div key={item.productSlug} className="co-item">
                   <span className="co-item-name">
-                    {item.name} <small>({item.code}) ×{item.qty} {item.unit}</small>
+                    <Link href={`/catalog/${item.productSlug}`}>{tr(item.name, lang)}</Link>{' '}
+                    <small>({item.code}) {item.qty} {item.unit} × {formatIDR(item.unitPrice)}</small>
                   </span>
-                  <span>{formatIDR(item.price * item.qty)}</span>
+                  <span>{formatIDR(item.lineTotal)}</span>
                 </div>
               ))}
-              <div className="summary-row order-summary-first">
-                <span>Subtotal</span>
-                <span>{formatIDR(order.subtotal)}</span>
-              </div>
+              <div className="summary-row order-summary-first"><span>Subtotal</span><span>{formatIDR(order.subtotal)}</span></div>
+              {order.discountTotal > 0 && (
+                <div className="summary-row"><span>{t('Diskon', 'Discount')}{order.voucherCode ? ` (${order.voucherCode})` : ''}</span><span>−{formatIDR(order.discountTotal)}</span></div>
+              )}
               <div className="summary-row">
-                <span>
-                  {lang === 'en' ? 'Shipping' : 'Ongkir'} · {order.shippingMethod}
-                </span>
-                <span>{formatIDR(order.shipping)}</span>
+                <span>{t('Ongkir', 'Shipping')}{order.shippingMethod ? ` · ${tr(order.shippingMethod.label, lang)}` : ''}</span>
+                <span>{formatIDR(order.shippingTotal)}</span>
               </div>
-              <div className="summary-row">
-                <span>{lang === 'en' ? 'Admin fee' : 'Biaya admin'}</span>
-                <span>{formatIDR(order.adminFee)}</span>
-              </div>
-              <div className="summary-row summary-total">
-                <span>Total</span>
-                <span>{formatIDR(order.total)}</span>
-              </div>
+              {order.feeTotal > 0 && <div className="summary-row"><span>{t('Biaya', 'Fees')}</span><span>{formatIDR(order.feeTotal)}</span></div>}
+              {order.taxTotal > 0 && (
+                <div className="summary-row summary-muted">
+                  <span>{order.priceIncludesTax === false ? `PPN${order.taxRate != null ? ` ${order.taxRate}%` : ''}` : t('Termasuk PPN', 'Includes VAT')}</span>
+                  <span>{formatIDR(order.taxTotal)}</span>
+                </div>
+              )}
+              {order.uniqueCode > 0 && <div className="summary-row"><span>{t('Kode unik', 'Unique code')}</span><span>{formatIDR(order.uniqueCode)}</span></div>}
+              <div className="summary-row summary-total"><span>Total</span><span>{formatIDR(order.grandTotal)}</span></div>
             </div>
           </section>
 
-          <section id="tracking" className={styles.card}>
-            <h2 className={styles.cardTitle}>{lang === 'en' ? 'Track Order' : 'Lacak pesanan'}</h2>
+          <section id="tracking" className={`${styles.card} no-print`}>
+            <h2 className={styles.cardTitle}>{t('Lacak pesanan', 'Track order')}</h2>
             <div className={styles.cardBody}>
               <OrderTracking order={order} />
-              {order.trackingNo && (
+              {order.cancelReason && <p className="qty-moq" style={{ marginTop: 10 }}>{t('Alasan pembatalan', 'Cancellation reason')}: {order.cancelReason}</p>}
+              {(order.courier || order.trackingNumber) && (
                 <p className="acct-track-no">
-                  {lang === 'en' ? 'Tracking No.:' : 'No. resi:'} <strong>{order.trackingNo}</strong>
+                  <Icon name="truck" size={16} /> {order.courier && <strong>{order.courier}</strong>}
+                  {order.trackingNumber && <> · {t('No. resi', 'Tracking no.')}: <strong>{order.trackingNumber}</strong></>}
                 </p>
               )}
-              {canConfirm && (
-                <button
-                  type="button"
-                  className="btn btn-solid btn-sm order-action"
-                  disabled={busy}
-                  onClick={() => void run(() => confirmReceived(order!.number))}
-                >
-                  {lang === 'en' ? 'Confirm item received' : 'Konfirmasi barang diterima'} <Icon name="check" />
+              {canConfirmReceived(order) && (
+                <button type="button" className="btn btn-solid btn-sm order-action" disabled={busy} onClick={() => void run(() => api(path('/confirm-received'), { method: 'POST' }))}>
+                  {t('Konfirmasi barang diterima', 'Confirm goods received')} <Icon name="check" />
                 </button>
               )}
-              {['delivered', 'completed'].includes(order.status) && (
-                <p className="proof-done order-action">
-                  <Icon name="check" size={18} />{' '}
-                  {lang === 'en' ? 'Delivery confirmed.' : 'Penerimaan barang sudah dikonfirmasi.'}
-                </p>
+              {canComplete(order) && (
+                <button type="button" className="btn btn-line btn-sm order-action" disabled={busy} onClick={() => void run(() => api(path('/complete'), { method: 'POST' }))}>
+                  {t('Selesaikan pesanan', 'Complete order')} <Icon name="checkCircle" />
+                </button>
               )}
             </div>
           </section>
 
-          {order.payment === 'paid' && (
+          {showInvoice && (
             <section className="invoice" aria-labelledby="invoice-title">
               <div className="invoice-top">
                 <div>
                   <span className="invoice-brand">PT IKN</span>
                   <h2 id="invoice-title" className="h3">Invoice</h2>
+                  <span className="acct-order-date">PT Industri Karet Nusantara</span>
                 </div>
-                <div>
-                  <span className="acct-order-no">INV-{order.number}</span>
-                  <span className="acct-order-date">{formatDate(order.date)}</span>
+                <div style={{ textAlign: 'right' }}>
+                  <span className="acct-order-no">{order.invoiceNumber || order.number}</span>
+                  <span className="acct-order-date">{t('Order', 'Order')} {order.number} · {formatDate(order.date, lang)}</span>
+                  {order.paidAt && <span className="acct-order-date">{t('Dibayar', 'Paid')} {formatDateTime(order.paidAt, lang)}</span>}
                 </div>
               </div>
-              <p>
-                <strong>{lang === 'en' ? 'Billed to:' : 'Ditagihkan kepada:'}</strong><br />
-                {order.customer.name}<br />
-                PIC: {order.customer.pic}
-              </p>
+              <div className="invoice-parties">
+                <p>
+                  <strong>{t('Ditagihkan kepada', 'Billed to')}:</strong><br />
+                  {order.customer.name}<br />
+                  PIC: {order.customer.pic}<br />
+                  {order.customer.email}
+                  {order.customer.taxId && <><br />NPWP: {order.customer.taxId}</>}
+                </p>
+                <p>
+                  <strong>{t('Dikirim ke', 'Ship to')}:</strong><br />
+                  {address.recipientName} · {address.phone}<br />
+                  {formatAddressLines({ ...address, id: 0, isDefault: false }).map((line) => <span key={line}>{line}<br /></span>)}
+                </p>
+              </div>
               <table className="invoice-table">
                 <thead>
                   <tr>
-                    <th>{lang === 'en' ? 'Product' : 'Produk'}</th>
-                    <th>{lang === 'en' ? 'Qty' : 'Qty'}</th>
-                    <th className="num">{lang === 'en' ? 'Amount' : 'Jumlah'}</th>
+                    <th>{t('Produk', 'Product')}</th>
+                    <th>Qty</th>
+                    <th className="num">{t('Harga', 'Price')}</th>
+                    <th className="num">{t('Jumlah', 'Amount')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {order.items.map((item) => (
-                    <tr key={item.slug}>
-                      <td>{item.name}</td>
+                    <tr key={item.productSlug}>
+                      <td>{tr(item.name, lang)} <small>({item.code})</small></td>
                       <td>{item.qty} {item.unit}</td>
-                      <td className="num">{formatIDR(item.price * item.qty)}</td>
+                      <td className="num">{formatIDR(item.unitPrice)}</td>
+                      <td className="num">{formatIDR(item.lineTotal)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr>
-                    <td colSpan={2}>Subtotal</td>
-                    <td className="num">{formatIDR(order.subtotal)}</td>
-                  </tr>
-                  <tr>
-                    <td colSpan={2}>{lang === 'en' ? 'Shipping + Admin fee' : 'Ongkir + biaya admin'}</td>
-                    <td className="num">{formatIDR(order.shipping + order.adminFee)}</td>
-                  </tr>
-                  <tr>
-                    <th colSpan={2}>Total</th>
-                    <th className="num">{formatIDR(order.total)}</th>
-                  </tr>
+                  <tr><td colSpan={3}>Subtotal</td><td className="num">{formatIDR(order.subtotal)}</td></tr>
+                  {order.discountTotal > 0 && <tr><td colSpan={3}>{t('Diskon', 'Discount')}</td><td className="num">−{formatIDR(order.discountTotal)}</td></tr>}
+                  <tr><td colSpan={3}>{t('Ongkir', 'Shipping')}</td><td className="num">{formatIDR(order.shippingTotal)}</td></tr>
+                  {order.feeTotal > 0 && <tr><td colSpan={3}>{t('Biaya', 'Fees')}</td><td className="num">{formatIDR(order.feeTotal)}</td></tr>}
+                  {order.taxTotal > 0 && <tr><td colSpan={3}>{order.priceIncludesTax === false ? 'PPN' : t('PPN (termasuk)', 'VAT (included)')}</td><td className="num">{formatIDR(order.taxTotal)}</td></tr>}
+                  {order.uniqueCode > 0 && <tr><td colSpan={3}>{t('Kode unik', 'Unique code')}</td><td className="num">{formatIDR(order.uniqueCode)}</td></tr>}
+                  <tr><th colSpan={3}>Total</th><th className="num">{formatIDR(order.grandTotal)}</th></tr>
                 </tfoot>
               </table>
-              <button
-                type="button"
-                className="btn btn-line btn-sm no-print"
-                onClick={() => window.print()}
-              >
-                {lang === 'en' ? 'Print / Save PDF' : 'Cetak / simpan PDF'} <Icon name="arrowDown" />
+              <button type="button" className="btn btn-line btn-sm no-print" onClick={() => window.print()}>
+                {t('Cetak / simpan PDF', 'Print / save PDF')} <Icon name="arrowDown" />
               </button>
             </section>
           )}
 
-          {(canReview || order.reviewed) && (
-            <section className={styles.card}>
-              <h2 className={styles.cardTitle}>{lang === 'en' ? 'Product Review' : 'Ulasan produk'}</h2>
+          {canReview(order) && reviewable.length > 0 && (
+            <section id="review" className={`${styles.card} no-print`}>
+              <h2 className={styles.cardTitle}>{t('Ulasan produk', 'Product review')}</h2>
               <div className={styles.cardBody}>
-                {order.reviewed ? (
-                  <p className="proof-done">
-                    <Icon name="check" size={18} />{' '}
-                    {lang === 'en'
-                      ? 'Thank you! Your review for this order has been submitted.'
-                      : 'Terima kasih, ulasan untuk pesanan ini sudah dikirim.'}
-                  </p>
-                ) : (
-                  <form className="form review-form" onSubmit={onSubmitReview}>
-                    <label>
-                      <span className="label">Rating</span>
-                      <select name="rating" className="cat-sort" defaultValue="5">
-                        <option value="5">{lang === 'en' ? '5 — Excellent' : '5 — Sangat baik'}</option>
-                        <option value="4">{lang === 'en' ? '4 — Good' : '4 — Baik'}</option>
-                        <option value="3">{lang === 'en' ? '3 — Average' : '3 — Cukup'}</option>
-                        <option value="2">{lang === 'en' ? '2 — Poor' : '2 — Kurang'}</option>
-                        <option value="1">{lang === 'en' ? '1 — Bad' : '1 — Buruk'}</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span className="label">{lang === 'en' ? 'Review' : 'Ulasan'}</span>
-                      <textarea
-                        name="review"
-                        rows={4}
-                        required
-                        placeholder={
-                          lang === 'en'
-                            ? 'Share your experience using PT IKN products.'
-                            : 'Bagikan pengalaman Anda menggunakan produk PT IKN.'
-                        }
-                      />
-                    </label>
-                    <button type="submit" className="btn btn-solid btn-sm" disabled={busy}>
-                      {lang === 'en' ? 'Submit review' : 'Kirim ulasan'} <Icon name="arrow" />
-                    </button>
-                  </form>
-                )}
+                <form className="form review-form" onSubmit={submitReviews}>
+                  {reviewable.map((item) => (
+                    <fieldset key={item.productSlug} className="review-fieldset">
+                      <legend>{tr(item.name, lang)}</legend>
+                      <label>
+                        <span className="label">Rating</span>
+                        <select className="cat-sort" value={ratings[item.productSlug] || 5} onChange={(e) => setRatings((r) => ({ ...r, [item.productSlug]: Number(e.target.value) }))}>
+                          <option value={5}>{t('5 — Sangat baik', '5 — Excellent')}</option>
+                          <option value={4}>{t('4 — Baik', '4 — Good')}</option>
+                          <option value={3}>{t('3 — Cukup', '3 — Average')}</option>
+                          <option value={2}>{t('2 — Kurang', '2 — Poor')}</option>
+                          <option value={1}>{t('1 — Buruk', '1 — Bad')}</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span className="label">{t('Ulasan', 'Review')}</span>
+                        <textarea rows={3} maxLength={2000} value={bodies[item.productSlug] || ''} onChange={(e) => setBodies((b) => ({ ...b, [item.productSlug]: e.target.value }))} placeholder={t('Bagikan pengalaman Anda menggunakan produk ini.', 'Share your experience with this product.')} />
+                      </label>
+                    </fieldset>
+                  ))}
+                  <button type="submit" className="btn btn-solid btn-sm" disabled={busy}>
+                    {t('Kirim ulasan', 'Submit review')} <Icon name="arrow" />
+                  </button>
+                </form>
               </div>
             </section>
           )}
         </div>
 
-        <aside className="acct-detail-side">
+        <aside className="acct-detail-side no-print">
           <section id="payment" className={styles.card}>
-            <h2 className={styles.cardTitle}>{lang === 'en' ? 'Payment' : 'Pembayaran'}</h2>
+            <h2 className={styles.cardTitle}>{t('Pembayaran', 'Payment')}</h2>
             <div className={styles.cardBody}>
-              {order.bankInfo && (
-                <div className="co-bank payment-bank">
-                  <span className="co-bank-name">{order.bankInfo.bank}</span>
-                  <span className="co-bank-no">{order.bankInfo.number}</span>
-                  <span className="co-bank-holder">a.n. {order.bankInfo.holder}</span>
-                </div>
-              )}
-              {order.payment === 'paid' ? (
+              {order.paymentStatus === 'paid' || order.paidAt ? (
                 <p className="proof-done">
-                  <Icon name="check" size={18} />{' '}
-                  {lang === 'en' ? 'Payment verified by admin.' : 'Pembayaran telah diverifikasi admin.'}
+                  <Icon name="check" size={18} /> {t('Pembayaran telah diverifikasi.', 'Payment verified.')}{order.paidAt && <> {formatDateTime(order.paidAt, lang)}</>}
                 </p>
               ) : (
-                <PaymentProof order={order} onUpload={(file) => uploadProof(order.number, file)} />
+                <>
+                  {(order.status === 'pending_payment' || order.status === 'payment_review') && (
+                    <PaymentInstructions order={order} config={config} />
+                  )}
+                  <PaymentProof
+                    order={order}
+                    payment={payment}
+                    onUpload={(file) => {
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      if (payment?.id && payment.status === 'pending') fd.append('paymentId', String(payment.id));
+                      return run(() => apiUpload(path('/proof'), fd), t('Bukti pembayaran terkirim.', 'Payment proof submitted.'));
+                    }}
+                  />
+                  {canChangePaymentMethod(order) && paymentMethods.length > 1 && (
+                    <div className="pay-change">
+                      {!changeMethod ? (
+                        <button type="button" className="link" onClick={() => { setChangeMethod(true); setNewMethod(paymentMethods.find((m) => m.code !== payment?.method)?.code || ''); }}>
+                          {t('Ganti metode pembayaran', 'Change payment method')}
+                        </button>
+                      ) : (
+                        <div className="co-ship">
+                          {paymentMethods.map((m) => (
+                            <label key={m.code} className={`co-ship-opt ${newMethod === m.code ? 'is-active' : ''}`}>
+                              <input type="radio" name="newMethod" value={m.code} checked={newMethod === m.code} onChange={() => setNewMethod(m.code)} />
+                              <span className="co-ship-label">{tr(m.name, lang)}</span>
+                            </label>
+                          ))}
+                          {selectedMethod?.type === 'manual_transfer' && (config?.bankAccounts || []).length > 0 && (
+                            <select className="cat-sort" value={newBank} onChange={(e) => setNewBank(e.target.value ? Number(e.target.value) : '')}>
+                              <option value="">{t('Pilih rekening tujuan', 'Choose bank account')}</option>
+                              {(config?.bankAccounts || []).map((b) => <option key={b.id} value={b.id}>{b.bankName} · {b.accountNumber}</option>)}
+                            </select>
+                          )}
+                          <div className="address-actions" style={{ borderTop: 0, paddingTop: 0, marginTop: 6 }}>
+                            <button
+                              type="button"
+                              className="btn btn-solid btn-sm"
+                              disabled={busy || !newMethod}
+                              onClick={() => void run(
+                                () => api(path('/payments'), { method: 'POST', body: { paymentMethodCode: newMethod, bankAccountId: newBank || undefined } }),
+                                t('Metode pembayaran diperbarui.', 'Payment method updated.'),
+                              ).then(() => setChangeMethod(false))}
+                            >
+                              {t('Simpan', 'Save')}
+                            </button>
+                            <button type="button" className="link" onClick={() => setChangeMethod(false)}>{t('Batal', 'Cancel')}</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <button type="button" className="link" style={{ marginTop: 14 }} onClick={loadPayments}>
+                {showPayments ? t('Sembunyikan riwayat pembayaran', 'Hide payment history') : t('Riwayat pembayaran', 'Payment history')}
+              </button>
+              {showPayments && (
+                <ul className="pay-history">
+                  {(payments || order.payments || []).map((p) => {
+                    const pl = paymentLabel(p.status);
+                    return (
+                      <li key={p.id}>
+                        <div>
+                          <strong>{tr(p.methodName, lang) || p.method}</strong> · {formatIDR(p.amount)}
+                          {p.createdAt && <span className="acct-order-date">{formatDateTime(p.createdAt, lang)}</span>}
+                          {p.rejectReason && <span className="acct-order-date">{t('Alasan', 'Reason')}: {p.rejectReason}</span>}
+                        </div>
+                        <StatusBadge label={pl[lang]} tone={pl.tone} small />
+                      </li>
+                    );
+                  })}
+                  {(payments || order.payments || []).length === 0 && <li className="form-note">{t('Belum ada percobaan pembayaran.', 'No payment attempts yet.')}</li>}
+                </ul>
               )}
             </div>
           </section>
 
           <section className={styles.card}>
-            <h2 className={styles.cardTitle}>{lang === 'en' ? 'Shipping Address' : 'Alamat pengiriman'}</h2>
+            <h2 className={styles.cardTitle}>{t('Alamat pengiriman', 'Shipping address')}</h2>
             <div className={styles.cardBody}>
               <p className="acct-addr">
-                <strong>{order.address.label}</strong><br />
-                {order.address.recipient}<br />
-                {order.address.phone}<br />
-                {order.address.line}
+                <strong>{address.label}</strong><br />
+                {address.recipientName}<br />
+                {address.phone}<br />
+                {formatAddressLines({ ...address, id: 0, isDefault: false }).map((line) => <span key={line}>{line}<br /></span>)}
+                {address.note && <em>{address.note}</em>}
               </p>
+              {order.shippingMethod && (
+                <p className="qty-moq">
+                  {tr(order.shippingMethod.label, lang)}{order.shippingMethod.eta ? ` · ${tr(order.shippingMethod.eta, lang)}` : ''}
+                </p>
+              )}
+              {order.note && <p className="qty-moq">{t('Catatan', 'Note')}: {order.note}</p>}
             </div>
           </section>
 
-          {canCancel && (
+          {canCancel(order) && (
             <section className={styles.card}>
-              <h2 className={styles.cardTitle}>{lang === 'en' ? 'Cancel Order' : 'Batalkan pesanan'}</h2>
+              <h2 className={styles.cardTitle}>{t('Batalkan pesanan', 'Cancel order')}</h2>
               <div className={styles.cardBody}>
-                <p className="pd-quote-note">
-                  {lang === 'en' ? 'Unpaid orders can be cancelled.' : 'Pesanan yang belum dibayar dapat dibatalkan.'}
-                </p>
+                <p className="pd-quote-note">{t('Pesanan yang belum dibayar dapat dibatalkan; stok yang direservasi dikembalikan.', 'Unpaid orders can be cancelled; reserved stock is released.')}</p>
                 <button
                   type="button"
                   className="btn btn-line btn-sm btn-block order-action"
                   disabled={busy}
                   onClick={() => {
-                    if (window.confirm(lang === 'en' ? 'Cancel this order?' : 'Batalkan pesanan ini?')) {
-                      void run(() => cancelOrder(order!.number));
+                    if (window.confirm(t('Batalkan pesanan ini?', 'Cancel this order?'))) {
+                      void run(() => api(path('/cancel'), { method: 'POST' }));
                     }
                   }}
                 >
-                  {lang === 'en' ? 'Cancel order' : 'Batalkan pesanan'} <Icon name="close" />
+                  {t('Batalkan pesanan', 'Cancel order')} <Icon name="close" />
                 </button>
               </div>
             </section>

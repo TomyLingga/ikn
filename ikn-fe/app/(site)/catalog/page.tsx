@@ -1,5 +1,5 @@
 import Breadcrumb from '@/components/Breadcrumb';
-import CatalogBrowser from '@/components/CatalogBrowser';
+import CatalogBrowser, { parseCatalogQuery } from '@/components/CatalogBrowser';
 import { fetchCategories, fetchProducts } from '@/lib/server-data';
 
 export const metadata = {
@@ -8,8 +8,11 @@ export const metadata = {
     'Katalog produk hilir karet PT Industri Karet Nusantara — Resiprene 35 dan aneka barang karet industri.',
 };
 
-export default async function CatalogPage() {
-  const [products, categories] = await Promise.all([fetchProducts(), fetchCategories()]);
+type SearchParams = Record<string, string | string[] | undefined>;
+
+export default async function CatalogPage({ searchParams }: { searchParams: SearchParams }) {
+  const query = parseCatalogQuery(searchParams);
+  const [products, categories] = await Promise.all([fetchProducts(query), fetchCategories()]);
 
   return (
     <>
@@ -23,7 +26,7 @@ export default async function CatalogPage() {
 
       <section className="section-tight">
         <div className="container">
-          <CatalogBrowser products={products} categories={categories} />
+          <CatalogBrowser products={products.items} meta={products.meta} categories={categories} query={query} basePath="/catalog" />
         </div>
       </section>
     </>

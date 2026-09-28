@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -9,17 +9,26 @@ import LangToggle from '@/components/LangToggle';
 import CartButton from '@/components/CartButton';
 import { useLang } from '@/components/LanguageProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { navTree, t } from '@/lib/i18n';
+import { useSite } from '@/components/SiteProvider';
+import { t } from '@/lib/i18n';
+import { isPrimaryMenuItem, tr, type MenuNode } from '@/lib/cms';
 import Icon from '@/components/Icon';
 import styles from './Navbar.module.css';
 
+// Navbar: menu tree from the CMS header menu (site.menus.header). Doc links
+// (site.docLinks) are appended to the top-level item whose key equals their category.
+// Menu utama ditata dalam kisi 6 kolom (NAV_COLUMNS): enam menu bawaan selalu mengisi baris
+// pertama, item tambahan turun ke baris berikutnya tepat di bawah kolom yang sama.
+// Tinggi bilah diukur dan ditulis ke --nav-h agar offset halaman ikut menyesuaikan saat 2 baris.
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null); // dropdown terbuka di mobile
+  const innerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const { lang } = useLang();
   const { customer, admin } = useAuth();
+  const site = useSite();
   const isUserLoggedIn = !!(customer || admin);
   const dashboardHref = admin ? '/admin' : '/dashboard';
   const dashboardLabel = admin
@@ -28,17 +37,9 @@ export default function Navbar() {
       : 'Dashboard Admin'
     : 'Dashboard';
 
-  const items = navTree[lang] || navTree.id;
+  const active = site.menus.header.items.filter((item) => item.isActive !== false);
+  const items = [...active.filter(isPrimaryMenuItem), ...active.filter((item) => !isPrimaryMenuItem(item))];
   const ui = t[lang] || t.id;
-
-  const [docLinks, setDocLinks] = useState<Array<{
-    id: string;
-    title: string;
-    description: string;
-    targetUrl: string;
-    parentCategory: string;
-    active: boolean;
-  }>>([]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -48,55 +49,101 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    async function loadDocLinks() {
-      try {
-        const res = await fetch('/api/navigation/doc-links');
-        if (res.ok) {
-          const data = await res.json() as Array<{
-            id: string;
-            title: string;
-            description: string;
-            targetUrl: string;
-            parentCategory: string;
-            active: boolean;
-          }>;
-          setDocLinks(data.filter((d) => d.active));
-          return;
-        }
-      } catch {
-        // Fallback default active documents
-      }
-      setDocLinks([
-        {
-          id: 'wbs',
-          title: 'Whistle Blowing System',
-          description: 'Kanal pelaporan resmi PT IKN',
-          targetUrl: '/storage/wbs-dokumen.pdf',
-          parentCategory: 'Keberlanjutan',
-          active: true,
-        },
-        {
-          id: 'reach',
-          title: 'REACH Compliance Certificate',
-          description: 'Sertifikat kepatuhan pasar Eropa',
-          targetUrl: '/storage/reach-compliance.pdf',
-          parentCategory: 'Keberlanjutan',
-          active: true,
-        },
-      ]);
-    }
-    void loadDocLinks();
-  }, []);
-
-  useEffect(() => {
     setOpen(false);
     setOpenGroup(null);
   }, [pathname]);
 
+  // Sinkronkan --nav-h dengan tinggi bilah sebenarnya (baris kedua menu, layar sempit, dsb.).
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement;
+    const apply = () => root.style.setProperty('--nav-h', `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--nav-h');
+    };
+  }, []);
+
+  function isActivePath(href: string): boolean {
+    const itemPath = href.split('#')[0] || href;
+    return href === '/' ? pathname === '/' : pathname.startsWith(itemPath);
+  }
+
+  function docLinks(item: MenuNode) {
+    if (!item.key) return [];
+    return site.docLinks
+      .filter((doc) => doc.isActive && doc.category === item.key && !!doc.targetUrl)
+      .map((doc) => {
+        const desc = tr(doc.description, lang);
+        return (
+          <a key={`doc-${doc.id}`} href={doc.targetUrl ?? '#'} target="_blank" rel="noopener noreferrer" className={styles.dropLink} role="menuitem">
+            <span className={styles.dropLabel}>
+              {tr(doc.label, lang)} <span style={{ fontSize: '0.74rem', opacity: 0.75 }}>↗</span>
+            </span>
+            {desc && <span className={styles.dropDescription}>{desc}</span>}
+          </a>
+        );
+      });
+  }
+
+  function renderItem(item: MenuNode, idx: number) {
+    const href = item.url || '/';
+    const label = tr(item.label, lang);
+    const groupKey = String(item.id ?? item.key ?? idx);
+    const children = (item.children ?? []).filter((child) => child.isActive !== false);
+    const docs = docLinks(item);
+
+    if (children.length === 0 && docs.length === 0) {
+      return (
+        <Link key={groupKey} href={href} className={`${styles.link} ${isActivePath(href) ? styles.active : ''}`}>
+          {label}
+        </Link>
+      );
+    }
+
+    return (
+      <div key={groupKey} className={`${styles.itemDrop} ${openGroup === groupKey ? styles.expanded : ''}`}>
+        <Link
+          href={href}
+          className={`${styles.link} ${styles.linkParent} ${isActivePath(href) ? styles.active : ''}`}
+          onClick={(e) => {
+            // Di mobile, klik pertama membuka panel alih-alih navigasi.
+            if (window.matchMedia('(max-width: 900px)').matches && openGroup !== groupKey) {
+              e.preventDefault();
+              setOpenGroup(groupKey);
+            }
+          }}
+        >
+          {label}
+          <Icon name="arrowDown" size={13} className={styles.caret} />
+        </Link>
+
+        <div className={styles.dropdown} role="menu">
+          <div className={styles.dropdownInner}>
+            {children.map((child, ci) => {
+              const desc = tr(child.description, lang);
+              return (
+                <Link key={String(child.id ?? `${groupKey}-${ci}`)} href={child.url || href} className={styles.dropLink} role="menuitem">
+                  <span className={styles.dropLabel}>{tr(child.label, lang)}</span>
+                  {desc && <span className={styles.dropDescription}>{desc}</span>}
+                </Link>
+              );
+            })}
+            {docs}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <header className={`${styles.nav} ${scrolled ? styles.scrolled : ''} ${open ? styles.open : ''}`}>
-      <div className={`${styles.inner} container`}>
-        <Link href="/" className={styles.brand} aria-label="PT Industri Karet Nusantara">
+      <div ref={innerRef} className={`${styles.inner} container`}>
+        <Link href="/" className={styles.brand} aria-label={site.settings.company.name}>
           <Image src="/img/rubin-logo.png" alt="Rubin Logo" width={40} height={40} priority />
           <span className={styles.brandMeta}>
             <span>Industri Karet</span>
@@ -105,105 +152,7 @@ export default function Navbar() {
         </Link>
 
         <nav id="main-navigation" className={styles.links} aria-label="Navigasi utama">
-          {items.map((item) => {
-            const itemPath = item.href.split('#')[0] ?? item.href;
-            const children = item.children ?? [];
-            const active =
-              item.href === '/'
-                ? pathname === '/'
-                : pathname.startsWith(itemPath);
-
-            const categoryName = item.label.toLowerCase();
-            const matchingDocs = docLinks.filter((doc) => {
-              if (!doc.active) return false;
-              const p = doc.parentCategory.toLowerCase();
-              return (
-                p === categoryName ||
-                (categoryName === 'sustainability' && p === 'keberlanjutan') ||
-                (categoryName === 'keberlanjutan' && p === 'sustainability') ||
-                (categoryName === 'about us' && p === 'tentang kami') ||
-                (categoryName === 'tentang kami' && p === 'about us') ||
-                (categoryName === 'business' && p === 'bisnis') ||
-                (categoryName === 'bisnis' && p === 'business') ||
-                (categoryName === 'media' && p === 'media')
-              );
-            });
-
-            const hasChildren = children.length > 0 || matchingDocs.length > 0;
-
-            if (!hasChildren) {
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`${styles.link} ${active ? styles.active : ''}`}
-                >
-                  {item.label}
-                </Link>
-              );
-            }
-
-            return (
-              <div
-                key={item.label}
-                className={`${styles.itemDrop} ${openGroup === item.label ? styles.expanded : ''}`}
-              >
-                <Link
-                  href={item.href}
-                  className={`${styles.link} ${styles.linkParent} ${active ? styles.active : ''}`}
-                  onClick={(e) => {
-                    // Di mobile, klik pertama membuka panel alih-alih navigasi.
-                    if (
-                      window.matchMedia('(max-width: 900px)').matches &&
-                      openGroup !== item.label
-                    ) {
-                      e.preventDefault();
-                      setOpenGroup(item.label);
-                    }
-                  }}
-                >
-                  {item.label}
-                  <Icon name="arrowDown" size={13} className={styles.caret} />
-                </Link>
-
-                <div className={styles.dropdown} role="menu">
-                  <div className={styles.dropdownInner}>
-                    {children.map((child) => (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        className={styles.dropLink}
-                        role="menuitem"
-                      >
-                        <span className={styles.dropLabel}>{child.label}</span>
-                        {child.desc && (
-                          <span className={styles.dropDescription}>{child.desc}</span>
-                        )}
-                      </Link>
-                    ))}
-
-                    {matchingDocs.map((doc) => (
-                      <a
-                        key={doc.id}
-                        href={doc.targetUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.dropLink}
-                        role="menuitem"
-                      >
-                        <span className={styles.dropLabel}>
-                          {doc.title} <span style={{ fontSize: '0.74rem', opacity: 0.75 }}>↗</span>
-                        </span>
-                        {doc.description && (
-                          <span className={styles.dropDescription}>{doc.description}</span>
-                        )}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <div className={styles.menuGrid}>{items.map(renderItem)}</div>
 
           <div className={styles.actions}>
             <LangToggle />

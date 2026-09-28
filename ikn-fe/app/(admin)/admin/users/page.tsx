@@ -1,243 +1,206 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import StatusBadge from '@/components/StatusBadge';
-import SessionLoader from '@/components/SessionLoader';
 import Icon from '@/components/Icon';
+import StatusBadge from '@/components/StatusBadge';
+import AdminModal from '@/components/admin/AdminModal';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
-import { AdminCard, AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
+import { AdminCard, AdminPageHead, DataTable, RowActions, type Column, type RowAction } from '@/components/admin/AdminPage';
 import FileUploadDropzone, { SegmentedRadio } from '@/components/admin/FileUploadDropzone/FileUploadDropzone';
-import { api, errorMessage } from '@/lib/api';
-import type { AdminUser } from '@/lib/types';
+import { firstError, type FieldErrors } from '@/components/admin/cms';
+import { api, ApiError, errorMessage } from '@/lib/api';
+import { tr, type AdminUserData, type ModuleOption } from '@/lib/cms';
+import { formatDateTime } from '@/lib/format';
 
-const permissionList: [string, string][] = [
-  ['orders', 'Order'],
-  ['payments', 'Payment'],
-  ['products', 'Produk'],
-  ['categories', 'Kategori'],
-  ['customers', 'Customer'],
-  ['bank', 'Rekening Bank'],
-  ['fees', 'Biaya Tambahan'],
-  ['reports', 'Laporan'],
-  ['menu', 'Menu'],
-  ['content', 'Konten'],
-  ['news', 'Berita'],
-  ['gallery', 'Galeri'],
-  ['wbs', 'WBS'],
-];
+type AdminRole = AdminUserData['role'];
 
 interface UserForm {
   name: string;
   email: string;
   password: string;
-  role: 'super_admin' | 'admin';
+  role: AdminRole;
   permissions: string[];
   active: boolean;
 }
 
-const emptyForm: UserForm = {
-  name: '',
-  email: '',
-  password: '',
-  role: 'admin',
-  permissions: [],
-  active: true,
-};
+const emptyForm = (): UserForm => ({ name: '', email: '', password: '', role: 'admin', permissions: [], active: true });
 
-interface HelpGuideConfig {
+// GET/POST /admin/help-guide
+interface HelpGuide {
   title: string;
   type: 'url' | 'file';
   url: string;
-  filePath: string;
-  fileName: string;
+  file: { url: string; originalName: string } | null;
 }
 
+const defaultGuide = (): HelpGuide => ({ title: 'Panduan Admin', type: 'url', url: '', file: null });
+
+// Admin accounts (super admin only) + help guide settings (module "users").
 export default function AdminUsers() {
-  const { admin, ready } = useAuth();
+  const { admin } = useAuth();
   const { lang } = useLang();
-  const [activeTab, setActiveTab] = useState<'users' | 'guide'>('users');
-  const [rows, setRows] = useState<AdminUser[]>([]);
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
+  const isSuperAdmin = admin?.role === 'super_admin';
+
+  const [tab, setTab] = useState<'users' | 'guide'>(isSuperAdmin ? 'users' : 'guide');
+  const [rows, setRows] = useState<AdminUserData[]>([]);
+  const [modules, setModules] = useState<ModuleOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<UserForm>(emptyForm);
+  const [formErrors, setFormErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Help Guide Config State (Super Admin Only)
-  const [guide, setGuide] = useState<HelpGuideConfig>({
-    title: 'Petunjuk Penggunaan Aplikasi Back-office PT IKN',
-    type: 'url',
-    url: '',
-    filePath: '',
-    fileName: '',
-  });
+  const [guide, setGuide] = useState<HelpGuide>(defaultGuide);
   const [guideFile, setGuideFile] = useState<File | null>(null);
   const [guideSaving, setGuideSaving] = useState(false);
-  const [guideNotice, setGuideNotice] = useState('');
   const [guideError, setGuideError] = useState('');
 
-  const isSuperAdmin = admin?.role === 'super_admin';
-
   const refresh = useCallback(async () => {
+    if (!isSuperAdmin) {
+      setLoading(false);
+      return;
+    }
     setError('');
     try {
-      const [usersData, guideData] = await Promise.all([
-        api<AdminUser[]>('/admin/users'),
-        api<HelpGuideConfig>('/admin/help-guide').catch(() => null),
+      const [users, moduleList] = await Promise.all([
+        api<AdminUserData[]>('/admin/users'),
+        api<ModuleOption[]>('/admin/users/modules'),
       ]);
-      setRows(usersData);
-      if (guideData) setGuide(guideData);
+      setRows(users);
+      setModules(moduleList);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
+  }, [isSuperAdmin]);
+
+  const loadGuide = useCallback(async () => {
+    try {
+      setGuide(await api<HelpGuide>('/admin/help-guide'));
+    } catch (err) {
+      setGuideError(errorMessage(err));
+    }
   }, []);
 
   useEffect(() => {
-    if (isSuperAdmin) void refresh();
-  }, [isSuperAdmin, refresh]);
+    void refresh();
+    void loadGuide();
+  }, [refresh, loadGuide]);
 
-  if (!ready) {
-    return <SessionLoader message={lang === 'en' ? 'Checking access rights...' : 'Memeriksa hak akses...'} />;
-  }
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(''), 3000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
-  if (!isSuperAdmin) {
-    return (
-      <div>
-        <AdminPageHead title={lang === 'en' ? 'Admin Accounts' : 'Akun Admin'} />
-        <p className="admin-note" style={{ color: 'var(--red)' }}>
-          {lang === 'en'
-            ? 'Access restricted. Only Super Admin can manage accounts and system settings.'
-            : 'Akses terbatas. Hanya Super Admin yang dapat mengelola akun dan pengaturan sistem.'}
-        </p>
-      </div>
+  const moduleName = (code: string) => {
+    const found = modules.find((m) => m.code === code);
+    return found ? tr(found.name, lang) : code;
+  };
+
+  function openForm(user: AdminUserData | null) {
+    setEditingId(user ? user.id : null);
+    setForm(
+      user
+        ? {
+            name: user.name,
+            email: user.email,
+            password: '',
+            role: user.role,
+            permissions: user.permissions.filter((p) => p !== '*'),
+            active: user.active,
+          }
+        : emptyForm(),
     );
-  }
-
-  function openAdd() {
-    setEditingId(null);
-    setForm(emptyForm);
+    setFormErrors({});
     setFormError('');
     setFormOpen(true);
   }
 
-  function openEdit(user: AdminUser) {
-    setEditingId(user.id);
-    setForm({
-      name: user.name,
-      email: user.email,
-      password: '',
-      role: user.role,
-      permissions: user.permissions || [],
-      active: user.active,
-    });
-    setFormError('');
-    setFormOpen(true);
+  function togglePermission(code: string) {
+    setForm((current) => ({
+      ...current,
+      permissions: current.permissions.includes(code)
+        ? current.permissions.filter((p) => p !== code)
+        : [...current.permissions, code],
+    }));
   }
 
-  function togglePermission(perm: string) {
-    setForm((prev) => {
-      const has = prev.permissions.includes(perm);
-      return {
-        ...prev,
-        permissions: has ? prev.permissions.filter((p) => p !== perm) : [...prev.permissions, perm],
-      };
-    });
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setFormError('');
-
+    setFormErrors({});
+    const body: Record<string, unknown> = {
+      name: form.name.trim(),
+      email: form.email.trim(),
+      role: form.role,
+      permissions: form.role === 'super_admin' ? [] : form.permissions,
+      active: form.active,
+    };
+    if (form.password) body.password = form.password;
     try {
       if (editingId) {
-        await api(`/admin/users/${encodeURIComponent(editingId)}`, {
-          method: 'PUT',
-          body: {
-            name: form.name,
-            email: form.email,
-            password: form.password || undefined,
-            role: form.role,
-            permissions: form.role === 'super_admin' ? [] : form.permissions,
-            active: form.active,
-          },
-        });
+        await api(`/admin/users/${editingId}`, { method: 'PUT', body });
       } else {
         if (!form.password) {
-          setFormError(lang === 'en' ? 'Password is required for new accounts.' : 'Kata sandi wajib diisi untuk akun baru.');
-          setSaving(false);
+          setFormError(t('Kata sandi wajib diisi untuk akun baru.', 'Password is required for new accounts.'));
           return;
         }
-        await api('/admin/users', {
-          method: 'POST',
-          body: {
-            name: form.name,
-            email: form.email,
-            password: form.password,
-            role: form.role,
-            permissions: form.role === 'super_admin' ? [] : form.permissions,
-            active: form.active,
-          },
-        });
+        await api('/admin/users', { method: 'POST', body });
       }
-
       setFormOpen(false);
+      setNotice(t('Akun tersimpan.', 'Account saved.'));
       await refresh();
     } catch (err) {
-      setFormError(errorMessage(err));
+      if (err instanceof ApiError && err.status === 422) {
+        setFormErrors(err.errors);
+        setFormError(err.message);
+      } else {
+        setFormError(errorMessage(err));
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  async function toggleActive(user: AdminUser) {
-    if (!window.confirm(
-      lang === 'en'
-        ? `Are you sure you want to ${user.active ? 'deactivate' : 'activate'} ${user.name}?`
-        : `Yakin ingin ${user.active ? 'menonaktifkan' : 'mengaktifkan'} ${user.name}?`
-    )) {
-      return;
-    }
+  async function toggleActive(user: AdminUserData) {
+    const question = user.active
+      ? t(`Nonaktifkan akun ${user.name}?`, `Deactivate ${user.name}?`)
+      : t(`Aktifkan akun ${user.name}?`, `Activate ${user.name}?`);
+    if (!window.confirm(question)) return;
+    setError('');
     try {
-      await api(`/admin/users/${encodeURIComponent(user.id)}`, {
-        method: 'PUT',
-        body: { active: !user.active },
-      });
+      await api(`/admin/users/${user.id}`, { method: 'PUT', body: { active: !user.active } });
       await refresh();
     } catch (err) {
       setError(errorMessage(err));
     }
   }
 
-  async function handleGuideSave(event: FormEvent<HTMLFormElement>) {
+  async function saveGuide(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (guideSaving) return;
     setGuideSaving(true);
     setGuideError('');
-    setGuideNotice('');
     try {
       const formData = new FormData();
       formData.append('title', guide.title);
       formData.append('type', guide.type);
-      if (guide.type === 'url') {
-        formData.append('url', guide.url);
-      }
-      if (guide.type === 'file' && guideFile) {
-        formData.append('file', guideFile);
-      }
-
-      await api('/admin/help-guide', {
-        method: 'POST',
-        formData,
-      });
-
-      setGuideNotice(lang === 'en' ? 'Help guide settings saved successfully!' : 'Pengaturan petunjuk penggunaan berhasil disimpan!');
+      if (guide.type === 'url') formData.append('url', guide.url);
+      if (guide.type === 'file' && guideFile) formData.append('file', guideFile);
+      const saved = await api<HelpGuide>('/admin/help-guide', { method: 'POST', formData });
+      setGuide(saved);
       setGuideFile(null);
-      await refresh();
+      setNotice(t('Pengaturan petunjuk penggunaan tersimpan.', 'Help guide settings saved.'));
     } catch (err) {
       setGuideError(errorMessage(err));
     } finally {
@@ -245,323 +208,207 @@ export default function AdminUsers() {
     }
   }
 
-  const columns: Column<AdminUser>[] = [
-    { key: 'name', label: lang === 'en' ? 'Name' : 'Nama' },
+  const columns: Column<AdminUserData>[] = [
+    { key: 'name', label: t('Nama', 'Name'), render: (u) => <strong>{u.name}</strong> },
     { key: 'email', label: 'Email', render: (u) => <span className="mono">{u.email}</span> },
-    {
-      key: 'role',
-      label: 'Role',
-      render: (u) => (u.role === 'super_admin' ? 'Super Admin' : 'Admin Staff'),
-    },
+    { key: 'role', label: 'Role', render: (u) => (u.role === 'super_admin' ? 'Super Admin' : 'Admin') },
     {
       key: 'permissions',
-      label: lang === 'en' ? 'Access Modules' : 'Modul Akses',
-      render: (user) =>
-        user.role === 'super_admin'
-          ? (lang === 'en' ? 'All modules (Super Admin)' : 'Semua modul (Super Admin)')
-          : (user.permissions || []).length > 0
-          ? (user.permissions || []).join(', ')
-          : '—',
+      label: t('Modul akses', 'Modules'),
+      render: (u) =>
+        u.role === 'super_admin' || u.permissions.includes('*')
+          ? t('Semua modul', 'All modules')
+          : u.permissions.length > 0
+            ? u.permissions.map(moduleName).join(', ')
+            : '—',
     },
+    { key: 'lastLoginAt', label: t('Login terakhir', 'Last login'), render: (u) => formatDateTime(u.lastLoginAt, lang) },
     {
       key: 'active',
       label: 'Status',
-      render: (user) => (
-        <StatusBadge
-          label={
-            user.active
-              ? lang === 'en' ? 'Active' : 'Aktif'
-              : lang === 'en' ? 'Inactive' : 'Nonaktif'
-          }
-          tone={user.active ? 'ok' : 'bad'}
-          small
-        />
-      ),
+      render: (u) => <StatusBadge label={u.active ? t('Aktif', 'Active') : t('Nonaktif', 'Inactive')} tone={u.active ? 'ok' : 'bad'} small />,
     },
     {
       key: 'act',
-      label: lang === 'en' ? 'Action' : 'Aksi',
-      render: (user) => (
-        <RowActions
-          actions={[
-            { label: lang === 'en' ? 'Edit' : 'Edit', onClick: () => openEdit(user) },
-            user.active
-              ? { label: lang === 'en' ? 'Deactivate' : 'Nonaktifkan', tone: 'danger', onClick: () => void toggleActive(user) }
-              : { label: lang === 'en' ? 'Activate' : 'Aktifkan', tone: 'success', onClick: () => void toggleActive(user) },
-          ]}
-        />
-      ),
+      label: t('Aksi', 'Actions'),
+      render: (u) => {
+        const isSelf = admin !== null && String(u.id) === admin.id;
+        const actions: RowAction[] = [{ label: 'Edit', onClick: () => openForm(u) }];
+        actions.push(
+          u.active
+            ? { label: t('Nonaktifkan', 'Deactivate'), tone: 'danger', disabled: isSelf, onClick: () => void toggleActive(u) }
+            : { label: t('Aktifkan', 'Activate'), tone: 'success', onClick: () => void toggleActive(u) },
+        );
+        return <RowActions actions={actions} />;
+      },
     },
   ];
 
   return (
     <div>
       <AdminPageHead
-        title={lang === 'en' ? 'Admin Accounts & System Settings' : 'Akun Admin & Pengaturan Sistem'}
-        desc={
-          lang === 'en'
-            ? 'Manage back-office accounts, module permissions, and application help guide.'
-            : 'Kelola akun pengelola back-office, hak akses per modul, dan petunjuk penggunaan aplikasi.'
-        }
-        action={
-          activeTab === 'users'
-            ? {
-                label: lang === 'en' ? 'Add Account' : 'Tambah akun',
-                icon: 'plus',
-                onClick: openAdd,
-              }
-            : undefined
-        }
+        title={t('Akun Admin', 'Admin Accounts')}
+        desc={t(
+          'Kelola akun back-office, hak akses per modul, dan petunjuk penggunaan aplikasi.',
+          'Manage back-office accounts, module permissions, and the application help guide.',
+        )}
+        action={tab === 'users' && isSuperAdmin ? { label: t('Tambah akun', 'Add account'), icon: 'plus', onClick: () => openForm(null) } : undefined}
       />
 
-      {/* 2 TOMBOL TERPISAH DI MENU SETTINGS */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          className={`btn ${activeTab === 'users' ? 'btn-solid' : 'btn-line'}`}
-          onClick={() => setActiveTab('users')}
-          style={{ gap: 8 }}
-        >
-          <Icon name="users" size={17} />
-          {lang === 'en' ? 'Manage Admin Users' : 'Kelola User / Akun Admin'}
-        </button>
-
-        <button
-          type="button"
-          className={`btn ${activeTab === 'guide' ? 'btn-solid' : 'btn-line'}`}
-          onClick={() => setActiveTab('guide')}
-          style={{ gap: 8 }}
-        >
-          <Icon name="compass" size={17} />
-          {lang === 'en' ? 'Help Guide Settings' : 'Pengaturan Petunjuk Penggunaan'}
+      <div className="admin-tabs">
+        {isSuperAdmin && (
+          <button type="button" className={`admin-tab${tab === 'users' ? ' is-active' : ''}`} onClick={() => setTab('users')}>
+            <Icon name="users" size={15} /> {t('Akun admin', 'Admin accounts')}
+          </button>
+        )}
+        <button type="button" className={`admin-tab${tab === 'guide' ? ' is-active' : ''}`} onClick={() => setTab('guide')}>
+          <Icon name="compass" size={15} /> {t('Petunjuk penggunaan', 'Help guide')}
         </button>
       </div>
 
-      {error && <p className="form-error" style={{ marginBottom: 16 }}>{error}</p>}
-
-      {/* TAB 1: KELOLA USER / AKUN ADMIN */}
-      {activeTab === 'users' && (
-        <div>
-          <DataTable
-            columns={columns}
-            rows={rows}
-            empty={
-              loading
-                ? lang === 'en' ? 'Loading accounts...' : 'Memuat akun...'
-                : lang === 'en' ? 'No admin accounts available.' : 'Akun admin belum tersedia.'
-            }
-          />
+      {notice && (
+        <div className="admin-toast" role="status">
+          {notice}
         </div>
       )}
+      {error && <p className="form-error">{error}</p>}
 
-      {/* TAB 2: PENGATURAN PETUNJUK PENGGUNAAN */}
-      {activeTab === 'guide' && (
-        <div>
-          <AdminCard title={lang === 'en' ? 'Help Guide & Usage Manual Settings' : 'Pengaturan Petunjuk Penggunaan Aplikasi'}>
-            <p className="admin-note" style={{ marginBottom: 18 }}>
-              {lang === 'en'
-                ? 'Configure the help guide opened when admins click "Petunjuk Penggunaan" in the profile menu. You can set a URL link or upload a document (PDF, DOCX, PPT).'
-                : 'Atur petunjuk penggunaan yang akan muncul saat admin mengklik tombol "Petunjuk Penggunaan" di menu profil. Bisa berupa tautan URL atau dokumen (PDF, DOCX, PPT).'}
-            </p>
+      {tab === 'users' && isSuperAdmin && (
+        <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat akun...', 'Loading accounts...') : t('Belum ada akun admin.', 'No admin accounts yet.')} />
+      )}
 
-            {guideNotice && (
-              <div className="admin-toast" role="status" style={{ marginBottom: 18 }}>
-                {guideNotice}
-              </div>
+      {tab === 'guide' && (
+        <AdminCard title={t('Petunjuk penggunaan aplikasi', 'Application help guide')}>
+          <p className="admin-note" style={{ marginBottom: 18 }}>
+            {t(
+              'Dibuka saat admin mengklik "Petunjuk Penggunaan" di menu profil. Bisa berupa tautan URL atau dokumen (PDF).',
+              'Opened when admins click "Help & User Manual" in the profile menu. Either a URL or an uploaded document (PDF).',
             )}
-            {guideError && <p className="form-error" role="alert" style={{ marginBottom: 18 }}>{guideError}</p>}
-
-            <form className="admin-form" onSubmit={(e) => void handleGuideSave(e)}>
-              <div>
-                <label>
-                  <span className="field-label">{lang === 'en' ? 'Guide Title' : 'Judul Petunjuk'}</span>
-                  <input
-                    value={guide.title}
-                    onChange={(e) => setGuide({ ...guide, title: e.target.value })}
-                    placeholder="Contoh: Petunjuk Penggunaan Back-office PT IKN"
-                    required
-                  />
-                </label>
-              </div>
-
-              <div style={{ marginTop: 14 }}>
-                <span className="field-label" style={{ display: 'block', marginBottom: 8 }}>
-                  {lang === 'en' ? 'Guide Source Type' : 'Tipe Sumber Petunjuk'}
-                </span>
-                <SegmentedRadio<'file' | 'url'>
-                  name="helpGuideSourceType"
-                  value={guide.type}
-                  onChange={(val) => setGuide({ ...guide, type: val })}
-                  options={[
-                    { value: 'url', label: lang === 'en' ? 'URL Link (Web / Drive)' : 'Tautan URL (Web / Drive)' },
-                    { value: 'file', label: lang === 'en' ? 'Upload Document File' : 'Unggah Dokumen (PDF, DOCX, PPT)' },
-                  ]}
-                />
-              </div>
-
-              {guide.type === 'url' ? (
-                <label style={{ marginTop: 14 }}>
-                  <span className="field-label">{lang === 'en' ? 'Help Guide URL Link' : 'Tautan URL Petunjuk'}</span>
-                  <input
-                    type="url"
-                    value={guide.url}
-                    onChange={(e) => setGuide({ ...guide, url: e.target.value })}
-                    placeholder="https://example.com/petunjuk-penggunaan.pdf"
-                    required={guide.type === 'url'}
-                  />
-                </label>
-              ) : (
-                <div style={{ marginTop: 14 }}>
-                  <FileUploadDropzone
-                    label={lang === 'en' ? 'Upload Document File' : 'Unggah File Dokumen Petunjuk'}
-                    accept=".pdf,.doc,.docx,.ppt,.pptx"
-                    selectedFile={guideFile}
-                    onFileSelect={(file) => setGuideFile(file)}
-                    activeFilePath={guide.filePath}
-                    activeFileName={guide.fileName}
-                    helperText={lang === 'en' ? 'Supported formats: PDF, DOCX, PPT, PPTX (Max 20MB)' : 'Format didukung: PDF, DOCX, PPT, PPTX (Maks 20MB)'}
-                  />
-                </div>
-              )}
-
-              <div style={{ marginTop: 12 }}>
-                <button type="submit" className="btn btn-solid btn-sm" disabled={guideSaving}>
-                  {guideSaving
-                    ? lang === 'en' ? 'Saving...' : 'Menyimpan...'
-                    : lang === 'en' ? 'Save Help Guide Settings' : 'Simpan Pengaturan Petunjuk'}
-                </button>
-              </div>
-            </form>
-          </AdminCard>
-        </div>
-      )}
-
-      {/* MODAL FORM TAMBAH / EDIT AKUN ADMIN */}
-      {formOpen && (
-        <div className="admin-modal-backdrop" onClick={() => setFormOpen(false)}>
-          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-head">
-              <h2>
-                {editingId
-                  ? lang === 'en' ? 'Edit Admin Account' : 'Edit Akun Admin'
-                  : lang === 'en' ? 'Add New Admin Account' : 'Tambah Akun Admin Baru'}
-              </h2>
-              <button type="button" className="admin-modal-close" onClick={() => setFormOpen(false)}>
-                ✕
+          </p>
+          {guideError && (
+            <p className="form-error" role="alert">
+              {guideError}
+            </p>
+          )}
+          <form className="admin-form" onSubmit={(event) => void saveGuide(event)} style={{ maxWidth: 720 }}>
+            <label>
+              <span className="field-label">{t('Judul petunjuk', 'Guide title')}</span>
+              <input value={guide.title} onChange={(e) => setGuide({ ...guide, title: e.target.value })} required maxLength={150} />
+            </label>
+            <div>
+              <span className="field-label" style={{ display: 'block', marginBottom: 8 }}>
+                {t('Tipe sumber', 'Source type')}
+              </span>
+              <SegmentedRadio<'url' | 'file'>
+                name="helpGuideType"
+                value={guide.type}
+                onChange={(type) => setGuide((current) => ({ ...current, type }))}
+                options={[
+                  { value: 'url', label: t('Tautan URL', 'URL link') },
+                  { value: 'file', label: t('Unggah dokumen', 'Upload document') },
+                ]}
+              />
+            </div>
+            {guide.type === 'url' ? (
+              <label>
+                <span className="field-label">{t('Tautan URL', 'URL link')}</span>
+                <input type="url" value={guide.url} onChange={(e) => setGuide({ ...guide, url: e.target.value })} placeholder="https://..." required />
+              </label>
+            ) : (
+              <FileUploadDropzone
+                label={t('Berkas petunjuk', 'Guide document')}
+                accept=".pdf,application/pdf"
+                selectedFile={guideFile}
+                onFileSelect={setGuideFile}
+                activeFilePath={guide.file?.url}
+                activeFileName={guide.file?.originalName}
+                helperText={t('Format PDF, maks 20MB.', 'PDF format, max 20MB.')}
+              />
+            )}
+            <div>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={guideSaving}>
+                {guideSaving ? t('Menyimpan...', 'Saving...') : t('Simpan petunjuk', 'Save help guide')}
               </button>
             </div>
+          </form>
+        </AdminCard>
+      )}
 
-            {formError && <p className="form-error">{formError}</p>}
-
-            <form onSubmit={(e) => void handleSubmit(e)}>
-              <div className="admin-form">
-                <label>
-                  <span className="field-label">{lang === 'en' ? 'Full Name' : 'Nama Lengkap'}</span>
-                  <input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    required
-                  />
-                </label>
-
-                <label>
-                  <span className="field-label">Email</span>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    required
-                  />
-                </label>
-
-                <label>
-                  <span className="field-label">
-                    {lang === 'en' ? 'Password' : 'Kata Sandi'}
-                    {editingId && (
-                      <span style={{ fontWeight: 'normal', color: 'var(--ink-soft)', marginLeft: 6 }}>
-                        ({lang === 'en' ? 'leave blank if unchanged' : 'kosongkan jika tidak diubah'})
-                      </span>
-                    )}
-                  </span>
-                  <input
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    required={!editingId}
-                  />
-                </label>
-
-                <label>
-                  <span className="field-label">Role</span>
-                  <select
-                    value={form.role}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        role: e.target.value as 'super_admin' | 'admin',
-                      })
-                    }
-                  >
-                    <option value="admin">Admin Staff (Akses Terbatas)</option>
-                    <option value="super_admin">Super Admin (Akses Penuh)</option>
-                  </select>
-                </label>
-
-                {form.role === 'admin' && (
-                  <div>
-                    <span className="field-label" style={{ display: 'block', marginBottom: 8 }}>
-                      {lang === 'en' ? 'Module Permissions' : 'Hak Akses Modul'}
-                    </span>
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-                        gap: 8,
-                      }}
-                    >
-                      {permissionList.map(([key, label]) => {
-                        const checked = form.permissions.includes(key);
-                        return (
-                          <label
-                            key={key}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              fontSize: '0.84rem',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => togglePermission(key)}
-                            />
-                            {label}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+      {formOpen && (
+        <AdminModal title={editingId ? t('Edit akun admin', 'Edit admin account') : t('Tambah akun admin', 'Add admin account')} onClose={() => setFormOpen(false)}>
+          <form className="admin-form" onSubmit={(event) => void submit(event)}>
+            {formError && (
+              <p className="form-error" role="alert">
+                {formError}
+              </p>
+            )}
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">{t('Nama lengkap', 'Full name')}</span>
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={120} />
+                {firstError(formErrors, 'name') && <small className="cms-field-error">{firstError(formErrors, 'name')}</small>}
+              </label>
+              <label>
+                <span className="field-label">Email</span>
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required maxLength={190} />
+                {firstError(formErrors, 'email') && <small className="cms-field-error">{firstError(formErrors, 'email')}</small>}
+              </label>
+            </div>
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">
+                  {t('Kata sandi', 'Password')}
+                  {editingId ? ` (${t('kosongkan jika tidak diubah', 'leave blank to keep')})` : ''}
+                </span>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required={!editingId}
+                  minLength={8}
+                  autoComplete="new-password"
+                />
+                {firstError(formErrors, 'password') && <small className="cms-field-error">{firstError(formErrors, 'password')}</small>}
+              </label>
+              <label>
+                <span className="field-label">Role</span>
+                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as AdminRole })}>
+                  <option value="admin">{t('Admin (akses per modul)', 'Admin (per-module access)')}</option>
+                  <option value="super_admin">{t('Super Admin (akses penuh)', 'Super Admin (full access)')}</option>
+                </select>
+              </label>
+            </div>
+            {form.role === 'admin' && (
+              <div>
+                <span className="field-label" style={{ display: 'block', marginBottom: 8 }}>
+                  {t('Hak akses modul', 'Module permissions')}
+                </span>
+                <div className="cms-check-grid">
+                  {modules.map((m) => (
+                    <label key={m.code} className="cms-check">
+                      <input type="checkbox" checked={form.permissions.includes(m.code)} onChange={() => togglePermission(m.code)} />
+                      <span>{tr(m.name, lang)}</span>
+                    </label>
+                  ))}
+                </div>
+                {firstError(formErrors, 'permissions') && <small className="cms-field-error">{firstError(formErrors, 'permissions')}</small>}
               </div>
-
-              <div className="admin-modal-actions">
-                <button type="button" className="btn btn-line btn-sm" onClick={() => setFormOpen(false)}>
-                  {lang === 'en' ? 'Cancel' : 'Batal'}
-                </button>
-                <button type="button" className="btn btn-solid btn-sm" disabled={saving} onClick={(e) => {
-                  const formEl = e.currentTarget.closest('div')?.previousElementSibling as HTMLFormElement;
-                  if (formEl) formEl.requestSubmit();
-                }}>
-                  {saving
-                    ? lang === 'en' ? 'Saving...' : 'Menyimpan...'
-                    : lang === 'en' ? 'Save Account' : 'Simpan Akun'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            )}
+            <label className="cms-check">
+              <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
+              <span>{t('Akun aktif', 'Account active')}</span>
+            </label>
+            {firstError(formErrors, 'active') && <small className="cms-field-error">{firstError(formErrors, 'active')}</small>}
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setFormOpen(false)}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>
+                {saving ? t('Menyimpan...', 'Saving...') : t('Simpan akun', 'Save account')}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
       )}
     </div>
   );

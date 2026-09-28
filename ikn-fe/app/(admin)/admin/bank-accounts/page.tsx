@@ -2,32 +2,38 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import StatusBadge from '@/components/StatusBadge';
+import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
-import { api, errorMessage } from '@/lib/api';
-
-interface BankAccountRow {
-  id: string;
-  bank: string;
-  number: string;
-  holder: string;
-  active: boolean;
-}
+import { firstError, type FieldErrors } from '@/components/admin/cms';
+import { useLang } from '@/components/LanguageProvider';
+import { api, ApiError, errorMessage } from '@/lib/api';
+import type { BankAccountRow } from '@/lib/admin';
 
 interface BankForm {
-  bank: string;
-  number: string;
-  holder: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  isActive: boolean;
+  sortOrder: number;
 }
 
-const emptyForm: BankForm = { bank: '', number: '', holder: '' };
+const emptyForm = (sortOrder: number): BankForm => ({ bankName: '', accountNumber: '', accountHolder: 'PT Industri Karet Nusantara', isActive: true, sortOrder });
 
+function formFromRow(row: BankAccountRow): BankForm {
+  return { bankName: row.bankName, accountNumber: row.accountNumber, accountHolder: row.accountHolder, isActive: row.isActive, sortOrder: row.sortOrder };
+}
+
+// Rekening tujuan transfer manual: GET/POST /admin/bank-accounts, PUT/DELETE /admin/bank-accounts/{id}.
 export default function AdminBankAccounts() {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const [rows, setRows] = useState<BankAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<BankForm>(emptyForm);
+  const [editing, setEditing] = useState<BankAccountRow | null>(null);
+  const [form, setForm] = useState<BankForm>(() => emptyForm(0));
+  const [formErrors, setFormErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -46,25 +52,12 @@ export default function AdminBankAccounts() {
     void refresh();
   }, [refresh]);
 
-  function openAdd() {
-    setEditingId(null);
-    setForm(emptyForm);
+  function openForm(row: BankAccountRow | null) {
+    setEditing(row);
+    setForm(row ? formFromRow(row) : emptyForm(rows.length));
+    setFormErrors({});
     setFormError('');
     setFormOpen(true);
-  }
-
-  function openEdit(row: BankAccountRow) {
-    setEditingId(row.id);
-    setForm({ bank: row.bank, number: row.number, holder: row.holder });
-    setFormError('');
-    setFormOpen(true);
-  }
-
-  function closeForm() {
-    setFormOpen(false);
-    setEditingId(null);
-    setForm(emptyForm);
-    setFormError('');
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -72,23 +65,23 @@ export default function AdminBankAccounts() {
     if (saving) return;
     setSaving(true);
     setFormError('');
-    const editing = rows.find((row) => row.id === editingId);
-    const body = {
-      bank: form.bank.trim(),
-      number: form.number.trim(),
-      holder: form.holder.trim(),
-      active: editing ? editing.active : true,
-    };
+    setFormErrors({});
+    const body = { ...form, bankName: form.bankName.trim(), accountNumber: form.accountNumber.trim(), accountHolder: form.accountHolder.trim() };
     try {
-      if (editingId) {
-        await api(`/admin/bank-accounts/${encodeURIComponent(editingId)}`, { method: 'PUT', body });
+      if (editing) {
+        await api(`/admin/bank-accounts/${editing.id}`, { method: 'PUT', body });
       } else {
         await api('/admin/bank-accounts', { method: 'POST', body });
       }
       await refresh();
-      closeForm();
+      setFormOpen(false);
     } catch (err) {
-      setFormError(errorMessage(err));
+      if (err instanceof ApiError && err.status === 422) {
+        setFormErrors(err.errors);
+        setFormError(err.message);
+      } else {
+        setFormError(errorMessage(err));
+      }
     } finally {
       setSaving(false);
     }
@@ -97,10 +90,7 @@ export default function AdminBankAccounts() {
   async function toggleActive(row: BankAccountRow) {
     setError('');
     try {
-      await api(`/admin/bank-accounts/${encodeURIComponent(row.id)}`, {
-        method: 'PUT',
-        body: { bank: row.bank, number: row.number, holder: row.holder, active: !row.active },
-      });
+      await api(`/admin/bank-accounts/${row.id}`, { method: 'PUT', body: { ...formFromRow(row), isActive: !row.isActive } });
       await refresh();
     } catch (err) {
       setError(errorMessage(err));
@@ -108,10 +98,10 @@ export default function AdminBankAccounts() {
   }
 
   async function remove(row: BankAccountRow) {
-    if (!window.confirm(`Hapus rekening ${row.bank} ${row.number}?`)) return;
+    if (!window.confirm(t(`Hapus rekening ${row.bankName} ${row.accountNumber}?`, `Delete account ${row.bankName} ${row.accountNumber}?`))) return;
     setError('');
     try {
-      await api(`/admin/bank-accounts/${encodeURIComponent(row.id)}`, { method: 'DELETE' });
+      await api(`/admin/bank-accounts/${row.id}`, { method: 'DELETE' });
       await refresh();
     } catch (err) {
       setError(errorMessage(err));
@@ -119,25 +109,26 @@ export default function AdminBankAccounts() {
   }
 
   const columns: Column<BankAccountRow>[] = [
-    { key: 'bank', label: 'Bank' },
-    { key: 'number', label: 'Nomor rekening', render: (b) => <span className="mono">{b.number}</span> },
-    { key: 'holder', label: 'Atas nama' },
+    { key: 'bankName', label: 'Bank' },
+    { key: 'accountNumber', label: t('Nomor rekening', 'Account number'), render: (b) => <span className="mono">{b.accountNumber}</span> },
+    { key: 'accountHolder', label: t('Atas nama', 'Account holder') },
+    { key: 'sortOrder', label: t('Urutan', 'Order'), align: 'right', render: (b) => String(b.sortOrder) },
     {
-      key: 'active',
+      key: 'isActive',
       label: 'Status',
-      render: (b) => <StatusBadge label={b.active ? 'Aktif' : 'Nonaktif'} tone={b.active ? 'ok' : 'bad'} small />,
+      render: (b) => <StatusBadge label={b.isActive ? t('Aktif', 'Active') : t('Nonaktif', 'Inactive')} tone={b.isActive ? 'ok' : 'bad'} small />,
     },
     {
       key: 'act',
-      label: 'Aksi',
+      label: t('Aksi', 'Action'),
       render: (b) => (
         <RowActions
           actions={[
-            { label: 'Edit', onClick: () => openEdit(b) },
-            b.active
-              ? { label: 'Nonaktifkan', tone: 'danger', onClick: () => void toggleActive(b) }
-              : { label: 'Aktifkan', tone: 'success', onClick: () => void toggleActive(b) },
-            { label: 'Hapus', tone: 'danger', onClick: () => void remove(b) },
+            { label: 'Edit', onClick: () => openForm(b) },
+            b.isActive
+              ? { label: t('Nonaktifkan', 'Deactivate'), tone: 'danger', onClick: () => void toggleActive(b) }
+              : { label: t('Aktifkan', 'Activate'), tone: 'success', onClick: () => void toggleActive(b) },
+            { label: t('Hapus', 'Delete'), tone: 'danger', onClick: () => void remove(b) },
           ]}
         />
       ),
@@ -147,49 +138,58 @@ export default function AdminBankAccounts() {
   return (
     <div>
       <AdminPageHead
-        title="Akun Bank"
-        desc="Rekening tujuan transfer yang ditampilkan saat checkout."
-        action={{ label: 'Tambah rekening', icon: 'plus', onClick: openAdd }}
+        title={t('Rekening Bank', 'Bank Accounts')}
+        desc={t('Rekening tujuan yang ditampilkan ke customer saat memilih transfer bank manual.', 'Destination accounts shown to customers who choose manual bank transfer.')}
+        action={{ label: t('Tambah rekening', 'Add account'), icon: 'plus', onClick: () => openForm(null) }}
       />
 
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        empty={loading ? 'Memuat rekening...' : 'Belum ada rekening.'}
-      />
+      <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat rekening...', 'Loading accounts...') : t('Belum ada rekening.', 'No bank accounts yet.')} />
 
       {formOpen && (
-        <div className="admin-modal-backdrop" onClick={closeForm}>
-          <div className="admin-modal admin-modal-small" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-head">
-              <h2>{editingId ? 'Edit rekening' : 'Tambah rekening'}</h2>
-              <button type="button" className="admin-modal-close" onClick={closeForm}>✕</button>
+        <AdminModal title={editing ? t('Edit rekening', 'Edit account') : t('Tambah rekening', 'Add account')} onClose={() => setFormOpen(false)} small>
+          <form className="admin-form" onSubmit={(e) => void submit(e)}>
+            {formError && (
+              <p className="admin-form-error" role="alert">
+                {formError}
+              </p>
+            )}
+            <label>
+              <span className="field-label">{t('Nama bank', 'Bank name')} *</span>
+              <input value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} placeholder="Bank BCA" required />
+              {firstError(formErrors, 'bankName') && <small className="cms-field-error">{firstError(formErrors, 'bankName')}</small>}
+            </label>
+            <label>
+              <span className="field-label">{t('Nomor rekening', 'Account number')} *</span>
+              <input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} inputMode="numeric" required />
+              {firstError(formErrors, 'accountNumber') && <small className="cms-field-error">{firstError(formErrors, 'accountNumber')}</small>}
+            </label>
+            <label>
+              <span className="field-label">{t('Atas nama', 'Account holder')} *</span>
+              <input value={form.accountHolder} onChange={(e) => setForm({ ...form, accountHolder: e.target.value })} required />
+              {firstError(formErrors, 'accountHolder') && <small className="cms-field-error">{firstError(formErrors, 'accountHolder')}</small>}
+            </label>
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">{t('Urutan tampil', 'Display order')}</span>
+                <input type="number" min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
+              </label>
+              <label className="cms-check" style={{ alignSelf: 'end' }}>
+                <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
+                <span>{t('Aktif (ditawarkan ke customer)', 'Active (offered to customers)')}</span>
+              </label>
             </div>
-            <form className="admin-form" onSubmit={(event) => void submit(event)}>
-              {formError && <p className="form-error" role="alert">{formError}</p>}
-              <label>
-                <span className="field-label">Bank</span>
-                <input value={form.bank} onChange={(e) => setForm({ ...form, bank: e.target.value })} placeholder="Bank Mandiri" required />
-              </label>
-              <label>
-                <span className="field-label">Nomor rekening</span>
-                <input value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })} required />
-              </label>
-              <label>
-                <span className="field-label">Atas nama</span>
-                <input value={form.holder} onChange={(e) => setForm({ ...form, holder: e.target.value })} required />
-              </label>
-              <div className="admin-modal-actions">
-                <button type="button" className="btn btn-line btn-sm" onClick={closeForm}>Batal</button>
-                <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>
-                  {saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah rekening'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setFormOpen(false)}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>
+                {saving ? t('Menyimpan...', 'Saving...') : editing ? t('Simpan perubahan', 'Save changes') : t('Tambah rekening', 'Add account')}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
       )}
     </div>
   );

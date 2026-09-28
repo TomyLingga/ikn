@@ -1,0 +1,911 @@
+# Fragmen OpenAPI area katalog & konfigurasi commerce (BE-2). Digabung oleh docs/openapi/merge.py.
+tags:
+  - name: catalog
+    description: Katalog publik (kategori, produk, ulasan) dan konfigurasi commerce publik
+  - name: cart
+    description: Quote keranjang (validasi item + hitung total tanpa membuat order)
+  - name: admin-catalog
+    description: Admin kategori, produk, gambar, ulasan, stok
+  - name: admin-commerce-config
+    description: Admin rekening bank, fee, zona/tarif ongkir, voucher, metode bayar, settings commerce
+
+paths:
+  # ---------------------------------------------------------------- katalog publik (kontrak 6)
+  /catalog/categories:
+    get:
+      tags: [catalog]
+      summary: Kategori aktif + jumlah produk published
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Category' } } } } } } }
+  /catalog/products:
+    get:
+      tags: [catalog]
+      summary: Produk published (paginated)
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: 'ILIKE pada name id/en, code, slug, aliases' }
+        - { name: category, in: query, schema: { type: string }, description: slug (atau id) kategori }
+        - { name: sort, in: query, schema: { type: string, enum: [name, price, newest] }, description: 'default: urutan id' }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Product' } }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+  /catalog/products/{slug}:
+    get:
+      tags: [catalog]
+      summary: Detail produk published + reviews (10 terbaru tayang) + related (4 produk kategori sama)
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ProductDetail' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /catalog/products/{slug}/reviews:
+    get:
+      tags: [catalog]
+      summary: Ulasan tayang (paginated, terbaru dulu)
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: perPage, in: query, schema: { type: integer, default: 10 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Review' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ---------------------------------------------------------------- konfigurasi commerce publik (kontrak 9, 10)
+  /commerce/config:
+    get:
+      tags: [catalog]
+      summary: Metode bayar aktif (tanpa config), rekening aktif, fee aktif, settings commerce yang publik
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/CommerceConfig' } } } } } }
+  /payment-methods:
+    get:
+      tags: [catalog]
+      summary: Metode bayar aktif + instruksi + qrisImageUrl (qris_static)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/PaymentMethodPublic' } } } } } } }
+
+  # ---------------------------------------------------------------- cart (kontrak 9)
+  /cart/quote:
+    post:
+      tags: [cart]
+      security: [{ cookieAuth: [] }]
+      summary: Validasi item dan hitung total tanpa membuat order (customer login; belum harus disetujui)
+      description: |
+        Body sama dengan POST /customer/orders. Tanpa `addressId`: `shipping = null`, `availableShippingRates = []`.
+        Dengan `addressId` (alamat milik user): `availableShippingRates[]` dihitung untuk berat keranjang dan
+        `shipping` terisi bila `shippingRateId` termasuk daftar itu. `uniqueCode` bersifat sementara (1–999) bila
+        metode `manual_transfer` dan setting `uniqueCodeEnabled`; nilai final ditetapkan saat checkout.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/QuoteRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/QuoteResult' } } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: INSUFFICIENT_STOCK (meta.items[] { productSlug, requested, available }) atau VOUCHER_INVALID (meta.reason in not_found|inactive|expired|not_started|quota|per_user_limit|min_subtotal|scope)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '422': { description: 'VALIDATION_ERROR: produk tidak ada/unpublished/price_mode=quote (items.N.productSlug), qty < moq (items.N.qty), shippingRateId tidak berlaku, paymentMethodCode tidak aktif, addressId bukan milik user', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  # ---------------------------------------------------------------- admin katalog (kontrak 11.3)
+  /admin/categories:
+    get:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      summary: Semua kategori (modul categories) + productCount termasuk produk soft-deleted
+      parameters: [{ name: q, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Category' } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CategoryInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Category' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/categories/{category}:
+    put:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: category, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CategoryInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Category' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: category, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '409': { description: CATEGORY_IN_USE (masih ada produk, termasuk soft-deleted), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /admin/products:
+    get:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      summary: Daftar produk (modul products), paginated
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string }, description: slug atau id }
+        - { name: published, in: query, schema: { type: boolean } }
+        - { name: trashed, in: query, schema: { type: boolean }, description: sertakan produk soft-deleted }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminProduct' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } } }
+    post:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      summary: Buat produk (+ images[] mediaId berurutan). Stok awal lewat POST /admin/products/{product}/stock.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminProduct' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/products/{product}:
+    get:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: product, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminProduct' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      summary: Ubah produk; images[] (bila dikirim) menggantikan seluruh daftar gambar
+      parameters: [{ name: product, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminProduct' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      summary: Soft delete (ledger dan order_items tetap merujuk produk)
+      parameters: [{ name: product, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/products/{product}/publish:
+    put:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: product, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [isPublished], properties: { isPublished: { type: boolean } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminProduct' } } } } } }
+  /admin/products/{product}/stock:
+    get:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      summary: Ledger stok berpaginasi + ringkasan (modul stock)
+      parameters:
+        - { name: product, in: path, required: true, schema: { type: integer } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/StockSummary'
+                      - type: object
+                        properties:
+                          movements: { type: array, items: { $ref: '#/components/schemas/StockMovement' } }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+    post:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      summary: 'Mutasi stok lewat StockLedger: in (qty > 0) atau adjust (qty ± , tidak boleh membuat available < 0)'
+      parameters: [{ name: product, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, qty]
+              properties:
+                type: { type: string, enum: [in, adjust] }
+                qty: { type: integer, description: 'in: > 0; adjust: bertanda, bukan 0' }
+                note: { type: string, maxLength: 500 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/StockSummary'
+                      - type: object
+                        properties:
+                          movement: { $ref: '#/components/schemas/StockMovement' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/reviews:
+    get:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      summary: Semua ulasan (modul products), paginated
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: isi ulasan / nama customer / produk }
+        - { name: product, in: query, schema: { type: string }, description: slug atau id produk }
+        - { name: published, in: query, schema: { type: boolean } }
+        - { name: page, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Review' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } } }
+  /admin/reviews/{review}:
+    put:
+      tags: [admin-catalog]
+      security: [{ cookieAuth: [] }]
+      summary: Sembunyikan/tampilkan ulasan (rating_avg/review_count produk dihitung ulang)
+      parameters: [{ name: review, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [isPublished], properties: { isPublished: { type: boolean } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Review' } } } } } }
+
+  # ---------------------------------------------------------------- admin konfigurasi commerce (kontrak 11.5)
+  /admin/bank-accounts:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: q, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/BankAccount' } } } } } } }
+    post:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BankAccountInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/BankAccount' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/bank-accounts/{bankAccount}:
+    put:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: bankAccount, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BankAccountInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/BankAccount' } } } } } }
+    delete:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: bankAccount, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/fees:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: q, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Fee' } } } } } } }
+    post:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FeeInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Fee' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/fees/{fee}:
+    put:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: fee, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FeeInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Fee' } } } } } }
+    delete:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: fee, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/shipping-zones:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      summary: Zona + regions[] + rates[] (modul shipping), urut priority desc
+      parameters: [{ name: q, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/ShippingZone' } } } } } } }
+    post:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ShippingZoneInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingZone' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/shipping-zones/{shippingZone}:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: shippingZone, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingZone' } } } } } }
+    put:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      summary: Ubah zona; regions[] (bila dikirim) menggantikan seluruh daftar wilayah
+      parameters: [{ name: shippingZone, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ShippingZoneInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingZone' } } } } } }
+    delete:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      summary: Hapus zona beserta regions dan rates
+      parameters: [{ name: shippingZone, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/shipping-zones/{shippingZone}/rates:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: shippingZone, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/ShippingRate' } } } } } } }
+    post:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: shippingZone, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ShippingRateInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingRate' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/shipping-rates/{shippingRate}:
+    put:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: shippingRate, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ShippingRateInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingRate' } } } } } }
+    delete:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: shippingRate, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/shipping-methods:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      summary: 'Alias kompatibilitas: semua tarif lintas zona (label = name, zone { id, name })'
+      parameters: [{ name: active, in: query, schema: { type: boolean } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/ShippingRate' } } } } } } }
+  /admin/vouchers:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: kode }
+        - { name: active, in: query, schema: { type: boolean } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Voucher' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } } }
+    post:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/VoucherInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Voucher' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/vouchers/{voucher}:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: voucher, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Voucher' } } } } } }
+    put:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: voucher, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/VoucherInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Voucher' } } } } } }
+    delete:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: voucher, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/payment-methods:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      summary: Semua metode bayar (modul payment_methods) + config non-rahasia + qrisImageUrl
+      parameters: [{ name: q, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/PaymentMethod' } } } } } } }
+    post:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentMethodInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/PaymentMethod' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/payment-methods/{paymentMethod}:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: paymentMethod, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/PaymentMethod' } } } } } }
+    put:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      summary: Ubah metode bayar (tidak ada DELETE; nonaktifkan lewat isActive). config dipertahankan bila tidak dikirim.
+      parameters: [{ name: paymentMethod, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentMethodInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/PaymentMethod' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/settings:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      summary: Pengaturan commerce (modul settings). Pengaturan situs ada di /admin/site-settings.
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/CommerceSettings' } } } } } }
+    put:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      summary: Ubah sebagian/seluruh pengaturan commerce (kunci asing diabaikan)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CommerceSettings' } } } }
+      responses:
+        '200': { description: '{ data, message }', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/CommerceSettings' }, message: { type: string } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+components:
+  schemas:
+    Category:
+      type: object
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { $ref: '#/components/schemas/I18n' }
+        description: { $ref: '#/components/schemas/I18n' }
+        image: { $ref: '#/components/schemas/MediaSummary', nullable: true }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+        productCount: { type: integer, description: 'publik: produk published; admin: termasuk soft-deleted' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CategoryInput:
+      type: object
+      required: [name]
+      properties:
+        slug: { type: string, maxLength: 120, description: dibuat dari name.id bila kosong }
+        name: { $ref: '#/components/schemas/I18n' }
+        description: { $ref: '#/components/schemas/I18n' }
+        imageMediaId: { type: integer, nullable: true }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+    I18nList:
+      type: object
+      description: Daftar string per bahasa; input boleh string[] (dianggap id) — en kosong diisi dari id
+      properties:
+        id: { type: array, items: { type: string } }
+        en: { type: array, items: { type: string } }
+    ProductImage:
+      type: object
+      properties:
+        id: { type: integer, description: media id }
+        url: { type: string }
+        sort: { type: integer }
+    Product:
+      type: object
+      description: Bentuk publik (kontrak bagian 6). Uang integer rupiah.
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        code: { type: string }
+        name: { $ref: '#/components/schemas/I18n' }
+        category: { type: object, nullable: true, properties: { slug: { type: string }, name: { $ref: '#/components/schemas/I18n' } } }
+        kind: { type: string, nullable: true }
+        priceMode: { type: string, enum: [fixed, quote] }
+        price: { type: integer, nullable: true, description: null untuk quote }
+        promoPrice: { type: integer, nullable: true, description: hanya terisi bila promo sedang aktif }
+        promoEndsAt: { type: string, format: date-time, nullable: true }
+        effectivePrice: { type: integer, nullable: true, description: promoPrice bila aktif, selain itu price }
+        unit: { type: string }
+        moq: { type: integer }
+        weightGram: { type: integer }
+        stock: { type: integer }
+        available: { type: integer, description: stock − reserved }
+        stockStatus: { type: string, enum: [in_stock, made_to_order, out_of_stock] }
+        isTaxable: { type: boolean }
+        images: { type: array, items: { $ref: '#/components/schemas/ProductImage' } }
+        image: { type: string, nullable: true, description: URL gambar pertama }
+        summary: { $ref: '#/components/schemas/I18n' }
+        highlights: { $ref: '#/components/schemas/I18nList' }
+        specs: { type: array, items: { type: array, items: { type: string }, minItems: 2, maxItems: 2 } }
+        applications: { $ref: '#/components/schemas/I18nList' }
+        solubility: { type: array, items: { type: array, items: { type: string }, minItems: 2, maxItems: 2 } }
+        aliases: { type: array, items: { type: string } }
+        ratingAvg: { type: number, example: 4.5 }
+        reviewCount: { type: integer }
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          properties:
+            reviews: { type: array, items: { $ref: '#/components/schemas/Review' }, description: 10 ulasan tayang terbaru }
+            related: { type: array, items: { $ref: '#/components/schemas/Product' }, description: maks 4 produk published kategori sama }
+    AdminProduct:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          properties:
+            categoryId: { type: integer }
+            category: { type: object, properties: { id: { type: integer }, slug: { type: string }, name: { $ref: '#/components/schemas/I18n' } } }
+            promoPrice: { type: integer, nullable: true, description: nilai tersimpan (tanpa memandang periode) }
+            promoStartsAt: { type: string, format: date-time, nullable: true }
+            promoEndsAt: { type: string, format: date-time, nullable: true }
+            promoActive: { type: boolean }
+            reserved: { type: integer }
+            isPublished: { type: boolean }
+            images:
+              type: array
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/ProductImage'
+                  - type: object
+                    properties:
+                      mediaId: { type: integer }
+                      media: { $ref: '#/components/schemas/MediaSummary' }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+            deletedAt: { type: string, format: date-time, nullable: true }
+    ProductInput:
+      type: object
+      required: [code, categoryId, name, priceMode]
+      properties:
+        slug: { type: string, maxLength: 160, description: dibuat dari name.id bila kosong }
+        code: { type: string, maxLength: 64 }
+        categoryId: { type: integer }
+        name: { $ref: '#/components/schemas/I18n' }
+        kind: { type: string, maxLength: 120 }
+        summary: { $ref: '#/components/schemas/I18n' }
+        highlights: { $ref: '#/components/schemas/I18nList' }
+        specs: { type: array, items: { type: array, items: { type: string }, minItems: 2, maxItems: 2 } }
+        applications: { $ref: '#/components/schemas/I18nList' }
+        solubility: { type: array, items: { type: array, items: { type: string }, minItems: 2, maxItems: 2 } }
+        aliases: { type: array, items: { type: string } }
+        priceMode: { type: string, enum: [fixed, quote] }
+        price: { type: integer, minimum: 0, description: wajib bila priceMode=fixed; diabaikan untuk quote }
+        promoPrice: { type: integer, minimum: 0, nullable: true }
+        promoStartsAt: { type: string, format: date-time, nullable: true }
+        promoEndsAt: { type: string, format: date-time, nullable: true }
+        unit: { type: string, maxLength: 32, default: pcs }
+        moq: { type: integer, minimum: 1, default: 1 }
+        weightGram: { type: integer, minimum: 1, default: 1000 }
+        stockStatus: { type: string, enum: [in_stock, made_to_order, out_of_stock], description: 'hanya made_to_order yang bertahan; lainnya diturunkan dari available' }
+        isTaxable: { type: boolean, default: true }
+        isPublished: { type: boolean, default: false }
+        images: { type: array, maxItems: 20, items: { type: integer }, description: media id berurutan (sort_order = indeks) }
+    Review:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        productSlug: { type: string }
+        productName: { $ref: '#/components/schemas/I18n' }
+        userId: { type: integer }
+        customer: { type: string, nullable: true, description: nama user }
+        orderId: { type: integer, nullable: true }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        body: { type: string, nullable: true }
+        isPublished: { type: boolean }
+        date: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    StockSummary:
+      type: object
+      properties:
+        product: { type: object, properties: { id: { type: integer }, slug: { type: string }, code: { type: string }, name: { $ref: '#/components/schemas/I18n' } } }
+        stock: { type: integer }
+        reserved: { type: integer }
+        available: { type: integer }
+        stockStatus: { type: string, enum: [in_stock, made_to_order, out_of_stock] }
+    StockMovement:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        type: { type: string, enum: [in, adjust, reserve, release, commit] }
+        qty: { type: integer, description: 'bertanda: in/adjust ±, reserve +, release/commit −' }
+        referenceType: { type: string, nullable: true, example: order }
+        referenceId: { type: integer, nullable: true }
+        idempotencyKey: { type: string, nullable: true, example: 'order:43:reserve:3' }
+        note: { type: string, nullable: true }
+        createdBy: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string } } }
+        createdAt: { type: string, format: date-time }
+    QuoteRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [qty]
+            properties:
+              productSlug: { type: string }
+              productId: { type: integer, description: alternatif productSlug }
+              qty: { type: integer, minimum: 1 }
+        addressId: { type: integer, nullable: true }
+        shippingRateId: { type: integer, nullable: true }
+        paymentMethodCode: { type: string, nullable: true, example: manual_transfer }
+        bankAccountId: { type: integer, nullable: true, description: diterima, tidak dipakai quote }
+        voucherCode: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+    QuoteItem:
+      type: object
+      properties:
+        productId: { type: integer }
+        productSlug: { type: string }
+        code: { type: string }
+        name: { $ref: '#/components/schemas/I18n' }
+        unit: { type: string }
+        image: { type: string, nullable: true }
+        categoryId: { type: integer }
+        qty: { type: integer }
+        moq: { type: integer }
+        unitPrice: { type: integer, description: harga berlaku (promo bila aktif) }
+        basePrice: { type: integer }
+        promoApplied: { type: boolean }
+        lineTotal: { type: integer }
+        discountAmount: { type: integer, description: alokasi proporsional diskon voucher }
+        taxAmount: { type: integer }
+        isTaxable: { type: boolean }
+        weightGram: { type: integer, description: berat × qty }
+        available: { type: integer }
+    ShippingRateQuote:
+      type: object
+      properties:
+        rateId: { type: integer }
+        zoneId: { type: integer }
+        label: { $ref: '#/components/schemas/I18n' }
+        eta: { $ref: '#/components/schemas/I18n', nullable: true }
+        amount: { type: integer }
+        type: { type: string, enum: [flat, per_kg] }
+        weightGram: { type: integer, description: hanya pada shipping terpilih }
+    QuoteResult:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/QuoteItem' } }
+        subtotal: { type: integer }
+        discountTotal: { type: integer }
+        voucher: { type: object, nullable: true, properties: { id: { type: integer }, code: { type: string }, type: { type: string, enum: [percent, fixed] }, value: { type: number } } }
+        shipping: { $ref: '#/components/schemas/ShippingRateQuote', nullable: true }
+        availableShippingRates: { type: array, items: { $ref: '#/components/schemas/ShippingRateQuote' } }
+        shippingTotal: { type: integer }
+        fees: { type: array, items: { type: object, properties: { id: { type: integer }, name: { $ref: '#/components/schemas/I18n' }, type: { type: string }, amount: { type: integer } } } }
+        feeTotal: { type: integer }
+        taxRate: { type: number, example: 11 }
+        priceIncludesTax: { type: boolean }
+        taxTotal: { type: integer, description: informasi bila inklusif; ditambahkan ke grandTotal bila eksklusif }
+        paymentMethodCode: { type: string, nullable: true }
+        uniqueCodeRequired: { type: boolean, description: manual_transfer + setting uniqueCodeEnabled }
+        uniqueCode: { type: integer, description: 'sementara 1–999 (0 bila tidak berlaku); final ditetapkan saat checkout' }
+        grandTotal: { type: integer, description: subtotal − diskon + ongkir + fee + (pajak bila eksklusif) + uniqueCode }
+        weightGram: { type: integer }
+        warnings: { type: array, items: { type: string, enum: [no_shipping_rate, shipping_rate_ignored_without_address] } }
+    PaymentMethodPublic:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string, example: manual_transfer }
+        type: { type: string, enum: [manual_transfer, qris_static, qris_dynamic, virtual_account, ewallet] }
+        driver: { type: string, enum: [manual, xendit] }
+        name: { $ref: '#/components/schemas/I18n' }
+        instructions: { $ref: '#/components/schemas/I18n' }
+        qrisImageUrl: { type: string, nullable: true, description: hanya qris_static }
+        sortOrder: { type: integer }
+    CommerceConfig:
+      type: object
+      properties:
+        paymentMethods: { type: array, items: { $ref: '#/components/schemas/PaymentMethodPublic' } }
+        bankAccounts: { type: array, items: { type: object, properties: { id: { type: integer }, bankName: { type: string }, accountNumber: { type: string }, accountHolder: { type: string }, isActive: { type: boolean } } } }
+        fees: { type: array, items: { $ref: '#/components/schemas/Fee' } }
+        paymentDueHours: { type: integer }
+        taxRate: { type: number }
+        priceIncludesTax: { type: boolean }
+        uniqueCodeEnabled: { type: boolean }
+        autoCompleteDays: { type: integer }
+    BankAccount:
+      type: object
+      properties:
+        id: { type: integer }
+        bankName: { type: string }
+        accountNumber: { type: string }
+        accountHolder: { type: string }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    BankAccountInput:
+      type: object
+      required: [bankName, accountNumber, accountHolder]
+      properties:
+        bankName: { type: string, maxLength: 120 }
+        accountNumber: { type: string, maxLength: 64 }
+        accountHolder: { type: string, maxLength: 160 }
+        isActive: { type: boolean, default: true }
+        sortOrder: { type: integer }
+    Fee:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { $ref: '#/components/schemas/I18n' }
+        type: { type: string, enum: [admin, other] }
+        amount: { type: integer }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    FeeInput:
+      type: object
+      required: [name, amount]
+      properties:
+        name: { $ref: '#/components/schemas/I18n' }
+        type: { type: string, enum: [admin, other], default: other }
+        amount: { type: integer, minimum: 0 }
+        isActive: { type: boolean, default: true }
+        sortOrder: { type: integer }
+    ShippingZone:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { $ref: '#/components/schemas/I18n' }
+        isActive: { type: boolean }
+        isDefault: { type: boolean, description: zona cadangan bila alamat tidak cocok zona mana pun }
+        priority: { type: integer, description: lebih besar menang saat level wilayah sama }
+        regions: { type: array, items: { type: object, properties: { code: { type: string, example: '12.71' }, level: { type: string, enum: [province, regency, district, village] } } } }
+        rates: { type: array, items: { $ref: '#/components/schemas/ShippingRate' } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ShippingZoneInput:
+      type: object
+      required: [name]
+      properties:
+        name: { $ref: '#/components/schemas/I18n' }
+        isActive: { type: boolean, default: true }
+        isDefault: { type: boolean, default: false }
+        priority: { type: integer, default: 0 }
+        regions: { type: array, items: { type: object, required: [code, level], properties: { code: { type: string, maxLength: 16 }, level: { type: string, enum: [province, regency, district, village] } } } }
+    ShippingRate:
+      type: object
+      description: 'amount = max(minAmount, baseAmount + perKgAmount × ceil(kg)); 0 bila subtotal − diskon ≥ freeAbove'
+      properties:
+        id: { type: integer }
+        zoneId: { type: integer }
+        zone: { type: object, properties: { id: { type: integer }, name: { $ref: '#/components/schemas/I18n' } } }
+        name: { $ref: '#/components/schemas/I18n' }
+        label: { $ref: '#/components/schemas/I18n', description: sama dengan name (alias FE lama) }
+        type: { type: string, enum: [flat, per_kg] }
+        baseAmount: { type: integer }
+        perKgAmount: { type: integer }
+        minAmount: { type: integer }
+        freeAbove: { type: integer, nullable: true }
+        eta: { $ref: '#/components/schemas/I18n', nullable: true }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ShippingRateInput:
+      type: object
+      required: [name, type]
+      properties:
+        zoneId: { type: integer, description: hanya pada PUT untuk memindahkan rate }
+        name: { $ref: '#/components/schemas/I18n' }
+        type: { type: string, enum: [flat, per_kg] }
+        baseAmount: { type: integer, minimum: 0, default: 0 }
+        perKgAmount: { type: integer, minimum: 0, default: 0 }
+        minAmount: { type: integer, minimum: 0, default: 0 }
+        freeAbove: { type: integer, minimum: 0, nullable: true }
+        eta: { $ref: '#/components/schemas/I18n' }
+        isActive: { type: boolean, default: true }
+        sortOrder: { type: integer }
+    Voucher:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string, example: IKN10 }
+        type: { type: string, enum: [percent, fixed] }
+        value: { type: number, description: persen (percent) atau rupiah (fixed) }
+        minSubtotal: { type: integer }
+        maxDiscount: { type: integer, nullable: true }
+        quota: { type: integer, nullable: true }
+        usedCount: { type: integer }
+        perUserLimit: { type: integer, nullable: true }
+        scope: { type: string, enum: [all, category] }
+        categoryIds: { type: array, items: { type: integer } }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    VoucherInput:
+      type: object
+      required: [code, type, value]
+      properties:
+        code: { type: string, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$', description: disimpan huruf besar }
+        type: { type: string, enum: [percent, fixed] }
+        value: { type: number, description: 'percent: 0–100; fixed: integer rupiah' }
+        minSubtotal: { type: integer, minimum: 0 }
+        maxDiscount: { type: integer, minimum: 0, nullable: true }
+        quota: { type: integer, minimum: 0, nullable: true }
+        perUserLimit: { type: integer, minimum: 0, nullable: true }
+        scope: { type: string, enum: [all, category], default: all }
+        categoryIds: { type: array, items: { type: integer }, description: wajib berisi bila scope=category }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        isActive: { type: boolean, default: true }
+    PaymentMethod:
+      type: object
+      description: Bentuk admin (config non-rahasia apa adanya + qrisImageUrl terhidrasi)
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        type: { type: string, enum: [manual_transfer, qris_static, qris_dynamic, virtual_account, ewallet] }
+        driver: { type: string, enum: [manual, xendit] }
+        name: { $ref: '#/components/schemas/I18n' }
+        instructions: { $ref: '#/components/schemas/I18n' }
+        config: { $ref: '#/components/schemas/PaymentMethodConfig' }
+        qrisImageUrl: { type: string, nullable: true }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    PaymentMethodConfig:
+      type: object
+      description: 'Whitelist kunci non-rahasia; kunci lain dibuang. Kredensial gateway hanya di .env (XENDIT_SECRET_KEY, XENDIT_CALLBACK_TOKEN).'
+      properties:
+        qrisMediaId: { type: integer, description: qris_static — media gambar QRIS merchant }
+        channelCode: { type: string, description: xendit — mis. QRIS, ID_OVO }
+        bankCode: { type: string, description: xendit virtual_account — mis. BCA }
+        feePercent: { type: number }
+        feeFixed: { type: integer }
+    PaymentMethodInput:
+      type: object
+      required: [code, type, name]
+      properties:
+        code: { type: string, maxLength: 64, pattern: '^[a-z0-9_]+$' }
+        type: { type: string, enum: [manual_transfer, qris_static, qris_dynamic, virtual_account, ewallet] }
+        driver: { type: string, enum: [manual, xendit], default: manual }
+        name: { $ref: '#/components/schemas/I18n' }
+        instructions: { $ref: '#/components/schemas/I18n' }
+        config: { $ref: '#/components/schemas/PaymentMethodConfig' }
+        isActive: { type: boolean, default: false }
+        sortOrder: { type: integer }
+    CommerceSettings:
+      type: object
+      description: 'Disimpan di tabel settings grup commerce (key commerce.<snake_case>, is_public=false); default config ikn.commerce.defaults'
+      properties:
+        paymentDueHours: { type: integer, minimum: 1, maximum: 720, example: 24 }
+        uniqueCodeEnabled: { type: boolean, example: true }
+        taxRate: { type: number, minimum: 0, maximum: 100, example: 11 }
+        priceIncludesTax: { type: boolean, example: true }
+        autoCompleteDays: { type: integer, minimum: 0, maximum: 90, example: 7 }
+        reminderHoursBeforeDue: { type: integer, minimum: 0, maximum: 168, example: 2 }

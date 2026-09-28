@@ -1,0 +1,70 @@
+name: ikn-api
+
+on:
+  push:
+    branches: [main]
+    paths: ["ikn-api/**", ".github/workflows/api.yml"]
+  pull_request:
+    paths: ["ikn-api/**"]
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/ikn-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ikn-api } }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_DB: ikn_test, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+          extensions: pdo_pgsql, pgsql, mbstring, bcmath, intl, gd, zip, exif, pcntl
+          coverage: none
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Prepare env
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+      - name: Run tests (Postgres ikn_test)
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: ikn_test
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          APP_TIMEZONE: Asia/Jakarta
+        run: php artisan test
+
+  build:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ikn-api
+          target: prod
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

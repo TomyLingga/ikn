@@ -1,19 +1,19 @@
 import Breadcrumb from '@/components/Breadcrumb';
-import CatalogBrowser from '@/components/CatalogBrowser';
+import CatalogBrowser, { parseCatalogQuery } from '@/components/CatalogBrowser';
 import EmptyState from '@/components/EmptyState';
 import { fetchCategories, fetchProducts } from '@/lib/server-data';
+
+type SearchParams = Record<string, string | string[] | undefined>;
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const categories = await fetchCategories();
   const c = categories.find((item) => item.slug === params.slug);
-  return c ? { title: `${c.name} — Katalog`, description: c.desc } : { title: 'Kategori' };
+  return c ? { title: `${c.name.id} — Katalog`, description: c.description?.id || '' } : { title: 'Kategori' };
 }
 
-export default async function CategoryPage({ params }: { params: { slug: string } }) {
-  const [categories, products] = await Promise.all([
-    fetchCategories(),
-    fetchProducts({ category: params.slug }),
-  ]);
+export default async function CategoryPage({ params, searchParams }: { params: { slug: string }; searchParams: SearchParams }) {
+  const query = parseCatalogQuery(searchParams, params.slug);
+  const [categories, products] = await Promise.all([fetchCategories(), fetchProducts(query)]);
   const category = categories.find((c) => c.slug === params.slug) || null;
 
   if (!category) {
@@ -39,18 +39,25 @@ export default async function CategoryPage({ params }: { params: { slug: string 
             items={[
               { label: 'Beranda', href: '/' },
               { label: 'Katalog', href: '/catalog' },
-              { label: category.name },
+              { label: category.name.id },
             ]}
           />
           <span className="label label-amber">/ Kategori</span>
-          <h1 className="display pagehead-title">{category.name}</h1>
-          <p className="lead" style={{ marginTop: 12, maxWidth: '48ch' }}>{category.desc}</p>
+          <h1 className="display pagehead-title">{category.name.id}</h1>
+          {category.description?.id && <p className="lead" style={{ marginTop: 12, maxWidth: '48ch' }}>{category.description.id}</p>}
         </div>
       </section>
 
       <section className="section-tight">
         <div className="container">
-          <CatalogBrowser products={products} categories={categories} initialCategory={category.slug} />
+          <CatalogBrowser
+            products={products.items}
+            meta={products.meta}
+            categories={categories}
+            query={query}
+            basePath={`/catalog/kategori/${category.slug}`}
+            lockCategory
+          />
         </div>
       </section>
     </>

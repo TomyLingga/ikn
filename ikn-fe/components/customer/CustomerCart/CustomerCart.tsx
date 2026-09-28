@@ -5,13 +5,18 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useCart } from '@/components/CartProvider';
+import { useLang } from '@/components/LanguageProvider';
 import Icon from '@/components/Icon';
+import { tr } from '@/lib/cms';
 import { formatIDR } from '@/lib/format';
 import styles from './CustomerCart.module.css';
 
+// Laci keranjang di topbar portal customer.
 export default function CustomerCart() {
   const [isOpen, setIsOpen] = useState(false);
   const { items, count, subtotal, remove, updateQty, ready } = useCart();
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -34,11 +39,11 @@ export default function CustomerCart() {
 
   return (
     <>
-      <button 
-        type="button" 
-        className={styles.cartBtn} 
+      <button
+        type="button"
+        className={styles.cartBtn}
         onClick={() => setIsOpen(true)}
-        aria-label={`Keranjang (${count} item)`}
+        aria-label={`${t('Keranjang', 'Cart')} (${count} item)`}
       >
         <Icon name="bag" size={20} />
         {count > 0 && <span className={styles.badge}>{count > 9 ? '9+' : count}</span>}
@@ -54,60 +59,63 @@ export default function CustomerCart() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.header}>
-              <h2 id="customer-cart-title" className="h3">Keranjang Anda</h2>
-              <button type="button" onClick={() => setIsOpen(false)} className={styles.closeBtn} aria-label="Tutup keranjang">
+              <h2 id="customer-cart-title" className="h3">{t('Keranjang Anda', 'Your cart')}</h2>
+              <button type="button" onClick={() => setIsOpen(false)} className={styles.closeBtn} aria-label={t('Tutup keranjang', 'Close cart')}>
                 <Icon name="close" size={20} />
               </button>
             </div>
-            
+
             <div className={styles.body}>
               {items.length === 0 ? (
                 <div className={styles.empty}>
                   <Icon name="bag" size={48} strokeWidth={1} />
-                  <p>Keranjang Anda kosong.</p>
-                  <Link href="/catalog" onClick={() => setIsOpen(false)} className="btn btn-line">Belanja sekarang</Link>
+                  <p>{t('Keranjang Anda kosong.', 'Your cart is empty.')}</p>
+                  <Link href="/dashboard/katalog" onClick={() => setIsOpen(false)} className="btn btn-line">{t('Belanja sekarang', 'Shop now')}</Link>
                 </div>
               ) : (
                 <div className={styles.list}>
-                  {items.map((item) => (
-                    <div key={item.slug} className={styles.item}>
-                      <div className={styles.thumb}>
-                        {item.image ? (
-                          <Image src={item.image} alt={item.name} fill sizes="60px" />
-                        ) : (
-                          <Icon name="image" size={24} />
-                        )}
-                      </div>
-                      <div className={styles.info}>
-                        <Link href={`/catalog/${item.slug}`} className={styles.name} onClick={() => setIsOpen(false)}>
-                          {item.name}
-                        </Link>
-                        <div className={styles.price}>{formatIDR(item.price || 0)}</div>
-                        <div className={styles.actions}>
-                          <div className={styles.qtyCtl}>
-                            <button type="button" onClick={() => updateQty(item.slug, item.qty - 1)}>-</button>
-                            <input type="number" readOnly value={item.qty} />
-                            <button type="button" onClick={() => updateQty(item.slug, item.qty + 1)}>+</button>
+                  {items.map((item) => {
+                    const name = tr(item.name, lang);
+                    return (
+                      <div key={item.slug} className={styles.item}>
+                        <div className={styles.thumb}>
+                          {item.image ? (
+                            <Image src={item.image} alt={name} fill sizes="60px" />
+                          ) : (
+                            <Icon name="image" size={24} />
+                          )}
+                        </div>
+                        <div className={styles.info}>
+                          <Link href={`/catalog/${item.slug}`} className={styles.name} onClick={() => setIsOpen(false)}>
+                            {name}
+                          </Link>
+                          <div className={styles.price}>{formatIDR(item.unitPrice || 0)}/{item.unit}</div>
+                          <div className={styles.actions}>
+                            <div className={styles.qtyCtl}>
+                              <button type="button" onClick={() => updateQty(item.slug, item.qty - 1)} disabled={item.qty <= item.moq} aria-label={t('Kurangi', 'Decrease')}>-</button>
+                              <input type="number" readOnly value={item.qty} aria-label={t('Jumlah', 'Quantity')} />
+                              <button type="button" onClick={() => updateQty(item.slug, item.qty + 1)} aria-label={t('Tambah', 'Increase')}>+</button>
+                            </div>
+                            <button type="button" onClick={() => remove(item.slug)} className={styles.removeBtn} aria-label={`${t('Hapus', 'Remove')} ${name}`}>
+                              <Icon name="trash" size={16} />
+                            </button>
                           </div>
-                          <button type="button" onClick={() => remove(item.slug)} className={styles.removeBtn}>
-                            <Icon name="trash" size={16} />
-                          </button>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
-            
+
             {items.length > 0 && (
               <div className={styles.footer}>
                 <div className={styles.subtotal}>
-                  <span>Subtotal</span>
+                  <span>{t('Estimasi subtotal', 'Estimated subtotal')}</span>
                   <strong>{formatIDR(subtotal)}</strong>
                 </div>
                 <Link href="/checkout" className="btn btn-solid btn-full" onClick={() => setIsOpen(false)}>
-                  Beli sekarang <Icon name="arrow" />
+                  {t('Checkout', 'Checkout')} <Icon name="arrow" />
                 </Link>
               </div>
             )}

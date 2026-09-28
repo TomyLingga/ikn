@@ -10,3 +10,6 @@
 *.webp binary
 *.pdf binary
 *.xlsx binary
+*.conf text eol=lf
+Caddyfile text eol=lf
+*.sql text eol=lf

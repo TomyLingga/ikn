@@ -1,0 +1,560 @@
+# Fragmen OpenAPI area akun & wilayah (BE-1). Digabung oleh docs/openapi/merge.py.
+# Path /auth/login, /auth/admin/login, /auth/logout, /auth/me sudah ada di base.yaml.
+tags:
+  - name: customer
+    description: Profil dan alamat customer (auth:sanctum + role customer)
+  - name: regions
+    description: Wilayah Kemendagri 4 level (publik)
+  - name: geo
+    description: Proxy geocoding Nominatim (auth:sanctum, 60/menit per IP, upstream 1/detik)
+  - name: admin-customers
+    description: Admin customers (modul customers)
+
+paths:
+  # ---------------------------------------------------------------- auth (registrasi, verifikasi, reset)
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Daftar customer (status pending, email verifikasi dikirim lewat queue). Rate limit 3/menit per IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterInput' }
+      responses:
+        '201':
+          description: Terdaftar; belum login otomatis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/RegisteredCustomer' }
+                  message: { type: string, example: Cek email Anda untuk verifikasi. }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooMany' }
+  /auth/verify-email/{id}/{hash}:
+    get:
+      tags: [auth]
+      summary: Tautan verifikasi dari email (URL bertanda tangan, berlaku 60 menit). Selalu redirect ke FE.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: hash, in: path, required: true, schema: { type: string }, description: sha1(email) }
+        - { name: expires, in: query, required: true, schema: { type: integer } }
+        - { name: signature, in: query, required: true, schema: { type: string } }
+      responses:
+        '302':
+          description: Redirect ke FRONTEND_URL/login?verified=1 (sukses/sudah terverifikasi) atau ?verified=0 (tautan tidak valid/kedaluwarsa)
+  /auth/verification/resend:
+    post:
+      tags: [auth]
+      summary: Kirim ulang email verifikasi. Selalu 200 (tidak membocorkan keberadaan email). Rate limit 3/jam per email+IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailInput' }
+      responses:
+        '200': { $ref: '#/components/responses/OkWithMessage' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooMany' }
+  /auth/password/forgot:
+    post:
+      tags: [auth]
+      summary: Kirim tautan reset kata sandi (FRONTEND_URL/reset-password?token=&email=). Selalu 200.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailInput' }
+      responses:
+        '200': { $ref: '#/components/responses/OkWithMessage' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooMany' }
+  /auth/password/reset:
+    post:
+      tags: [auth]
+      summary: Setel kata sandi baru dengan token dari email (sekali pakai, berlaku 60 menit).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetPasswordInput' }
+      responses:
+        '200': { $ref: '#/components/responses/OkWithMessage' }
+        '422': { description: 'VALIDATION_ERROR; token tidak valid → errors.token', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  # ---------------------------------------------------------------- regions (publik)
+  /regions:
+    get:
+      tags: [regions]
+      summary: Daftar wilayah per level atau anak dari kode induk (tanpa parameter = provinsi).
+      parameters:
+        - { name: level, in: query, schema: { type: string, enum: [province, regency, district, village] } }
+        - { name: parent, in: query, schema: { type: string, example: '31.75' }, description: 'Kode induk; mengalahkan level' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Region' } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /regions/search:
+    get:
+      tags: [regions]
+      summary: Cari nama wilayah (ILIKE lintas level, maks 20) dengan jalur nama induk.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 2 } }
+        - { name: level, in: query, schema: { type: string, enum: [province, regency, district, village] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/RegionSearchResult' } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ---------------------------------------------------------------- geo (proxy Nominatim)
+  /geo/search:
+    get:
+      tags: [geo]
+      summary: Geocoding teks (Nominatim search, countrycodes=id, limit 5, cache 7 hari).
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 3 } }
+      responses:
+        '200': { $ref: '#/components/responses/GeoResults' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooMany' }
+        '502': { description: UPSTREAM_ERROR, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /geo/reverse:
+    get:
+      tags: [geo]
+      summary: Reverse geocoding (Nominatim reverse, cache 30 hari). data berisi 0 atau 1 item.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: lat, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: lng, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+      responses:
+        '200': { $ref: '#/components/responses/GeoResults' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooMany' }
+        '502': { description: UPSTREAM_ERROR, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  # ---------------------------------------------------------------- customer: profil & alamat
+  /customer/profile:
+    get:
+      tags: [customer]
+      summary: Profil customer + addresses[]
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/CustomerProfile' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [customer]
+      summary: Ubah name, phone, position
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                phone: { type: string, nullable: true, maxLength: 40 }
+                position: { type: string, nullable: true, maxLength: 120 }
+      responses:
+        '200': { $ref: '#/components/responses/CustomerProfile' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /customer/profile/company:
+    put:
+      tags: [customer]
+      summary: Ubah company, companyEmail, companyPhone, taxId
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                company: { type: string, nullable: true, maxLength: 160 }
+                companyEmail: { type: string, nullable: true, format: email }
+                companyPhone: { type: string, nullable: true, maxLength: 40 }
+                taxId: { type: string, nullable: true, maxLength: 40 }
+      responses:
+        '200': { $ref: '#/components/responses/CustomerProfile' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /customer/profile/password:
+    put:
+      tags: [customer]
+      summary: Ganti kata sandi (currentPassword wajib cocok; kebijakan min 8 huruf+angka)
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, password, passwordConfirmation]
+              properties:
+                currentPassword: { type: string }
+                password: { type: string, minLength: 8 }
+                passwordConfirmation: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/OkWithMessage' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /customer/addresses:
+    get:
+      tags: [customer]
+      summary: Daftar alamat (default selalu pertama)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/CustomerAddress' } }
+    post:
+      tags: [customer]
+      summary: Buat alamat (alamat pertama otomatis default; isDefault=true memindahkan default)
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerAddressInput' }
+      responses:
+        '201': { $ref: '#/components/responses/CustomerAddress' }
+        '422': { description: 'VALIDATION_ERROR; rantai wilayah tidak konsisten → errors.<field>Code', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /customer/addresses/{id}:
+    put:
+      tags: [customer]
+      summary: Ubah alamat (milik user lain → 404)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerAddressInput' }
+      responses:
+        '200': { $ref: '#/components/responses/CustomerAddress' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [customer]
+      summary: Hapus alamat; bila default, default pindah ke alamat lain
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /customer/addresses/{id}/primary:
+    put:
+      tags: [customer]
+      summary: Jadikan alamat default
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { $ref: '#/components/responses/CustomerAddress' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ---------------------------------------------------------------- admin: customers
+  /admin/customers:
+    get:
+      tags: [admin-customers]
+      summary: Daftar customer berpaginasi (status=pending untuk antrean persetujuan)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pending, active, rejected, inactive] } }
+        - { name: q, in: query, schema: { type: string }, description: ILIKE nama/email/perusahaan/telepon }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/AdminCustomerSummary' } }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/customers/{customer}:
+    get:
+      tags: [admin-customers]
+      summary: Detail customer + profil + alamat + orders[] ringkas (diisi phase order)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: customer, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { $ref: '#/components/responses/AdminCustomer' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/customers/{customer}/status:
+    put:
+      tags: [admin-customers]
+      summary: 'Ubah status: active (approve, email), rejected (reason wajib, email), inactive (tanpa email). Tidak boleh ke pending.'
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: customer, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerStatusInput' }
+      responses:
+        '200': { $ref: '#/components/responses/AdminCustomer' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+components:
+  responses:
+    OkWithMessage:
+      description: '{ data: { ok: true }, message }'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  ok: { type: boolean }
+              message: { type: string }
+    GeoResults:
+      description: Hasil geocoding dinormalisasi
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { type: array, items: { $ref: '#/components/schemas/GeoResult' } }
+    CustomerProfile:
+      description: '{ data: CustomerProfile, message? }'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: '#/components/schemas/CustomerProfile' }
+              message: { type: string }
+    CustomerAddress:
+      description: '{ data: CustomerAddress, message? }'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: '#/components/schemas/CustomerAddress' }
+              message: { type: string }
+    AdminCustomer:
+      description: '{ data: AdminCustomer, message? }'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { $ref: '#/components/schemas/AdminCustomer' }
+              message: { type: string }
+
+  schemas:
+    EmailInput:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+    RegisterInput:
+      type: object
+      required: [name, email, password, passwordConfirmation]
+      properties:
+        name: { type: string, maxLength: 120 }
+        email: { type: string, format: email, description: disimpan lowercase }
+        password: { type: string, minLength: 8, description: 'huruf dan angka (ASUMSI A-25)' }
+        passwordConfirmation: { type: string }
+        phone: { type: string, nullable: true, maxLength: 40 }
+        company: { type: string, nullable: true, maxLength: 160 }
+        position: { type: string, nullable: true, maxLength: 120 }
+        taxId: { type: string, nullable: true, maxLength: 40 }
+    RegisteredCustomer:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        status: { type: string, enum: [pending] }
+        emailVerifiedAt: { type: string, nullable: true }
+    ResetPasswordInput:
+      type: object
+      required: [token, email, password, passwordConfirmation]
+      properties:
+        token: { type: string }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        passwordConfirmation: { type: string }
+    UserProfile:
+      type: object
+      description: 'Profil pada objek User (customer saja) untuk /auth/login dan /auth/me'
+      properties:
+        company: { type: string, nullable: true }
+        position: { type: string, nullable: true }
+        companyEmail: { type: string, nullable: true }
+        companyPhone: { type: string, nullable: true }
+        taxId: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+    RegionNames:
+      type: object
+      properties:
+        province: { type: string, nullable: true }
+        regency: { type: string, nullable: true }
+        district: { type: string, nullable: true }
+        village: { type: string, nullable: true }
+    Region:
+      type: object
+      properties:
+        code: { type: string, example: '31.75.06' }
+        parentCode: { type: string, nullable: true, example: '31.75' }
+        level: { type: string, enum: [province, regency, district, village] }
+        name: { type: string, example: Cakung }
+    RegionSearchResult:
+      allOf:
+        - { $ref: '#/components/schemas/Region' }
+        - type: object
+          properties:
+            path: { type: array, items: { type: string }, description: 'Nama leluhur dari provinsi ke bawah', example: ['Daerah Khusus Ibukota Jakarta', 'Kota Administrasi Jakarta Timur'] }
+            fullName: { type: string, example: 'Cakung, Kota Administrasi Jakarta Timur, Daerah Khusus Ibukota Jakarta' }
+    GeoResult:
+      type: object
+      properties:
+        displayName: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+        address:
+          type: object
+          properties:
+            road: { type: string, nullable: true }
+            village: { type: string, nullable: true }
+            district: { type: string, nullable: true }
+            city: { type: string, nullable: true }
+            state: { type: string, nullable: true }
+            postcode: { type: string, nullable: true }
+    CustomerAddressInput:
+      type: object
+      required: [label, recipientName, phone, addressLine, provinceCode, regencyCode, districtCode, villageCode]
+      properties:
+        label: { type: string, maxLength: 80 }
+        recipientName: { type: string, maxLength: 120 }
+        phone: { type: string, maxLength: 40 }
+        addressLine: { type: string, maxLength: 1000 }
+        provinceCode: { type: string, example: '31' }
+        regencyCode: { type: string, example: '31.75' }
+        districtCode: { type: string, example: '31.75.06' }
+        villageCode: { type: string, example: '31.75.06.1007', description: harus anak dari districtCode, dst. }
+        postalCode: { type: string, nullable: true, maxLength: 10 }
+        lat: { type: number, nullable: true, minimum: -90, maximum: 90 }
+        lng: { type: number, nullable: true, minimum: -180, maximum: 180 }
+        note: { type: string, nullable: true, maxLength: 500 }
+        isDefault: { type: boolean, nullable: true }
+    CustomerAddressSnapshot:
+      type: object
+      description: 'Bentuk beku alamat untuk orders.shipping_address (CustomerAddress::toSnapshot())'
+      properties:
+        label: { type: string }
+        recipientName: { type: string }
+        phone: { type: string }
+        addressLine: { type: string }
+        provinceCode: { type: string }
+        regencyCode: { type: string }
+        districtCode: { type: string }
+        villageCode: { type: string }
+        region: { $ref: '#/components/schemas/RegionNames' }
+        postalCode: { type: string, nullable: true }
+        lat: { type: number, nullable: true }
+        lng: { type: number, nullable: true }
+        note: { type: string, nullable: true }
+    CustomerAddress:
+      allOf:
+        - type: object
+          properties:
+            id: { type: integer }
+        - { $ref: '#/components/schemas/CustomerAddressSnapshot' }
+        - type: object
+          properties:
+            isDefault: { type: boolean }
+            createdAt: { type: string, nullable: true }
+            updatedAt: { type: string, nullable: true }
+    CustomerProfile:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        status: { type: string, enum: [pending, active, rejected, inactive] }
+        locale: { type: string, enum: [id, en] }
+        emailVerifiedAt: { type: string, nullable: true }
+        approvedAt: { type: string, nullable: true }
+        rejectionReason: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        company: { type: string, nullable: true }
+        position: { type: string, nullable: true }
+        companyEmail: { type: string, nullable: true }
+        companyPhone: { type: string, nullable: true }
+        taxId: { type: string, nullable: true }
+        addresses: { type: array, items: { $ref: '#/components/schemas/CustomerAddress' } }
+        createdAt: { type: string, nullable: true }
+    AdminCustomerSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string, nullable: true }
+        company: { type: string, nullable: true }
+        status: { type: string, enum: [pending, active, rejected, inactive] }
+        joinedAt: { type: string, nullable: true }
+        approvedAt: { type: string, nullable: true }
+        rejectionReason: { type: string, nullable: true }
+        emailVerifiedAt: { type: string, nullable: true }
+        lastLoginAt: { type: string, nullable: true }
+        addressesCount: { type: integer }
+    AdminCustomer:
+      allOf:
+        - { $ref: '#/components/schemas/AdminCustomerSummary' }
+        - type: object
+          properties:
+            locale: { type: string, enum: [id, en] }
+            position: { type: string, nullable: true }
+            companyEmail: { type: string, nullable: true }
+            companyPhone: { type: string, nullable: true }
+            taxId: { type: string, nullable: true }
+            approvedBy:
+              type: object
+              nullable: true
+              properties:
+                id: { type: integer }
+                name: { type: string }
+            addresses: { type: array, items: { $ref: '#/components/schemas/CustomerAddress' } }
+            orders: { type: array, items: { type: object }, description: 'Ringkasan order terbaru (diisi phase order; sementara [])' }
+            ordersCount: { type: integer }
+    CustomerStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [active, rejected, inactive] }
+        reason: { type: string, nullable: true, maxLength: 1000, description: wajib bila rejected }

@@ -1,13 +1,14 @@
-import { marquee } from '@/lib/site';
 import styles from './Marquee.module.css';
 
-export default function Marquee() {
+// Teks berjalan di bawah hero. Kata-kata berasal dari CMS (section marquee).
+export default function Marquee({ items }: { items: string[] }) {
+  if (items.length === 0) return null;
   // Digandakan agar loop mulus.
-  const items = [...marquee, ...marquee];
+  const loop = [...items, ...items];
   return (
     <div className={styles.marquee} aria-hidden="true">
       <div className={styles.track}>
-        {items.map((word, i) => (
+        {loop.map((word, i) => (
           <span key={i} className={styles.item}>
             {word}
             <span className={styles.dot}>◆</span>

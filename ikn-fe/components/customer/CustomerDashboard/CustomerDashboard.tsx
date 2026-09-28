@@ -1,73 +1,95 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
 import EmptyState from '@/components/EmptyState';
 import StatusBadge from '@/components/StatusBadge';
+import AccountStatusBanner from '@/components/customer/AccountStatusBanner';
 import { useAuth } from '@/components/AuthProvider';
-import { useTransactions } from '@/components/TransactionProvider';
 import { useLang } from '@/components/LanguageProvider';
-import { t } from '@/lib/i18n';
-import { orderStatus } from '@/lib/commerce';
+import { t as dict } from '@/lib/i18n';
+import { orderLabel } from '@/lib/commerce';
+import { api, errorMessage } from '@/lib/api';
 import { formatDate, formatIDR } from '@/lib/format';
-import type { IconName } from '@/lib/types';
+import type { CustomerDashboardData, IconName, OrderSummary } from '@/lib/types';
 
+const emptyData: CustomerDashboardData = {
+  totalOrders: 0,
+  awaitingPayment: 0,
+  inProgress: 0,
+  completed: 0,
+  transactionValue: 0,
+  recentOrders: [],
+  account: { status: 'pending', rejectionReason: null, canOrder: false },
+};
+
+// GET /customer/dashboard (BE-3): statistik datar + recentOrders[] (ringkasan) + status akun.
 export default function CustomerDashboard() {
   const { customer } = useAuth();
-  const { orders } = useTransactions();
   const { lang } = useLang();
+  const [data, setData] = useState<CustomerDashboardData | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!customer) return;
+    let active = true;
+    api<CustomerDashboardData>('/customer/dashboard')
+      .then((raw) => {
+        if (active) setData({ ...emptyData, ...raw, recentOrders: Array.isArray(raw.recentOrders) ? raw.recentOrders : [] });
+      })
+      .catch((err) => {
+        if (!active) return;
+        setData(emptyData);
+        setError(errorMessage(err));
+      });
+    return () => {
+      active = false;
+    };
+  }, [customer]);
 
   if (!customer) return null;
 
-  const ui = t[lang] || t.id;
+  const ui = dict[lang] || dict.id;
   const d = ui.dash;
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
   const quickActions: { href: string; label: string; body: string; icon: IconName }[] = [
-    { href: '/catalog', label: d.quick.catalog, body: d.quick.catalogDesc, icon: 'flask' },
+    { href: '/dashboard/katalog', label: d.quick.catalog, body: d.quick.catalogDesc, icon: 'flask' },
     { href: '/dashboard/pesanan', label: d.quick.orders, body: d.quick.ordersDesc, icon: 'drop' },
     { href: '/dashboard/alamat', label: d.quick.address, body: d.quick.addressDesc, icon: 'pin' },
     { href: '/dashboard/profil', label: d.quick.profile, body: d.quick.profileDesc, icon: 'handshake' },
   ];
 
-  // Provider hanya berisi pesanan milik customer yang sedang login.
-  const customerOrders = Array.isArray(orders) ? orders : [];
-  const stats = {
-    totalOrders: customerOrders.length,
-    awaitingPayment: customerOrders.filter((order) =>
-      ['unpaid', 'rejected'].includes(order.payment),
-    ).length,
-    inProgress: customerOrders.filter((order) =>
-      ['awaiting_verification', 'processing', 'packing', 'shipped', 'delivered'].includes(order.status),
-    ).length,
-    completed: customerOrders.filter((order) => order.status === 'completed').length,
-    transactionValue: customerOrders
-      .filter((order) => order.status !== 'cancelled')
-      .reduce((total, order) => total + (Number(order.total) || 0), 0),
-  };
-  const recent = customerOrders.slice(0, 3);
-  const alerts = customerOrders.filter(
-    (order) =>
-      ['unpaid', 'rejected'].includes(order.payment) ||
-      order.status === 'shipped' ||
-      (order.status === 'completed' && !order.reviewed)
-  );
+  const stats = data || emptyData;
+  const recent = data?.recentOrders || [];
+  // Ringkasan tidak membawa flag can*; perhatian diturunkan dari status.
+  const alerts = recent.filter((o) => o.status === 'pending_payment' || o.status === 'shipped');
+  const customerName = (customer.name || '').split(' ')[0] || t('Pelanggan', 'Customer');
 
-  const customerName = (customer.name || '').split(' ')[0] || 'Pelanggan';
+  function alertMessage(order: OrderSummary): { text: string; icon: IconName } {
+    if (order.status === 'pending_payment') return { text: d.alerts.unpaid.replace('{num}', order.number), icon: 'wallet' };
+    return { text: d.alerts.shipped.replace('{num}', order.number) + (order.trackingNumber ? ` (${order.trackingNumber})` : ''), icon: 'truck' };
+  }
 
   return (
     <div className="customer-dashboard">
+      <AccountStatusBanner />
+
       <section className="dash-welcome">
         <div>
           <span className="label label-amber">{d.title}</span>
           <h2 className="h2">{d.welcome} {customerName}.</h2>
           <p>{customer.company || customer.name} · {d.subtitle}</p>
         </div>
-        <Link href="/catalog" className="btn btn-solid">
+        <Link href="/dashboard/katalog" className="btn btn-solid">
           {d.shop} <Icon name="arrow" />
         </Link>
       </section>
 
-      <section className="acct-stats" aria-label="Ringkasan pesanan">
+      {error && <p className="form-error" role="alert">{t('Ringkasan belum tersedia', 'Summary unavailable')}: {error}</p>}
+
+      <section className="acct-stats" aria-label={t('Ringkasan pesanan', 'Order summary')}>
         <div className="acct-stat"><span className="acct-stat-val">{stats.totalOrders}</span><span className="acct-stat-label">{d.stats.total}</span></div>
         <div className="acct-stat"><span className="acct-stat-val">{stats.awaitingPayment}</span><span className="acct-stat-label">{d.stats.unpaid}</span></div>
         <div className="acct-stat"><span className="acct-stat-val">{stats.inProgress}</span><span className="acct-stat-label">{d.stats.inProgress}</span></div>
@@ -81,16 +103,11 @@ export default function CustomerDashboard() {
             <h2 id="customer-alert-title" className="h3">{d.alerts.title}</h2>
           </div>
           {alerts.map((order) => {
-            const needsPayment = ['unpaid', 'rejected'].includes(order.payment);
-            const message = needsPayment
-              ? d.alerts.unpaid.replace('{num}', order.number)
-              : order.status === 'shipped'
-                ? d.alerts.shipped.replace('{num}', order.number) + (order.trackingNo ? ` (${order.trackingNo})` : '')
-                : d.alerts.reviewed.replace('{num}', order.number);
+            const { text, icon } = alertMessage(order);
             return (
               <Link key={order.number} href={`/dashboard/pesanan/${order.number}`} className="dash-alert">
-                <Icon name={needsPayment ? 'drop' : order.status === 'shipped' ? 'compass' : 'check'} size={19} />
-                <span>{message}</span>
+                <Icon name={icon} size={19} />
+                <span>{text}</span>
                 <Icon name="chevronRight" size={17} />
               </Link>
             );
@@ -104,16 +121,16 @@ export default function CustomerDashboard() {
           <Link href="/dashboard/pesanan" className="link">{d.recent.all} <Icon name="arrow" /></Link>
         </div>
         {recent.length === 0 ? (
-          <EmptyState title={d.recent.emptyTitle} body={d.recent.emptyBody} action={{ href: '/catalog', label: d.recent.catalog }} />
+          <EmptyState title={d.recent.emptyTitle} body={d.recent.emptyBody} action={{ href: '/dashboard/katalog', label: d.recent.catalog }} />
         ) : (
           <div className="acct-order-list">
             {recent.map((order) => {
-              const status = orderStatus[order.status];
+              const status = orderLabel(order.status);
               return (
                 <Link key={order.number} href={`/dashboard/pesanan/${order.number}`} className="acct-order-row">
-                  <div><span className="acct-order-no">{order.number}</span><span className="acct-order-date">{formatDate(order.date)}</span></div>
-                  <StatusBadge label={status.id} tone={status.tone} small />
-                  <span className="acct-order-total">{formatIDR(order.total)}</span>
+                  <div><span className="acct-order-no">{order.number}</span><span className="acct-order-date">{formatDate(order.date, lang)}</span></div>
+                  <StatusBadge label={status[lang]} tone={status.tone} small />
+                  <span className="acct-order-total">{formatIDR(order.grandTotal)}</span>
                   <Icon name="chevronRight" size={18} />
                 </Link>
               );

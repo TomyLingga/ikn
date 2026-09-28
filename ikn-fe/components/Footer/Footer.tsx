@@ -3,16 +3,28 @@
 import Link from 'next/link';
 import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
-import { t, navTree } from '@/lib/i18n';
-import { company, contact, locations } from '@/lib/site';
+import { useSite } from '@/components/SiteProvider';
+import { t } from '@/lib/i18n';
+import { tr } from '@/lib/cms';
 import styles from './Footer.module.css';
 
+// Footer: nav from the CMS footer menu, contact from the shared contact block,
+// headline/CTA/subsidiary note from site settings. Column labels stay in lib/i18n.
 export default function Footer() {
   const { lang } = useLang();
+  const site = useSite();
   const year = new Date().getFullYear();
-  const primaryLocation = locations[0];
   const ui = t[lang] || t.id;
-  const navItems = navTree[lang] || navTree.id;
+
+  const { company, site: siteText } = site.settings;
+  const navItems = site.menus.footer.items.filter((item) => item.isActive !== false);
+  const emails = site.contact?.emails ?? [];
+  const phones = site.contact?.locations[0]?.phones ?? [];
+  const social = site.contact?.social ?? [];
+
+  const headline = tr(siteText.footer_headline, lang) || ui.footer.headline;
+  const ctaLabel = tr(siteText.footer_cta_label, lang) || ui.footer.startConvo;
+  const subsidiary = tr(siteText.subsidiary_note, lang) || ui.footer.subsidiary;
 
   return (
     <footer className={styles.footer}>
@@ -21,7 +33,7 @@ export default function Footer() {
           <div>
             <span className="label label-amber">/ {company.location}</span>
             <p className={styles.headline}>
-              {ui.footer.headline.split(',').map((part, idx, arr) => (
+              {headline.split(',').map((part, idx, arr) => (
                 <span key={idx}>
                   {part}{idx < arr.length - 1 ? ',' : ''}
                   {idx < arr.length - 1 && <br />}
@@ -29,7 +41,7 @@ export default function Footer() {
               ))}
             </p>
             <Link href="/kontak" className="btn btn-amber">
-              {ui.footer.startConvo} <Icon name="arrow" />
+              {ctaLabel} <Icon name="arrow" />
             </Link>
           </div>
 
@@ -37,9 +49,9 @@ export default function Footer() {
             <div className={styles.column}>
               <span className="label">{ui.footer.nav}</span>
               <ul>
-                {navItems.map((item) => (
-                  <li key={item.href}>
-                    <Link href={item.href}>{item.label}</Link>
+                {navItems.map((item, idx) => (
+                  <li key={String(item.id ?? item.key ?? idx)}>
+                    <Link href={item.url || '/'}>{tr(item.label, lang)}</Link>
                   </li>
                 ))}
               </ul>
@@ -48,14 +60,14 @@ export default function Footer() {
             <div className={styles.column}>
               <span className="label">{ui.footer.contact}</span>
               <ul>
-                {contact.emails.map((e) => (
-                  <li key={e}>
-                    <a href={`mailto:${e}`}>{e}</a>
+                {emails.map((e) => (
+                  <li key={e.address}>
+                    <a href={`mailto:${e.address}`}>{e.address}</a>
                   </li>
                 ))}
-                {(primaryLocation?.phone ?? []).map((p) => (
-                  <li key={p}>
-                    <a href={`tel:${p.replace(/\s/g, '')}`}>{p}</a>
+                {phones.map((p) => (
+                  <li key={p.number}>
+                    <a href={`tel:${p.number.replace(/\s/g, '')}`}>{p.number}</a>
                   </li>
                 ))}
               </ul>
@@ -64,9 +76,9 @@ export default function Footer() {
             <div className={styles.column}>
               <span className="label">{ui.footer.follow}</span>
               <ul>
-                {contact.social.map((s) => (
-                  <li key={s.label}>
-                    <a href={s.href} target="_blank" rel="noreferrer">
+                {social.map((s) => (
+                  <li key={s.url || s.label}>
+                    <a href={s.url} target="_blank" rel="noreferrer">
                       {s.label} <span className={styles.handle}>{s.handle}</span>
                     </a>
                   </li>
@@ -80,7 +92,7 @@ export default function Footer() {
           <span className={styles.wordmark}>IKN</span>
           <div className={styles.fine}>
             <span>© {year} {company.name}</span>
-            <span>{ui.footer.subsidiary}</span>
+            <span>{subsidiary}</span>
           </div>
         </div>
       </div>

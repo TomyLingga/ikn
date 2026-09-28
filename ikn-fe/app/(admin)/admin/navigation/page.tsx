@@ -1,370 +1,259 @@
 'use client';
 
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import StatusBadge from '@/components/StatusBadge';
-import Icon from '@/components/Icon';
-import { AdminPageHead, AdminCard, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
-import FileUploadDropzone, { SegmentedRadio } from '@/components/admin/FileUploadDropzone/FileUploadDropzone';
-import { navTree } from '@/lib/i18n';
-import { api, errorMessage } from '@/lib/api';
+import AdminModal from '@/components/admin/AdminModal';
+import { AdminCard, AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
+import { SegmentedRadio } from '@/components/admin/FileUploadDropzone/FileUploadDropzone';
+import { I18nInput, MediaPicker, MenuEditor, firstError, menuPayload, type FieldErrors } from '@/components/admin/cms';
+import { useLang } from '@/components/LanguageProvider';
+import { api, ApiError, errorMessage } from '@/lib/api';
+import { emptyI18n, tr, type DocLinkData, type I18n, type MediaSummary, type MenuData, type MenuNode } from '@/lib/cms';
 
-interface DocLinkRow {
-  id: string;
-  title: string;
-  description: string;
-  targetUrl: string;
-  parentCategory: string;
-  active: boolean;
-}
+type MenuLocation = 'header' | 'footer';
 
 interface DocLinkForm {
-  title: string;
-  description: string;
-  targetUrl: string;
-  parentCategory: string;
-  linkMode: 'file' | 'url';
+  category: string;
+  label: I18n;
+  description: I18n;
+  mode: 'file' | 'url';
+  file: MediaSummary | null;
+  url: string;
+  isActive: boolean;
+  sortOrder: number;
 }
 
-const emptyDocForm: DocLinkForm = {
-  title: '',
-  description: '',
-  targetUrl: '',
-  parentCategory: 'Keberlanjutan',
-  linkMode: 'file',
-};
+const emptyDocForm = (category: string): DocLinkForm => ({
+  category,
+  label: emptyI18n(),
+  description: emptyI18n(),
+  mode: 'file',
+  file: null,
+  url: '',
+  isActive: true,
+  sortOrder: 0,
+});
 
-const categoryOptions = [
-  { value: 'Tentang Kami', label: 'Tentang Kami (About Us)' },
-  { value: 'Bisnis', label: 'Bisnis (Business)' },
-  { value: 'Media', label: 'Media (Press & Gallery)' },
-  { value: 'Keberlanjutan', label: 'Keberlanjutan (Sustainability)' },
-];
-
-const mainCardStyle: CSSProperties = {
-  padding: 16,
-  border: '1px solid var(--line)',
-  borderRadius: 12,
-  background: 'var(--paper)',
-};
-
-const subBoxStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '8px 12px',
-  background: 'var(--surface)',
-  borderRadius: 6,
-  border: '1px solid var(--line)',
-};
-
-const docBoxStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '8px 12px',
-  background: 'var(--amber-tint)',
-  borderRadius: 6,
-  border: '1px solid var(--amber)',
-};
-
-function MainNavItemCard({
-  mainItem,
-  docLinks,
-}: {
-  mainItem: { label: string; href: string; children?: { label: string; href: string; desc?: string }[] };
-  docLinks: DocLinkRow[];
-}) {
-  const childrenList = mainItem.children || [];
-  // Hanya tampilkan dokumen yang AKTIF (active === true)
-  const extraDocs = docLinks.filter(
-    (doc) => doc.active && doc.parentCategory.toLowerCase() === mainItem.label.toLowerCase()
-  );
-  const hasSub = childrenList.length > 0 || extraDocs.length > 0;
-
-  return (
-    <div style={mainCardStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Icon name="compass" size={18} style={{ color: 'var(--green)' }} />
-          <strong style={{ fontSize: '1rem', color: 'var(--ink)' }}>{mainItem.label}</strong>
-          <span className="mono" style={{ fontSize: '0.78rem', color: 'var(--ink-soft)' }}>
-            ({mainItem.href})
-          </span>
-        </div>
-        <span className="badge badge-green" style={{ fontSize: '0.7rem' }}>
-          Menu Utama
-        </span>
-      </div>
-
-      {hasSub ? (
-        <div style={{ display: 'grid', gap: 8, paddingLeft: 24, borderLeft: '2px dashed var(--line-strong)', marginLeft: 8, marginTop: 12 }}>
-          {childrenList.map((child) => (
-            <div key={child.label} style={subBoxStyle}>
-              <div>
-                <strong style={{ fontSize: '0.88rem' }}>Sub-menu: {child.label}</strong>
-                {child.desc ? (
-                  <small style={{ display: 'block', color: 'var(--ink-soft)', fontSize: '0.76rem', marginLeft: 16 }}>
-                    {child.desc}
-                  </small>
-                ) : null}
-              </div>
-              <span className="mono" style={{ fontSize: '0.78rem', color: 'var(--ink-soft)' }}>
-                {child.href}
-              </span>
-            </div>
-          ))}
-
-          {extraDocs.map((doc) => (
-            <div key={doc.id} style={docBoxStyle}>
-              <div>
-                <strong style={{ fontSize: '0.88rem', color: 'var(--amber)' }}>
-                  Dokumen: {doc.title}
-                </strong>
-                {doc.description ? (
-                  <small style={{ display: 'block', color: 'var(--ink-soft)', fontSize: '0.76rem', marginLeft: 16 }}>
-                    {doc.description}
-                  </small>
-                ) : null}
-              </div>
-              <a
-                href={doc.targetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mono"
-                style={{ fontSize: '0.78rem', color: 'var(--green)', textDecoration: 'underline' }}
-              >
-                {doc.targetUrl} ↗
-              </a>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p style={{ fontSize: '0.82rem', color: 'var(--ink-soft)', marginLeft: 24, marginTop: 6 }}>
-          — Halaman tunggal tanpa sub-menu.
-        </p>
-      )}
-    </div>
-  );
+function docFormFromRow(row: DocLinkData): DocLinkForm {
+  return {
+    category: row.category,
+    label: row.label,
+    description: row.description ?? emptyI18n(),
+    mode: row.file || !row.url ? 'file' : 'url',
+    file: row.file,
+    url: row.url ?? '',
+    isActive: row.isActive,
+    sortOrder: row.sortOrder,
+  };
 }
 
-export default function AdminNavigationHierarchy() {
-  const [activeTab, setActiveTab] = useState<'visual' | 'docs'>('visual');
-  const [docLinks, setDocLinks] = useState<DocLinkRow[]>([]);
+// DocLinkRequest replaces every field on update, so always send the full record.
+function docPayload(form: DocLinkForm) {
+  return {
+    category: form.category,
+    label: form.label,
+    description: form.description,
+    mediaId: form.mode === 'file' ? form.file?.id ?? null : null,
+    url: form.mode === 'url' ? form.url.trim() || null : null,
+    isActive: form.isActive,
+    sortOrder: form.sortOrder,
+  };
+}
+
+// Navigation: header/footer menu trees (PUT whole tree) and document links (CRUD).
+export default function AdminNavigation() {
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
+
+  const [menus, setMenus] = useState<Record<MenuLocation, MenuNode[]>>({ header: [], footer: [] });
+  const [menuTab, setMenuTab] = useState<MenuLocation>('header');
+  const [menuErrors, setMenuErrors] = useState<FieldErrors>({});
+  const [menuError, setMenuError] = useState('');
+  const [savingMenu, setSavingMenu] = useState(false);
+  const [dirty, setDirty] = useState<Record<MenuLocation, boolean>>({ header: false, footer: false });
+
+  const [docLinks, setDocLinks] = useState<DocLinkData[]>([]);
+  const [docFormOpen, setDocFormOpen] = useState(false);
+  const [editingDocId, setEditingDocId] = useState<number | null>(null);
+  const [docForm, setDocForm] = useState<DocLinkForm>(() => emptyDocForm('wbs'));
+  const [docErrors, setDocErrors] = useState<FieldErrors>({});
+  const [docError, setDocError] = useState('');
+  const [savingDoc, setSavingDoc] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<DocLinkForm>(emptyDocForm);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [formError, setFormError] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState('');
 
-  const refreshDocLinks = useCallback(async () => {
+  const load = useCallback(async () => {
     setError('');
     try {
-      const data = await api<DocLinkRow[]>('/admin/navigation/doc-links');
-      setDocLinks(data);
-    } catch {
-      setDocLinks([
-        {
-          id: '1',
-          title: 'Whistle Blowing System (WBS)',
-          description: 'Kanal pelaporan resmi PT IKN (Dokumen PDF)',
-          targetUrl: '/storage/wbs-dokumen.pdf',
-          parentCategory: 'Keberlanjutan',
-          active: true,
-        },
-        {
-          id: '2',
-          title: 'REACH Compliance Certificate',
-          description: 'Sertifikat kepatuhan pasar Eropa (Dokumen PDF)',
-          targetUrl: '/storage/reach-compliance.pdf',
-          parentCategory: 'Keberlanjutan',
-          active: true,
-        },
+      const [header, footer, links] = await Promise.all([
+        api<MenuData>('/admin/menus/header'),
+        api<MenuData>('/admin/menus/footer'),
+        api<DocLinkData[]>('/admin/navigation/doc-links'),
       ]);
+      setMenus({ header: header.items, footer: footer.items });
+      setDirty({ header: false, footer: false });
+      setDocLinks(links);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void refreshDocLinks();
-  }, [refreshDocLinks]);
+    void load();
+  }, [load]);
 
-  function openAdd() {
-    setEditingId(null);
-    setForm(emptyDocForm);
-    setSelectedFile(null);
-    setFormError('');
-    setFormOpen(true);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(''), 3000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  // Doc-link categories: header top-level keys plus the fixed "wbs" category.
+  const categories = useMemo(() => {
+    const keys = menus.header.map((item) => item.key?.trim() ?? '').filter((key) => key !== '');
+    return Array.from(new Set([...keys, 'wbs']));
+  }, [menus.header]);
+
+  function updateMenu(location: MenuLocation, items: MenuNode[]) {
+    setMenus((current) => ({ ...current, [location]: items }));
+    setDirty((current) => ({ ...current, [location]: true }));
   }
 
-  function openEdit(row: DocLinkRow) {
-    setEditingId(row.id);
-    const isFile = row.targetUrl.startsWith('/storage') || row.targetUrl.includes('.pdf') || row.targetUrl.includes('.doc');
-    setForm({
-      title: row.title,
-      description: row.description,
-      targetUrl: row.targetUrl,
-      parentCategory: row.parentCategory,
-      linkMode: isFile ? 'file' : 'url',
-    });
-    setSelectedFile(null);
-    setFormError('');
-    setFormOpen(true);
-  }
-
-  function closeForm() {
-    setFormOpen(false);
-    setEditingId(null);
-    setForm(emptyDocForm);
-    setSelectedFile(null);
-    setFormError('');
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (saving) return;
-
-    setSaving(true);
-    setFormError('');
-
+  async function saveMenu(location: MenuLocation) {
+    if (savingMenu) return;
+    setSavingMenu(true);
+    setMenuError('');
+    setMenuErrors({});
     try {
-      let finalTargetUrl = form.targetUrl.trim();
-
-      // Unggah file ke backend /admin/media jika user memilih file baru
-      if (form.linkMode === 'file' && selectedFile) {
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        const uploaded = await api<{ url: string; name: string }>('/admin/media', {
-          method: 'POST',
-          formData,
-        });
-        finalTargetUrl = uploaded.url;
-      }
-
-      if (!finalTargetUrl) {
-        setFormError('Harap unggah file dokumen (PDF/DOC) atau masukkan URL target.');
-        setSaving(false);
-        return;
-      }
-
-      const body = {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        targetUrl: finalTargetUrl,
-        parentCategory: form.parentCategory,
-        active: true,
-      };
-
-      try {
-        if (editingId) {
-          await api(`/admin/navigation/doc-links/${encodeURIComponent(editingId)}`, { method: 'PUT', body });
-        } else {
-          await api('/admin/navigation/doc-links', { method: 'POST', body });
-        }
-      } catch {
-        if (editingId) {
-          setDocLinks((prev) => prev.map((item) => (item.id === editingId ? { ...item, ...body } : item)));
-        } else {
-          const newItem: DocLinkRow = { id: String(Date.now()), ...body };
-          setDocLinks((prev) => [...prev, newItem]);
-        }
-      }
-
-      await refreshDocLinks();
-      closeForm();
+      const saved = await api<MenuData>(`/admin/menus/${location}`, {
+        method: 'PUT',
+        body: { items: menuPayload(menus[location], location === 'header') },
+      });
+      setMenus((current) => ({ ...current, [location]: saved.items }));
+      setDirty((current) => ({ ...current, [location]: false }));
+      setNotice(location === 'header' ? t('Menu header tersimpan.', 'Header menu saved.') : t('Menu footer tersimpan.', 'Footer menu saved.'));
     } catch (err) {
-      setFormError(errorMessage(err));
+      if (err instanceof ApiError && err.status === 422) {
+        setMenuErrors(err.errors);
+        setMenuError(err.message);
+      } else {
+        setMenuError(errorMessage(err));
+      }
     } finally {
-      setSaving(false);
+      setSavingMenu(false);
     }
   }
 
-  async function toggleActive(row: DocLinkRow) {
-    setError('');
-    const newActiveState = !row.active;
+  function openDocForm(row: DocLinkData | null) {
+    setEditingDocId(row ? row.id : null);
+    setDocForm(row ? docFormFromRow(row) : { ...emptyDocForm(categories[0] ?? 'wbs'), sortOrder: docLinks.length });
+    setDocErrors({});
+    setDocError('');
+    setDocFormOpen(true);
+  }
+
+  function closeDocForm() {
+    setDocFormOpen(false);
+    setEditingDocId(null);
+  }
+
+  async function submitDoc(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (savingDoc) return;
+    setSavingDoc(true);
+    setDocError('');
+    setDocErrors({});
     try {
-      try {
-        await api(`/admin/navigation/doc-links/${encodeURIComponent(row.id)}`, {
-          method: 'PUT',
-          body: { ...row, active: newActiveState },
-        });
-      } catch {
-        setDocLinks((prev) => prev.map((item) => (item.id === row.id ? { ...item, active: newActiveState } : item)));
+      if (editingDocId) {
+        await api(`/admin/navigation/doc-links/${editingDocId}`, { method: 'PUT', body: docPayload(docForm) });
+      } else {
+        await api('/admin/navigation/doc-links', { method: 'POST', body: docPayload(docForm) });
       }
-      await refreshDocLinks();
+      setDocLinks(await api<DocLinkData[]>('/admin/navigation/doc-links'));
+      closeDocForm();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 422) {
+        setDocErrors(err.errors);
+        setDocError(err.message);
+      } else {
+        setDocError(errorMessage(err));
+      }
+    } finally {
+      setSavingDoc(false);
+    }
+  }
+
+  async function toggleDoc(row: DocLinkData) {
+    setError('');
+    try {
+      await api(`/admin/navigation/doc-links/${row.id}`, {
+        method: 'PUT',
+        body: docPayload({ ...docFormFromRow(row), isActive: !row.isActive }),
+      });
+      setDocLinks(await api<DocLinkData[]>('/admin/navigation/doc-links'));
     } catch (err) {
       setError(errorMessage(err));
     }
   }
 
-  async function remove(row: DocLinkRow) {
-    if (!window.confirm(`Hapus link dokumen "${row.title}"?`)) return;
+  async function removeDoc(row: DocLinkData) {
+    if (!window.confirm(t(`Hapus tautan dokumen "${tr(row.label, lang)}"?`, `Delete document link "${tr(row.label, lang)}"?`))) return;
     setError('');
     try {
-      try {
-        await api(`/admin/navigation/doc-links/${encodeURIComponent(row.id)}`, { method: 'DELETE' });
-      } catch {
-        setDocLinks((prev) => prev.filter((item) => item.id !== row.id));
-      }
-      await refreshDocLinks();
+      await api(`/admin/navigation/doc-links/${row.id}`, { method: 'DELETE' });
+      setDocLinks(await api<DocLinkData[]>('/admin/navigation/doc-links'));
     } catch (err) {
       setError(errorMessage(err));
     }
   }
 
-  const columns: Column<DocLinkRow>[] = [
+  const docColumns: Column<DocLinkData>[] = [
     {
-      key: 'title',
-      label: 'Judul Button / Dokumen',
-      render: (item) => (
+      key: 'label',
+      label: t('Tautan dokumen', 'Document link'),
+      render: (d) => (
         <div>
-          <strong>{item.title}</strong>
-          {item.description ? (
-            <small style={{ display: 'block', color: 'var(--ink-soft)', fontSize: '0.78rem' }}>
-              {item.description}
-            </small>
-          ) : null}
+          <strong>{tr(d.label, lang)}</strong>
+          {d.description && tr(d.description, lang) && (
+            <small style={{ display: 'block', color: 'var(--ink-soft)', fontSize: '0.78rem' }}>{tr(d.description, lang)}</small>
+          )}
         </div>
       ),
     },
+    { key: 'category', label: t('Kategori', 'Category'), render: (d) => <span className="cms-tag">{d.category}</span> },
     {
-      key: 'parentCategory',
-      label: 'Posisi Induk',
-      render: (item) => <span className="badge badge-amber">{item.parentCategory}</span>,
+      key: 'target',
+      label: t('Target', 'Target'),
+      render: (d) =>
+        d.targetUrl ? (
+          <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" className="cms-link mono">
+            {d.file ? d.file.originalName : d.targetUrl}
+          </a>
+        ) : (
+          '—'
+        ),
     },
+    { key: 'sortOrder', label: t('Urutan', 'Order'), align: 'right' },
     {
-      key: 'targetUrl',
-      label: 'Target Tautan',
-      render: (item) => (
-        <a
-          href={item.targetUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: 'var(--green)', textDecoration: 'underline', fontSize: '0.84rem' }}
-        >
-          {item.targetUrl} ↗
-        </a>
-      ),
-    },
-    {
-      key: 'active',
+      key: 'isActive',
       label: 'Status',
-      render: (item) => <StatusBadge label={item.active ? 'Aktif' : 'Nonaktif'} tone={item.active ? 'ok' : 'bad'} small />,
+      render: (d) => <StatusBadge label={d.isActive ? t('Aktif', 'Active') : t('Nonaktif', 'Inactive')} tone={d.isActive ? 'ok' : 'bad'} small />,
     },
     {
       key: 'act',
-      label: 'Aksi',
-      render: (item) => (
+      label: t('Aksi', 'Actions'),
+      render: (d) => (
         <RowActions
           actions={[
-            { label: 'Edit', onClick: () => openEdit(item) },
-            item.active
-              ? { label: 'Nonaktifkan', tone: 'danger', onClick: () => void toggleActive(item) }
-              : { label: 'Aktifkan', tone: 'success', onClick: () => void toggleActive(item) },
-            { label: 'Hapus', tone: 'danger', onClick: () => void remove(item) },
+            { label: 'Edit', onClick: () => openDocForm(d) },
+            d.isActive
+              ? { label: t('Nonaktifkan', 'Deactivate'), tone: 'danger', onClick: () => void toggleDoc(d) }
+              : { label: t('Aktifkan', 'Activate'), tone: 'success', onClick: () => void toggleDoc(d) },
+            { label: t('Hapus', 'Delete'), tone: 'danger', onClick: () => void removeDoc(d) },
           ]}
         />
       ),
@@ -374,178 +263,167 @@ export default function AdminNavigationHierarchy() {
   return (
     <div style={{ display: 'grid', gap: 24 }}>
       <AdminPageHead
-        title="Hirarki Navigasi"
-        desc="Visualisasi hirarki menu situs (View-Only) & pengelolaan tombol link dokumen perusahaan."
+        title={t('Menu Navigasi', 'Navigation')}
+        desc={t(
+          'Susunan menu header (dua tingkat) dan footer, serta tautan dokumen yang muncul di menu.',
+          'Header (two levels) and footer menu structure, plus document links shown in the menus.',
+        )}
       />
 
-      {error ? <p className="form-error">{error}</p> : null}
+      {notice && (
+        <div className="admin-toast" role="status">
+          {notice}
+        </div>
+      )}
+      {error && <p className="form-error">{error}</p>}
 
-      {/* NAVIGATION TABS */}
-      <div style={{ display: 'flex', gap: 8, borderBottom: '2px solid var(--line)', paddingBottom: 2 }}>
-        <button
-          type="button"
-          onClick={() => setActiveTab('visual')}
-          style={{
-            padding: '10px 20px',
-            border: 0,
-            borderBottom: activeTab === 'visual' ? '3px solid var(--green)' : '3px solid transparent',
-            background: 'transparent',
-            color: activeTab === 'visual' ? 'var(--green)' : 'var(--ink-soft)',
-            fontWeight: activeTab === 'visual' ? 600 : 500,
-            fontSize: '0.92rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s var(--ease)',
-          }}
-        >
-          <Icon name="compass" size={16} /> Viewer Visual Hirarki
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('docs')}
-          style={{
-            padding: '10px 20px',
-            border: 0,
-            borderBottom: activeTab === 'docs' ? '3px solid var(--green)' : '3px solid transparent',
-            background: 'transparent',
-            color: activeTab === 'docs' ? 'var(--green)' : 'var(--ink-soft)',
-            fontWeight: activeTab === 'docs' ? 600 : 500,
-            fontSize: '0.92rem',
-            cursor: 'pointer',
-            transition: 'all 0.2s var(--ease)',
-          }}
-        >
-          <Icon name="quote" size={16} /> Kelola Button Dokumen ({docLinks.filter((d) => d.active).length} Aktif)
-        </button>
-      </div>
+      <AdminCard
+        title={t('Struktur menu', 'Menu structure')}
+        desc={t('Perubahan disimpan sekaligus per lokasi menu.', 'Changes are saved as a whole per menu location.')}
+      >
+        <div className="admin-tabs">
+          {(['header', 'footer'] as MenuLocation[]).map((location) => (
+            <button
+              key={location}
+              type="button"
+              className={`admin-tab${menuTab === location ? ' is-active' : ''}`}
+              onClick={() => setMenuTab(location)}
+            >
+              {location === 'header' ? t('Menu header', 'Header menu') : t('Menu footer', 'Footer menu')}
+              {dirty[location] ? ' •' : ''}
+            </button>
+          ))}
+        </div>
 
-      {/* TAB 1: VIEWER VISUAL HIRARKI (VIEW ONLY) */}
-      {activeTab === 'visual' ? (
-        <AdminCard
-          title="Visual Hirarki Navigasi Company Profile"
-          desc="Struktur navigasi utama di-render langsung dari arsitektur Next.js (View Only). Tombol dokumen aktif juga akan muncul di hirarki terkait."
-        >
-          <div style={{ display: 'grid', gap: 20, marginTop: 12 }}>
-            {navTree.id.map((mainItem) => (
-              <MainNavItemCard key={mainItem.label} mainItem={mainItem} docLinks={docLinks} />
-            ))}
-          </div>
-        </AdminCard>
-      ) : null}
+        {menuError && (
+          <p className="form-error" role="alert">
+            {menuError}
+          </p>
+        )}
 
-      {/* TAB 2: KELOLA BUTTON DOKUMEN */}
-      {activeTab === 'docs' ? (
-        <AdminCard
-          title="Pengaturan Dokumen & Link Button"
-          desc="Kelola tombol link dokumen (seperti WBS, REACH Compliance, Company Profile) yang membuka dokumen saat diklik."
-          action={{ label: 'Tambah Link Dokumen', icon: 'plus', onClick: openAdd }}
-        >
-          <DataTable
-            columns={columns}
-            rows={docLinks}
-            empty={loading ? 'Memuat daftar dokumen...' : 'Belum ada link dokumen.'}
-          />
-        </AdminCard>
-      ) : null}
-
-      {/* MODAL FORM TAMBAH / EDIT DOKUMEN */}
-      {formOpen ? (
-        <div className="admin-modal-backdrop" onClick={closeForm}>
-          <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 540 }}>
-            <div className="admin-modal-head">
-              <h2>{editingId ? 'Edit Link Dokumen' : 'Tambah Link Dokumen Baru'}</h2>
-              <button type="button" className="admin-modal-close" onClick={closeForm}>
-                ✕
+        {loading ? (
+          <div className="admin-empty">{t('Memuat menu...', 'Loading menus...')}</div>
+        ) : (
+          <div className="admin-form">
+            <MenuEditor
+              key={menuTab}
+              items={menus[menuTab]}
+              onChange={(items) => updateMenu(menuTab, items)}
+              allowChildren={menuTab === 'header'}
+              errors={menuErrors}
+              lang={lang}
+            />
+            <div className="admin-card-foot">
+              <button type="button" className="btn btn-solid btn-sm" disabled={savingMenu || !dirty[menuTab]} onClick={() => void saveMenu(menuTab)}>
+                {savingMenu ? t('Menyimpan...', 'Saving...') : menuTab === 'header' ? t('Simpan menu header', 'Save header menu') : t('Simpan menu footer', 'Save footer menu')}
+              </button>
+              <button type="button" className="btn btn-line btn-sm" disabled={savingMenu || !dirty[menuTab]} onClick={() => void load()}>
+                {t('Batalkan perubahan', 'Discard changes')}
               </button>
             </div>
-            <form className="admin-form" onSubmit={(event) => void handleSubmit(event)}>
-              {formError ? <p className="form-error" role="alert">{formError}</p> : null}
-              <div className="admin-form-row">
-                <label>
-                  <span className="field-label">Judul Button / Dokumen</span>
-                  <input
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    placeholder="Misal: Whistle Blowing System (WBS)"
-                    required
-                  />
-                </label>
-                <label>
-                  <span className="field-label">Posisi Induk Menu</span>
-                  <select
-                    value={form.parentCategory}
-                    onChange={(e) => setForm({ ...form, parentCategory: e.target.value })}
-                  >
-                    {categoryOptions.map((cat) => (
-                      <option key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label>
-                <span className="field-label">Deskripsi Singkat</span>
-                <input
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Ringkasan atau keterangan dokumen"
-                />
-              </label>
-
-              {/* MODE SELECTION */}
-              <div style={{ marginBottom: 16 }}>
-                <span className="field-label" style={{ display: 'block', marginBottom: 8 }}>Sumber Tautan Dokumen</span>
-                <SegmentedRadio<'file' | 'url'>
-                  name="docLinkMode"
-                  value={form.linkMode}
-                  onChange={(val) => setForm((prev) => ({ ...prev, linkMode: val }))}
-                  options={[
-                    { value: 'file', label: 'Upload File Dokumen (PDF / DOC)' },
-                    { value: 'url', label: 'Tautan URL Web (https://...)' },
-                  ]}
-                />
-              </div>
-
-              {form.linkMode === 'file' ? (
-                <label>
-                  <span className="field-label">File Dokumen (PDF / DOCX)</span>
-                  <FileUploadDropzone
-                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    maxSizeMB={20}
-                    selectedFile={selectedFile}
-                    onFileSelect={(file) => {
-                      setSelectedFile(file);
-                      if (file) setForm((prev) => ({ ...prev, targetUrl: file.name }));
-                    }}
-                    activeFilePath={form.targetUrl}
-                  />
-                </label>
-              ) : (
-                <label>
-                  <span className="field-label">Masukkan URL Web Target</span>
-                  <input
-                    type="url"
-                    value={form.targetUrl}
-                    onChange={(e) => setForm({ ...form, targetUrl: e.target.value })}
-                    placeholder="https://perusahaan.com/dokumen.pdf"
-                    required={form.linkMode === 'url'}
-                  />
-                </label>
-              )}
-
-              <div className="admin-modal-actions" style={{ marginTop: 20 }}>
-                <button type="button" className="btn btn-line btn-sm" onClick={closeForm}>
-                  Batal
-                </button>
-                <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>
-                  {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Tambah Link Dokumen'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      ) : null}
+        )}
+      </AdminCard>
+
+      <AdminCard
+        title={t('Tautan dokumen', 'Document links')}
+        desc={t(
+          'Tombol dokumen (PDF atau URL) yang muncul di bawah menu induk sesuai kategori. Kategori "wbs" dipakai halaman WBS.',
+          'Document buttons (PDF or URL) shown under the parent menu by category. The "wbs" category is used by the WBS page.',
+        )}
+        action={{ label: t('Tambah tautan', 'Add link'), icon: 'plus', onClick: () => openDocForm(null) }}
+      >
+        <DataTable columns={docColumns} rows={docLinks} empty={loading ? t('Memuat...', 'Loading...') : t('Belum ada tautan dokumen.', 'No document links yet.')} />
+      </AdminCard>
+
+      {docFormOpen && (
+        <AdminModal title={editingDocId ? t('Edit tautan dokumen', 'Edit document link') : t('Tambah tautan dokumen', 'Add document link')} onClose={closeDocForm} width={880}>
+          <form className="admin-form" onSubmit={(event) => void submitDoc(event)}>
+            {docError && (
+              <p className="form-error" role="alert">
+                {docError}
+              </p>
+            )}
+            <I18nInput
+              label="Label"
+              value={docForm.label}
+              onChange={(label) => setDocForm({ ...docForm, label })}
+              required
+              maxLength={150}
+              errorId={firstError(docErrors, 'label.id', 'label')}
+              errorEn={firstError(docErrors, 'label.en')}
+            />
+            <I18nInput
+              label={t('Deskripsi singkat', 'Short description')}
+              value={docForm.description}
+              onChange={(description) => setDocForm({ ...docForm, description })}
+              maxLength={300}
+              errorId={firstError(docErrors, 'description.id')}
+              errorEn={firstError(docErrors, 'description.en')}
+            />
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">{t('Kategori (menu induk)', 'Category (parent menu)')}</span>
+                <select value={docForm.category} onChange={(e) => setDocForm({ ...docForm, category: e.target.value })}>
+                  {!categories.includes(docForm.category) && <option value={docForm.category}>{docForm.category}</option>}
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+                {firstError(docErrors, 'category') && <small className="cms-field-error">{firstError(docErrors, 'category')}</small>}
+              </label>
+              <label>
+                <span className="field-label">{t('Urutan', 'Sort order')}</span>
+                <input type="number" min={0} value={docForm.sortOrder} onChange={(e) => setDocForm({ ...docForm, sortOrder: Number(e.target.value) || 0 })} />
+              </label>
+            </div>
+            <div>
+              <span className="field-label" style={{ display: 'block', marginBottom: 8 }}>
+                {t('Sumber tautan', 'Link source')}
+              </span>
+              <SegmentedRadio<'file' | 'url'>
+                name="docLinkMode"
+                value={docForm.mode}
+                onChange={(mode) => setDocForm((current) => ({ ...current, mode }))}
+                options={[
+                  { value: 'file', label: t('Berkas dokumen (PDF)', 'Document file (PDF)') },
+                  { value: 'url', label: t('Tautan URL', 'Web URL') },
+                ]}
+              />
+            </div>
+            {docForm.mode === 'file' ? (
+              <MediaPicker
+                label={t('Berkas dokumen', 'Document file')}
+                value={docForm.file}
+                onChange={(file) => setDocForm({ ...docForm, file })}
+                accept="document"
+                collection="documents"
+                error={firstError(docErrors, 'mediaId')}
+              />
+            ) : (
+              <label>
+                <span className="field-label">URL</span>
+                <input value={docForm.url} onChange={(e) => setDocForm({ ...docForm, url: e.target.value })} placeholder="https://..." maxLength={500} required />
+                {firstError(docErrors, 'url') && <small className="cms-field-error">{firstError(docErrors, 'url')}</small>}
+              </label>
+            )}
+            <label className="cms-check">
+              <input type="checkbox" checked={docForm.isActive} onChange={(e) => setDocForm({ ...docForm, isActive: e.target.checked })} />
+              <span>{t('Aktif (tampil di menu)', 'Active (shown in menu)')}</span>
+            </label>
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={closeDocForm}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={savingDoc}>
+                {savingDoc ? t('Menyimpan...', 'Saving...') : editingDocId ? t('Simpan perubahan', 'Save changes') : t('Tambah tautan', 'Add link')}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
     </div>
   );
 }

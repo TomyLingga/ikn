@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+!.env.docker.example
+node_modules
+vendor
+storage/app/*
+!storage/app/.gitignore
+storage/logs/*
+tests
+docs
+*.md

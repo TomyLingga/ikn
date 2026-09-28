@@ -2,44 +2,71 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import StatusBadge from '@/components/StatusBadge';
+import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
-import { api, errorMessage } from '@/lib/api';
-
-interface CertificateRow {
-  id: string;
-  name: string;
-  material: string;
-  desc: string;
-  file: string;
-  image: string;
-  published: boolean;
-}
+import { I18nInput, MediaPicker, firstError, type FieldErrors } from '@/components/admin/cms';
+import { useLang } from '@/components/LanguageProvider';
+import { api, ApiError, errorMessage } from '@/lib/api';
+import { emptyI18n, tr, type CertificateData, type I18n, type MediaSummary } from '@/lib/cms';
 
 interface CertificateForm {
-  name: string;
-  material: string;
-  desc: string;
-  file: string;
-  image: string;
+  name: I18n;
+  material: I18n;
+  description: I18n;
+  file: MediaSummary | null;
+  isPublished: boolean;
+  sortOrder: number;
 }
 
-const emptyForm: CertificateForm = { name: '', material: '', desc: '', file: '', image: '' };
+const emptyForm = (): CertificateForm => ({
+  name: emptyI18n(),
+  material: emptyI18n(),
+  description: emptyI18n(),
+  file: null,
+  isPublished: true,
+  sortOrder: 0,
+});
+
+function formFromRow(row: CertificateData): CertificateForm {
+  return {
+    name: row.name,
+    material: row.material ?? emptyI18n(),
+    description: row.description ?? emptyI18n(),
+    file: row.file,
+    isPublished: row.isPublished,
+    sortOrder: row.sortOrder,
+  };
+}
+
+// CertificateRequest replaces every field on update, so always send the full record.
+function toPayload(form: CertificateForm) {
+  return {
+    name: form.name,
+    material: form.material,
+    description: form.description,
+    mediaId: form.file?.id ?? null,
+    isPublished: form.isPublished,
+    sortOrder: form.sortOrder,
+  };
+}
 
 export default function AdminCertificates() {
-  const [rows, setRows] = useState<CertificateRow[]>([]);
+  const { lang } = useLang();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
+  const [rows, setRows] = useState<CertificateData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<CertificateForm>(emptyForm);
+  const [formErrors, setFormErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState<'file' | 'image' | null>(null);
 
   const refresh = useCallback(async () => {
     setError('');
     try {
-      setRows(await api<CertificateRow[]>('/admin/certificates'));
+      setRows(await api<CertificateData[]>('/admin/certificates'));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -51,22 +78,10 @@ export default function AdminCertificates() {
     void refresh();
   }, [refresh]);
 
-  function openAdd() {
-    setEditingId(null);
-    setForm(emptyForm);
-    setFormError('');
-    setFormOpen(true);
-  }
-
-  function openEdit(row: CertificateRow) {
-    setEditingId(row.id);
-    setForm({
-      name: row.name,
-      material: row.material || '',
-      desc: row.desc || '',
-      file: row.file || '',
-      image: row.image || '',
-    });
+  function openForm(row: CertificateData | null) {
+    setEditingId(row ? row.id : null);
+    setForm(row ? formFromRow(row) : { ...emptyForm(), sortOrder: rows.length });
+    setFormErrors({});
     setFormError('');
     setFormOpen(true);
   }
@@ -74,32 +89,6 @@ export default function AdminCertificates() {
   function closeForm() {
     setFormOpen(false);
     setEditingId(null);
-    setForm(emptyForm);
-    setFormError('');
-  }
-
-  async function upload(field: 'file' | 'image', file: File) {
-    if (!file) return;
-    setUploading(field);
-    setFormError('');
-    try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        if (dataUrl) {
-          setForm((current) => ({ ...current, [field]: dataUrl }));
-        }
-        setUploading(null);
-      };
-      reader.onerror = () => {
-        setFormError('Gagal membaca file.');
-        setUploading(null);
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setFormError(errorMessage(err));
-      setUploading(null);
-    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -107,43 +96,33 @@ export default function AdminCertificates() {
     if (saving) return;
     setSaving(true);
     setFormError('');
-    const editing = rows.find((row) => row.id === editingId);
-    const body = {
-      name: form.name.trim(),
-      material: form.material.trim(),
-      desc: form.desc.trim(),
-      file: form.file.trim(),
-      image: form.image.trim(),
-      published: editing ? editing.published : true,
-    };
+    setFormErrors({});
     try {
       if (editingId) {
-        await api(`/admin/certificates/${encodeURIComponent(editingId)}`, { method: 'PUT', body });
+        await api(`/admin/certificates/${editingId}`, { method: 'PUT', body: toPayload(form) });
       } else {
-        await api('/admin/certificates', { method: 'POST', body });
+        await api('/admin/certificates', { method: 'POST', body: toPayload(form) });
       }
       await refresh();
       closeForm();
     } catch (err) {
-      setFormError(errorMessage(err));
+      if (err instanceof ApiError && err.status === 422) {
+        setFormErrors(err.errors);
+        setFormError(err.message);
+      } else {
+        setFormError(errorMessage(err));
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  async function togglePublished(row: CertificateRow) {
+  async function togglePublished(row: CertificateData) {
     setError('');
     try {
-      await api(`/admin/certificates/${encodeURIComponent(row.id)}`, {
+      await api(`/admin/certificates/${row.id}`, {
         method: 'PUT',
-        body: {
-          name: row.name,
-          material: row.material,
-          desc: row.desc,
-          file: row.file,
-          image: row.image,
-          published: !row.published,
-        },
+        body: toPayload({ ...formFromRow(row), isPublished: !row.isPublished }),
       });
       await refresh();
     } catch (err) {
@@ -151,37 +130,51 @@ export default function AdminCertificates() {
     }
   }
 
-  async function remove(row: CertificateRow) {
-    if (!window.confirm(`Hapus sertifikat "${row.name}"?`)) return;
+  async function remove(row: CertificateData) {
+    if (!window.confirm(t(`Hapus sertifikat "${tr(row.name, lang)}"?`, `Delete certificate "${tr(row.name, lang)}"?`))) return;
     setError('');
     try {
-      await api(`/admin/certificates/${encodeURIComponent(row.id)}`, { method: 'DELETE' });
+      await api(`/admin/certificates/${row.id}`, { method: 'DELETE' });
       await refresh();
     } catch (err) {
       setError(errorMessage(err));
     }
   }
 
-  const columns: Column<CertificateRow>[] = [
-    { key: 'name', label: 'Sertifikat' },
-    { key: 'material', label: 'Materi/standar', render: (c) => c.material || '—' },
-    { key: 'file', label: 'Berkas', render: (c) => (c.file ? <span className="mono">{c.file}</span> : '—') },
+  const columns: Column<CertificateData>[] = [
+    { key: 'name', label: t('Sertifikat', 'Certificate'), render: (c) => <strong>{tr(c.name, lang)}</strong> },
+    { key: 'material', label: t('Materi / standar', 'Scope / standard'), render: (c) => tr(c.material, lang) || '—' },
     {
-      key: 'published',
+      key: 'file',
+      label: t('Berkas', 'File'),
+      render: (c) =>
+        c.file ? (
+          <a href={c.file.url} target="_blank" rel="noopener noreferrer" className="cms-link mono">
+            {c.file.originalName}
+          </a>
+        ) : (
+          '—'
+        ),
+    },
+    { key: 'sortOrder', label: t('Urutan', 'Order'), align: 'right' },
+    {
+      key: 'isPublished',
       label: 'Status',
-      render: (c) => <StatusBadge label={c.published ? 'Tampil' : 'Draf'} tone={c.published ? 'ok' : 'warn'} small />,
+      render: (c) => (
+        <StatusBadge label={c.isPublished ? t('Tampil', 'Visible') : t('Draf', 'Draft')} tone={c.isPublished ? 'ok' : 'warn'} small />
+      ),
     },
     {
       key: 'act',
-      label: 'Aksi',
+      label: t('Aksi', 'Actions'),
       render: (c) => (
         <RowActions
           actions={[
-            { label: 'Edit', onClick: () => openEdit(c) },
-            c.published
-              ? { label: 'Sembunyikan', tone: 'danger', onClick: () => void togglePublished(c) }
-              : { label: 'Tampilkan', tone: 'success', onClick: () => void togglePublished(c) },
-            { label: 'Hapus', tone: 'danger', onClick: () => void remove(c) },
+            { label: 'Edit', onClick: () => openForm(c) },
+            c.isPublished
+              ? { label: t('Sembunyikan', 'Hide'), tone: 'danger', onClick: () => void togglePublished(c) }
+              : { label: t('Tampilkan', 'Show'), tone: 'success', onClick: () => void togglePublished(c) },
+            { label: t('Hapus', 'Delete'), tone: 'danger', onClick: () => void remove(c) },
           ]}
         />
       ),
@@ -191,88 +184,79 @@ export default function AdminCertificates() {
   return (
     <div>
       <AdminPageHead
-        title="Certificate"
-        desc="Kelola sertifikat & kepatuhan (ISO, REACH, dll)."
-        action={{ label: 'Tambah sertifikat', icon: 'plus', onClick: openAdd }}
+        title={t('Sertifikat', 'Certificates')}
+        desc={t('Kelola sertifikat dan kepatuhan (ISO, REACH, dll).', 'Manage certificates and compliance documents (ISO, REACH, etc).')}
+        action={{ label: t('Tambah sertifikat', 'Add certificate'), icon: 'plus', onClick: () => openForm(null) }}
       />
 
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        empty={loading ? 'Memuat sertifikat...' : 'Belum ada sertifikat.'}
-      />
+      <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat sertifikat...', 'Loading certificates...') : t('Belum ada sertifikat.', 'No certificates yet.')} />
 
       {formOpen && (
-        <div className="admin-modal-backdrop" onClick={closeForm}>
-          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-head">
-              <h2>{editingId ? 'Edit sertifikat' : 'Tambah sertifikat'}</h2>
-              <button type="button" className="admin-modal-close" onClick={closeForm}>✕</button>
-            </div>
-            <form className="admin-form" onSubmit={(event) => void submit(event)}>
-              {formError && <p className="form-error" role="alert">{formError}</p>}
-              <div className="admin-form-row">
-                <label>
-                  <span className="field-label">Nama sertifikat</span>
-                  <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                </label>
-                <label>
-                  <span className="field-label">Materi/standar</span>
-                  <input value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} placeholder="Contoh: ISO 9001:2015" />
-                </label>
-              </div>
+        <AdminModal title={editingId ? t('Edit sertifikat', 'Edit certificate') : t('Tambah sertifikat', 'Add certificate')} onClose={closeForm} width={880}>
+          <form className="admin-form" onSubmit={(event) => void submit(event)}>
+            {formError && (
+              <p className="form-error" role="alert">
+                {formError}
+              </p>
+            )}
+            <I18nInput
+              label={t('Nama sertifikat', 'Certificate name')}
+              value={form.name}
+              onChange={(name) => setForm({ ...form, name })}
+              required
+              maxLength={200}
+              errorId={firstError(formErrors, 'name.id', 'name')}
+              errorEn={firstError(formErrors, 'name.en')}
+            />
+            <I18nInput
+              label={t('Materi / standar', 'Scope / standard')}
+              value={form.material}
+              onChange={(material) => setForm({ ...form, material })}
+              maxLength={200}
+              placeholder="Contoh: Sistem Manajemen Mutu"
+              errorId={firstError(formErrors, 'material.id')}
+              errorEn={firstError(formErrors, 'material.en')}
+            />
+            <I18nInput
+              label={t('Deskripsi', 'Description')}
+              value={form.description}
+              onChange={(description) => setForm({ ...form, description })}
+              multiline
+              rows={3}
+              maxLength={2000}
+              errorId={firstError(formErrors, 'description.id')}
+              errorEn={firstError(formErrors, 'description.en')}
+            />
+            <MediaPicker
+              label={t('Berkas sertifikat (PDF)', 'Certificate file (PDF)')}
+              value={form.file}
+              onChange={(file) => setForm({ ...form, file })}
+              accept="document"
+              collection="certificates"
+              error={firstError(formErrors, 'mediaId')}
+            />
+            <div className="admin-form-row">
               <label>
-                <span className="field-label">Deskripsi</span>
-                <textarea rows={3} value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} />
+                <span className="field-label">{t('Urutan', 'Sort order')}</span>
+                <input type="number" min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
               </label>
-              <div className="admin-form-row">
-                <label>
-                  <span className="field-label">Berkas (path)</span>
-                  <input value={form.file} onChange={(e) => setForm({ ...form, file: e.target.value })} placeholder="/files/sertifikat-iso.pdf" />
-                </label>
-                <label>
-                  <span className="field-label">Unggah berkas {uploading === 'file' ? '(mengunggah...)' : ''}</span>
-                  <input
-                    type="file"
-                    disabled={uploading !== null}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) void upload('file', file);
-                      event.target.value = '';
-                    }}
-                  />
-                </label>
-              </div>
-              <div className="admin-form-row">
-                <label>
-                  <span className="field-label">Gambar (path)</span>
-                  <input value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} placeholder="/img/sertifikat-iso.webp" />
-                </label>
-                <label>
-                  <span className="field-label">Unggah gambar {uploading === 'image' ? '(mengunggah...)' : ''}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={uploading !== null}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) void upload('image', file);
-                      event.target.value = '';
-                    }}
-                  />
-                </label>
-              </div>
-              <div className="admin-modal-actions">
-                <button type="button" className="btn btn-line btn-sm" onClick={closeForm}>Batal</button>
-                <button type="submit" className="btn btn-solid btn-sm" disabled={saving || uploading !== null}>
-                  {saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah sertifikat'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+              <label className="cms-check" style={{ alignSelf: 'end' }}>
+                <input type="checkbox" checked={form.isPublished} onChange={(e) => setForm({ ...form, isPublished: e.target.checked })} />
+                <span>{t('Tampilkan di situs', 'Show on site')}</span>
+              </label>
+            </div>
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={closeForm}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>
+                {saving ? t('Menyimpan...', 'Saving...') : editingId ? t('Simpan perubahan', 'Save changes') : t('Tambah sertifikat', 'Add certificate')}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
       )}
     </div>
   );

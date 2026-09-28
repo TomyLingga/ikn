@@ -1,0 +1,680 @@
+# Fragmen OpenAPI area order & pembayaran (BE-3). Digabung oleh docs/openapi/merge.py.
+tags:
+  - name: orders
+    description: Order customer (checkout, detail, cancel, konfirmasi, ulasan, dashboard)
+  - name: payments
+    description: Pembayaran customer (histori percobaan bayar, ganti metode, unggah bukti)
+  - name: webhook
+    description: Webhook gateway pembayaran (publik, verifikasi token per provider)
+  - name: admin-orders
+    description: Admin order (modul orders)
+  - name: admin-payments
+    description: Admin verifikasi pembayaran (modul payments)
+  - name: admin-dashboard
+    description: Dashboard admin (modul dashboard)
+  - name: admin-reports
+    description: Laporan penjualan (modul reports)
+  - name: admin-audit
+    description: Audit log (super_admin)
+
+paths:
+  # ---------------------------------------------------------------- order customer (kontrak 9)
+  /customer/dashboard:
+    get:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: Statistik order customer + 5 order terakhir + status akun
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/CustomerDashboard' } } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /customer/orders:
+    get:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: Daftar order milik sendiri (paginated, terbaru dulu)
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/OrderStatus' } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/OrderSummary' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+    post:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: Checkout (customer aktif) — reserve stok + voucher, payment pending, email
+      description: |
+        Body sama dengan POST /cart/quote tetapi `addressId`, `shippingRateId`, `paymentMethodCode` wajib.
+        Dalam satu transaksi: produk dikunci `SELECT ... FOR UPDATE` urut id, dihitung ulang OrderCalculator,
+        kode unik final unik di antara order pending_payment hari ini (manual_transfer + setting), snapshot alamat/harga/ongkir.
+        Header `Idempotency-Key` (opsional, ≤ 80 karakter, per user, 24 jam): kunci sama mengembalikan order yang sama dengan **200** (bukan 201).
+      parameters:
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string, maxLength: 80 } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CheckoutInput' } } }
+      responses:
+        '201': { description: Order baru, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '200': { description: Order yang sama (Idempotency-Key sudah dipakai ≤ 24 jam), content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '403': { description: 'ACCOUNT_NOT_APPROVED (meta.status) bila customer belum disetujui', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'INSUFFICIENT_STOCK (meta.items[]) | VOUCHER_INVALID (meta.reason)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '502': { description: 'GATEWAY_ERROR (metode gateway) | 503 GATEWAY_UNAVAILABLE (secret belum diisi)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /customer/orders/{number}:
+    get:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: Detail order lengkap (items, payments, activePayment, timeline, flag can*)
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '404': { description: 'NOT_FOUND (tidak ada atau bukan milik user)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /customer/orders/{number}/cancel:
+    post:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: Batalkan order (hanya pending_payment) — release stok + voucher, payment aktif cancelled
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: false, content: { application/json: { schema: { type: object, properties: { reason: { type: string, maxLength: 1000 } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+  /customer/orders/{number}/confirm-received:
+    post:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: shipped → delivered
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+  /customer/orders/{number}/complete:
+    post:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: delivered → completed (otomatis setelah autoCompleteDays bila tidak dikonfirmasi)
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+  /customer/orders/{number}/reviews:
+    post:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: Ulasan produk dari order completed (satu per produk per order)
+      description: 'Body berupa list di root [{productSlug, rating, body}] atau { reviews: [...] }. Ulasan langsung tayang (ASUMSI A-13).'
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ReviewInput' } } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { reviews: { type: array, items: { $ref: '#/components/schemas/Review' } }, order: { type: object, properties: { number: { type: string }, canReview: { type: boolean } } } } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'INVALID_TRANSITION bila order belum completed', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { description: 'VALIDATION_ERROR: reviews.N.productSlug (bukan bagian order / sudah diulas), reviews.N.rating', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  # ---------------------------------------------------------------- pembayaran customer (kontrak 9–10)
+  /customer/orders/{number}/payments:
+    get:
+      tags: [payments]
+      security: [{ cookieAuth: [] }]
+      summary: Histori percobaan bayar order
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Payment' } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [payments]
+      security: [{ cookieAuth: [] }]
+      summary: Ganti metode bayar (payment baru)
+      description: |
+        Payment manual `pending` (belum ada bukti) dibatalkan dan diganti. `awaiting_verification` (order payment_review)
+        atau payment gateway yang masih pending → 409 PAYMENT_ALREADY_ACTIVE. Kode unik dihitung ulang bila pindah
+        ke/dari manual_transfer; `grandTotal` order diperbarui. Lewat batas waktu → 409 ORDER_EXPIRED.
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [paymentMethodCode], properties: { paymentMethodCode: { type: string }, bankAccountId: { type: integer, nullable: true } } } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { payment: { $ref: '#/components/schemas/Payment' }, order: { $ref: '#/components/schemas/Order' } } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'PAYMENT_ALREADY_ACTIVE (meta.paymentId) | ORDER_EXPIRED | INVALID_TRANSITION', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /customer/orders/{number}/proof:
+    post:
+      tags: [payments]
+      security: [{ cookieAuth: [] }]
+      summary: Unggah bukti bayar (multipart) → payment awaiting_verification, order payment_review
+      description: |
+        `file` jpg/png/pdf ≤ 5 MB (disk private, diunduh lewat GET /files/{mediaId} oleh pemilik order dan admin).
+        `paymentId` opsional (default payment aktif). Bila payment aktif rejected/tidak ada → payment baru dengan metode & rekening yang sama.
+        Setelah `paymentDueAt` → 409 ORDER_EXPIRED. Masih menunggu verifikasi → 409 PAYMENT_ALREADY_ACTIVE. Metode gateway → 422 paymentId.
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                paymentId: { type: integer }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ProofResponse' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'ORDER_EXPIRED | PAYMENT_ALREADY_ACTIVE | INVALID_TRANSITION', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: FILE_TOO_LARGE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '415': { description: UNSUPPORTED_MEDIA_TYPE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ---------------------------------------------------------------- webhook (kontrak 10)
+  /payments/webhook/{provider}:
+    post:
+      tags: [webhook]
+      summary: Webhook gateway (publik, tanpa CSRF, throttle api)
+      description: |
+        Provider `xendit`: header `x-callback-token` harus sama dengan XENDIT_CALLBACK_TOKEN (salah → 401 WEBHOOK_SIGNATURE_INVALID, tetap dicatat).
+        Payload disimpan mentah ke payment_webhook_logs. Idempoten by provider+external_id+event (`duplicate`).
+        `external_id` = "{orderNumber}-{paymentId}". Nominal harus sama dengan payments.amount (selain itu `ignored`).
+        Status SUCCEEDED|PAID|COMPLETED → payment paid, order pending_payment → payment_review → paid (actor webhook);
+        EXPIRED → payment expired (order tetap pending_payment sampai orders:expire); FAILED → payment failed.
+      parameters: [{ name: provider, in: path, required: true, schema: { type: string, enum: [xendit] } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: true, example: { id: qr_123, external_id: IKN-20260921-00043-51, status: SUCCEEDED, amount: 16805217, paid_at: '2026-09-21T03:00:00Z' } } } } }
+      responses:
+        '200': { description: Selalu 200 kecuali tanda tangan salah, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/WebhookResponse' } } } } } }
+        '401': { description: WEBHOOK_SIGNATURE_INVALID, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: Provider tidak dikenal / tanpa webhook (manual), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  # ---------------------------------------------------------------- admin order (kontrak 11.2)
+  /admin/orders:
+    get:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: Daftar order (modul orders)
+      parameters:
+        - { name: status, in: query, schema: { type: string }, description: 'OrderStatus atau `all` (default semua)' }
+        - { name: paymentStatus, in: query, schema: { $ref: '#/components/schemas/PaymentStatus' } }
+        - { name: q, in: query, schema: { type: string }, description: 'ILIKE nomor order/invoice, nama/perusahaan/PIC/email customer (snapshot)' }
+        - { name: from, in: query, schema: { type: string, format: date }, description: 'created_at >= (zona aplikasi)' }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 'created_at <= akhir hari' }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/OrderSummary' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/orders/{number}:
+    get:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: Detail order
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/orders/{number}/status:
+    post:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: 'Ubah status: processing | shipped (wajib courier + trackingNumber) | delivered | completed'
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OrderStatusInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/orders/{number}/cancel:
+    post:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: Batalkan order (pending_payment/payment_review → release; paid/processing → adjust +stok, refund manual)
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, maxLength: 1000 } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/orders/{number}/due:
+    put:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: Ubah batas waktu bayar (hanya pending_payment/payment_review); expires_at payment aktif ikut
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { paymentDueAt: { type: string, format: date-time }, extendHours: { type: integer, minimum: 1, maximum: 720, description: 'ditambahkan ke batas waktu saat ini (atau sekarang bila sudah lewat)' } } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+        '422': { description: 'VALIDATION_ERROR: paymentDueAt di masa lalu / keduanya kosong', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /admin/orders/{number}/payments/accept:
+    post:
+      tags: [admin-payments]
+      security: [{ cookieAuth: [] }]
+      summary: Alias FE lama — accept payment awaiting_verification dari nomor order
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      responses:
+        '200': { $ref: '#/components/responses/PaymentVerified' }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+  /admin/orders/{number}/payments/reject:
+    post:
+      tags: [admin-payments]
+      security: [{ cookieAuth: [] }]
+      summary: Alias FE lama — reject payment awaiting_verification dari nomor order
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, maxLength: 1000 } } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/PaymentVerified' }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ---------------------------------------------------------------- admin payments (kontrak 11.2)
+  /admin/payments:
+    get:
+      tags: [admin-payments]
+      security: [{ cookieAuth: [] }]
+      summary: Daftar payment + order ringkas (modul payments); default status awaiting_verification
+      parameters:
+        - { name: status, in: query, schema: { type: string }, description: 'PaymentStatus atau `all`; default awaiting_verification' }
+        - { name: method, in: query, schema: { type: string }, description: 'kode metode bayar' }
+        - { name: q, in: query, schema: { type: string }, description: 'ILIKE external_id, nomor order/invoice, nama/perusahaan/email customer' }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminPayment' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/payments/{payment}:
+    get:
+      tags: [admin-payments]
+      security: [{ cookieAuth: [] }]
+      summary: Detail payment + proofUrl (/api/v1/files/{mediaId})
+      parameters: [{ name: payment, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminPayment' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/payments/{payment}/accept:
+    post:
+      tags: [admin-payments]
+      security: [{ cookieAuth: [] }]
+      summary: awaiting_verification → paid; order payment_review → paid (commit stok + voucher, invoice, email)
+      parameters: [{ name: payment, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/PaymentVerified' }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+  /admin/payments/{payment}/reject:
+    post:
+      tags: [admin-payments]
+      security: [{ cookieAuth: [] }]
+      summary: awaiting_verification → rejected (+alasan); order payment_review → pending_payment, batas waktu tetap
+      parameters: [{ name: payment, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, maxLength: 1000 } } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/PaymentVerified' }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ---------------------------------------------------------------- dashboard, laporan, audit (kontrak 11.1)
+  /admin/dashboard:
+    get:
+      tags: [admin-dashboard]
+      security: [{ cookieAuth: [] }]
+      summary: Statistik, order terbaru, order butuh tindakan, grafik penjualan 12 bulan (paid_at)
+      parameters: [{ name: year, in: query, schema: { type: integer }, description: 'default tahun berjalan' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminDashboard' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/reports/sales:
+    get:
+      tags: [admin-reports]
+      security: [{ cookieAuth: [] }]
+      summary: Laporan penjualan dari paid_at (status ≥ paid; cancelled/expired tidak dihitung); format=csv mengunduh
+      parameters:
+        - { name: year, in: query, schema: { type: integer }, description: 'default tahun berjalan' }
+        - { name: month, in: query, schema: { type: integer, minimum: 1, maximum: 12 } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: 'mengalahkan year/month (inklusif)' }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: format, in: query, schema: { type: string, enum: [json, csv] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/SalesReport' } } } }
+            text/csv: { schema: { type: string }, example: "number,invoiceNumber,paidAt,status,customer,company,email,items,subtotal,discount,shipping,fee,tax,uniqueCode,grandTotal,paymentMethod" }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/audit-logs:
+    get:
+      tags: [admin-audit]
+      security: [{ cookieAuth: [] }]
+      summary: Audit log aksi admin + aksi sistem/webhook pada order (super_admin)
+      parameters:
+        - { name: user, in: query, schema: { type: string }, description: 'id user atau ILIKE nama/email' }
+        - { name: action, in: query, schema: { type: string }, description: 'ILIKE aksi (mis. orders, order.expired)' }
+        - { name: subjectType, in: query, schema: { type: string }, description: 'mis. Order, Payment, User' }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AuditLog' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  parameters:
+    OrderNumber:
+      name: number
+      in: path
+      required: true
+      schema: { type: string, example: IKN-20260921-00043 }
+
+  responses:
+    InvalidTransition:
+      description: 'INVALID_TRANSITION (meta { from, to, paymentId? })'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PaymentVerified:
+      description: '{ data: { payment, order } }'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  payment: { $ref: '#/components/schemas/Payment' }
+                  order: { $ref: '#/components/schemas/OrderRef' }
+
+  schemas:
+    OrderStatus:
+      type: string
+      enum: [pending_payment, payment_review, paid, processing, shipped, delivered, completed, cancelled, expired]
+    PaymentStatus:
+      type: string
+      enum: [pending, awaiting_verification, paid, rejected, expired, failed, cancelled]
+    CheckoutInput:
+      type: object
+      required: [items, addressId, shippingRateId, paymentMethodCode]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [qty]
+            properties:
+              productSlug: { type: string }
+              productId: { type: integer }
+              qty: { type: integer, minimum: 1 }
+        addressId: { type: integer, description: 'alamat milik user (snapshot dibuat server)' }
+        shippingRateId: { type: integer, description: 'dari availableShippingRates POST /cart/quote' }
+        paymentMethodCode: { type: string, example: manual_transfer }
+        bankAccountId: { type: integer, nullable: true, description: 'manual_transfer: rekening aktif; default rekening aktif pertama' }
+        voucherCode: { type: string, nullable: true }
+        note: { type: string, nullable: true, maxLength: 1000 }
+    OrderCustomer:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, description: 'nama perusahaan (fallback nama user)' }
+        company: { type: string, nullable: true }
+        pic: { type: string, nullable: true, description: 'nama user' }
+        email: { type: string }
+        phone: { type: string, nullable: true }
+        taxId: { type: string, nullable: true }
+    OrderItem:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        productSlug: { type: string }
+        code: { type: string, nullable: true }
+        name: { $ref: '#/components/schemas/I18n' }
+        unit: { type: string, nullable: true }
+        image: { type: string, nullable: true }
+        categoryId: { type: integer, nullable: true }
+        qty: { type: integer }
+        unitPrice: { type: integer, description: 'rupiah (snapshot saat checkout)' }
+        discountAmount: { type: integer }
+        taxAmount: { type: integer }
+        lineTotal: { type: integer }
+        weightGram: { type: integer }
+        reviewed: { type: boolean, nullable: true, description: 'sudah diulas untuk order ini (null bila tidak dimuat)' }
+    OrderTimelineEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        fromStatus: { type: string, nullable: true }
+        at: { type: string, format: date-time }
+        note: { type: string, nullable: true }
+        actorType: { type: string, enum: [user, system, webhook] }
+        actor: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string } } }
+        meta: { type: object, nullable: true, description: 'courier, trackingNumber, reason, paymentId' }
+    Payment:
+      type: object
+      properties:
+        id: { type: integer }
+        orderId: { type: integer }
+        method: { type: string, example: manual_transfer }
+        methodName: { $ref: '#/components/schemas/I18n' }
+        type: { type: string, nullable: true, enum: [manual_transfer, qris_static, qris_dynamic, virtual_account, ewallet] }
+        provider: { type: string, enum: [manual, xendit] }
+        externalId: { type: string, nullable: true, example: IKN-20260921-00043-51 }
+        amount: { type: integer, description: 'rupiah = grandTotal order saat payment dibuat' }
+        status: { $ref: '#/components/schemas/PaymentStatus' }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+        instructions: { $ref: '#/components/schemas/I18n' }
+        bankAccount: { type: object, nullable: true, properties: { id: { type: integer }, bankName: { type: string }, accountNumber: { type: string }, accountHolder: { type: string } } }
+        qrisImageUrl: { type: string, nullable: true }
+        uniqueCode: { type: integer }
+        gateway: { type: object, nullable: true, description: 'hanya provider gateway: providerId, qrString, accountNumber, bankCode, checkoutUrl, channelCode, providerStatus' }
+        proof:
+          type: object
+          nullable: true
+          properties:
+            mediaId: { type: integer }
+            url: { type: string, description: '/api/v1/files/{mediaId} (pemilik order & admin)' }
+            originalName: { type: string }
+            mime: { type: string }
+            size: { type: integer }
+            uploadedAt: { type: string, format: date-time }
+        verifiedBy: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string } } }
+        verifiedAt: { type: string, format: date-time, nullable: true }
+        rejectReason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrderRef:
+      type: object
+      description: Order ringkas di respons accept/reject dan baris admin payments
+      properties:
+        id: { type: integer }
+        number: { type: string }
+        invoiceNumber: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        paymentStatus: { $ref: '#/components/schemas/PaymentStatus' }
+        customer: { type: object, properties: { id: { type: integer }, name: { type: string }, company: { type: string, nullable: true }, pic: { type: string, nullable: true }, email: { type: string } } }
+        grandTotal: { type: integer }
+        uniqueCode: { type: integer }
+        paymentDueAt: { type: string, format: date-time, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+        date: { type: string, format: date-time }
+    AdminPayment:
+      allOf:
+        - { $ref: '#/components/schemas/Payment' }
+        - type: object
+          properties:
+            proofUrl: { type: string, nullable: true }
+            order: { $ref: '#/components/schemas/OrderRef' }
+    OrderSummary:
+      type: object
+      description: Baris daftar (customer/admin/dashboard/laporan)
+      properties:
+        id: { type: integer }
+        number: { type: string }
+        invoiceNumber: { type: string, nullable: true }
+        date: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        paymentStatus: { $ref: '#/components/schemas/PaymentStatus' }
+        customer: { type: object, properties: { id: { type: integer }, name: { type: string }, company: { type: string, nullable: true }, pic: { type: string, nullable: true }, email: { type: string } } }
+        itemsCount: { type: integer }
+        items: { type: array, items: { type: object, properties: { productSlug: { type: string }, name: { $ref: '#/components/schemas/I18n' }, code: { type: string, nullable: true }, qty: { type: integer }, unit: { type: string, nullable: true }, unitPrice: { type: integer }, lineTotal: { type: integer } } } }
+        subtotal: { type: integer }
+        grandTotal: { type: integer }
+        paymentMethod: { type: string, nullable: true }
+        paymentDueAt: { type: string, format: date-time, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+        courier: { type: string, nullable: true }
+        trackingNumber: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Order:
+      type: object
+      description: Bentuk Order lengkap (kontrak bagian 9, superset tipe FE). Uang integer rupiah, tanggal ISO-8601 +07:00.
+      properties:
+        id: { type: integer }
+        number: { type: string, example: IKN-20260921-00043 }
+        invoiceNumber: { type: string, nullable: true, example: INV/2026/09/00021 }
+        date: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        paymentStatus: { $ref: '#/components/schemas/PaymentStatus' }
+        locale: { type: string, enum: [id, en] }
+        customer: { $ref: '#/components/schemas/OrderCustomer' }
+        items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
+        subtotal: { type: integer }
+        discountTotal: { type: integer }
+        shippingTotal: { type: integer }
+        feeTotal: { type: integer }
+        fees: { type: array, items: { type: object, properties: { id: { type: integer }, name: { $ref: '#/components/schemas/I18n' }, type: { type: string }, amount: { type: integer } } } }
+        taxTotal: { type: integer }
+        taxRate: { type: number }
+        priceIncludesTax: { type: boolean }
+        uniqueCode: { type: integer, description: '0 bila tanpa kode unik' }
+        grandTotal: { type: integer }
+        voucherCode: { type: string, nullable: true }
+        shippingMethod: { type: object, nullable: true, properties: { rateId: { type: integer }, zoneId: { type: integer }, label: { $ref: '#/components/schemas/I18n' }, eta: { $ref: '#/components/schemas/I18n' }, amount: { type: integer }, type: { type: string }, weightGram: { type: integer } } }
+        shippingAddress: { type: object, description: 'CustomerAddress::toSnapshot(): label, recipientName, phone, addressLine, provinceCode…villageCode, region{province,regency,district,village}, postalCode, lat, lng, note' }
+        courier: { type: string, nullable: true }
+        trackingNumber: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        cancelReason: { type: string, nullable: true }
+        paymentDueAt: { type: string, format: date-time, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+        shippedAt: { type: string, format: date-time, nullable: true }
+        deliveredAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        expiredAt: { type: string, format: date-time, nullable: true }
+        activePayment: { allOf: [{ $ref: '#/components/schemas/Payment' }], nullable: true, description: 'payment pending/awaiting_verification terbaru' }
+        payment: { allOf: [{ $ref: '#/components/schemas/Payment' }], nullable: true, description: 'alias activePayment (contoh 201 kontrak bagian 9)' }
+        payments: { type: array, items: { $ref: '#/components/schemas/Payment' } }
+        timeline: { type: array, items: { $ref: '#/components/schemas/OrderTimelineEntry' } }
+        canCancel: { type: boolean }
+        canUploadProof: { type: boolean }
+        canChangePayment: { type: boolean }
+        canConfirmReceived: { type: boolean }
+        canComplete: { type: boolean }
+        canReview: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ProofResponse:
+      type: object
+      properties:
+        order: { type: object, properties: { number: { type: string }, status: { $ref: '#/components/schemas/OrderStatus' }, paymentStatus: { $ref: '#/components/schemas/PaymentStatus' } } }
+        payment: { $ref: '#/components/schemas/Payment' }
+    ReviewInput:
+      type: object
+      required: [productSlug, rating]
+      properties:
+        productSlug: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        body: { type: string, nullable: true, maxLength: 2000 }
+    OrderStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [processing, shipped, delivered, completed] }
+        note: { type: string, nullable: true, maxLength: 1000 }
+        courier: { type: string, nullable: true, description: 'wajib untuk shipped' }
+        trackingNumber: { type: string, nullable: true, description: 'wajib untuk shipped' }
+    WebhookResponse:
+      type: object
+      properties:
+        received: { type: boolean, example: true }
+        result: { type: string, enum: [processed, duplicate, ignored, error] }
+        event: { type: string }
+        externalId: { type: string, nullable: true }
+        paymentId: { type: integer, nullable: true }
+    CustomerDashboard:
+      type: object
+      description: Kompatibel CustomerDashboardStats FE + recentOrders + account
+      properties:
+        totalOrders: { type: integer }
+        awaitingPayment: { type: integer, description: 'pending_payment + payment_review' }
+        inProgress: { type: integer, description: 'paid + processing + shipped + delivered' }
+        completed: { type: integer }
+        transactionValue: { type: integer, description: 'Σ grandTotal order paid_at ≠ null, status ≥ paid' }
+        recentOrders: { type: array, items: { $ref: '#/components/schemas/OrderSummary' } }
+        account: { type: object, properties: { status: { type: string }, rejectionReason: { type: string, nullable: true }, canOrder: { type: boolean } } }
+    SalesChartPoint:
+      type: object
+      properties:
+        ym: { type: string, example: '2026-09' }
+        month: { type: string, example: Sep, description: 'nama bulan singkat (ID)' }
+        monthIndex: { type: integer, minimum: 1, maximum: 12 }
+        year: { type: integer }
+        total: { type: integer, description: 'total grandTotal (rupiah) dari paid_at' }
+        orders: { type: integer }
+    AdminDashboard:
+      type: object
+      properties:
+        stats:
+          type: object
+          properties:
+            ordersToday: { type: integer }
+            ordersThisMonth: { type: integer }
+            awaitingVerification: { type: integer, description: 'payment awaiting_verification' }
+            pendingVerification: { type: integer, description: 'alias awaitingVerification (FE mock)' }
+            revenueThisMonth: { type: integer }
+            pendingCustomers: { type: integer }
+            activeCustomers: { type: integer }
+        recentOrders: { type: array, items: { $ref: '#/components/schemas/OrderSummary' }, description: '10 terbaru' }
+        needsAction: { type: array, items: { $ref: '#/components/schemas/OrderSummary' }, description: 'payment_review, paid, processing (maks 10)' }
+        salesChart: { type: array, items: { $ref: '#/components/schemas/SalesChartPoint' }, description: '12 bulan tahun dipilih' }
+        salesByMonth: { type: array, items: { $ref: '#/components/schemas/SalesChartPoint' }, description: 'alias salesChart (FE mock)' }
+        year: { type: integer }
+    SalesReport:
+      type: object
+      properties:
+        period: { type: object, properties: { from: { type: string, format: date-time }, to: { type: string, format: date-time }, year: { type: integer }, month: { type: integer, nullable: true } } }
+        summary:
+          type: object
+          properties:
+            orders: { type: integer }
+            revenue: { type: integer }
+            avgOrder: { type: integer }
+            items: { type: integer, description: 'total qty' }
+            subtotal: { type: integer }
+            discount: { type: integer }
+            shipping: { type: integer }
+            fees: { type: integer }
+            tax: { type: integer }
+            orderCount: { type: integer, description: 'alias orders (FE mock)' }
+            paidCount: { type: integer, description: 'alias orders (FE mock)' }
+            totalPaid: { type: integer, description: 'alias revenue (FE mock)' }
+            itemsSold: { type: integer, description: 'alias items (FE mock)' }
+        byMonth: { type: array, items: { $ref: '#/components/schemas/SalesChartPoint' } }
+        byProduct: { type: array, items: { type: object, properties: { productId: { type: integer }, productSlug: { type: string, nullable: true }, code: { type: string, nullable: true }, name: { $ref: '#/components/schemas/I18n' }, qty: { type: integer }, orders: { type: integer }, revenue: { type: integer, description: 'Σ (lineTotal − discountAmount)' } } } }
+        orders: { type: array, items: { $ref: '#/components/schemas/OrderSummary' }, description: 'maks 1000, paid_at terbaru dulu' }
+    AuditLog:
+      type: object
+      properties:
+        id: { type: integer }
+        action: { type: string, example: 'POST api/v1/admin/orders/{order}/status' }
+        subjectType: { type: string, nullable: true }
+        subjectId: { type: integer, nullable: true }
+        user: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string }, email: { type: string }, role: { type: string } }, description: 'null untuk aksi sistem/webhook' }
+        before: { type: object, nullable: true }
+        after: { type: object, nullable: true }
+        ip: { type: string, nullable: true }
+        userAgent: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }

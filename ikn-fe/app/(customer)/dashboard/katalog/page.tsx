@@ -1,4 +1,4 @@
-import CatalogBrowser from '@/components/CatalogBrowser';
+import CatalogBrowser, { parseCatalogQuery } from '@/components/CatalogBrowser';
 import { fetchCategories, fetchProducts } from '@/lib/server-data';
 
 export const metadata = {
@@ -6,8 +6,11 @@ export const metadata = {
   description: 'Beli produk karet industri PT IKN dengan harga khusus customer.',
 };
 
-export default async function CustomerCatalogPage() {
-  const [products, categories] = await Promise.all([fetchProducts(), fetchCategories()]);
+type SearchParams = Record<string, string | string[] | undefined>;
+
+export default async function CustomerCatalogPage({ searchParams }: { searchParams: SearchParams }) {
+  const query = parseCatalogQuery(searchParams);
+  const [products, categories] = await Promise.all([fetchProducts(query), fetchCategories()]);
 
   return (
     <div>
@@ -18,7 +21,7 @@ export default async function CustomerCatalogPage() {
         </p>
       </div>
 
-      <CatalogBrowser products={products} categories={categories} />
+      <CatalogBrowser products={products.items} meta={products.meta} categories={categories} query={query} basePath="/dashboard/katalog" />
     </div>
   );
 }

@@ -1,0 +1,1204 @@
+openapi: 3.0.3
+info:
+  title: IKN API
+  version: 1.0.0
+  description: |
+    API PT Industri Karet Nusantara (Laravel 8.83.29). Envelope sukses `{ data }` (+ `meta` untuk paginasi),
+    envelope error `{ message, code, errors?, meta? }`. Field translatable berbentuk `{ id, en }`.
+    Auth admin memakai Sanctum cookie SPA: `GET /sanctum/csrf-cookie` lalu `POST /api/v1/auth/admin/login`
+    dengan `credentials: include` dan header `X-XSRF-TOKEN`. Ringkasan manusia: plan/02-api-contract.md.
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Dev lokal
+tags:
+  - name: auth
+  - name: content
+  - name: forms
+  - name: files
+  - name: admin-users
+  - name: admin-media
+  - name: admin-settings
+  - name: admin-cms
+  - name: admin-content
+  - name: admin-wbs
+  - name: admin-messages
+
+paths:
+  /ping:
+    get:
+      summary: Health check API
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      ok: { type: boolean }
+                      time: { type: string, format: date-time, example: '2026-09-22T09:24:00+07:00' }
+                      locale: { type: string, enum: [id, en] }
+
+  # ---------------------------------------------------------------- auth
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login customer (sesi cookie). Registrasi/verifikasi email menyusul di phase akun.
+      requestBody: { $ref: '#/components/requestBodies/Login' }
+      responses:
+        '200': { $ref: '#/components/responses/UserSession' }
+        '403': { description: EMAIL_NOT_VERIFIED atau ACCOUNT_NOT_APPROVED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooMany' }
+  /auth/admin/login:
+    post:
+      tags: [auth]
+      summary: Login admin / super_admin (rate limit 5/menit per IP+email)
+      requestBody: { $ref: '#/components/requestBodies/Login' }
+      responses:
+        '200': { $ref: '#/components/responses/UserSession' }
+        '400': { description: BAD_REQUEST bila request bukan dari origin FE stateful }
+        '403': { description: FORBIDDEN bila akun tidak aktif }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooMany' }
+  /auth/logout:
+    post:
+      tags: [auth]
+      security: [{ cookieAuth: [] }]
+      summary: Hapus sesi
+      responses:
+        '200': { description: '{ data: { ok: true }, message }' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /auth/me:
+    get:
+      tags: [auth]
+      security: [{ cookieAuth: [] }]
+      summary: User sesi saat ini (admin menyertakan permissions + modules)
+      responses:
+        '200': { $ref: '#/components/responses/UserSession' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  # ---------------------------------------------------------------- konten publik
+  /content/site:
+    get:
+      tags: [content]
+      summary: Bundel lintas halaman untuk navbar/footer (settings publik, menu header+footer, blok kontak, doc-links aktif)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      settings: { $ref: '#/components/schemas/SiteSettings' }
+                      menus:
+                        type: object
+                        properties:
+                          header: { $ref: '#/components/schemas/Menu' }
+                          footer: { $ref: '#/components/schemas/Menu' }
+                      contact: { $ref: '#/components/schemas/ContactInfo', nullable: true }
+                      docLinks: { type: array, items: { $ref: '#/components/schemas/DocLink' } }
+  /content/settings:
+    get:
+      tags: [content]
+      summary: Setting publik (bersarang per grup)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/SiteSettings' } } } } } }
+  /content/menus/{location}:
+    get:
+      tags: [content]
+      parameters: [{ name: location, in: path, required: true, schema: { type: string, enum: [header, footer] } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Menu' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /content/doc-links:
+    get:
+      tags: [content]
+      parameters: [{ name: category, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: Daftar doc-link aktif, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/DocLink' } } } } } } }
+  /content/pages/{slug}:
+    get:
+      tags: [content]
+      summary: Halaman published dengan section yang tampil (media terhidrasi)
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Page' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /content/blocks/{key}:
+    get:
+      tags: [content]
+      summary: Alias kompatibilitas ke section tertentu (history, vision-mission, contact)
+      parameters: [{ name: key, in: path, required: true, schema: { type: string, enum: [history, vision-mission, contact] } }]
+      responses:
+        '200': { description: '{ data: { key, type, data: content, updatedAt } }' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /content/news:
+    get:
+      tags: [content]
+      parameters:
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        '200': { description: Berita terbit tanpa body, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/PostSummary' } } } } } } }
+  /content/news/{slug}:
+    get:
+      tags: [content]
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 'Detail + related (maks 3, tag sama diprioritaskan)', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Post' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /content/gallery:
+    get:
+      tags: [content]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/GalleryItem' } } } } } } }
+  /content/certificates:
+    get:
+      tags: [content]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Certificate' } } } } } } }
+  /content/brochures:
+    get:
+      tags: [content]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Brochure' } } } } } } }
+  /content/customer-logos:
+    get:
+      tags: [content]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/CustomerLogo' } } } } } } }
+
+  # ---------------------------------------------------------------- formulir publik
+  /wbs:
+    post:
+      tags: [forms]
+      summary: Kirim laporan WBS (rate limit 5/jam per IP). Lampiran ke disk private.
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [subject, body]
+              properties:
+                subject: { type: string, maxLength: 200 }
+                body: { type: string, maxLength: 5000 }
+                isAnonymous: { type: boolean, default: true }
+                reporterName: { type: string }
+                reporterContact: { type: string, description: wajib bila isAnonymous=false }
+                attachment: { type: string, format: binary, description: 'pdf/jpg/png ≤ 10 MB' }
+          application/json:
+            schema:
+              type: object
+              properties:
+                subject: { type: string }
+                body: { type: string }
+                isAnonymous: { type: boolean }
+                reporterName: { type: string }
+                reporterContact: { type: string }
+      responses:
+        '201': { description: '{ data: { code: "WBS-202609-0001", status: "new", createdAt }, message }' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooMany' }
+  /wbs/{code}:
+    get:
+      tags: [forms]
+      summary: Status laporan by kode (tanpa isi)
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: '{ data: { code, status, createdAt, updatedAt } }' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /contact:
+    post:
+      tags: [forms]
+      summary: Kirim pesan kontak (rate limit 5/jam per IP)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, message]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                phone: { type: string }
+                subject: { type: string }
+                message: { type: string }
+                type: { type: string, enum: [contact, quote], default: contact }
+                productSlug: { type: string }
+      responses:
+        '201': { description: '{ data: { id, receivedAt }, message }' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooMany' }
+
+  # ---------------------------------------------------------------- berkas privat
+  /files/{media}:
+    get:
+      tags: [files]
+      security: [{ cookieAuth: [] }]
+      summary: Unduh berkas privat (MediaPolicy; sementara admin saja)
+      parameters: [{ name: media, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Isi berkas }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ---------------------------------------------------------------- admin: umum
+  /admin/permissions/self:
+    get:
+      tags: [admin-users]
+      security: [{ cookieAuth: [] }]
+      summary: Modul yang boleh diakses admin saat ini
+      responses:
+        '200': { description: '{ data: { role, modules: string[] } }' }
+  /admin/users:
+    get:
+      tags: [admin-users]
+      security: [{ cookieAuth: [] }]
+      summary: Daftar akun admin (super_admin)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminUser' } } } } } } }
+    post:
+      tags: [admin-users]
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserInput' }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminUser' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/users/modules:
+    get:
+      tags: [admin-users]
+      security: [{ cookieAuth: [] }]
+      summary: Daftar modul untuk form hak akses
+      responses:
+        '200': { description: '{ data: [ { code, name: {id,en} } ] }' }
+  /admin/users/{user}:
+    put:
+      tags: [admin-users]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: user, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUserInput' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminUser' } } } } } }
+        '422': { description: 'Termasuk cannot_deactivate_self pada field active' }
+  /admin/help-guide:
+    get:
+      tags: [admin-users]
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: '{ data: { title, type: url|file, url, file: Media|null } }' }
+    post:
+      tags: [admin-users]
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, type]
+              properties:
+                title: { type: string }
+                type: { type: string, enum: [url, file] }
+                url: { type: string }
+                file: { type: string, format: binary }
+      responses:
+        '200': { description: Sama seperti GET }
+
+  # ---------------------------------------------------------------- admin: media
+  /admin/media:
+    get:
+      tags: [admin-media]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: collection, in: query, schema: { type: string } }
+        - { name: type, in: query, schema: { type: string, enum: [image, document] } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: perPage, in: query, schema: { type: integer, default: 30, maximum: 100 } }
+      responses:
+        '200': { description: '{ data: Media[], meta }', content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Media' } }, meta: { $ref: '#/components/schemas/PageMeta' } } } } } }
+    post:
+      tags: [admin-media]
+      security: [{ cookieAuth: [] }]
+      summary: Unggah ke disk public (gambar ≤ 5 MB, PDF ≤ 20 MB; mime dideteksi finfo)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                collection: { type: string, default: general }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Media' } } } } } }
+        '413': { description: FILE_TOO_LARGE }
+        '415': { description: UNSUPPORTED_MEDIA_TYPE }
+  /admin/media/{media}:
+    delete:
+      tags: [admin-media]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: media, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '409': { description: MEDIA_IN_USE }
+
+  # ---------------------------------------------------------------- admin: settings
+  /admin/site-settings:
+    get:
+      tags: [admin-settings]
+      security: [{ cookieAuth: [] }]
+      summary: Semua setting situs (termasuk privat). Catatan — /admin/settings dicadangkan untuk pengaturan commerce.
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/SiteSettings' } } } } } }
+    put:
+      tags: [admin-settings]
+      security: [{ cookieAuth: [] }]
+      summary: Perbarui sebagian (bersarang); kunci di luar skema diabaikan
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteSettings' }
+      responses:
+        '200': { description: '{ data, message }' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ---------------------------------------------------------------- admin: CMS
+  /admin/cms/section-types:
+    get:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      summary: Skema tipe section untuk form admin otomatis
+      responses:
+        '200': { description: '{ data: { types: { [type]: SectionTypeDef }, icons: string[] } }' }
+  /admin/pages:
+    get:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: '{ data: [ { id, slug, title, status, template, sectionCount, isProtected, updatedAt } ] }' }
+    post:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PageInput' }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Page' } } } } } }
+  /admin/pages/{page}:
+    get:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: page, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: Halaman + semua section (termasuk tersembunyi), content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Page' } } } } } }
+    put:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: page, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PageInput' }
+      responses:
+        '200': { description: OK }
+        '409': { description: PAGE_PROTECTED bila slug halaman bawaan diubah }
+    delete:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: page, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '409': { description: PAGE_PROTECTED }
+  /admin/pages/{page}/sections:
+    get:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: page, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: '{ data: Section[] }' }
+    post:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: page, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string }
+                key: { type: string, nullable: true }
+                content: { type: object, description: 'divalidasi terhadap skema tipe; media boleh id atau {id}' }
+                isVisible: { type: boolean }
+                sortOrder: { type: integer }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Section' } } } } } }
+        '422': { description: 'VALIDATION_ERROR; tipe tidak dikenal atau konten tidak sesuai skema (errors: content.items.0.title.id, ...)' }
+  /admin/pages/{page}/sections/reorder:
+    put:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: page, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [ids], properties: { ids: { type: array, items: { type: integer } } } }
+      responses:
+        '200': { description: Halaman lengkap terurut }
+        '422': { description: id bukan milik halaman }
+  /admin/sections/{section}:
+    put:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: section, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content: { type: object }
+                isVisible: { type: boolean }
+                key: { type: string, nullable: true }
+                sortOrder: { type: integer }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Section' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: section, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/blocks/{key}:
+    get:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      summary: Alias kompatibilitas (history|vision-mission|contact)
+      parameters: [{ name: key, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: '{ data: { key, type, data, updatedAt } }' }
+    put:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: key, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { data: { type: object } } }
+      responses:
+        '200': { description: OK }
+  /admin/menus/{location}:
+    get:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: location, in: path, required: true, schema: { type: string, enum: [header, footer] } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Menu' } } } } } }
+    put:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      summary: Ganti seluruh pohon (maks 2 tingkat)
+      parameters: [{ name: location, in: path, required: true, schema: { type: string, enum: [header, footer] } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items: { type: array, items: { $ref: '#/components/schemas/MenuItemInput' } }
+      responses:
+        '200': { description: OK }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/customer-logos:
+    get:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: '{ data: CustomerLogo[] }' }
+    post:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/CustomerLogo' }
+      responses:
+        '201': { description: OK }
+  /admin/customer-logos/{customerLogo}:
+    put:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: customerLogo, in: path, required: true, schema: { type: integer } }]
+      requestBody: { $ref: '#/components/requestBodies/CustomerLogo' }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: customerLogo, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/navigation/doc-links:
+    get:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: category, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: '{ data: DocLink[] }' }
+    post:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/DocLink' }
+      responses:
+        '201': { description: OK }
+  /admin/navigation/doc-links/{docLink}:
+    put:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: docLink, in: path, required: true, schema: { type: integer } }]
+      requestBody: { $ref: '#/components/requestBodies/DocLink' }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [admin-cms]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: docLink, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+
+  # ---------------------------------------------------------------- admin: konten
+  /admin/news:
+    get:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: q, in: query, schema: { type: string }, description: ILIKE pada judul }]
+      responses:
+        '200': { description: '{ data: Post[] } (termasuk draf)' }
+    post:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/Post' }
+      responses:
+        '201': { description: OK }
+  /admin/news/{post}:
+    get:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: post, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK }
+    put:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: post, in: path, required: true, schema: { type: integer } }]
+      requestBody: { $ref: '#/components/requestBodies/Post' }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: post, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/gallery:
+    get:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: '{ data: GalleryItem[] }' }
+    post:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/GalleryItem' }
+      responses:
+        '201': { description: OK }
+  /admin/gallery/{galleryItem}:
+    put:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: galleryItem, in: path, required: true, schema: { type: integer } }]
+      requestBody: { $ref: '#/components/requestBodies/GalleryItem' }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: galleryItem, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/certificates:
+    get:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: '{ data: Certificate[] }' }
+    post:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/Certificate' }
+      responses:
+        '201': { description: OK }
+  /admin/certificates/{certificate}:
+    put:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: certificate, in: path, required: true, schema: { type: integer } }]
+      requestBody: { $ref: '#/components/requestBodies/Certificate' }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: certificate, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+  /admin/brochures:
+    get:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: '{ data: Brochure[] }' }
+    post:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/Brochure' }
+      responses:
+        '201': { description: OK }
+  /admin/brochures/{brochure}:
+    put:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: brochure, in: path, required: true, schema: { type: integer } }]
+      requestBody: { $ref: '#/components/requestBodies/Brochure' }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: brochure, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+
+  # ---------------------------------------------------------------- admin: WBS & pesan
+  /admin/whistleblowing:
+    get:
+      tags: [admin-wbs]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: status, in: query, schema: { type: string, enum: [new, review, closed] } }]
+      responses:
+        '200': { description: '{ data: WbsReport[] }' }
+  /admin/whistleblowing/{wbsReport}:
+    get:
+      tags: [admin-wbs]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: wbsReport, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/WbsReport' } } } } } }
+    put:
+      tags: [admin-wbs]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: wbsReport, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { status: { type: string, enum: [new, review, closed] }, adminNotes: { type: string, nullable: true } } }
+      responses:
+        '200': { description: OK }
+  /admin/wbs/config:
+    get:
+      tags: [admin-wbs]
+      security: [{ cookieAuth: [] }]
+      summary: Dokumen SOP WBS (doc-link kategori wbs)
+      responses:
+        '200': { description: '{ data: { document: DocLink|null } }' }
+  /admin/wbs/upload:
+    post:
+      tags: [admin-wbs]
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: PDF }
+                label[id]: { type: string }
+                label[en]: { type: string }
+      responses:
+        '200': { description: '{ data: { document: DocLink } }' }
+  /admin/contact-messages:
+    get:
+      tags: [admin-messages]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: unread, in: query, schema: { type: boolean } }
+        - { name: type, in: query, schema: { type: string, enum: [contact, quote] } }
+        - { name: page, in: query, schema: { type: integer } }
+        - { name: perPage, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: '{ data: ContactMessage[], meta }' }
+  /admin/contact-messages/{contactMessage}/read:
+    put:
+      tags: [admin-messages]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: contactMessage, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: laravel_session
+      description: Sesi Sanctum SPA; sertakan juga header X-XSRF-TOKEN dari cookie XSRF-TOKEN.
+
+  requestBodies:
+    Login:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password]
+            properties:
+              email: { type: string, format: email }
+              password: { type: string }
+    Post:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [title]
+            properties:
+              title: { $ref: '#/components/schemas/I18n' }
+              slug: { type: string, nullable: true, description: otomatis dari judul bila kosong }
+              excerpt: { $ref: '#/components/schemas/I18n' }
+              body:
+                allOf: [{ $ref: '#/components/schemas/I18n' }]
+                description: >-
+                  HTML per bahasa dari editor. Server men-sanitasi dengan whitelist
+                  (p, br, h2-h4, strong, em, u, s, a, ul, ol, li, blockquote, img, figure, figcaption, hr,
+                  table, iframe YouTube/Vimeo saja; style hanya text-align). Tag/atribut lain dibuang.
+              tag: { type: string, nullable: true }
+              author: { type: string, nullable: true, maxLength: 120 }
+              coverMediaId: { type: integer, nullable: true }
+              isPublished: { type: boolean }
+              publishedAt: { type: string, format: date-time, nullable: true }
+    GalleryItem:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [title, type]
+            properties:
+              title: { $ref: '#/components/schemas/I18n' }
+              type: { type: string, enum: [image, video] }
+              mediaId: { type: integer, nullable: true, description: wajib untuk image }
+              externalUrl: { type: string, nullable: true, description: ID/URL YouTube, wajib untuk video }
+              isPublished: { type: boolean }
+              sortOrder: { type: integer }
+    Certificate:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name: { $ref: '#/components/schemas/I18n' }
+              material: { $ref: '#/components/schemas/I18n' }
+              description: { $ref: '#/components/schemas/I18n' }
+              mediaId: { type: integer, nullable: true }
+              isPublished: { type: boolean }
+              sortOrder: { type: integer }
+    Brochure:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [title]
+            properties:
+              title: { $ref: '#/components/schemas/I18n' }
+              description: { $ref: '#/components/schemas/I18n' }
+              mediaId: { type: integer, nullable: true }
+              isPublished: { type: boolean }
+              sortOrder: { type: integer }
+    CustomerLogo:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name: { type: string }
+              mediaId: { type: integer, nullable: true }
+              url: { type: string, nullable: true }
+              isActive: { type: boolean }
+              sortOrder: { type: integer }
+    DocLink:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [category, label]
+            properties:
+              category: { type: string, description: key item menu induk atau "wbs" }
+              label: { $ref: '#/components/schemas/I18n' }
+              description: { $ref: '#/components/schemas/I18n' }
+              mediaId: { type: integer, nullable: true }
+              url: { type: string, nullable: true }
+              isActive: { type: boolean }
+              sortOrder: { type: integer }
+
+  responses:
+    UserSession:
+      description: '{ data: { user } }'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+    Deleted:
+      description: '{ data: { deleted: true } }'
+    ValidationError:
+      description: VALIDATION_ERROR
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthenticated:
+      description: UNAUTHENTICATED
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: FORBIDDEN
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: NOT_FOUND
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooMany:
+      description: TOO_MANY_REQUESTS (header Retry-After)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        message: { type: string }
+        code: { type: string, example: VALIDATION_ERROR }
+        errors: { type: object, additionalProperties: { type: array, items: { type: string } } }
+        meta: { type: object }
+    I18n:
+      type: object
+      properties:
+        id: { type: string }
+        en: { type: string, description: 'kosong → server mengisi dari id' }
+    PageMeta:
+      type: object
+      properties:
+        page: { type: integer }
+        perPage: { type: integer }
+        total: { type: integer }
+        lastPage: { type: integer }
+    Media:
+      type: object
+      properties:
+        id: { type: integer }
+        url: { type: string }
+        disk: { type: string, enum: [public, private] }
+        mime: { type: string }
+        size: { type: integer }
+        originalName: { type: string }
+        collection: { type: string }
+        isImage: { type: boolean }
+        meta: { type: object, nullable: true }
+        createdAt: { type: string, format: date-time }
+    MediaSummary:
+      type: object
+      nullable: true
+      properties:
+        id: { type: integer }
+        url: { type: string }
+        mime: { type: string }
+        size: { type: integer }
+        originalName: { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [super_admin, admin, customer] }
+        status: { type: string, enum: [pending, active, rejected, inactive] }
+        emailVerifiedAt: { type: string, nullable: true }
+        lastLoginAt: { type: string, nullable: true }
+        locale: { type: string, enum: [id, en] }
+        permissions: { type: array, items: { type: string }, description: 'admin saja; ["*"] untuk super_admin' }
+        modules: { type: array, items: { type: string }, description: admin saja }
+        approvedAt: { type: string, nullable: true, description: customer saja }
+        rejectionReason: { type: string, nullable: true, description: customer saja }
+        profile: { $ref: '#/components/schemas/UserProfile', description: customer saja }
+    AdminUser:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [super_admin, admin] }
+        active: { type: boolean }
+        permissions: { type: array, items: { type: string } }
+        lastLoginAt: { type: string, nullable: true }
+        createdAt: { type: string, nullable: true }
+    AdminUserInput:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string }
+        password: { type: string, description: wajib saat membuat, min 8 }
+        role: { type: string, enum: [super_admin, admin] }
+        permissions: { type: array, items: { type: string } }
+        active: { type: boolean }
+    SiteSettings:
+      type: object
+      properties:
+        company:
+          type: object
+          properties:
+            name: { type: string }
+            short: { type: string }
+            parent: { type: string }
+            since: { type: string }
+            location: { type: string }
+            tagline: { $ref: '#/components/schemas/I18n' }
+            profile_document: { $ref: '#/components/schemas/MediaSummary' }
+        site:
+          type: object
+          properties:
+            footer_headline: { $ref: '#/components/schemas/I18n' }
+            footer_cta_label: { $ref: '#/components/schemas/I18n' }
+            subsidiary_note: { $ref: '#/components/schemas/I18n' }
+        seo:
+          type: object
+          properties:
+            default_title: { $ref: '#/components/schemas/I18n' }
+            default_description: { $ref: '#/components/schemas/I18n' }
+        admin:
+          type: object
+          description: privat (hanya GET/PUT admin)
+    Page:
+      type: object
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        title: { $ref: '#/components/schemas/I18n' }
+        status: { type: string, enum: [draft, published] }
+        template: { type: string }
+        seo:
+          type: object
+          properties:
+            title: { $ref: '#/components/schemas/I18n' }
+            description: { $ref: '#/components/schemas/I18n' }
+        sections: { type: array, items: { $ref: '#/components/schemas/Section' } }
+        updatedAt: { type: string, nullable: true }
+        isProtected: { type: boolean, description: admin saja }
+    PageInput:
+      type: object
+      properties:
+        slug: { type: string }
+        title: { $ref: '#/components/schemas/I18n' }
+        status: { type: string, enum: [draft, published] }
+        template: { type: string }
+        seo:
+          type: object
+          properties:
+            title: { $ref: '#/components/schemas/I18n' }
+            description: { $ref: '#/components/schemas/I18n' }
+    Section:
+      type: object
+      properties:
+        id: { type: integer }
+        key: { type: string, nullable: true }
+        type: { type: string, description: lihat GET /admin/cms/section-types }
+        sortOrder: { type: integer }
+        isVisible: { type: boolean }
+        content: { type: object, description: 'sesuai skema tipe; field media terhidrasi menjadi MediaSummary' }
+        updatedAt: { type: string, nullable: true }
+    Menu:
+      type: object
+      properties:
+        location: { type: string, enum: [header, footer] }
+        items: { type: array, items: { $ref: '#/components/schemas/MenuItem' } }
+        updatedAt: { type: string, nullable: true }
+    MenuItem:
+      type: object
+      properties:
+        id: { type: integer }
+        key: { type: string, nullable: true }
+        label: { $ref: '#/components/schemas/I18n' }
+        description: { $ref: '#/components/schemas/I18n' }
+        url: { type: string, nullable: true }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        children: { type: array, items: { $ref: '#/components/schemas/MenuItem' } }
+    MenuItemInput:
+      type: object
+      required: [label]
+      properties:
+        key: { type: string, nullable: true }
+        label: { $ref: '#/components/schemas/I18n' }
+        description: { $ref: '#/components/schemas/I18n' }
+        url: { type: string, nullable: true }
+        isActive: { type: boolean }
+        children: { type: array, items: { $ref: '#/components/schemas/MenuItemInput' } }
+    ContactInfo:
+      type: object
+      properties:
+        locations:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { $ref: '#/components/schemas/I18n' }
+              address: { type: string }
+              phones: { type: array, items: { type: object, properties: { number: { type: string } } } }
+        emails: { type: array, items: { type: object, properties: { address: { type: string } } } }
+        social: { type: array, items: { type: object, properties: { label: { type: string }, handle: { type: string }, url: { type: string } } } }
+    DocLink:
+      type: object
+      properties:
+        id: { type: integer }
+        category: { type: string }
+        label: { $ref: '#/components/schemas/I18n' }
+        description: { $ref: '#/components/schemas/I18n' }
+        file: { $ref: '#/components/schemas/MediaSummary' }
+        url: { type: string, nullable: true }
+        targetUrl: { type: string, nullable: true }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+    PostSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        title: { $ref: '#/components/schemas/I18n' }
+        excerpt: { $ref: '#/components/schemas/I18n' }
+        tag: { type: string, nullable: true }
+        author: { type: string, nullable: true }
+        readingMinutes: { type: integer, description: estimasi menit baca dari isi bahasa ID (200 kata/menit, min 1) }
+        cover: { $ref: '#/components/schemas/MediaSummary' }
+        isPublished: { type: boolean }
+        publishedAt: { type: string, nullable: true }
+        createdAt: { type: string, nullable: true }
+        updatedAt: { type: string, nullable: true }
+    Post:
+      allOf:
+        - $ref: '#/components/schemas/PostSummary'
+        - type: object
+          properties:
+            body: { $ref: '#/components/schemas/I18n' }
+            related:
+              type: array
+              maxItems: 3
+              description: berita terkait (tag sama diprioritaskan, lalu terbaru); hanya pada GET /content/news/{slug}
+              items: { $ref: '#/components/schemas/PostSummary' }
+    GalleryItem:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { $ref: '#/components/schemas/I18n' }
+        type: { type: string, enum: [image, video] }
+        media: { $ref: '#/components/schemas/MediaSummary' }
+        externalUrl: { type: string, nullable: true }
+        youtubeId: { type: string, nullable: true }
+        isPublished: { type: boolean }
+        sortOrder: { type: integer }
+    Certificate:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { $ref: '#/components/schemas/I18n' }
+        material: { $ref: '#/components/schemas/I18n' }
+        description: { $ref: '#/components/schemas/I18n' }
+        file: { $ref: '#/components/schemas/MediaSummary' }
+        isPublished: { type: boolean }
+        sortOrder: { type: integer }
+    Brochure:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { $ref: '#/components/schemas/I18n' }
+        description: { $ref: '#/components/schemas/I18n' }
+        file: { $ref: '#/components/schemas/MediaSummary' }
+        isPublished: { type: boolean }
+        sortOrder: { type: integer }
+    CustomerLogo:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        logo: { $ref: '#/components/schemas/MediaSummary' }
+        url: { type: string, nullable: true }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+    WbsReport:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        subject: { type: string }
+        body: { type: string }
+        isAnonymous: { type: boolean }
+        reporterName: { type: string, nullable: true }
+        reporterContact: { type: string, nullable: true }
+        attachment: { $ref: '#/components/schemas/MediaSummary' }
+        status: { type: string, enum: [new, review, closed] }
+        adminNotes: { type: string, nullable: true }
+        handledBy: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string } } }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    ContactMessage:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [contact, quote] }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string, nullable: true }
+        subject: { type: string, nullable: true }
+        message: { type: string }
+        meta: { type: object, nullable: true }
+        readAt: { type: string, nullable: true }
+        createdAt: { type: string }

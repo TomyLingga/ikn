@@ -1,72 +1,93 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
+import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
+import { Pager } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
-import { orderStatus } from '@/lib/commerce';
-import { api, errorMessage } from '@/lib/api';
-import { formatDate, formatIDR } from '@/lib/format';
-import type { Order } from '@/lib/types';
+import { accountStatusLabels, orderLabel, paymentLabel } from '@/lib/commerce';
+import { api, apiPaged, ApiError, errorMessage } from '@/lib/api';
+import { queryString, type AdminCustomerDetail, type AdminCustomerOrder, type AdminCustomerRow } from '@/lib/admin';
+import { formatAddressLines } from '@/components/customer/CustomerAddresses';
+import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
+import type { PagedMeta } from '@/lib/cms';
+import type { AccountStatus } from '@/lib/types';
 
-interface CustomerRow {
-  id: string;
-  name: string;
-  pic: string;
-  email: string;
-  phone: string;
-  company: string;
-  orders: number;
-  status: 'active' | 'inactive';
-  joined: string;
+type StatusTab = AccountStatus | '';
+type Action = { status: 'active' | 'rejected' | 'inactive'; customer: AdminCustomerRow | AdminCustomerDetail } | null;
+
+const TABS: StatusTab[] = ['pending', 'active', 'rejected', 'inactive', ''];
+const PER_PAGE = 20;
+
+function statusBadge(status: AccountStatus, lang: 'id' | 'en') {
+  const label = accountStatusLabels[status] || { id: status, en: status, tone: 'info' as const };
+  return <StatusBadge label={label[lang]} tone={label.tone} small />;
 }
 
-interface CustomerDetail {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  company: string;
-  position: string;
-  companyEmail: string;
-  companyPhone: string;
-  taxId: string;
-  status: 'active' | 'inactive';
-  joined: string;
-  addresses: { id: string; label: string; recipient: string; phone: string; line: string; primary: boolean }[];
-  orders: Order[];
+export default function AdminCustomersPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminCustomers />
+    </Suspense>
+  );
 }
 
-export default function AdminCustomers() {
+// Customer B2B: GET /admin/customers?status&q&page, detail GET /admin/customers/{id}, PUT .../status (approve/reject/nonaktif).
+function AdminCustomers() {
   const { lang } = useLang();
-  const [rows, setRows] = useState<CustomerRow[]>([]);
+  const params = useSearchParams();
+  const t = (id: string, en: string) => (lang === 'en' ? en : id);
+
+  // Tab awal: ?status= bila valid; datang dengan ?q= saja (dari detail order) → cari di semua status.
+  const initialStatus = params.get('status') as StatusTab | null;
+  const [tab, setTab] = useState<StatusTab>(initialStatus && TABS.includes(initialStatus) ? initialStatus : params.get('q') ? '' : 'pending');
+  const [search, setSearch] = useState(params.get('q') || '');
+  const [q, setQ] = useState(params.get('q') || '');
+  const [page, setPage] = useState(1);
+  const [rows, setRows] = useState<AdminCustomerRow[]>([]);
+  const [meta, setMeta] = useState<PagedMeta>({ page: 1, perPage: PER_PAGE, total: 0, lastPage: 1 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [detail, setDetail] = useState<CustomerDetail | null>(null);
+  const [notice, setNotice] = useState('');
+  const [detail, setDetail] = useState<AdminCustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [action, setAction] = useState<Action>(null);
+  const [reason, setReason] = useState('');
+  const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
+    setLoading(true);
     setError('');
     try {
-      setRows(await api<CustomerRow[]>('/admin/customers'));
+      const result = await apiPaged<AdminCustomerRow>(`/admin/customers${queryString({ status: tab, q, page, perPage: PER_PAGE })}`);
+      setRows(result.items);
+      setMeta(result.meta);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tab, q, page]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  async function openDetail(id: string) {
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  async function openDetail(id: number) {
     setDetailLoading(true);
     setError('');
     try {
-      setDetail(await api<CustomerDetail>(`/admin/customers/${encodeURIComponent(id)}`));
+      setDetail(await api<AdminCustomerDetail>(`/admin/customers/${id}`));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -74,201 +95,345 @@ export default function AdminCustomers() {
     }
   }
 
-  async function setStatus(customer: { id: string; status: 'active' | 'inactive' }, status: 'active' | 'inactive') {
-    if (busy) return;
+  function startAction(next: Action) {
+    setReason('');
+    setActionError('');
+    setAction(next);
+  }
+
+  async function submitAction(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!action || busy) return;
+    if (action.status === 'rejected' && !reason.trim()) {
+      setActionError(t('Alasan penolakan wajib diisi.', 'Rejection reason is required.'));
+      return;
+    }
     setBusy(true);
-    setError('');
+    setActionError('');
     try {
-      await api(`/admin/customers/${encodeURIComponent(customer.id)}/status`, {
+      const updated = await api<AdminCustomerDetail>(`/admin/customers/${action.customer.id}/status`, {
         method: 'PUT',
-        body: { status },
+        body: { status: action.status, reason: reason.trim() || null },
       });
+      const labels: Record<string, [string, string]> = {
+        active: ['Akun customer disetujui/diaktifkan; email pemberitahuan dikirim.', 'Customer account approved/activated; notification email sent.'],
+        rejected: ['Pendaftaran ditolak; customer menerima email berisi alasan.', 'Registration rejected; the customer receives the reason by email.'],
+        inactive: ['Akun dinonaktifkan; customer tidak dapat login/checkout.', 'Account deactivated; the customer can no longer log in or check out.'],
+      };
+      const [msgId, msgEn] = labels[action.status] || ['Status diperbarui.', 'Status updated.'];
+      setNotice(t(msgId, msgEn));
+      setAction(null);
+      if (detail?.id === updated.id) setDetail(updated);
       await refresh();
-      if (detail?.id === customer.id) await openDetail(customer.id);
     } catch (err) {
-      setError(errorMessage(err));
+      setActionError(err instanceof ApiError && err.status === 422 ? Object.values(err.errors)[0]?.[0] || err.message : errorMessage(err));
     } finally {
       setBusy(false);
     }
   }
 
-  const columns: Column<CustomerRow>[] = [
-    { key: 'company', label: lang === 'en' ? 'Company' : 'Perusahaan', render: (c) => c.company || c.name },
-    { key: 'pic', label: 'PIC' },
-    { key: 'email', label: 'Email', render: (c) => <span className="mono">{c.email}</span> },
-    { key: 'phone', label: lang === 'en' ? 'Phone' : 'Telepon', render: (c) => c.phone || '—' },
-    { key: 'orders', label: lang === 'en' ? 'Orders' : 'Order', align: 'right', render: (c) => String(c.orders) },
-    { key: 'joined', label: lang === 'en' ? 'Joined' : 'Bergabung', render: (c) => formatDate(c.joined) },
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPage(1);
+    setQ(search.trim());
+  }
+
+  const tabLabel = (key: StatusTab) => (key === '' ? t('Semua', 'All') : accountStatusLabels[key][lang]);
+
+  const rowActions = (c: AdminCustomerRow | AdminCustomerDetail) => {
+    const list: Array<{ label: string; tone?: 'danger' | 'success' | 'default'; onClick: () => void; disabled?: boolean }> = [];
+    if (c.status === 'pending' || c.status === 'rejected') {
+      list.push({ label: t('Setujui', 'Approve'), tone: 'success', disabled: busy, onClick: () => startAction({ status: 'active', customer: c }) });
+    }
+    if (c.status === 'pending') {
+      list.push({ label: t('Tolak', 'Reject'), tone: 'danger', disabled: busy, onClick: () => startAction({ status: 'rejected', customer: c }) });
+    }
+    if (c.status === 'active') {
+      list.push({ label: t('Nonaktifkan', 'Deactivate'), tone: 'danger', disabled: busy, onClick: () => startAction({ status: 'inactive', customer: c }) });
+    }
+    if (c.status === 'inactive') {
+      list.push({ label: t('Aktifkan', 'Activate'), tone: 'success', disabled: busy, onClick: () => startAction({ status: 'active', customer: c }) });
+    }
+    return list;
+  };
+
+  const columns: Column<AdminCustomerRow>[] = [
+    {
+      key: 'company',
+      label: t('Perusahaan / PIC', 'Company / PIC'),
+      render: (c) => (
+        <span>
+          <strong>{c.company || c.name}</strong>
+          {c.company && <small className="admin-cell-sub">{c.name}</small>}
+        </span>
+      ),
+    },
+    {
+      key: 'contact',
+      label: t('Kontak', 'Contact'),
+      render: (c) => (
+        <span>
+          <span className="mono">{c.email}</span>
+          <small className="admin-cell-sub">{c.phone || '—'}</small>
+        </span>
+      ),
+    },
+    {
+      key: 'joined',
+      label: t('Mendaftar', 'Registered'),
+      render: (c) => (
+        <span>
+          {formatDate(c.joinedAt, lang)}
+          <small className="admin-cell-sub">{c.emailVerifiedAt ? t('email terverifikasi', 'email verified') : t('email belum diverifikasi', 'email not verified')}</small>
+        </span>
+      ),
+    },
+    { key: 'addresses', label: t('Alamat', 'Addresses'), align: 'right', render: (c) => String(c.addressesCount) },
     {
       key: 'status',
       label: 'Status',
       render: (c) => (
-        <StatusBadge
-          label={
-            c.status === 'active'
-              ? lang === 'en' ? 'Active' : 'Aktif'
-              : lang === 'en' ? 'Inactive' : 'Nonaktif'
-          }
-          tone={c.status === 'active' ? 'ok' : 'bad'}
-          small
-        />
+        <span>
+          {statusBadge(c.status, lang)}
+          {c.status === 'rejected' && c.rejectionReason && <small className="admin-cell-sub">{c.rejectionReason}</small>}
+        </span>
       ),
     },
     {
       key: 'act',
-      label: lang === 'en' ? 'Action' : 'Aksi',
-      render: (c) => (
-        <RowActions
-          actions={[
-            { label: lang === 'en' ? 'Detail' : 'Detail', onClick: () => void openDetail(c.id) },
-            c.status === 'active'
-              ? { label: lang === 'en' ? 'Deactivate' : 'Nonaktifkan', tone: 'danger', disabled: busy, onClick: () => void setStatus(c, 'inactive') }
-              : { label: lang === 'en' ? 'Activate' : 'Aktifkan', tone: 'success', disabled: busy, onClick: () => void setStatus(c, 'active') },
-          ]}
-        />
-      ),
+      label: t('Aksi', 'Action'),
+      render: (c) => <RowActions actions={[{ label: 'Detail', onClick: () => void openDetail(c.id) }, ...rowActions(c)]} />,
     },
   ];
 
-  const orderColumns: Column<Order>[] = [
+  const orderColumns: Column<AdminCustomerOrder>[] = [
     {
       key: 'number',
-      label: lang === 'en' ? 'Order No.' : 'No. Order',
-      render: (o) => <Link href={`/admin/orders/${o.number}`} className="mono link">{o.number}</Link>,
-    },
-    { key: 'date', label: lang === 'en' ? 'Date' : 'Tanggal', render: (o) => formatDate(o.date) },
-    { key: 'total', label: 'Total', align: 'right', render: (o) => formatIDR(o.total) },
-    {
-      key: 'status',
-      label: 'Status',
+      label: t('No. Order', 'Order No.'),
       render: (o) => (
-        <StatusBadge
-          label={orderStatus[o.status]?.[lang] || orderStatus[o.status]?.id || o.status}
-          tone={orderStatus[o.status]?.tone}
-          small
-        />
+        <Link href={`/admin/orders/${encodeURIComponent(o.number)}`} className="mono link">
+          {o.number}
+        </Link>
       ),
     },
+    { key: 'date', label: t('Tanggal', 'Date'), render: (o) => formatDateTime(o.date, lang) },
+    { key: 'items', label: t('Item', 'Items'), align: 'right', render: (o) => String(o.itemsCount) },
+    { key: 'total', label: 'Total', align: 'right', render: (o) => formatIDR(o.grandTotal) },
+    { key: 'payment', label: t('Pembayaran', 'Payment'), render: (o) => <StatusBadge label={paymentLabel(o.paymentStatus)[lang]} tone={paymentLabel(o.paymentStatus).tone} small /> },
+    { key: 'status', label: 'Status', render: (o) => <StatusBadge label={orderLabel(o.status)[lang]} tone={orderLabel(o.status).tone} small /> },
   ];
+
+  const actionTitle = (a: NonNullable<Action>) =>
+    a.status === 'active'
+      ? a.customer.status === 'inactive'
+        ? t('Aktifkan kembali akun', 'Reactivate account')
+        : t('Setujui pendaftaran', 'Approve registration')
+      : a.status === 'rejected'
+        ? t('Tolak pendaftaran', 'Reject registration')
+        : t('Nonaktifkan akun', 'Deactivate account');
 
   return (
     <div>
       <AdminPageHead
-        title={lang === 'en' ? 'Customers' : 'Customer'}
-        desc={lang === 'en' ? 'List of registered customers.' : 'Daftar pelanggan terdaftar.'}
+        title={t('Customer', 'Customers')}
+        desc={t('Persetujuan pendaftaran B2B dan status akun customer.', 'B2B registration approval and customer account status.')}
       />
 
+      {notice && (
+        <div className="admin-toast" role="status">
+          {notice}
+        </div>
+      )}
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        empty={
-          loading
-            ? lang === 'en' ? 'Loading customers...' : 'Memuat customer...'
-            : lang === 'en' ? 'No customers yet.' : 'Belum ada customer.'
-        }
-      />
+      <div className="admin-tabs" role="tablist">
+        {TABS.map((key) => (
+          <button
+            key={key || 'all'}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={`admin-tab ${tab === key ? 'is-active' : ''}`}
+            onClick={() => {
+              setTab(key);
+              setPage(1);
+            }}
+          >
+            {tabLabel(key)}
+          </button>
+        ))}
+      </div>
 
-      {detailLoading && (
-        <p className="admin-note" style={{ marginTop: 16 }}>
-          {lang === 'en' ? 'Loading customer details...' : 'Memuat detail customer...'}
-        </p>
-      )}
+      <form className="admin-toolbar" onSubmit={submitSearch}>
+        <label className="admin-search">
+          <span className="sr-only">{t('Cari customer', 'Search customers')}</span>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('Cari nama, email, perusahaan, telepon', 'Search name, email, company, phone')} />
+        </label>
+        <button type="submit" className="btn btn-line btn-sm">
+          {t('Cari', 'Search')}
+        </button>
+        <span className="admin-result-count">
+          {meta.total} {t('customer', 'customers')}
+        </span>
+      </form>
 
-      {/* Modal Detail Customer */}
+      <DataTable columns={columns} rows={rows} pagination={false} empty={loading ? t('Memuat customer...', 'Loading customers...') : t('Tidak ada customer pada filter ini.', 'No customers match this filter.')} />
+      <Pager meta={meta} onPage={setPage} disabled={loading} />
+
+      {detailLoading && <p className="admin-field-hint" style={{ marginTop: 12 }}>{t('Memuat detail customer...', 'Loading customer details...')}</p>}
+
       {detail && !detailLoading && (
-        <div className="admin-modal-backdrop" onClick={() => setDetail(null)}>
-          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-head">
-              <h2>{lang === 'en' ? 'Customer Detail' : 'Detail Customer'}: {detail.company || detail.name}</h2>
-              <button type="button" className="admin-modal-close" onClick={() => setDetail(null)}>✕</button>
+        <AdminModal title={`${t('Detail customer', 'Customer details')}: ${detail.company || detail.name}`} onClose={() => setDetail(null)} width={920}>
+          <div className="admin-modal-body">
+            <div className="admin-grid-2">
+              <div>
+                <h3 className="admin-subtitle">{t('Profil perusahaan', 'Company profile')}</h3>
+                <dl className="admin-kv">
+                  <div>
+                    <dt>{t('Perusahaan', 'Company')}</dt>
+                    <dd>{detail.company || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('Nama PIC', 'PIC name')}</dt>
+                    <dd>
+                      {detail.name}
+                      {detail.position ? ` · ${detail.position}` : ''}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Email</dt>
+                    <dd className="mono">{detail.email}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('Telepon', 'Phone')}</dt>
+                    <dd>{detail.phone || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('Email perusahaan', 'Company email')}</dt>
+                    <dd>{detail.companyEmail || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('Telepon perusahaan', 'Company phone')}</dt>
+                    <dd>{detail.companyPhone || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>NPWP</dt>
+                    <dd className="mono">{detail.taxId || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>
+                      {statusBadge(detail.status, lang)}
+                      {detail.rejectionReason && (
+                        <>
+                          <br />
+                          <small>{detail.rejectionReason}</small>
+                        </>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t('Riwayat akun', 'Account timeline')}</dt>
+                    <dd>
+                      {t('Mendaftar', 'Registered')} {formatDateTime(detail.joinedAt, lang)}
+                      <br />
+                      {t('Verifikasi email', 'Email verified')} {formatDateTime(detail.emailVerifiedAt, lang)}
+                      <br />
+                      {t('Disetujui', 'Approved')} {formatDateTime(detail.approvedAt, lang)}
+                      {detail.approvedBy ? ` (${detail.approvedBy.name})` : ''}
+                      <br />
+                      {t('Login terakhir', 'Last login')} {formatDateTime(detail.lastLoginAt, lang)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+              <div>
+                <h3 className="admin-subtitle">
+                  {t('Alamat pengiriman', 'Shipping addresses')} ({detail.addressesCount})
+                </h3>
+                {detail.addresses.length === 0 && <p className="admin-field-hint">{t('Belum ada alamat tersimpan.', 'No saved addresses yet.')}</p>}
+                {detail.addresses.map((address) => (
+                  <p key={address.id} className="admin-address">
+                    <strong>
+                      {address.label}
+                      {address.isDefault ? ` · ${t('Utama', 'Default')}` : ''}
+                    </strong>
+                    <br />
+                    {address.recipientName} · {address.phone}
+                    <br />
+                    {formatAddressLines(address).join(', ')}
+                  </p>
+                ))}
+              </div>
             </div>
 
-            <div className="admin-product-detail" style={{ padding: 22 }}>
-              <div className="admin-grid-2" style={{ marginBottom: 20 }}>
-                <div>
-                  <h3 style={{ marginBottom: 8, fontSize: '0.95rem' }}>
-                    {lang === 'en' ? 'Customer Profile' : 'Profil Customer'}
-                  </h3>
-                  <p className="admin-note" style={{ lineHeight: 1.8 }}>
-                    {lang === 'en' ? 'PIC Name' : 'Nama PIC'}: <strong>{detail.name}</strong><br />
-                    {lang === 'en' ? 'Position' : 'Jabatan'}: {detail.position || '—'}<br />
-                    Email: <span className="mono">{detail.email}</span><br />
-                    {lang === 'en' ? 'Phone' : 'Telepon'}: {detail.phone || '—'}<br />
-                    {lang === 'en' ? 'Company' : 'Perusahaan'}: {detail.company || '—'}<br />
-                    {lang === 'en' ? 'Company Email' : 'Email perusahaan'}: {detail.companyEmail || '—'}<br />
-                    {lang === 'en' ? 'Company Phone' : 'Telepon perusahaan'}: {detail.companyPhone || '—'}<br />
-                    {lang === 'en' ? 'Tax ID (NPWP)' : 'NPWP'}: {detail.taxId || '—'}<br />
-                    {lang === 'en' ? 'Joined Date' : 'Bergabung'}: {formatDate(detail.joined)}<br />
-                    Status:{' '}
-                    <StatusBadge
-                      label={
-                        detail.status === 'active'
-                          ? lang === 'en' ? 'Active' : 'Aktif'
-                          : lang === 'en' ? 'Inactive' : 'Nonaktif'
-                      }
-                      tone={detail.status === 'active' ? 'ok' : 'bad'}
-                      small
-                    />
-                  </p>
-                </div>
-                <div>
-                  <h3 style={{ marginBottom: 8, fontSize: '0.95rem' }}>
-                    {lang === 'en' ? 'Saved Addresses' : 'Daftar Alamat'}
-                  </h3>
-                  {detail.addresses.length === 0 && (
-                    <p className="admin-note">
-                      {lang === 'en' ? 'No saved addresses yet.' : 'Belum ada alamat tersimpan.'}
-                    </p>
-                  )}
-                  {detail.addresses.map((address) => (
-                    <p key={address.id} className="admin-note" style={{ marginBottom: 10, lineHeight: 1.7 }}>
-                      <strong>{address.label}</strong>{address.primary ? (lang === 'en' ? ' · Primary' : ' · Utama') : ''}<br />
-                      {address.recipient} · {address.phone}<br />
-                      {address.line}
-                    </p>
-                  ))}
-                </div>
-              </div>
+            <h3 className="admin-subtitle" style={{ marginTop: 18 }}>
+              {t('Riwayat order', 'Order history')} ({detail.ordersCount})
+            </h3>
+            <DataTable columns={orderColumns} rows={detail.orders} rowKey="number" pagination={false} empty={t('Belum ada order.', 'No orders yet.')} />
+            {detail.ordersCount > detail.orders.length && (
+              <p className="admin-field-hint" style={{ marginTop: 8 }}>
+                {t('Menampilkan 10 order terbaru.', 'Showing the 10 most recent orders.')}{' '}
+                <Link href={`/admin/orders?q=${encodeURIComponent(detail.email)}`} className="link">
+                  {t('Lihat semua di daftar order', 'See all in the order list')}
+                </Link>
+              </p>
+            )}
 
-              <h3 style={{ margin: '18px 0 10px', fontSize: '0.95rem' }}>
-                {lang === 'en' ? 'Order History' : 'Riwayat Pesanan'}
-              </h3>
-              <DataTable
-                columns={orderColumns}
-                rows={detail.orders}
-                rowKey="number"
-                empty={lang === 'en' ? 'No orders found.' : 'Belum ada order.'}
-              />
-
-              <div className="admin-modal-actions">
-                {detail.status === 'active' ? (
-                  <button
-                    type="button"
-                    className="btn btn-danger btn-sm"
-                    disabled={busy}
-                    onClick={() => void setStatus(detail, 'inactive')}
-                  >
-                    {lang === 'en' ? 'Deactivate Account' : 'Nonaktifkan Akun'}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn-solid btn-sm"
-                    disabled={busy}
-                    onClick={() => void setStatus(detail, 'active')}
-                  >
-                    {lang === 'en' ? 'Activate Account' : 'Aktifkan Akun'}
-                  </button>
-                )}
-                <button type="button" className="btn btn-line btn-sm" onClick={() => setDetail(null)}>
-                  {lang === 'en' ? 'Close' : 'Tutup'}
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setDetail(null)}>
+                {t('Tutup', 'Close')}
+              </button>
+              {rowActions(detail).map((a) => (
+                <button key={a.label} type="button" className={`btn btn-sm ${a.tone === 'danger' ? 'btn-danger' : 'btn-solid'}`} disabled={a.disabled} onClick={a.onClick}>
+                  {a.label}
                 </button>
-              </div>
+              ))}
             </div>
           </div>
-        </div>
+        </AdminModal>
+      )}
+
+      {action && (
+        <AdminModal title={actionTitle(action)} onClose={() => setAction(null)} small>
+          <form className="admin-form" onSubmit={(e) => void submitAction(e)}>
+            <p className="admin-field-hint">
+              <strong>{action.customer.company || action.customer.name}</strong> · <span className="mono">{action.customer.email}</span>
+            </p>
+            <p className="admin-field-hint">
+              {action.status === 'active' &&
+                (action.customer.status === 'inactive'
+                  ? t('Customer dapat login dan berbelanja kembali. Tidak ada email yang dikirim.', 'The customer can log in and order again. No email is sent.')
+                  : t('Customer menerima email persetujuan dan dapat mulai memesan.', 'The customer receives an approval email and can start ordering.'))}
+              {action.status === 'rejected' && t('Customer menerima email penolakan berisi alasan di bawah. Akun bisa disetujui belakangan.', 'The customer receives a rejection email with the reason below. The account can still be approved later.')}
+              {action.status === 'inactive' && t('Customer tidak dapat login maupun checkout sampai diaktifkan kembali. Order yang sudah ada tidak berubah.', 'The customer cannot log in or check out until reactivated. Existing orders are unaffected.')}
+            </p>
+            {action.status === 'rejected' ? (
+              <label>
+                <span className="field-label">{t('Alasan penolakan', 'Rejection reason')} *</span>
+                <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} required />
+              </label>
+            ) : (
+              <label>
+                <span className="field-label">{t('Catatan (opsional)', 'Note (optional)')}</span>
+                <input value={reason} onChange={(e) => setReason(e.target.value)} />
+              </label>
+            )}
+            {actionError && (
+              <p className="admin-form-error" role="alert">
+                {actionError}
+              </p>
+            )}
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setAction(null)}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className={`btn btn-sm ${action.status === 'active' ? 'btn-solid' : 'btn-danger'}`} disabled={busy}>
+                {busy ? t('Memproses...', 'Processing...') : actionTitle(action)}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
       )}
     </div>
   );

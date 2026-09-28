@@ -364,3 +364,105 @@
   font-size: 0.84rem;
   margin-bottom: 16px;
 }
+
+/* ---- Tambahan phase e-commerce: notifikasi status akun, error per field, tautan kecil ---- */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.notice_ok {
+  border-color: var(--green);
+  background: var(--green-tint);
+}
+
+.notice_ok svg {
+  color: var(--green);
+}
+
+.notice_warn {
+  border-color: var(--amber);
+  background: var(--amber-tint);
+}
+
+.notice_warn svg {
+  color: var(--amber);
+}
+
+.notice_bad {
+  border-color: var(--red);
+  background: var(--red-tint);
+}
+
+.notice_bad svg {
+  color: var(--red);
+}
+
+.fieldError {
+  color: var(--red);
+  font-size: 0.78rem;
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: var(--green);
+  cursor: pointer;
+  font: inherit;
+}
+
+.linkButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.formRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -6px;
+}
+
+.subtleLink {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.subtleLink:hover {
+  color: var(--green);
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.hint {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+  .twoCol {
+    grid-template-columns: 1fr;
+  }
+}

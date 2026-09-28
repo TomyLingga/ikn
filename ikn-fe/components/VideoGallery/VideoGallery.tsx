@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import Reveal from '@/components/Reveal';
 import Icon from '@/components/Icon';
-import type { Video } from '@/lib/site';
+
+// Video YouTube: id dari URL youtu.be / youtube.com, judul & keterangan sudah dipilih bahasanya.
+export interface Video {
+  id: string;
+  title: string;
+  desc: string;
+}
 
 // Galeri video YouTube. Klik thumbnail -> memuat iframe (lazy, hemat bandwidth).
 function VideoCard({ video, delay }: { video: Video; delay: number }) {
@@ -38,7 +44,7 @@ function VideoCard({ video, delay }: { video: Video; delay: number }) {
         <span className="video-dot" aria-hidden="true" />
         <div>
           <h3 className="video-title">{video.title}</h3>
-          <p className="video-desc">{video.desc}</p>
+          {video.desc && <p className="video-desc">{video.desc}</p>}
         </div>
       </div>
     </Reveal>
@@ -49,7 +55,7 @@ export default function VideoGallery({ videos }: { videos: Video[] }) {
   return (
     <div className="video-grid">
       {videos.map((v, i) => (
-        <VideoCard key={v.id} video={v} delay={i * 100} />
+        <VideoCard key={`${v.id}-${i}`} video={v} delay={i * 100} />
       ))}
     </div>
   );

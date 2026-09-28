@@ -1,0 +1,31 @@
+name: deploy
+
+# Deploy manual (workflow_dispatch) atau otomatis setelah kedua image terbangun. VPS hanya menjalankan pull + up.
+on:
+  workflow_dispatch:
+    inputs:
+      api_tag: { description: "Tag image ikn-api (sha atau latest)", default: latest, required: true }
+      fe_tag: { description: "Tag image ikn-fe (sha atau latest)", default: latest, required: true }
+      run_migrations: { description: "Jalankan migrasi (true/false)", default: "false", required: true }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/ikn
+            echo "${{ secrets.GHCR_READ_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+            export IKN_API_TAG="${{ github.event.inputs.api_tag }}"
+            export IKN_FE_TAG="${{ github.event.inputs.fe_tag }}"
+            export RUN_MIGRATIONS="${{ github.event.inputs.run_migrations }}"
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f
+            docker compose -f docker-compose.prod.yml ps

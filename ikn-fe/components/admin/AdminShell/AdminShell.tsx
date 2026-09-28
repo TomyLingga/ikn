@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -20,28 +20,45 @@ const roleLabels: Record<'super_admin' | 'admin', Record<'id' | 'en', string>> =
   admin: { id: 'Admin', en: 'Admin' },
 };
 
-// Peta href menu → modul permission backend.
+// Menu href → backend module code (GET /admin/permissions/self → modules[]).
 const moduleByHref: Record<string, string> = {
   '/admin/orders': 'orders',
   '/admin/payments': 'payments',
   '/admin/products': 'products',
   '/admin/product-categories': 'categories',
+  '/admin/reviews': 'products',
   '/admin/customers': 'customers',
-  '/admin/bank-accounts': 'bank',
-  '/admin/additional-fees': 'fees',
+  '/admin/shipping': 'shipping',
+  '/admin/vouchers': 'vouchers',
+  '/admin/payment-methods': 'payment_methods',
+  '/admin/bank-accounts': 'bank_accounts',
+  '/admin/checkout-settings': 'fees',
   '/admin/reports/sales': 'reports',
-  '/admin/navigation': 'menu',
-  '/admin/content/media': 'gallery',
+  '/admin/audit-logs': 'audit',
+  '/admin/pages': 'cms',
+  '/admin/navigation': 'cms',
+  '/admin/customer-logos': 'cms',
+  '/admin/content/media': 'media',
   '/admin/gallery': 'gallery',
   '/admin/news': 'news',
-  '/admin/certificates': 'content',
-  '/admin/history': 'content',
-  '/admin/vision-mission': 'content',
-  '/admin/contact': 'content',
-  '/admin/brochures': 'content',
+  '/admin/certificates': 'certificates',
+  '/admin/brochures': 'brochures',
   '/admin/whistleblowing': 'wbs',
+  '/admin/contact-messages': 'messages',
+  '/admin/site-settings': 'settings',
   '/admin/users': 'users',
 };
+
+// Halaman yang hanya untuk super_admin (disembunyikan dari admin biasa walau modulnya ada).
+const superAdminOnly = new Set(['/admin/audit-logs']);
+
+// GET /admin/help-guide
+interface HelpGuide {
+  title: string;
+  type: 'url' | 'file';
+  url: string;
+  file: { url: string; originalName: string } | null;
+}
 
 interface NavItem {
   href: string;
@@ -62,34 +79,42 @@ const groupsId: NavGroup[] = [
   {
     title: 'Commerce',
     items: [
-      { href: '/admin/orders', label: 'Order', icon: 'drop' },
-      { href: '/admin/payments', label: 'Payment', icon: 'check' },
+      { href: '/admin/orders', label: 'Order', icon: 'orders' },
+      { href: '/admin/payments', label: 'Pembayaran', icon: 'paymentCheck' },
       { href: '/admin/products', label: 'Produk', icon: 'flask' },
-      { href: '/admin/product-categories', label: 'Kategori Produk', icon: 'gear' },
+      { href: '/admin/product-categories', label: 'Kategori Produk', icon: 'package' },
+      { href: '/admin/reviews', label: 'Ulasan', icon: 'quote' },
       { href: '/admin/customers', label: 'Customer', icon: 'handshake' },
-      { href: '/admin/bank-accounts', label: 'Akun Bank', icon: 'target' },
-      { href: '/admin/additional-fees', label: 'Pengaturan Checkout', icon: 'gear' },
-      { href: '/admin/reports/sales', label: 'Laporan Penjualan', icon: 'compass' },
+      { href: '/admin/shipping', label: 'Ongkir', icon: 'truck' },
+      { href: '/admin/vouchers', label: 'Voucher', icon: 'target' },
+      { href: '/admin/payment-methods', label: 'Metode Bayar', icon: 'wallet' },
+      { href: '/admin/bank-accounts', label: 'Rekening Bank', icon: 'shieldCheck' },
+      { href: '/admin/checkout-settings', label: 'Pengaturan Checkout', icon: 'gear' },
+      { href: '/admin/reports/sales', label: 'Laporan Penjualan', icon: 'trendUp' },
     ],
   },
   {
     title: 'Konten',
     items: [
-      { href: '/admin/navigation', label: 'Hirarki Navigasi', icon: 'compass' },
-      { href: '/admin/content/media', label: 'Video & Gambar', icon: 'play' },
+      { href: '/admin/pages', label: 'Halaman', icon: 'panelLeft' },
+      { href: '/admin/navigation', label: 'Menu Navigasi', icon: 'compass' },
+      { href: '/admin/content/media', label: 'Video & Gambar', icon: 'image' },
       { href: '/admin/news', label: 'Berita', icon: 'quote' },
-      { href: '/admin/certificates', label: 'Sertifikat', icon: 'check' },
-      { href: '/admin/history', label: 'Sejarah', icon: 'compass' },
-      { href: '/admin/vision-mission', label: 'Visi & Misi', icon: 'target' },
-      { href: '/admin/contact', label: 'Kontak Kami', icon: 'pin' },
       { href: '/admin/gallery', label: 'Galeri Foto', icon: 'play' },
-      { href: '/admin/brochures', label: 'Brosur Unduhan', icon: 'quote' },
+      { href: '/admin/certificates', label: 'Sertifikat', icon: 'shieldCheck' },
+      { href: '/admin/brochures', label: 'Brosur Unduhan', icon: 'package' },
+      { href: '/admin/customer-logos', label: 'Logo Pelanggan', icon: 'handshake' },
+      { href: '/admin/contact-messages', label: 'Pesan Kontak', icon: 'mail' },
       { href: '/admin/whistleblowing', label: 'Pelaporan WBS', icon: 'leaf' },
     ],
   },
   {
     title: 'Sistem',
-    items: [{ href: '/admin/users', label: 'Akun Admin', icon: 'handshake' }],
+    items: [
+      { href: '/admin/site-settings', label: 'Pengaturan Situs', icon: 'gear' },
+      { href: '/admin/users', label: 'Akun Admin', icon: 'users' },
+      { href: '/admin/audit-logs', label: 'Audit Log', icon: 'shieldCheck' },
+    ],
   },
 ];
 
@@ -102,34 +127,42 @@ const groupsEn: NavGroup[] = [
   {
     title: 'Commerce',
     items: [
-      { href: '/admin/orders', label: 'Orders', icon: 'drop' },
-      { href: '/admin/payments', label: 'Payments', icon: 'check' },
+      { href: '/admin/orders', label: 'Orders', icon: 'orders' },
+      { href: '/admin/payments', label: 'Payments', icon: 'paymentCheck' },
       { href: '/admin/products', label: 'Products', icon: 'flask' },
-      { href: '/admin/product-categories', label: 'Product Categories', icon: 'gear' },
+      { href: '/admin/product-categories', label: 'Product Categories', icon: 'package' },
+      { href: '/admin/reviews', label: 'Reviews', icon: 'quote' },
       { href: '/admin/customers', label: 'Customers', icon: 'handshake' },
-      { href: '/admin/bank-accounts', label: 'Bank Accounts', icon: 'target' },
-      { href: '/admin/additional-fees', label: 'Checkout Settings', icon: 'gear' },
-      { href: '/admin/reports/sales', label: 'Sales Reports', icon: 'compass' },
+      { href: '/admin/shipping', label: 'Shipping Rates', icon: 'truck' },
+      { href: '/admin/vouchers', label: 'Vouchers', icon: 'target' },
+      { href: '/admin/payment-methods', label: 'Payment Methods', icon: 'wallet' },
+      { href: '/admin/bank-accounts', label: 'Bank Accounts', icon: 'shieldCheck' },
+      { href: '/admin/checkout-settings', label: 'Checkout Settings', icon: 'gear' },
+      { href: '/admin/reports/sales', label: 'Sales Reports', icon: 'trendUp' },
     ],
   },
   {
     title: 'Content',
     items: [
-      { href: '/admin/navigation', label: 'Navigation Hierarchy', icon: 'compass' },
-      { href: '/admin/content/media', label: 'Videos & Media', icon: 'play' },
-      { href: '/admin/news', label: 'News & Press', icon: 'quote' },
-      { href: '/admin/certificates', label: 'Certificates', icon: 'check' },
-      { href: '/admin/history', label: 'Company History', icon: 'compass' },
-      { href: '/admin/vision-mission', label: 'Vision & Mission', icon: 'target' },
-      { href: '/admin/contact', label: 'Contact Details', icon: 'pin' },
-      { href: '/admin/gallery', label: 'Photo Gallery', icon: 'play' },
-      { href: '/admin/brochures', label: 'Brochure Downloads', icon: 'quote' },
+      { href: '/admin/pages', label: 'Pages', icon: 'panelLeft' },
+      { href: '/admin/navigation', label: 'Navigation', icon: 'compass' },
+      { href: '/admin/content/media', label: 'Media Library', icon: 'image' },
+      { href: '/admin/news', label: 'News', icon: 'quote' },
+      { href: '/admin/gallery', label: 'Gallery', icon: 'play' },
+      { href: '/admin/certificates', label: 'Certificates', icon: 'shieldCheck' },
+      { href: '/admin/brochures', label: 'Brochures', icon: 'package' },
+      { href: '/admin/customer-logos', label: 'Customer Logos', icon: 'handshake' },
+      { href: '/admin/contact-messages', label: 'Contact Messages', icon: 'mail' },
       { href: '/admin/whistleblowing', label: 'WBS Reports', icon: 'leaf' },
     ],
   },
   {
     title: 'System',
-    items: [{ href: '/admin/users', label: 'Admin Accounts', icon: 'handshake' }],
+    items: [
+      { href: '/admin/site-settings', label: 'Site Settings', icon: 'gear' },
+      { href: '/admin/users', label: 'Admin Accounts', icon: 'users' },
+      { href: '/admin/audit-logs', label: 'Audit Log', icon: 'shieldCheck' },
+    ],
   },
 ];
 
@@ -143,15 +176,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const [allowed, setAllowed] = useState<string[] | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
-  const [helpGuideData, setHelpGuideData] = useState<{
-    title: string;
-    type: 'url' | 'file';
-    url: string;
-    filePath: string;
-    fileName: string;
-  } | null>(null);
+  const [helpGuideData, setHelpGuideData] = useState<HelpGuide | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const { admin, customer, ready, logoutAdmin } = useAuth();
+  const { admin, ready, logoutAdmin } = useAuth();
   const { lang } = useLang();
 
   const isLoginPage = pathname === '/admin/login';
@@ -179,9 +206,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    api<{ role: string; allowed: string[] }>('/admin/permissions/self')
+    api<{ role: string; modules: string[] }>('/admin/permissions/self')
       .then((result) => {
-        if (!cancelled) setAllowed(result.allowed);
+        if (!cancelled) setAllowed(result.modules);
       })
       .catch(() => {
         if (!cancelled) setAllowed([]);
@@ -192,19 +219,24 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   }, [admin]);
 
   // Filter menu berdasarkan permission admin.
-  const visibleGroups: NavGroup[] = groups
-    .map((g) => ({
-      ...g,
-      items: g.items.filter((it) => {
-        if (!admin) return false;
-        if (admin.role === 'super_admin') return true;
-        if (it.href === '/admin') return true;
-        const requiredModule = moduleByHref[it.href];
-        if (!requiredModule) return true;
-        return (allowed ?? []).includes(requiredModule);
-      }),
-    }))
-    .filter((g) => g.items.length > 0);
+  const visibleGroups: NavGroup[] = useMemo(
+    () =>
+      groups
+        .map((g) => ({
+          ...g,
+          items: g.items.filter((it) => {
+            if (!admin) return false;
+            if (admin.role === 'super_admin') return true;
+            if (superAdminOnly.has(it.href)) return false;
+            if (it.href === '/admin') return true;
+            const requiredModule = moduleByHref[it.href];
+            if (!requiredModule) return true;
+            return (allowed ?? []).includes(requiredModule);
+          }),
+        }))
+        .filter((g) => g.items.length > 0),
+    [groups, admin, allowed],
+  );
 
   // Responsif & keyboard shortcut
   useEffect(() => {
@@ -253,7 +285,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         [activeGroup.title]: true,
       }));
     }
-  }, [pathname, allowed]);
+  }, [pathname, visibleGroups]);
 
   const toggleGroup = (title: string) => {
     setExpandedGroups((prev) => ({
@@ -270,18 +302,12 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const openHelpGuide = async () => {
     setProfileOpen(false);
     try {
-      const data = await api<{
-        title: string;
-        type: 'url' | 'file';
-        url: string;
-        filePath: string;
-        fileName: string;
-      }>('/admin/help-guide');
+      const data = await api<HelpGuide>('/admin/help-guide');
 
       if (data.type === 'url' && data.url) {
-        window.open(data.url, '_blank');
-      } else if (data.type === 'file' && data.filePath) {
-        window.open(data.filePath, '_blank');
+        window.open(data.url, '_blank', 'noopener');
+      } else if (data.type === 'file' && data.file?.url) {
+        window.open(data.file.url, '_blank', 'noopener');
       } else {
         setHelpGuideData(data);
         setHelpModalOpen(true);
@@ -585,8 +611,8 @@ export default function AdminShell({ children }: { children: ReactNode }) {
               {admin.role === 'super_admin' && (
                 <p className="admin-note" style={{ color: 'var(--green)', fontWeight: 600 }}>
                   {lang === 'en'
-                    ? 'As a Super Admin, you can set the URL link or upload PDF/DOCX/PPT manual in "Akun Admin & Pengaturan Sistem".'
-                    : 'Sebagai Super Admin, Anda dapat mengatur link URL atau mengunggah manual PDF/DOCX/PPT di menu "Akun Admin & Pengaturan Sistem".'}
+                    ? 'As a Super Admin, you can set the URL link or upload a PDF manual under "Admin Accounts" > "Help guide".'
+                    : 'Sebagai Super Admin, Anda dapat mengatur tautan URL atau mengunggah manual PDF di menu "Akun Admin" > "Petunjuk penggunaan".'}
                 </p>
               )}
               <div className="admin-modal-actions" style={{ marginTop: 20 }}>
