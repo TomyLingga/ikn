@@ -4,6 +4,7 @@ import Reveal from '@/components/Reveal';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { CustomerLogoData, PageSection } from '@/lib/cms';
+import SecHead from './SecHead';
 import type { CustomerLogosContent } from '../utils';
 
 interface Props {
@@ -11,14 +12,19 @@ interface Props {
   items: CustomerLogoData[];
 }
 
-// Intro paragraph + logo grid; logos come from GET /content/customer-logos (passed via `extra`).
+// Optional heading + intro paragraph + logo grid; logos come from GET /content/customer-logos (passed via `extra`).
+// Section id = key (#pelanggan).
 export default function CustomerLogosSection({ section, items }: Props) {
   const { lang } = useLang();
-  const lead = tr((section.content as CustomerLogosContent).lead, lang);
+  const c = section.content as CustomerLogosContent;
+  const lead = tr(c.lead, lang);
+  const label = tr(c.label, lang);
+  const heading = tr(c.heading, lang);
 
   return (
-    <section className="section-tight">
+    <section className="section-tight" id={section.key || undefined}>
       <div className="container">
+        {(label || heading) && <SecHead label={label} heading={heading} />}
         {lead && (
           <p className="lead" style={{ maxWidth: '52ch', marginBottom: 36 }}>
             {lead}

@@ -20,6 +20,12 @@ Route::prefix('admin')
             Route::post('orders/{order:number}/status', [Admin\OrderController::class, 'updateStatus']);
             Route::post('orders/{order:number}/cancel', [Admin\OrderController::class, 'cancel']);
             Route::put('orders/{order:number}/due', [Admin\OrderController::class, 'updateDue']);
+            // Catatan perjalanan kiriman selama status shipped (ASUMSI A-70).
+            Route::post('orders/{order:number}/tracking', [Admin\OrderTrackingController::class, 'store']);
+            Route::delete('orders/{order:number}/tracking/{update}', [Admin\OrderTrackingController::class, 'destroy'])->where('update', '[0-9]+');
+            // Lampiran order (faktur pajak, surat jalan) di disk private (ASUMSI A-74).
+            Route::post('orders/{order:number}/attachments', [Admin\OrderAttachmentController::class, 'store']);
+            Route::delete('orders/{order:number}/attachments/{attachment}', [Admin\OrderAttachmentController::class, 'destroy'])->where('attachment', '[0-9]+');
         });
 
         Route::middleware('module:payments')->group(function () {

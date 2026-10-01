@@ -16,7 +16,8 @@ class PostController extends ApiController
 {
     public function index(Request $request)
     {
-        $posts = Post::with('cover')
+        $posts = Post::with(['cover', 'category'])
+            ->when($request->query('category'), fn ($q, $id) => $q->where('category_id', (int) $id))
             ->when($request->query('q'), function ($q, $s) {
                 $q->where(function ($w) use ($s) {
                     $w->where('title->id', 'ilike', '%'.$s.'%')->orWhere('title->en', 'ilike', '%'.$s.'%');
@@ -32,19 +33,19 @@ class PostController extends ApiController
         $data = $request->validated();
         $post = Post::create($this->attributes($data, null));
 
-        return $this->created(new PostResource($post->load('cover')));
+        return $this->created(new PostResource($post->load(['cover', 'category'])));
     }
 
     public function show(Post $post)
     {
-        return $this->data(new PostResource($post->load('cover')));
+        return $this->data(new PostResource($post->load(['cover', 'category'])));
     }
 
     public function update(PostRequest $request, Post $post)
     {
         $post->update($this->attributes($request->validated(), $post));
 
-        return $this->data(new PostResource($post->fresh('cover')));
+        return $this->data(new PostResource($post->fresh(['cover', 'category'])));
     }
 
     public function destroy(Post $post)
@@ -67,7 +68,7 @@ class PostController extends ApiController
             'title' => $data['title'],
             'excerpt' => $this->plainText($data['excerpt'] ?? null),
             'body' => I18n::normalizeHtml($data['body'] ?? null),
-            'tag' => $data['tag'] ?? null,
+            'category_id' => $data['categoryId'] ?? null,
             'author' => isset($data['author']) ? trim($data['author']) ?: null : null,
             'cover_media_id' => $data['coverMediaId'] ?? null,
             'is_published' => $isPublished,

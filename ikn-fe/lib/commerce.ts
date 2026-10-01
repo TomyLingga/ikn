@@ -6,6 +6,7 @@ import type {
   OrderStatusKey,
   PaymentStatusKey,
   StatusLabel,
+  ShippingBreakdown,
   StockStatus,
   AccountStatus,
 } from '@/lib/types';
@@ -98,3 +99,25 @@ export const orderFilters: { key: string; statuses: OrderStatusKey[]; id: string
   { key: 'completed', statuses: ['completed'], id: 'Selesai', en: 'Completed' },
   { key: 'cancelled', statuses: ['cancelled', 'expired'], id: 'Batal', en: 'Cancelled' },
 ];
+
+/** Rincian ongkir tiga parameter dalam satu baris, mis. "Dasar Rp 20.000 · Jarak Rp 15.000 · Berat Rp 6.000 · Volume Rp 30.000". */
+export function shippingBreakdownText(breakdown: ShippingBreakdown, lang: 'id' | 'en'): string {
+  const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+  const parts: string[] = [];
+  if (breakdown.base) parts.push(`${lang === 'en' ? 'Base' : 'Dasar'} ${fmt(breakdown.base)}`);
+  if (breakdown.distance) parts.push(`${lang === 'en' ? 'Distance' : 'Jarak'} ${fmt(breakdown.distance)}`);
+  if (breakdown.weight) parts.push(`${lang === 'en' ? 'Weight' : 'Berat'} ${fmt(breakdown.weight)}`);
+  if (breakdown.volume) parts.push(`${lang === 'en' ? 'Volume' : 'Volume'} ${fmt(breakdown.volume)}`);
+  const text = parts.join(' · ');
+  return breakdown.minimumApplied ? `${text} (${lang === 'en' ? 'minimum charge applies' : 'berlaku ongkir minimum'})` : text;
+}
+
+/** Ringkasan parameter kiriman order: "±120 km · 3,5 kg · 0,06 m³". */
+export function shipmentMetricsText(method: { distanceKm?: number | null; weightGram?: number; volumeCm3?: number } | null | undefined): string {
+  if (!method) return '';
+  const parts: string[] = [];
+  if (method.distanceKm) parts.push(`±${method.distanceKm.toLocaleString('id-ID')} km`);
+  if (method.weightGram) parts.push(`${(method.weightGram / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg`);
+  if (method.volumeCm3) parts.push(`${(method.volumeCm3 / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 3 })} m³`);
+  return parts.join(' · ');
+}

@@ -9,6 +9,7 @@ import { I18nInput, MediaPicker, MenuEditor, firstError, menuPayload, type Field
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type DocLinkData, type I18n, type MediaSummary, type MenuData, type MenuNode } from '@/lib/cms';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 type MenuLocation = 'header' | 'footer';
 
@@ -201,7 +202,7 @@ export default function AdminNavigation() {
   }
 
   async function removeDoc(row: DocLinkData) {
-    if (!window.confirm(t(`Hapus tautan dokumen "${tr(row.label, lang)}"?`, `Delete document link "${tr(row.label, lang)}"?`))) return;
+    if (!await confirmDialog(t(`Hapus tautan dokumen "${tr(row.label, lang)}"?`, `Delete document link "${tr(row.label, lang)}"?`))) return;
     setError('');
     try {
       await api(`/admin/navigation/doc-links/${row.id}`, { method: 'DELETE' });

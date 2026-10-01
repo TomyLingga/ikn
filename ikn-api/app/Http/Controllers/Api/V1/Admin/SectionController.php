@@ -10,6 +10,7 @@ use App\Http\Requests\Admin\UpdateSectionRequest;
 use App\Models\Page;
 use App\Models\PageSection;
 use App\Services\Cms\PageRenderer;
+use App\Services\Cms\SectionDefinitions;
 use App\Services\Cms\SectionRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -21,7 +22,8 @@ class SectionController extends ApiController
 
     public function types(SectionRegistry $registry)
     {
-        return $this->data(['types' => $registry->types(), 'icons' => SectionRegistry::ICONS]);
+        // `groups` = kelompok tipe (urutan tampil) untuk pemilih "Tambah section"; tiap tipe membawa kunci `group`.
+        return $this->data(['types' => $registry->types(), 'groups' => SectionDefinitions::GROUPS, 'icons' => SectionRegistry::ICONS]);
     }
 
     public function index(Page $page, PageRenderer $renderer)

@@ -12,7 +12,8 @@
         <td align="center">
             <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
                 <tr>
-                    <td style="background-color:#14532d;padding:20px 32px;">
+                    {{-- Warna header mengikuti theme.primary_deep di Pengaturan Situs (kosong = biru tua bawaan) --}}
+                    <td style="background-color:{{ app(\App\Services\Cms\SettingsService::class)->get('theme.primary_deep') ?: '#0a3f6b' }};padding:20px 32px;">
                         <span style="color:#ffffff;font-size:18px;font-weight:bold;letter-spacing:0.3px;">PT Industri Karet Nusantara</span>
                     </td>
                 </tr>

@@ -41,6 +41,7 @@ interface AdminSalesChartProps {
 
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const TICKS = 4;
 
 function parsePoint(point: SalesChartPoint, index: number, months: string[]): ChartPoint {
   const currentYear = new Date().getFullYear();
@@ -67,17 +68,18 @@ function parsePoint(point: SalesChartPoint, index: number, months: string[]): Ch
   };
 }
 
-// Bulatkan ke atas menuju angka "cantik" (1/2/5 × 10^n) untuk sumbu.
-function niceCeil(value: number): number {
-  if (value <= 0) return 1_000_000;
-  const exponent = Math.floor(Math.log10(value));
-  const base = Math.pow(10, exponent);
-  const fraction = value / base;
-  const nice = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
-  return nice * base;
+// Puncak sumbu = TICKS × langkah "cantik" (1/2/5 × 10^n), supaya setiap garis bantu jatuh di angka bulat.
+function axisTop(max: number, fallback: number, integer = false): number {
+  if (max <= 0) return fallback;
+  const raw = max / TICKS;
+  const base = Math.pow(10, Math.floor(Math.log10(raw)));
+  const fraction = raw / base;
+  let step = (fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10) * base;
+  if (integer) step = Math.max(1, Math.ceil(step));
+  return step * TICKS;
 }
 
-// Label sumbu ringkas: jutaan (jt) / miliar (M).
+// Label sumbu ringkas: ribuan (rb) / jutaan (jt) / miliar (M).
 function formatAxis(value: number): string {
   if (value >= 1_000_000_000) return `${Math.round((value / 1_000_000_000) * 10) / 10} M`;
   if (value >= 1_000_000) return `${Math.round((value / 1_000_000) * 10) / 10} jt`;
@@ -85,6 +87,8 @@ function formatAxis(value: number): string {
   return String(Math.round(value));
 }
 
+// Grafik penjualan bulanan: dua batang per bulan (pendapatan di sumbu kiri, jumlah order di sumbu kanan).
+// Rincian bulan yang disorot tampil di pita tetap di atas area batang, jadi tidak pernah terpotong tepi kartu.
 export default function AdminSalesChart({
   data,
   year: controlledYear,
@@ -116,11 +120,19 @@ export default function AdminSalesChart({
 
   const [yearChoice, setYearChoice] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState('all');
+  const [hovered, setHovered] = useState<string | null>(null);
 
   const year =
     controlledYear ??
     (yearChoice !== null && years.includes(yearChoice) ? yearChoice : years[0] || new Date().getFullYear());
-  const yearData = points.filter((point) => point.year === year);
+  // Selalu 12 bulan: laporan hanya mengirim bulan yang punya penjualan, bulan lain diisi nol agar sumbu tetap utuh.
+  const yearData = useMemo(() => {
+    const byMonth = new Map(points.filter((point) => point.year === year).map((point) => [point.monthIndex, point]));
+    return months.map<ChartPoint>((month, index) => {
+      const monthIndex = index + 1;
+      return byMonth.get(monthIndex) ?? { ym: `${year}-${String(monthIndex).padStart(2, '0')}`, year, monthIndex, month, total: 0, orders: 0 };
+    });
+  }, [points, year, months]);
   const selectedPoint =
     selectedMonth === 'all' ? null : yearData.find((point) => point.monthIndex === Number(selectedMonth)) ?? null;
 
@@ -132,9 +144,11 @@ export default function AdminSalesChart({
     (best, point) => (!best || point.total > best.total ? point : best),
     null,
   );
-  const maxValue = Math.max(0, ...yearData.map((point) => point.total));
-  const axisMax = niceCeil(maxValue);
-  const axisValues = [axisMax, axisMax * 0.75, axisMax * 0.5, axisMax * 0.25, 0];
+
+  const revenueTop = axisTop(Math.max(0, ...yearData.map((point) => point.total)), 1_000_000);
+  const ordersTop = axisTop(Math.max(0, ...yearData.map((point) => point.orders)), TICKS, true);
+  const ticks = Array.from({ length: TICKS + 1 }, (_, i) => TICKS - i);
+
   const selectedIndex = selectedPoint ? yearData.findIndex((point) => point.ym === selectedPoint.ym) : -1;
   const previousPoint = selectedIndex > 0 ? yearData[selectedIndex - 1] : null;
   const change =
@@ -142,8 +156,13 @@ export default function AdminSalesChart({
       ? ((selectedPoint.total - previousPoint.total) / previousPoint.total) * 100
       : null;
 
+  // Bulan yang rinciannya ditampilkan: yang disorot kursor/fokus, kalau tidak ada maka bulan terpilih.
+  const activeIndex = hovered ? yearData.findIndex((point) => point.ym === hovered) : selectedIndex;
+  const activePoint = activeIndex >= 0 ? yearData[activeIndex] : null;
+
   function changeYear(nextYear: number) {
     setSelectedMonth('all');
+    setHovered(null);
     if (onYearChange) onYearChange(nextYear);
     else setYearChoice(nextYear);
   }
@@ -156,8 +175,8 @@ export default function AdminSalesChart({
           <h2 id="sales-chart-title">{title || t('Penjualan bulanan', 'Monthly sales')}</h2>
           <p>
             {t(
-              'Pendapatan dari order yang sudah dibayar (berdasarkan tanggal bayar). Pilih tahun atau bulan untuk rincian.',
-              'Revenue from paid orders (by payment date). Pick a year or month for details.',
+              'Pendapatan dan jumlah order yang sudah dibayar (berdasarkan tanggal bayar). Pilih tahun atau bulan untuk rincian.',
+              'Revenue and number of paid orders (by payment date). Pick a year or month for details.',
             )}
           </p>
         </div>
@@ -208,44 +227,73 @@ export default function AdminSalesChart({
       </div>
 
       <div className={styles.chartViewport}>
-        <div className={styles.plot}>
+        <div className={styles.plot} onMouseLeave={() => setHovered(null)}>
+          <div className={`${styles.legend} ${activePoint ? styles.legendDim : ''}`} aria-hidden="true">
+            <span>
+              <i className={styles.swatchRevenue} /> {t('Pendapatan (Rp, sumbu kiri)', 'Revenue (Rp, left axis)')}
+            </span>
+            <span>
+              <i className={styles.swatchOrders} /> {t('Jumlah order (sumbu kanan)', 'Orders (right axis)')}
+            </span>
+          </div>
+          {/* Pita rincian: posisinya mengikuti bulan yang disorot dan dijepit di dalam lebar grafik. */}
+          <div
+            className={`${styles.readout} ${activePoint ? styles.readoutOn : ''}`}
+            style={{ '--pos': yearData.length ? (Math.max(activeIndex, 0) + 0.5) / yearData.length : 0.5 } as CSSProperties}
+            role="status"
+            aria-live="polite"
+          >
+            {activePoint && (
+              <>
+                <strong>
+                  {activePoint.month} {activePoint.year}
+                </strong>
+                <span>
+                  <i className={styles.swatchRevenue} /> {formatIDR(activePoint.total)}
+                </span>
+                <span>
+                  <i className={styles.swatchOrders} /> {activePoint.orders} {t('order', activePoint.orders === 1 ? 'order' : 'orders')}
+                </span>
+              </>
+            )}
+          </div>
+
           <div className={styles.grid} aria-hidden="true">
-            {axisValues.map((value) => (
-              <span key={value} className={styles.gridLine}>
-                <em>{formatAxis(value)}</em>
+            {ticks.map((tick) => (
+              <span key={tick} className={styles.gridLine}>
+                <em className={styles.axisLeft}>{formatAxis((revenueTop / TICKS) * tick)}</em>
+                <em className={styles.axisRight}>{Math.round((ordersTop / TICKS) * tick)}</em>
               </span>
             ))}
           </div>
-          <div className={styles.bars} role="list" aria-label={`${t('Penjualan bulanan tahun', 'Monthly sales for')} ${year}`}>
-            {yearData.length === 0 && (
-              <p className={styles.hint}>{loading ? t('Memuat data...', 'Loading data...') : t('Belum ada data penjualan.', 'No sales data yet.')}</p>
-            )}
+
+          <div className={styles.bars} role="group" aria-label={`${t('Penjualan bulanan tahun', 'Monthly sales for')} ${year}`}>
             {yearData.map((point) => {
-              const height = Math.max(5, Math.round((point.total / axisMax) * 100));
-              const active = selectedPoint?.monthIndex === point.monthIndex;
+              const selected = selectedPoint?.monthIndex === point.monthIndex;
+              const active = activePoint?.ym === point.ym;
               return (
                 <button
                   key={point.ym}
                   type="button"
-                  role="listitem"
-                  className={`${styles.bar} ${active ? styles.selected : ''}`}
-                  style={{ '--bar-height': `${height}%` } as CSSProperties}
+                  className={`${styles.col} ${selected ? styles.selected : ''} ${active ? styles.active : ''}`}
+                  style={
+                    {
+                      '--h-revenue': `${Math.min(100, (point.total / revenueTop) * 100)}%`,
+                      '--h-orders': `${Math.min(100, (point.orders / ordersTop) * 100)}%`,
+                    } as CSSProperties
+                  }
+                  aria-pressed={selected}
                   aria-label={`${point.month} ${point.year}: ${formatIDR(point.total)}, ${point.orders} ${t('order', 'orders')}`}
-                  onClick={() => setSelectedMonth(active ? 'all' : String(point.monthIndex))}
+                  onMouseEnter={() => setHovered(point.ym)}
+                  onFocus={() => setHovered(point.ym)}
+                  onBlur={() => setHovered(null)}
+                  onClick={() => setSelectedMonth(selected ? 'all' : String(point.monthIndex))}
                 >
-                  <span className={styles.tooltip}>
-                    <strong>
-                      {point.month} {point.year}
-                    </strong>
-                    <span>{formatIDR(point.total)}</span>
-                    <span>
-                      {point.orders} {t('order', 'orders')}
-                    </span>
+                  <span className={styles.colBars}>
+                    <span className={`${styles.barFill} ${styles.barRevenue} ${point.total > 0 ? '' : styles.barZero}`} />
+                    <span className={`${styles.barFill} ${styles.barOrders} ${point.orders > 0 ? '' : styles.barZero}`} />
                   </span>
-                  <span className={styles.barTrack}>
-                    <span className={styles.barFill} />
-                  </span>
-                  <span className={styles.barLabel}>{point.month}</span>
+                  <span className={styles.colLabel}>{point.month}</span>
                 </button>
               );
             })}
@@ -256,8 +304,8 @@ export default function AdminSalesChart({
       <p className={styles.hint}>
         <Icon name="compass" size={17} />{' '}
         {t(
-          'Arahkan kursor, fokuskan dengan keyboard, atau ketuk batang untuk melihat nilainya.',
-          'Hover, focus with the keyboard, or tap a bar to see its value.',
+          'Arahkan kursor atau fokuskan bulan untuk melihat nilainya; klik untuk mengunci rincian bulan itu.',
+          'Hover or focus a month to see its values; click to pin that month.',
         )}
       </p>
     </section>

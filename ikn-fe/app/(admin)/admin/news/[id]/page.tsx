@@ -8,7 +8,7 @@ import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
 import { I18nInput, I18nRichTextEditor, MediaPicker, firstError, type FieldErrors } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
-import { tr, type PostDetail } from '@/lib/cms';
+import { tr, type PostCategory, type PostDetail } from '@/lib/cms';
 import { formatDateTime } from '@/lib/format';
 import { emptyForm, formFromPost, toLocalInput, toPayload, type NewsForm } from '../newsForm';
 
@@ -30,8 +30,16 @@ export default function AdminNewsEditor({ params }: { params: { id: string } }) 
   const [formErrors, setFormErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState<'save' | 'publish' | null>(null);
+  const [categories, setCategories] = useState<PostCategory[]>([]);
 
   const dirty = useMemo(() => JSON.stringify(form) !== snapshot, [form, snapshot]);
+
+  // Pilihan kategori (dikelola di /admin/news-categories).
+  useEffect(() => {
+    api<PostCategory[]>('/admin/news-categories')
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, []);
 
   const applyPost = useCallback((detail: PostDetail) => {
     const next = formFromPost(detail);
@@ -266,9 +274,22 @@ export default function AdminNewsEditor({ params }: { params: { id: string } }) 
             <AdminCard title={t('Kategori & penulis', 'Category & author')}>
               <div className="cms-fields">
                 <label>
-                  <span className="field-label">{t('Kategori / tag', 'Tag')}</span>
-                  <input value={form.tag} onChange={(e) => setForm({ ...form, tag: e.target.value })} placeholder="Contoh: Perusahaan" maxLength={64} />
-                  {firstError(formErrors, 'tag') && <small className="cms-field-error">{firstError(formErrors, 'tag')}</small>}
+                  <span className="field-label">{t('Kategori', 'Category')}</span>
+                  <select value={form.categoryId ?? ''} onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : null })}>
+                    <option value="">{t('— Tanpa kategori —', '— No category —')}</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {tr(cat.name, lang)}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="admin-field-hint">
+                    {t('Kategori tampil sebagai filter di halaman Berita. ', 'Categories appear as filters on the News page. ')}
+                    <Link href="/admin/news-categories" className="cms-link">
+                      {t('Kelola kategori', 'Manage categories')}
+                    </Link>
+                  </small>
+                  {firstError(formErrors, 'categoryId') && <small className="cms-field-error">{firstError(formErrors, 'categoryId')}</small>}
                 </label>
                 <label>
                   <span className="field-label">{t('Penulis', 'Author')}</span>

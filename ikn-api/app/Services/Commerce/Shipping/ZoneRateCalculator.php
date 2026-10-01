@@ -5,36 +5,91 @@ namespace App\Services\Commerce\Shipping;
 use App\Models\ShippingRate;
 use App\Models\ShippingZone;
 use App\Models\ShippingZoneRegion;
+use App\Services\Commerce\CommerceSettings;
 use Illuminate\Support\Arr;
 
 /**
  * Ongkir berbasis zona (arsitektur bagian 9 langkah 4): zona paling spesifik menang
  * (village → district → regency → province), lalu zona default (is_default atau tanpa region) sebagai cadangan.
- * amount = max(min_amount, base + per_kg × ceil(kg)); 0 bila subtotal − diskon ≥ free_above.
+ * Tarif "calculated" memakai tiga parameter (ASUMSI A-76): jarak km (garis lurus titik asal → titik peta alamat × faktor
+ * jalan, dibulatkan ke atas), berat kg, volume m³ — lihat ShippingRate::breakdown(). 0 bila subtotal − diskon ≥ free_above.
  */
 class ZoneRateCalculator implements ShippingRateCalculator
 {
-    public function ratesFor($address, int $weightGram, int $subtotalAfterDiscount): array
+    private const EARTH_RADIUS_KM = 6371.0088;
+
+    public function __construct(private CommerceSettings $settings)
+    {
+    }
+
+    public function ratesFor($address, int $weightGram, int $subtotalAfterDiscount, int $volumeCm3 = 0): array
     {
         $zone = $this->resolveZone($address);
         if (! $zone) {
             return [];
         }
 
-        return $zone->rates()->active()->get()
-            ->map(fn (ShippingRate $rate) => $this->present($rate, $weightGram, $subtotalAfterDiscount))
+        $rates = $zone->rates()->active()->orderBy('sort_order')->orderBy('id')->get();
+        $distanceKm = $rates->contains(fn (ShippingRate $rate) => $rate->needsDistance()) ? $this->distanceKm($address) : null;
+
+        return $rates
+            ->map(fn (ShippingRate $rate) => $this->present($rate, $weightGram, $subtotalAfterDiscount, $volumeCm3, $distanceKm))
             ->values()->all();
     }
 
-    public function quote(int $rateId, $address, int $weightGram, int $subtotalAfterDiscount): ?array
+    public function quote(int $rateId, $address, int $weightGram, int $subtotalAfterDiscount, int $volumeCm3 = 0): ?array
     {
-        foreach ($this->ratesFor($address, $weightGram, $subtotalAfterDiscount) as $rate) {
-            if ($rate['rateId'] === $rateId) {
+        foreach ($this->ratesFor($address, $weightGram, $subtotalAfterDiscount, $volumeCm3) as $rate) {
+            if ($rate['rateId'] === $rateId && $rate['available']) {
                 return $rate;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Jarak jalan perkiraan (km, dibulatkan ke atas) dari titik asal pengaturan commerce ke titik peta alamat;
+     * null bila salah satu titik belum diatur.
+     *
+     * @param  object|array  $address
+     */
+    public function distanceKm($address): ?int
+    {
+        $originLat = $this->settings->get('shipping_origin_lat');
+        $originLng = $this->settings->get('shipping_origin_lng');
+        $lat = $this->coordinate($address, 'lat');
+        $lng = $this->coordinate($address, 'lng');
+        if ($originLat === null || $originLng === null || $lat === null || $lng === null) {
+            return null;
+        }
+
+        $straight = self::haversineKm((float) $originLat, (float) $originLng, $lat, $lng);
+        $factor = max(1.0, (float) $this->settings->get('shipping_road_factor'));
+
+        return (int) max(1, ceil($straight * $factor));
+    }
+
+    public static function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return 2 * self::EARTH_RADIUS_KM * asin(min(1.0, sqrt($a)));
+    }
+
+    /** @param  object|array  $address */
+    private function coordinate($address, string $key): ?float
+    {
+        $value = null;
+        if (is_array($address)) {
+            $value = $address[$key] ?? Arr::get($address, 'geo.'.$key);
+        } elseif (is_object($address)) {
+            $value = $address->{$key} ?? null;
+        }
+
+        return $value === null || $value === '' || ! is_numeric($value) ? null : (float) $value;
     }
 
     /** @param  object|array  $address */
@@ -111,15 +166,25 @@ class ZoneRateCalculator implements ShippingRateCalculator
         return $codes;
     }
 
-    private function present(ShippingRate $rate, int $weightGram, int $subtotalAfterDiscount): array
+    private function present(ShippingRate $rate, int $weightGram, int $subtotalAfterDiscount, int $volumeCm3, ?int $distanceKm): array
     {
+        $available = ! $rate->needsDistance() || $distanceKm !== null;
+        $breakdown = $rate->breakdown($weightGram, $subtotalAfterDiscount, $volumeCm3, $distanceKm);
+        $amount = $breakdown['amount'];
+        unset($breakdown['amount']);
+
         return [
             'rateId' => $rate->id,
             'zoneId' => $rate->zone_id,
             'label' => $rate->name,
             'eta' => $rate->eta,
-            'amount' => $rate->amountFor($weightGram, $subtotalAfterDiscount),
-            'type' => $rate->type,
+            'amount' => $available ? $amount : 0,
+            'type' => $rate->isCalculated() ? ShippingRate::TYPE_CALCULATED : ShippingRate::TYPE_FLAT,
+            'available' => $available,
+            'distanceKm' => $rate->needsDistance() ? $distanceKm : null,
+            'weightGram' => $weightGram,
+            'volumeCm3' => $volumeCm3,
+            'breakdown' => $breakdown,
         ];
     }
 }

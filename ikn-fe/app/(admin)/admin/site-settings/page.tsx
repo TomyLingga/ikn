@@ -2,19 +2,23 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
-import { I18nInput, MediaPicker, firstError, type FieldErrors } from '@/components/admin/cms';
+import { ColorInput, I18nInput, ListField, MediaPicker, firstError, type FieldErrors } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
-import type { SiteSettings } from '@/lib/cms';
+import type { SiteSettings, WhatsAppContact } from '@/lib/cms';
+import { THEME_DEFAULTS, THEME_VARIABLES, themeColor, type ThemeSettings } from '@/lib/theme';
 
 type CompanyPatch = Partial<SiteSettings['company']>;
 type SitePatch = Partial<SiteSettings['site']>;
 type SeoPatch = Partial<SiteSettings['seo']>;
 type ContactPatch = Partial<NonNullable<SiteSettings['contact']>>;
 type AnalyticsPatch = Partial<NonNullable<SiteSettings['analytics']>>;
+type ThemePatch = Partial<ThemeSettings>;
 
-const emptyContact = { whatsapp: '', whatsapp_message: { id: '', en: '' } };
+const emptyContact = { whatsapp: '', whatsapp_message: { id: '', en: '' }, whatsapp_contacts: [] as WhatsAppContact[] };
 const emptyAnalytics = { ga_measurement_id: '', gsc_verification: '' };
+const emptyTheme: ThemeSettings = { ...THEME_DEFAULTS };
+const THEME_KEYS = Object.keys(THEME_VARIABLES) as (keyof ThemeSettings)[];
 
 // Site settings (GET/PUT /admin/site-settings): company identity, footer texts, default SEO.
 export default function AdminSiteSettings() {
@@ -48,6 +52,18 @@ export default function AdminSiteSettings() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  // Pratinjau langsung: warna tema di form dipasang ke --theme-* pada <html> (mengalahkan style dari server);
+  // nilai kosong/tidak valid dipratinjau sebagai bawaan. Saat halaman ditinggalkan, kembali ke nilai tersimpan.
+  const previewTheme = settings?.theme;
+  useEffect(() => {
+    if (!previewTheme) return;
+    const root = document.documentElement;
+    for (const key of THEME_KEYS) root.style.setProperty(THEME_VARIABLES[key], themeColor(previewTheme, key));
+    return () => {
+      for (const key of THEME_KEYS) root.style.removeProperty(THEME_VARIABLES[key]);
+    };
+  }, [previewTheme]);
+
   const patchCompany = (patch: CompanyPatch) =>
     setSettings((current) => (current ? { ...current, company: { ...current.company, ...patch } } : current));
   const patchSite = (patch: SitePatch) =>
@@ -58,6 +74,8 @@ export default function AdminSiteSettings() {
     setSettings((current) => (current ? { ...current, contact: { ...(current.contact ?? emptyContact), ...patch } } : current));
   const patchAnalytics = (patch: AnalyticsPatch) =>
     setSettings((current) => (current ? { ...current, analytics: { ...(current.analytics ?? emptyAnalytics), ...patch } } : current));
+  const patchTheme = (patch: ThemePatch) =>
+    setSettings((current) => (current ? { ...current, theme: { ...(current.theme ?? emptyTheme), ...patch } } : current));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,6 +92,7 @@ export default function AdminSiteSettings() {
           seo: settings.seo,
           contact: settings.contact ?? emptyContact,
           analytics: settings.analytics ?? emptyAnalytics,
+          theme: settings.theme ?? emptyTheme,
         },
       });
       setSettings(saved);
@@ -101,6 +120,22 @@ export default function AdminSiteSettings() {
     );
   }
 
+  const theme = settings.theme ?? emptyTheme;
+  const themeField = (key: keyof ThemeSettings, label: string, hint: string) => (
+    <label>
+      <span className="field-label">{label}</span>
+      <ColorInput
+        value={theme[key] ?? ''}
+        onChange={(value) => patchTheme({ [key]: value })}
+        label={label}
+        fallback={THEME_DEFAULTS[key]}
+        placeholder={t('kosong = bawaan', 'empty = default')}
+      />
+      <small className="admin-field-hint">{hint}</small>
+      {firstError(errors, `theme.${key}`) && <small className="cms-field-error">{firstError(errors, `theme.${key}`)}</small>}
+    </label>
+  );
+
   const textField = (label: string, key: 'name' | 'short' | 'parent' | 'since' | 'location') => (
     <label>
       <span className="field-label">{label}</span>
@@ -113,7 +148,7 @@ export default function AdminSiteSettings() {
     <div>
       <AdminPageHead
         title={t('Pengaturan Situs', 'Site Settings')}
-        desc={t('Identitas perusahaan, teks footer, dan SEO bawaan situs publik.', 'Company identity, footer texts, and default SEO for the public site.')}
+        desc={t('Identitas perusahaan, teks footer, SEO bawaan, kanal chat, dan tema warna situs.', 'Company identity, footer texts, default SEO, chat channel, and the site colour theme.')}
       />
 
       {notice && (
@@ -237,6 +272,33 @@ export default function AdminSiteSettings() {
                 {firstError(errors, 'analytics.ga_measurement_id') && <small className="cms-field-error">{firstError(errors, 'analytics.ga_measurement_id')}</small>}
               </label>
             </div>
+            <ListField<WhatsAppContact>
+              label={t('Nomor WhatsApp marketing lainnya (opsional)', 'Other marketing WhatsApp numbers (optional)')}
+              items={settings.contact?.whatsapp_contacts ?? []}
+              onChange={(items) => patchContact({ whatsapp_contacts: items })}
+              createItem={() => ({ label: '', number: '' })}
+              maxItems={10}
+              addLabel={t('Tambah nomor', 'Add number')}
+              error={firstError(errors, 'contact.whatsapp_contacts')}
+              renderItem={(item, _index, set) => (
+                <div className="admin-form-row">
+                  <label>
+                    <span className="field-label">{t('Nama tim / orang', 'Team / person')}</span>
+                    <input value={item.label} maxLength={60} onChange={(e) => set({ ...item, label: e.target.value })} placeholder={t('mis. Marketing Resiprene', 'e.g. Resiprene marketing')} />
+                  </label>
+                  <label>
+                    <span className="field-label">{t('Nomor', 'Number')}</span>
+                    <input value={item.number} maxLength={20} className="mono" onChange={(e) => set({ ...item, number: e.target.value.replace(/[^0-9+ ()-]/g, '') })} placeholder="6281234567890" />
+                  </label>
+                </div>
+              )}
+            />
+            <p className="admin-field-hint">
+              {t(
+                'Bila ada lebih dari satu nomor, tombol melayang "Chat WhatsApp", footer, dan halaman Kontak menampilkan daftar pilihan (nama tim + nomor). Nomor utama di atas selalu menjadi pilihan pertama dengan label "Marketing".',
+                'With more than one number, the floating "Chat WhatsApp" button, the footer, and the Contact page show a list to choose from (team name + number). The main number above is always the first option, labelled "Marketing".',
+              )}
+            </p>
             <I18nInput
               label={t('Pesan awal WhatsApp', 'WhatsApp opening message')}
               value={settings.contact?.whatsapp_message ?? emptyContact.whatsapp_message}
@@ -256,6 +318,29 @@ export default function AdminSiteSettings() {
               />
               {firstError(errors, 'analytics.gsc_verification') && <small className="cms-field-error">{firstError(errors, 'analytics.gsc_verification')}</small>}
             </label>
+          </div>
+        </AdminCard>
+
+        <AdminCard title={t('Tema warna', 'Colour theme')}>
+          <div className="admin-form">
+            <p className="admin-field-hint">
+              {t(
+                'Warna logo IKN: biru dan putih. Perubahan langsung dipratinjau di panel ini dan berlaku di seluruh situs (company profile dan toko online) setelah disimpan. Tombol "Bawaan" mengembalikan warna standar.',
+                'IKN logo colours: blue and white. Changes preview instantly in this panel and apply to the whole site (company profile and shop) once saved. "Bawaan" restores the default colour.',
+              )}
+            </p>
+            <div className="admin-form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+              {themeField('primary', t('Warna utama', 'Primary colour'), t('Tombol, tautan, label, ikon aktif.', 'Buttons, links, labels, active icons.'))}
+              {themeField('primary_deep', t('Warna gelap', 'Deep colour'), t('Footer dan blok berlatar gelap.', 'Footer and dark background blocks.'))}
+              {themeField('accent', t('Warna aksen', 'Accent colour'), t('Nomor bagian, badge promo, sorotan kecil.', 'Section numbers, promo badges, small highlights.'))}
+            </div>
+            <div className="theme-swatches" aria-hidden="true">
+              {THEME_KEYS.map((key) => (
+                <div key={key} className="theme-swatch" style={{ background: themeColor(theme, key) }}>
+                  {themeColor(theme, key)}
+                </div>
+              ))}
+            </div>
           </div>
         </AdminCard>
 

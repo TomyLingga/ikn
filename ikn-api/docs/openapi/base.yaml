@@ -144,16 +144,22 @@ paths:
     get:
       tags: [content]
       parameters:
-        - { name: tag, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string }, description: slug kategori (lihat /content/news-categories) }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 100 } }
       responses:
         '200': { description: Berita terbit tanpa body, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/PostSummary' } } } } } } }
+  /content/news-categories:
+    get:
+      tags: [content]
+      summary: Kategori berita + jumlah berita terbit (filter di halaman Berita)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/PostCategory' } } } } } } }
   /content/news/{slug}:
     get:
       tags: [content]
       parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
       responses:
-        '200': { description: 'Detail + related (maks 3, tag sama diprioritaskan)', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Post' } } } } } }
+        '200': { description: 'Detail + related (maks 3, kategori sama diprioritaskan)', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Post' } } } } } }
         '404': { $ref: '#/components/responses/NotFound' }
   /content/gallery:
     get:
@@ -243,7 +249,10 @@ paths:
     get:
       tags: [files]
       security: [{ cookieAuth: [] }]
-      summary: Unduh berkas privat (MediaPolicy; sementara admin saja)
+      summary: Unduh berkas privat (MediaPolicy - admin aktif, atau customer pemilik order untuk bukti bayarnya)
+      description: >-
+        Bisa dibuka langsung di tab browser oleh pengguna yang sudah login: middleware `session.downloads`
+        menyalakan sesi walau permintaan tidak membawa Origin/Referer FE (tautan rel=noreferrer, alamat ditempel, muat ulang).
       parameters: [{ name: media, in: path, required: true, schema: { type: integer } }]
       responses:
         '200': { description: Isi berkas }
@@ -325,7 +334,7 @@ paths:
       security: [{ cookieAuth: [] }]
       parameters:
         - { name: collection, in: query, schema: { type: string } }
-        - { name: type, in: query, schema: { type: string, enum: [image, document] } }
+        - { name: type, in: query, schema: { type: string, enum: [image, video, visual, document] }, description: 'visual = gambar + video; document = selain keduanya' }
         - { name: q, in: query, schema: { type: string } }
         - { name: page, in: query, schema: { type: integer } }
         - { name: perPage, in: query, schema: { type: integer, default: 30, maximum: 100 } }
@@ -384,7 +393,7 @@ paths:
       security: [{ cookieAuth: [] }]
       summary: Skema tipe section untuk form admin otomatis
       responses:
-        '200': { description: '{ data: { types: { [type]: SectionTypeDef }, icons: string[] } }' }
+        '200': { description: '{ data: { types: { [type]: SectionTypeDef }, groups: { [group]: I18n }, icons: string[] } }. SectionTypeDef = { name, description, pages[] (petunjuk halaman bawaan, bukan pembatas), group (kunci di groups: header|content|showcase|data|contact), fields }. Tipe: page_header, hero, marquee, stats, capabilities, product_highlights, video_gallery, cta, text_visual, timeline, vision_mission, values, org_chart, contact_info, contact_form, contact_summary, link_cards, pillars, info_blocks, wbs_form, customer_logos, certificates, brochures, gallery, news, latest_news, steps, icon_features, faq, spec_table, team, testimonials, image_grid, rich_text.' }
   /admin/pages:
     get:
       tags: [admin-cms]
@@ -583,11 +592,43 @@ paths:
         '200': { $ref: '#/components/responses/Deleted' }
 
   # ---------------------------------------------------------------- admin: konten
+  /admin/news-categories:
+    get:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      summary: Kategori berita (modul news) + jumlah semua berita per kategori
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/PostCategory' } } } } } } }
+    post:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/PostCategory' }
+      responses:
+        '201': { description: OK }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/news-categories/{newsCategory}:
+    put:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: newsCategory, in: path, required: true, schema: { type: integer } }]
+      requestBody: { $ref: '#/components/requestBodies/PostCategory' }
+      responses:
+        '200': { description: OK }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [admin-content]
+      security: [{ cookieAuth: [] }]
+      summary: Hapus kategori; berita di dalamnya tetap ada dengan category null
+      parameters: [{ name: newsCategory, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
   /admin/news:
     get:
       tags: [admin-content]
       security: [{ cookieAuth: [] }]
-      parameters: [{ name: q, in: query, schema: { type: string }, description: ILIKE pada judul }]
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: ILIKE pada judul }
+        - { name: category, in: query, schema: { type: integer }, description: id kategori }
       responses:
         '200': { description: '{ data: Post[] } (termasuk draf)' }
     post:
@@ -798,11 +839,22 @@ components:
                   HTML per bahasa dari editor. Server men-sanitasi dengan whitelist
                   (p, br, h2-h4, strong, em, u, s, a, ul, ol, li, blockquote, img, figure, figcaption, hr,
                   table, iframe YouTube/Vimeo saja; style hanya text-align). Tag/atribut lain dibuang.
-              tag: { type: string, nullable: true }
+              categoryId: { type: integer, nullable: true, description: id dari /admin/news-categories }
               author: { type: string, nullable: true, maxLength: 120 }
               coverMediaId: { type: integer, nullable: true }
               isPublished: { type: boolean }
               publishedAt: { type: string, format: date-time, nullable: true }
+    PostCategory:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name: { $ref: '#/components/schemas/I18n' }
+              slug: { type: string, nullable: true, maxLength: 80, description: otomatis dari nama bila kosong; unik }
+              sortOrder: { type: integer, minimum: 0 }
     GalleryItem:
       required: true
       content:
@@ -1015,6 +1067,28 @@ components:
           properties:
             default_title: { $ref: '#/components/schemas/I18n' }
             default_description: { $ref: '#/components/schemas/I18n' }
+        contact:
+          type: object
+          properties:
+            whatsapp: { type: string, description: 'nomor utama, internasional tanpa +; kosong = tombol WhatsApp tidak tampil' }
+            whatsapp_message: { $ref: '#/components/schemas/I18n' }
+            whatsapp_contacts:
+              type: array
+              maxItems: 10
+              description: 'nomor marketing tambahan; bersama nomor utama menjadi daftar pilihan di tombol melayang/footer/Kontak; nomor dinormalkan ke 62…, ganda ditolak'
+              items: { type: object, properties: { label: { type: string, maxLength: 60, example: Marketing Resiprene }, number: { type: string, example: '628116480083' } } }
+        analytics:
+          type: object
+          properties:
+            ga_measurement_id: { type: string, description: 'G-XXXXXXXXXX; kosong = tanpa GA4' }
+            gsc_verification: { type: string, description: 'token meta google-site-verification' }
+        theme:
+          type: object
+          description: 'Warna tema situs, hex #rrggbb (disimpan lowercase; kosong = warna bawaan CSS). FE menyuntik nilai valid sebagai --theme-primary / --theme-primary-deep / --theme-accent di root layout; nilai lain → 422.'
+          properties:
+            primary: { type: string, example: '#0b6fb8', description: 'tombol, tautan, label, ikon aktif' }
+            primary_deep: { type: string, example: '#0a3f6b', description: 'footer dan blok latar gelap' }
+            accent: { type: string, example: '#1785cc', description: 'nomor bagian, badge promo, sorotan kecil' }
         admin:
           type: object
           description: privat (hanya GET/PUT admin)
@@ -1108,6 +1182,14 @@ components:
         targetUrl: { type: string, nullable: true }
         isActive: { type: boolean }
         sortOrder: { type: integer }
+    PostCategory:
+      type: object
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { $ref: '#/components/schemas/I18n' }
+        sortOrder: { type: integer }
+        postCount: { type: integer, nullable: true, description: publik = berita terbit; admin = semua berita }
     PostSummary:
       type: object
       properties:
@@ -1115,7 +1197,10 @@ components:
         slug: { type: string }
         title: { $ref: '#/components/schemas/I18n' }
         excerpt: { $ref: '#/components/schemas/I18n' }
-        tag: { type: string, nullable: true }
+        category:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/PostCategory' }]
+          description: kategori berita (tanpa postCount); null bila belum dikategorikan
         author: { type: string, nullable: true }
         readingMinutes: { type: integer, description: estimasi menit baca dari isi bahasa ID (200 kata/menit, min 1) }
         cover: { $ref: '#/components/schemas/MediaSummary' }
@@ -1132,7 +1217,7 @@ components:
             related:
               type: array
               maxItems: 3
-              description: berita terkait (tag sama diprioritaskan, lalu terbaru); hanya pada GET /content/news/{slug}
+              description: berita terkait (kategori sama diprioritaskan, lalu terbaru); hanya pada GET /content/news/{slug}
               items: { $ref: '#/components/schemas/PostSummary' }
     GalleryItem:
       type: object

@@ -47,7 +47,8 @@ class OrderController extends ApiController
             })
             ->orderByDesc('created_at')->orderByDesc('id');
 
-        return $this->paginated($query->paginate($this->perPage()), OrderSummaryResource::class);
+        // meta.counts = jumlah per status sepanjang waktu (angka pada tab), tidak ikut filter tanggal/pencarian.
+        return $this->paginated($query->paginate($this->perPage()), OrderSummaryResource::class, ['counts' => $this->statusCounts(Order::query(), Order::STATUSES)]);
     }
 
     public function show(Order $order)

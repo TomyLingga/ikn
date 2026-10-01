@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Exceptions\ApiException;
 use App\Models\BankAccount;
+use App\Models\ChatMessage;
 use App\Models\CustomerAddress;
 use App\Models\Media;
 use App\Models\Order;
@@ -11,8 +12,11 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\User;
+use App\Models\UserNotification;
+use App\Services\Chat\ChatService;
 use App\Services\Commerce\CheckoutService;
 use App\Services\Commerce\OrderCalculator;
+use App\Services\Commerce\OrderNotifier;
 use App\Services\Commerce\OrderStateMachine;
 use App\Services\Media\MediaService;
 use App\Services\Payment\PaymentService;
@@ -80,6 +84,9 @@ class CommerceDemoSeeder extends Seeder
             $shipped = $this->paidOrder($checkout, $payments, $media, $calculator, $now->copy()->subDays(6)->setTime(11, 20), [['resiprene-35', 30], ['acting-rubber', 2]]);
             $this->at($shipped->created_at->copy()->addDay()->setTime(8, 30), fn () => $sm->transition($shipped, Order::STATUS_PROCESSING, $this->admin, ['note' => 'Disiapkan gudang Medan']));
             $this->at($shipped->created_at->copy()->addDays(2)->setTime(15, 0), fn () => $sm->transition($shipped, Order::STATUS_SHIPPED, $this->admin, ['courier' => 'JNE Trucking', 'trackingNumber' => 'JNT2026093001']));
+            // Catatan perjalanan kiriman dari admin (ASUMSI A-70).
+            $this->trackingNote($shipped, $shipped->created_at->copy()->addDays(3)->setTime(9, 10), 'Pesanan berangkat dari gudang Medan');
+            $this->trackingNote($shipped, $shipped->created_at->copy()->addDays(4)->setTime(17, 45), 'Pesanan tiba di gudang transit Pekanbaru, Riau');
 
             // 5. Diproses (1 hari lalu).
             $processing = $this->paidOrder($checkout, $payments, $media, $calculator, $now->copy()->subDay()->setTime(10, 0), [['rubber-ring', 50]]);
@@ -108,9 +115,43 @@ class CommerceDemoSeeder extends Seeder
                     return $this->place($checkout, $calculator, [['resiprene-35', 30]], 'Kirim jam kerja (08.00–16.00).');
                 }
             });
+
+            $this->demoChat($shipped, $now);
+
+            // Lonceng portal: notifikasi lama dianggap sudah dibaca, yang tiga hari terakhir dibiarkan baru.
+            UserNotification::where('user_id', $this->buyer->id)->where('created_at', '<', $now->copy()->subDays(3))
+                ->update(['read_at' => $now]);
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    private function trackingNote(Order $order, Carbon $time, string $note): void
+    {
+        $this->at($time, function () use ($order, $note) {
+            $update = $order->trackingUpdates()->create(['note' => $note, 'created_by' => $this->admin->id]);
+            app(OrderNotifier::class)->trackingUpdated($order, $update);
+        });
+    }
+
+    /** Percakapan contoh customer ↔ admin (ASUMSI A-73): satu pesan customer terakhir dibiarkan belum dibaca admin. */
+    private function demoChat(Order $shipped, Carbon $now): void
+    {
+        $chat = app(ChatService::class);
+        $conversation = $chat->conversationFor($this->buyer);
+        if ($conversation->messages()->exists()) {
+            return;
+        }
+
+        $say = function (Carbon $time, User $sender, string $role, string $body, ?array $context = null) use ($chat, $conversation) {
+            $this->at($time, fn () => $chat->send($conversation, $sender, $role, $body, $role === ChatMessage::ROLE_CUSTOMER ? $chat->resolveContext($sender, $context) : null));
+        };
+
+        $start = $now->copy()->subDays(2)->setTime(9, 12);
+        $say($start, $this->buyer, ChatMessage::ROLE_CUSTOMER, 'Selamat pagi, apakah Resiprene 35 tersedia untuk 2 ton pengiriman bulan depan?', ['type' => 'product', 'slug' => 'resiprene-35']);
+        $say($start->copy()->addMinutes(14), $this->admin, ChatMessage::ROLE_ADMIN, 'Selamat pagi, Pak Budi. Stok tersedia, untuk 2 ton bisa kami kirim bertahap mulai minggu pertama. Silakan checkout lewat portal ya.');
+        $say($start->copy()->addMinutes(20), $this->buyer, ChatMessage::ROLE_CUSTOMER, 'Baik, terima kasih.');
+        $say($now->copy()->subHours(2), $this->buyer, ChatMessage::ROLE_CUSTOMER, 'Pesanan ini sudah sampai mana ya?', ['type' => 'order', 'number' => $shipped->number]);
     }
 
     /** Jalankan closure pada waktu tertentu (semua now() di service mengikuti). */

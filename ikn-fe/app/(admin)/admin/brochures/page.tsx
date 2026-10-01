@@ -8,6 +8,7 @@ import { I18nInput, MediaPicker, firstError, formatBytes, type FieldErrors } fro
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type BrochureData, type I18n, type MediaSummary } from '@/lib/cms';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 interface BrochureForm {
   title: I18n;
@@ -127,7 +128,7 @@ export default function AdminBrochures() {
   }
 
   async function remove(row: BrochureData) {
-    if (!window.confirm(t(`Hapus brosur "${tr(row.title, lang)}"?`, `Delete brochure "${tr(row.title, lang)}"?`))) return;
+    if (!await confirmDialog(t(`Hapus brosur "${tr(row.title, lang)}"?`, `Delete brochure "${tr(row.title, lang)}"?`))) return;
     setError('');
     try {
       await api(`/admin/brochures/${row.id}`, { method: 'DELETE' });

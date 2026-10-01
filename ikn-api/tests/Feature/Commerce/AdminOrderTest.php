@@ -35,7 +35,8 @@ class AdminOrderTest extends TestCase
         $this->actingAs($admin)->getJson('/api/v1/admin/orders')
             ->assertOk()->assertJsonCount(3, 'data')->assertJsonPath('meta.total', 3)
             ->assertJsonStructure(['data' => [['number', 'status', 'paymentStatus', 'customer' => ['name', 'company', 'email'], 'grandTotal', 'paymentDueAt', 'itemsCount']]]);
-        $this->actingAs($admin)->getJson('/api/v1/admin/orders?status=paid')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.number', $paid->number);
+        $this->actingAs($admin)->getJson('/api/v1/admin/orders?status=paid')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.number', $paid->number)
+            ->assertJsonPath('meta.counts.paid', 1)->assertJsonPath('meta.counts.pending_payment', 2)->assertJsonPath('meta.counts.completed', 0); // angka tab sepanjang waktu
         $this->actingAs($admin)->getJson('/api/v1/admin/orders?status=all&perPage=2')->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('meta.lastPage', 2);
         $this->actingAs($admin)->getJson('/api/v1/admin/orders?q=lain+jaya')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.number', $theirs->number);
         $this->actingAs($admin)->getJson('/api/v1/admin/orders?q='.$pending->number)->assertOk()->assertJsonCount(1, 'data');

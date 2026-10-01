@@ -1,0 +1,300 @@
+/* Lembar A4 ala dokumen klien: serif, garis tabel tegas, hitam di atas putih (tidak mengikuti tema gelap). */
+.sheetWrap {
+  min-height: 100vh;
+  padding: 24px 16px 48px;
+  background: #e9ecf1;
+  color: #000;
+}
+
+.toolbar {
+  width: min(210mm, 100%);
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #4b5a6e;
+  font-size: 0.86rem;
+}
+
+.printBtn {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--theme-primary, #0b5fa5);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.state {
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  color: #4b5a6e;
+}
+
+.sheet {
+  --ink: #000;
+  position: relative;
+  width: min(210mm, 100%);
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 14mm 14mm 42mm;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 16px 48px rgba(15, 27, 45, 0.18);
+  font-family: 'Times New Roman', Times, 'Liberation Serif', serif;
+  font-size: 11pt;
+  line-height: 1.35;
+}
+
+.sheet h1, .sheet h2, .sheet p { margin: 0; color: #000; }
+
+/* ---- Kop ---- */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.headLeft h1 {
+  font-size: 17pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+}
+
+.headLeft p {
+  font-size: 12pt;
+  font-weight: 700;
+  text-align: center;
+}
+
+.headRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  font-size: 9.5pt;
+  line-height: 1.3;
+}
+
+.headRight strong { font-size: 11pt; }
+
+.rule {
+  height: 3px;
+  margin: 8px 0 18px;
+  background: linear-gradient(to right, var(--theme-primary, #0b5fa5), var(--theme-primary-deep, #063b6b));
+  border-bottom: 1px solid #000;
+}
+
+.dateline { text-align: right; }
+
+.titleBlock {
+  margin: 4px 0 14px;
+  text-align: center;
+}
+
+.titleBlock h2 {
+  display: inline-block;
+  font-size: 15pt;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.number {
+  font-size: 11pt;
+}
+
+.number b { padding: 0 10px; font-weight: 700; }
+
+.proforma {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px solid #000;
+  font-size: 9pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- Penerima ---- */
+.parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+  margin-bottom: 14px;
+}
+
+.toBlock span { display: block; }
+.toBlock strong { display: block; font-weight: 700; }
+.toBlock p { max-width: 42ch; }
+
+.intro {
+  align-self: end;
+  padding-left: 12px;
+}
+
+/* ---- Tabel ---- */
+.table {
+  width: 100%;
+  border: 2px solid #000;
+  border-collapse: collapse;
+  font-size: 10.5pt;
+}
+
+.table th,
+.table td {
+  padding: 3px 6px;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
+  vertical-align: top;
+}
+
+.table thead th {
+  padding: 4px 6px;
+  border-bottom: 2px solid #000;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.colQty { width: 15%; }
+.colDesc { width: 48%; letter-spacing: 0.25em; }
+.colPrice { width: 17%; }
+.colTotal { width: 20%; }
+
+.refRow td {
+  padding-top: 8px;
+  font-weight: 700;
+}
+
+.refRow u { text-decoration: underline; }
+
+.itemRow .qty {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.itemRow .qty small { font-size: 0.9em; }
+.itemRow small { font-size: 0.85em; }
+
+.money {
+  display: table-cell;
+  white-space: nowrap;
+}
+
+.money span:first-child { float: left; }
+.money span:last-child { float: right; }
+
+.spacer td { height: 26mm; }
+
+.payRow td { border-top: 1px solid #000; }
+.payRow:first-of-type td { border-top: 1px solid #000; }
+
+.payCell {
+  padding-top: 6px;
+  font-size: 10pt;
+  line-height: 1.35;
+}
+
+.payCell u { font-weight: 700; }
+.payCell em { font-style: italic; }
+
+.sumLabel { text-align: center; }
+
+.totalRow td { font-weight: 700; }
+
+.words {
+  font-size: 10pt;
+}
+
+.words em {
+  font-style: italic;
+  font-weight: 600;
+}
+
+/* ---- Tembusan + tanda tangan ---- */
+.foot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 14px;
+}
+
+.cc {
+  display: flex;
+  flex-direction: column;
+  padding-left: 6px;
+  font-size: 10pt;
+}
+
+.cc span + span { padding-left: 2.6em; }
+
+.sign {
+  min-width: 62mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  font-size: 10.5pt;
+}
+
+.signSpace { height: 22mm; }
+.sign u { font-weight: 700; }
+.sign small { font-size: 10pt; }
+
+/* ---- Kaki halaman ---- */
+.pageFoot {
+  position: absolute;
+  right: 14mm;
+  bottom: 10mm;
+  left: 14mm;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 8px;
+  border-top: 3px solid var(--theme-primary, #0b5fa5);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 8.5pt;
+}
+
+.values { padding-bottom: 2px; }
+
+.office {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  line-height: 1.35;
+}
+
+@media screen and (max-width: 640px) {
+  .sheet { padding: 12mm 8mm 42mm; font-size: 9.5pt; }
+  .parties { grid-template-columns: 1fr; }
+  .headLeft h1 { font-size: 13pt; }
+}
+
+@media print {
+  .sheetWrap { min-height: 0; padding: 0; background: #fff; }
+  .toolbar { display: none !important; }
+  .sheet { width: auto; min-height: 0; margin: 0; padding: 0 0 38mm; box-shadow: none; }
+  .pageFoot { position: fixed; right: 0; bottom: 0; left: 0; }
+}

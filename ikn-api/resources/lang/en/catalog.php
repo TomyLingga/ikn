@@ -4,6 +4,8 @@
 return [
     'insufficient_stock' => 'Insufficient stock.',
     'category_in_use' => 'Category is still used by products.',
+    'product_media_invalid' => 'Product media must be a photo or video from the media library.',
+    'product_thumbnail_invalid' => 'The thumbnail must be one of the photos in the product media list.',
     'stock_qty_positive' => 'Quantity must be greater than 0.',
     'stock_qty_zero' => 'Adjustment quantity cannot be 0.',
     'stock_adjust_negative' => 'Adjustment would make available stock negative (available :available).',
@@ -19,6 +21,7 @@ return [
         'per_user_limit' => 'Per-account usage limit for this voucher has been reached.',
         'min_subtotal' => 'Minimum purchase for this voucher has not been met.',
         'scope' => 'Voucher does not apply to the products in the cart.',
+        'not_eligible' => 'This voucher is not available for your account.',
     ],
 
     'quote' => [

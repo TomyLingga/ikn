@@ -3,6 +3,7 @@
 namespace Tests\Feature\Cms;
 
 use App\Models\Post;
+use App\Models\PostCategory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,18 +14,25 @@ class PostTest extends TestCase
     public function test_create_generates_slug_and_publish_date(): void
     {
         $admin = $this->adminWith(['news']);
+        $category = PostCategory::create(['slug' => 'produk', 'name' => ['id' => 'Produk', 'en' => 'Products']]);
 
         $response = $this->actingAs($admin)->postJson('/api/v1/admin/news', [
             'title' => ['id' => 'Resiprene 35 menembus pasar ekspor', 'en' => 'Resiprene 35 enters export markets'],
             'excerpt' => ['id' => 'Ringkasan'],
             'body' => ['id' => '<p>Isi berita</p>'],
-            'tag' => 'Produk',
+            'categoryId' => $category->id,
             'isPublished' => true,
         ]);
 
         $response->assertStatus(201)
             ->assertJsonPath('data.slug', 'resiprene-35-menembus-pasar-ekspor')
-            ->assertJsonPath('data.excerpt.en', 'Ringkasan');
+            ->assertJsonPath('data.excerpt.en', 'Ringkasan')
+            ->assertJsonPath('data.category.slug', 'produk')
+            ->assertJsonPath('data.category.name.en', 'Products');
+
+        // Kategori tidak dikenal -> 422.
+        $this->actingAs($admin)->postJson('/api/v1/admin/news', ['title' => ['id' => 'Salah kategori'], 'categoryId' => 999])
+            ->assertStatus(422)->assertJsonValidationErrors(['categoryId']);
         $this->assertNotNull($response->json('data.publishedAt'));
 
         // Judul sama → slug diberi akhiran.
@@ -91,11 +99,15 @@ class PostTest extends TestCase
             ->assertStatus(201)->assertJsonPath('data.body.id', '')->assertJsonPath('data.body.en', '');
     }
 
-    public function test_related_posts_prefer_same_tag_and_max_three(): void
+    public function test_related_posts_prefer_same_category_and_max_three(): void
     {
-        Post::create(['slug' => 'utama', 'title' => ['id' => 'Utama'], 'tag' => 'Produk', 'is_published' => true, 'published_at' => now()->subDays(10)]);
-        foreach (['a' => 'Perusahaan', 'b' => 'Produk', 'c' => 'Perusahaan', 'd' => 'Kemitraan'] as $slug => $tag) {
-            Post::create(['slug' => $slug, 'title' => ['id' => strtoupper($slug)], 'tag' => $tag, 'is_published' => true, 'published_at' => now()->subDay()]);
+        $ids = [];
+        foreach (['produk', 'perusahaan', 'kemitraan'] as $i => $slug) {
+            $ids[$slug] = PostCategory::create(['slug' => $slug, 'name' => ['id' => ucfirst($slug)], 'sort_order' => $i])->id;
+        }
+        Post::create(['slug' => 'utama', 'title' => ['id' => 'Utama'], 'category_id' => $ids['produk'], 'is_published' => true, 'published_at' => now()->subDays(10)]);
+        foreach (['a' => 'perusahaan', 'b' => 'produk', 'c' => 'perusahaan', 'd' => 'kemitraan'] as $slug => $category) {
+            Post::create(['slug' => $slug, 'title' => ['id' => strtoupper($slug)], 'category_id' => $ids[$category], 'is_published' => true, 'published_at' => now()->subDay()]);
         }
 
         $related = $this->getJson('/api/v1/content/news/utama')->assertOk()->json('data.related');

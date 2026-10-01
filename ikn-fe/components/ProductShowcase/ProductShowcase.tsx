@@ -8,45 +8,52 @@ import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { Product } from '@/lib/types';
 
-// Daftar produk di halaman /produk (company profile): nama, ringkasan, spesifikasi, tautan ke katalog.
+// Pratinjau produk di halaman Bisnis (company profile): kartu ringkas berisi foto, jenis, nama, ringkasan,
+// dua spesifikasi utama, dan tautan ke katalog. id = slug agar bisa dituju anchor (mis. /bisnis#resiprene-35).
 export default function ProductShowcase({ products }: { products: Product[] }) {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
   return (
-    <div className="prod-full">
-      {products.map((p, i) => (
-        <Reveal key={p.slug} id={p.slug} className="prod-item" delay={(i % 2) * 80}>
-          <div className="prod-item-media">
-            <span className="prod-code">{p.code}</span>
-            {p.image ? (
-              <Image src={p.image} alt={tr(p.name, lang)} fill sizes="(max-width:900px) 100vw, 480px" style={{ objectFit: 'cover' }} />
-            ) : (
-              <span className="prod-item-drop">
-                <Icon name="drop" size={72} strokeWidth={1} />
-              </span>
-            )}
-          </div>
-          <div>
-            <span className="prod-item-kind">{p.kind || tr(p.category?.name, lang)}</span>
-            <h2 className="prod-item-name">{tr(p.name, lang)}</h2>
-            <p className="prod-item-sum">{tr(p.summary, lang)}</p>
-            {p.specs && p.specs.length > 0 && (
-              <div className="spec-table">
-                {p.specs.map(([key, value], idx) => (
-                  <div key={`${key}-${idx}`} className="spec-row">
-                    <span className="spec-key">{key}</span>
-                    <span className="spec-val">{value}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <Link href={`/catalog/${p.slug}`} className="link" style={{ marginTop: 18 }}>
-              {t('Lihat di katalog', 'View in catalog')} <Icon name="arrow" />
+    <div className="biz-prod-grid">
+      {products.map((p, i) => {
+        const name = tr(p.name, lang);
+        const href = `/catalog/${p.slug}`;
+        const kind = p.kind || tr(p.category?.name, lang);
+        const summary = tr(p.summary, lang);
+        const specs = (p.specs || []).slice(0, 2);
+        return (
+          <Reveal as="article" key={p.slug} id={p.slug} className="biz-prod" delay={(i % 4) * 60}>
+            <Link href={href} className="biz-prod-media" aria-label={name} tabIndex={-1}>
+              {p.image ? (
+                <Image src={p.image} alt={name} fill sizes="(max-width: 600px) 100vw, (max-width: 1100px) 50vw, 300px" />
+              ) : (
+                <Icon name="drop" size={56} strokeWidth={1} />
+              )}
             </Link>
-          </div>
-        </Reveal>
-      ))}
+            <div className="biz-prod-body">
+              {kind && <span className="biz-prod-kind">{kind}</span>}
+              <h3 className="biz-prod-name">
+                <Link href={href}>{name}</Link>
+              </h3>
+              {summary && <p className="biz-prod-sum">{summary}</p>}
+              {specs.length > 0 && (
+                <dl className="biz-prod-specs">
+                  {specs.map(([key, value], idx) => (
+                    <div key={`${key}-${idx}`}>
+                      <dt>{key}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <Link href={href} className="biz-prod-more">
+                {t('Lihat di katalog', 'View in catalog')} <Icon name="arrow" size={14} />
+              </Link>
+            </div>
+          </Reveal>
+        );
+      })}
     </div>
   );
 }

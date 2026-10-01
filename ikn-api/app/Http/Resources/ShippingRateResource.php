@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\ShippingRate;
 use App\Support\Money;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,9 +17,11 @@ class ShippingRateResource extends JsonResource
             'zone' => $this->whenLoaded('zone', fn () => $this->zone ? ['id' => $this->zone->id, 'name' => $this->zone->name] : null),
             'name' => $this->name,
             'label' => $this->name,
-            'type' => $this->type,
+            'type' => $this->isCalculated() ? ShippingRate::TYPE_CALCULATED : ShippingRate::TYPE_FLAT,
             'baseAmount' => Money::toInt($this->base_amount),
+            'perKmAmount' => Money::toInt($this->per_km_amount),
             'perKgAmount' => Money::toInt($this->per_kg_amount),
+            'perM3Amount' => Money::toInt($this->per_m3_amount),
             'minAmount' => Money::toInt($this->min_amount),
             'freeAbove' => $this->free_above === null ? null : Money::toInt($this->free_above),
             'eta' => $this->eta,

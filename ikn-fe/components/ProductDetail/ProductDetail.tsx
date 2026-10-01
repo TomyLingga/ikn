@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import Link from 'next/link';
 import Icon from '@/components/Icon';
+import ProductGallery from '@/components/ProductGallery';
 import Breadcrumb from '@/components/Breadcrumb';
 import StatusBadge from '@/components/StatusBadge';
 import StarRating from '@/components/StarRating';
@@ -14,6 +15,7 @@ import { apiPaged, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
 import { stockLabels } from '@/lib/commerce';
 import { formatDate } from '@/lib/format';
+import { useShopPaths } from '@/lib/shop';
 import type { ProductDetail as ProductDetailData, ProductReview } from '@/lib/types';
 
 interface Props {
@@ -22,14 +24,15 @@ interface Props {
   reviewPageSize?: number;
 }
 
-// Halaman detail produk: galeri (images[]), harga efektif, spesifikasi, aplikasi, kelarutan,
-// ulasan (reviews[] + paginasi lanjutan), dan produk terkait (related[]).
+// Halaman detail produk: galeri geser foto/video (images[]), harga efektif, spesifikasi, aplikasi, kelarutan,
+// ulasan (reviews[] + paginasi lanjutan), dan produk terkait (related[]). Dipakai situs publik (/catalog/{slug})
+// dan portal customer (/dashboard/katalog/{slug}); di portal semua tautan tetap di dalam portal.
 export default function ProductDetail({ product, reviewPageSize = 10 }: Props) {
   const { lang } = useLang();
+  const shop = useShopPaths();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
   const images = product.images?.length ? product.images : product.image ? [{ id: 0, url: product.image, sort: 0 }] : [];
-  const [active, setActive] = useState(0);
   const [reviews, setReviews] = useState<ProductReview[]>(product.reviews || []);
   const [reviewPage, setReviewPage] = useState(1);
   const [hasMore, setHasMore] = useState((product.reviewCount || 0) > (product.reviews || []).length);
@@ -44,7 +47,6 @@ export default function ProductDetail({ product, reviewPageSize = 10 }: Props) {
   const solubility = product.solubility || [];
   const related = product.related || [];
   const categoryName = tr(product.category?.name, lang) || t('Produk', 'Products');
-  const activeImage = images[Math.min(active, Math.max(0, images.length - 1))];
 
   async function loadMoreReviews() {
     if (loadingMore) return;
@@ -70,48 +72,39 @@ export default function ProductDetail({ product, reviewPageSize = 10 }: Props) {
 
   return (
     <>
-      <section className="pagehead commerce-head">
-        <div className="container">
-          <Breadcrumb
-            items={[
-              { label: t('Beranda', 'Home'), href: '/' },
-              { label: t('Katalog', 'Catalog'), href: '/catalog' },
-              ...(product.category ? [{ label: categoryName, href: `/catalog/kategori/${product.category.slug}` }] : []),
-              { label: name },
-            ]}
-          />
-        </div>
-      </section>
+      {shop.portal ? (
+        <nav className="portal-crumbs" aria-label={t('Lokasi halaman', 'Breadcrumb')}>
+          <Link href={shop.catalog}>
+            <Icon name="chevronLeft" size={16} /> {t('Belanja produk', 'Shop products')}
+          </Link>
+          {product.category && (
+            <>
+              <span aria-hidden="true">/</span>
+              <Link href={shop.category(product.category.slug)}>{categoryName}</Link>
+            </>
+          )}
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">{name}</span>
+        </nav>
+      ) : (
+        <section className="pagehead commerce-head">
+          <div className="container">
+            <Breadcrumb
+              items={[
+                { label: t('Beranda', 'Home'), href: '/' },
+                { label: t('Katalog', 'Catalog'), href: shop.catalog },
+                ...(product.category ? [{ label: categoryName, href: shop.category(product.category.slug) }] : []),
+                { label: name },
+              ]}
+            />
+          </div>
+        </section>
+      )}
 
       <section className="section-tight" style={{ paddingTop: 0 }}>
         <div className="container">
           <div className="pd-grid">
-            <div className="pd-gallery">
-              <div className="pd-media">
-                {activeImage ? (
-                  <Image src={activeImage.url} alt={name} fill sizes="(max-width:900px) 100vw, 520px" style={{ objectFit: 'cover' }} priority />
-                ) : (
-                  <span className="pd-drop"><Icon name="drop" size={90} strokeWidth={0.8} /></span>
-                )}
-                <span className="pd-code">{product.code}</span>
-              </div>
-              {images.length > 1 && (
-                <div className="pd-thumbs" role="tablist" aria-label={t('Galeri produk', 'Product gallery')}>
-                  {images.map((img, i) => (
-                    <button
-                      key={img.id || img.url}
-                      type="button"
-                      role="tab"
-                      aria-selected={i === active}
-                      className={`pd-thumb ${i === active ? 'is-active' : ''}`}
-                      onClick={() => setActive(i)}
-                    >
-                      <Image src={img.url} alt={`${name} ${i + 1}`} fill sizes="80px" style={{ objectFit: 'cover' }} />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <ProductGallery media={images} name={name} code={product.code} poster={product.image} />
 
             <div className="pd-info">
               <span className="pcard-kind">{product.kind || categoryName}</span>

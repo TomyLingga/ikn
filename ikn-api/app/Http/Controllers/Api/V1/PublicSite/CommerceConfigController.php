@@ -20,12 +20,20 @@ class CommerceConfigController extends ApiController
             'paymentMethods' => $this->activeMethods(),
             'bankAccounts' => BankAccount::active()->orderBy('sort_order')->orderBy('id')->get()
                 ->map(fn (BankAccount $account) => $account->toSummary() + ['isActive' => true])->values()->all(),
-            'fees' => FeeResource::collection(Fee::active()->orderBy('sort_order')->orderBy('id')->get())->resolve(),
+            // Hanya biaya untuk semua customer; biaya khusus customer muncul di POST /cart/quote miliknya.
+            'fees' => Fee::active()->forEveryone()->orderBy('sort_order')->orderBy('id')->get()
+                ->map(fn (Fee $fee) => FeeResource::publicArray($fee))->values()->all(),
             'paymentDueHours' => $api['paymentDueHours'],
             'taxRate' => $api['taxRate'],
             'priceIncludesTax' => $api['priceIncludesTax'],
             'uniqueCodeEnabled' => $api['uniqueCodeEnabled'],
             'autoCompleteDays' => $api['autoCompleteDays'],
+            // Teks cetakan invoice (penanda tangan, tembusan) untuk halaman cetak customer; prefix nomor tidak perlu di sini.
+            'invoice' => [
+                'signerName' => $api['invoiceSignerName'],
+                'signerTitle' => $api['invoiceSignerTitle'],
+                'cc' => $api['invoiceCc'],
+            ],
         ]);
     }
 

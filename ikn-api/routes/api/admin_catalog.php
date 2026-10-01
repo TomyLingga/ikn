@@ -52,6 +52,8 @@ Route::prefix('admin')
             Route::post('shipping-zones/{shippingZone}/rates', [Admin\ShippingRateController::class, 'store']);
             Route::put('shipping-rates/{shippingRate}', [Admin\ShippingRateController::class, 'update']);
             Route::delete('shipping-rates/{shippingRate}', [Admin\ShippingRateController::class, 'destroy']);
+            Route::get('shipping-origin', [Admin\ShippingOriginController::class, 'show']);
+            Route::put('shipping-origin', [Admin\ShippingOriginController::class, 'update']);
         });
 
         Route::middleware('module:vouchers')->group(function () {

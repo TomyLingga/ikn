@@ -12,6 +12,7 @@ import { firstError, type FieldErrors } from '@/components/admin/cms';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { tr, type AdminUserData, type ModuleOption } from '@/lib/cms';
 import { formatDateTime } from '@/lib/format';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 type AdminRole = AdminUserData['role'];
 
@@ -176,7 +177,7 @@ export default function AdminUsers() {
     const question = user.active
       ? t(`Nonaktifkan akun ${user.name}?`, `Deactivate ${user.name}?`)
       : t(`Aktifkan akun ${user.name}?`, `Activate ${user.name}?`);
-    if (!window.confirm(question)) return;
+    if (!await confirmDialog(question)) return;
     setError('');
     try {
       await api(`/admin/users/${user.id}`, { method: 'PUT', body: { active: !user.active } });

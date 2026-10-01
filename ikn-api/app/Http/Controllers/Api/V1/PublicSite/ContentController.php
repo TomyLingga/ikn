@@ -7,6 +7,7 @@ use App\Http\Resources\BrochureResource;
 use App\Http\Resources\CertificateResource;
 use App\Http\Resources\CustomerLogoResource;
 use App\Http\Resources\GalleryItemResource;
+use App\Http\Resources\PostCategoryResource;
 use App\Http\Resources\PostResource;
 use App\Http\Resources\PostSummaryResource;
 use App\Models\Brochure;
@@ -14,6 +15,7 @@ use App\Models\Certificate;
 use App\Models\CustomerLogo;
 use App\Models\GalleryItem;
 use App\Models\Post;
+use App\Models\PostCategory;
 use Illuminate\Http\Request;
 
 // Daftar konten publik (kontrak 7): hanya yang terbit/aktif.
@@ -21,8 +23,8 @@ class ContentController extends ApiController
 {
     public function news(Request $request)
     {
-        $posts = Post::published()->with('cover')
-            ->when($request->query('tag'), fn ($q, $t) => $q->where('tag', $t))
+        $posts = Post::published()->with(['cover', 'category'])
+            ->when($request->query('category'), fn ($q, $slug) => $q->whereHas('category', fn ($c) => $c->where('slug', $slug)))
             ->orderByDesc('published_at')->orderByDesc('id')
             ->limit(min(100, (int) $request->query('limit', 50) ?: 50))
             ->get();
@@ -30,12 +32,20 @@ class ContentController extends ApiController
         return $this->data(PostSummaryResource::collection($posts));
     }
 
+    /** Kategori berita beserta jumlah berita terbit (untuk filter di halaman Berita). */
+    public function newsCategories()
+    {
+        $categories = PostCategory::withCount(['posts' => fn ($q) => $q->published()])->ordered()->get();
+
+        return $this->data(PostCategoryResource::collection($categories));
+    }
+
     public function newsDetail(string $slug)
     {
-        $post = Post::published()->with('cover')->where('slug', $slug)->firstOrFail();
-        // Berita terkait: tag sama lebih dulu, lalu yang terbaru; maksimal 3.
-        $related = Post::published()->with('cover')->where('id', '!=', $post->id)
-            ->when($post->tag, fn ($q, $tag) => $q->orderByRaw('CASE WHEN tag = ? THEN 0 ELSE 1 END', [$tag]))
+        $post = Post::published()->with(['cover', 'category'])->where('slug', $slug)->firstOrFail();
+        // Berita terkait: kategori sama lebih dulu, lalu yang terbaru; maksimal 3.
+        $related = Post::published()->with(['cover', 'category'])->where('id', '!=', $post->id)
+            ->when($post->category_id, fn ($q, $id) => $q->orderByRaw('CASE WHEN category_id = ? THEN 0 ELSE 1 END', [$id]))
             ->orderByDesc('published_at')->orderByDesc('id')->limit(3)->get();
 
         return $this->data((new PostResource($post))->resolve() + ['related' => PostSummaryResource::collection($related)->resolve()]);

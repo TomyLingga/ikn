@@ -27,7 +27,9 @@ class AdminDashboardReportTest extends TestCase
         $product = $this->makeProduct(['slug' => 'resiprene-35', 'price' => 100000], 1000);
         $sm = app(OrderStateMachine::class);
         $admin = $this->superAdmin();
-        $real = now(); // waktu nyata sebelum setTestNow (now() setelahnya mengikuti waktu uji)
+        // "Hari ini" dibekukan di pertengahan bulan berjalan agar skenario tidak bergantung pada tanggal
+        // menjalankan test (tanggal 1-2 membuat order "bulan ini" jatuh di masa depan).
+        $real = now()->startOfMonth()->addDays(14)->setTime(12, 0);
 
         // Bulan lalu: order completed (paid_at bulan lalu).
         Carbon::setTestNow($real->copy()->startOfMonth()->subDays(10)->setTime(10, 0));
@@ -44,7 +46,7 @@ class AdminDashboardReportTest extends TestCase
         $sm->transition($expired, Order::STATUS_EXPIRED, null);
         $cancelled = $this->payOrder($this->placeOrder($product, 2), $admin);
         $sm->transition($cancelled, Order::STATUS_CANCELLED, $admin, ['reason' => 'refund']);
-        Carbon::setTestNow();
+        Carbon::setTestNow($real);
         $pending = $this->placeOrder($product, 1);
         $this->uploadProof($pending);
 

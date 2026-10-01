@@ -24,6 +24,7 @@ return [
     'gateway_unavailable' => 'Gateway pembayaran belum dikonfigurasi.',
     'gateway_error' => 'Gateway pembayaran mengembalikan kesalahan.',
     'gateway_unsupported_type' => 'Tipe metode bayar tidak didukung gateway ini.',
+    'attachment_not_allowed' => 'Lampiran hanya dapat ditambahkan pada pesanan yang sudah dibayar.',
     'idempotency_replay' => 'Order dengan Idempotency-Key yang sama sudah ada.',
 
     'status' => [

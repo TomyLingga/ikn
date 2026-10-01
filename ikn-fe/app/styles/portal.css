@@ -1,0 +1,611 @@
+/* ============================ PORTAL CUSTOMER ============================
+   Lapisan tampilan portal (/dashboard/*), dimuat setelah commerce.css dan dibatasi ke `.cust-app`
+   (kelas akar CustomerShell). Situs publik memakai gaya editorial (sudut tajam, tombol huruf besar);
+   portal adalah aplikasi kerja, jadi di sini kontrol dibuat membulat, tenang, dan konsisten.
+   Warna selalu dari token tema (--primary, --accent, --ok/--warn/--info/--red). */
+
+.cust-app {
+  --cu-r: 10px;
+  --cu-r-lg: 14px;
+  --cu-ctl: 42px;
+  --cu-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+/* ---------- Bagian situs yang dipakai ulang di portal (detail produk, checkout) ---------- */
+.cust-app .section-tight { padding: 0; }
+.cust-app .container { max-width: none; margin: 0; padding-inline: 0; }
+
+/* ---------- Tombol & tautan ---------- */
+.cust-app .btn {
+  min-height: var(--cu-ctl);
+  padding: 0 18px;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--cu-r);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  transition: background 0.18s var(--ease), border-color 0.18s var(--ease), color 0.18s var(--ease), transform 0.12s var(--ease);
+}
+
+.cust-app .btn.btn-sm { min-height: 38px; padding: 0 14px; font-size: 0.86rem; }
+.cust-app .btn svg { width: 17px; height: 17px; }
+.cust-app .btn:hover:not(:disabled) svg { transform: none; }
+.cust-app .btn:active:not(:disabled) { transform: scale(0.98); }
+.cust-app .btn:focus-visible { outline: 0; box-shadow: var(--cu-ring); }
+
+.cust-app .btn-solid {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+[data-theme='dark'] .cust-app .btn-solid { color: #06121f; }
+
+.cust-app .btn-solid:hover:not(:disabled) {
+  border-color: var(--primary-deep);
+  background: var(--primary-deep);
+  color: #fff;
+}
+
+.cust-app .btn-line:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--surface);
+  color: var(--primary);
+}
+
+.cust-app .link {
+  gap: 6px;
+  border-bottom: 0;
+  color: var(--primary);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cust-app button.link { padding: 0; background: transparent; cursor: pointer; }
+.cust-app .link:hover { gap: 6px; text-decoration: underline; text-underline-offset: 3px; }
+
+.cust-app .form-note {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.cust-app .label {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---------- Kepala halaman portal ---------- */
+.portal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 18px;
+}
+
+.portal-head h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.2vw, 1.75rem);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.portal-head p {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.portal-back,
+.portal-crumbs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.portal-back { align-self: flex-start; }
+.portal-back:hover,
+.portal-crumbs a:hover { color: var(--primary); }
+
+.portal-crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-bottom: 16px;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.portal-crumbs [aria-current] {
+  max-width: 44ch;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Belanja produk: pencarian, chip kategori ---------- */
+.shop {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.shop-toolbar {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.shop-search {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.shop-search:focus-within {
+  border-color: var(--primary);
+  box-shadow: var(--cu-ring);
+}
+
+.shop-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.96rem;
+}
+
+.shop-search button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.18s var(--ease);
+}
+
+[data-theme='dark'] .shop-search button { color: #06121f; }
+.shop-search button:hover { background: var(--primary-deep); color: #fff; }
+.shop-search button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.shop-sort {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+.shop-sort:focus-within { border-color: var(--primary); box-shadow: var(--cu-ring); }
+
+.shop-sort .cat-sort {
+  min-height: 44px;
+  padding: 0 8px 0 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.shop-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.shop-chips::-webkit-scrollbar { display: none; }
+
+.shop-chip {
+  flex: none;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease), color 0.16s var(--ease);
+}
+
+.shop-chip small {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.shop-chip:hover { border-color: var(--primary); color: var(--primary); }
+.shop-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.shop-chip.is-active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+[data-theme='dark'] .shop-chip.is-active { color: #06121f; }
+.shop-chip.is-active small { color: inherit; opacity: 0.8; }
+
+.shop-meta {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.shop-meta strong { color: var(--ink); }
+
+/* ---------- Kartu produk ---------- */
+.cust-app .pgrid {
+  grid-template-columns: repeat(auto-fill, minmax(208px, 1fr));
+  gap: 16px;
+}
+
+.cust-app .pcard {
+  border-radius: var(--cu-r-lg);
+  transition: transform 0.22s var(--ease), box-shadow 0.22s var(--ease), border-color 0.22s var(--ease);
+}
+
+.cust-app .pcard:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+  box-shadow: var(--shadow-md);
+}
+
+.cust-app .pcard-media { aspect-ratio: 1 / 1; }
+.cust-app .pcard-media img { transition: transform 0.4s var(--ease); }
+.cust-app .pcard:hover .pcard-media img { transform: scale(1.04); }
+
+.cust-app .pcard-code {
+  top: 10px;
+  left: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(4px);
+  font-size: 0.64rem;
+}
+
+.cust-app .pcard-promo {
+  border-radius: 999px;
+  background: var(--red);
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.cust-app .pcard-body { padding: 13px 14px 14px; gap: 6px; }
+
+.cust-app .pcard-kind {
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.cust-app .pcard-name {
+  display: -webkit-box;
+  overflow: hidden;
+  min-height: 2.6em;
+  font-size: 0.98rem;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cust-app .pcard-name a:hover { color: var(--primary); }
+
+.cust-app .pcard-stock {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+}
+
+.cust-app .pcard-price {
+  color: var(--primary);
+  font-size: 1.08rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cust-app .pcard-price small { font-family: var(--font-sans); }
+.cust-app .pcard-price-old { font-variant-numeric: tabular-nums; }
+
+.cust-app .pcard-add {
+  width: 42px;
+  height: 42px;
+  border-color: var(--primary);
+  border-radius: 12px;
+  background: var(--primary);
+  color: #fff;
+}
+
+[data-theme='dark'] .cust-app .pcard-add { color: #06121f; }
+
+.cust-app .pcard-add:hover {
+  border-color: var(--primary-deep);
+  background: var(--primary-deep);
+  color: #fff;
+  transform: none;
+}
+
+.cust-app .pcard-add:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.cust-app .pcard-add.is-added { border-color: var(--ok); background: var(--ok); }
+
+.cust-app .pcard-add-view {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.cust-app .pcard-add-view:hover {
+  border-color: var(--primary);
+  background: var(--surface);
+  color: var(--primary);
+}
+
+.cust-app .cat-pagination .btn { min-width: 40px; padding: 0 12px; }
+
+/* ---------- Detail produk ---------- */
+.cust-app .pd-grid {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1fr);
+  gap: clamp(20px, 3vw, 40px);
+  padding: clamp(16px, 2.2vw, 26px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.cust-app .pd-title {
+  margin: 6px 0 12px;
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.cust-app .pd-info .pcard-kind {
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.cust-app .pd-summary { margin-bottom: 16px; font-size: 0.95rem; line-height: 1.65; }
+
+.cust-app .pd-price-block {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--primary-tint);
+}
+
+.cust-app .pd-price {
+  color: var(--primary);
+  font-size: 1.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cust-app .pd-price small { font-family: var(--font-sans); }
+.cust-app .pd-promo-badge { border-radius: 999px; background: var(--red); font-family: var(--font-sans); font-weight: 700; letter-spacing: 0.02em; }
+.cust-app .pd-highlights { margin-bottom: 18px; font-size: 0.92rem; }
+.cust-app .pd-highlights svg { color: var(--ok); }
+
+.cust-app .pd-buy {
+  display: block;
+  margin-bottom: 0;
+  padding: 16px 0 0;
+  border-bottom: 0;
+}
+
+.cust-app .qty-ctl {
+  border-radius: var(--cu-r);
+}
+
+.cust-app .qty-ctl button { width: 42px; }
+.cust-app .qty-ctl input { font-family: var(--font-sans); font-weight: 650; font-variant-numeric: tabular-nums; }
+.cust-app .qty-ctl:focus-within { border-color: var(--primary); box-shadow: var(--cu-ring); }
+.cust-app .qty-ctl input:focus { outline: 0; }
+.cust-app .qty-moq { font-family: var(--font-sans); font-size: 0.82rem; }
+
+.pd-buy-row {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pd-buy-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin-top: 14px;
+}
+
+.pd-text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pd-text-btn:hover { color: var(--primary); }
+.pd-text-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 4px; }
+
+.cust-app .pd-login-note { border-radius: 12px; }
+.cust-app .pd-detail-grid,
+.cust-app .pd-reviews,
+.cust-app .pd-related { margin-top: 28px; }
+
+.cust-app .pd-sec-title { margin-bottom: 12px; font-size: 1.08rem; }
+.cust-app .spec-table { border-radius: 12px; background: var(--surface); }
+.cust-app .spec-row { font-size: 0.92rem; }
+.cust-app .spec-val { font-family: var(--font-sans); font-weight: 600; text-align: right; }
+.cust-app .spec-row:nth-child(odd) { background: var(--paper); }
+.cust-app .pd-app-list li { font-size: 0.92rem; }
+.cust-app .pd-app-list svg { color: var(--primary); }
+
+.cust-app .pd-reviews {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--cu-r-lg);
+  background: var(--surface);
+}
+
+.cust-app .review-item:last-of-type { border-bottom: 0; }
+
+/* ---------- Checkout di portal ---------- */
+.cust-app .stepper {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--cu-r-lg);
+  background: var(--surface);
+}
+
+.cust-app .step-label { font-family: var(--font-sans); font-size: 0.88rem; font-weight: 600; letter-spacing: 0; }
+.cust-app .step.is-active .step-num { border-color: var(--primary); background: var(--primary); color: #fff; }
+[data-theme='dark'] .cust-app .step.is-active .step-num { color: #06121f; }
+.cust-app .step.is-done .step-num { border-color: var(--ok); background: var(--ok); }
+
+.cust-app .co-block,
+.cust-app .summary {
+  border-radius: var(--cu-r-lg);
+  background: var(--surface);
+}
+
+.cust-app .summary { top: 90px; }
+
+.cust-app .co-ship-opt,
+.cust-app .co-addr-card,
+.cust-app .radio-card,
+.cust-app .bank-card,
+.cust-app .co-bank,
+.cust-app .pay-amount,
+.cust-app .pay-countdown,
+.cust-app .co-qris,
+.cust-app .upload-drop,
+.cust-app .account-banner,
+.cust-app .address-card,
+.cust-app .address-form,
+.cust-app .addr-map,
+.cust-app .addr-geo-results {
+  border-radius: var(--cu-r);
+}
+
+.cust-app .co-ship-opt.is-active,
+.cust-app .co-addr-card.is-active,
+.cust-app .radio-card.is-sel {
+  border-color: var(--primary);
+  background: var(--primary-tint);
+}
+
+.cust-app .co-fields input,
+.cust-app .co-fields textarea,
+.cust-app .co-fields select.addr-select,
+.cust-app .co-voucher input,
+.cust-app .co-textarea,
+.cust-app .addr-geo-search input,
+.cust-app .cat-sort,
+.cust-app .copy-btn {
+  border-radius: var(--cu-r);
+}
+
+.cust-app .co-fields input:focus,
+.cust-app .co-fields textarea:focus,
+.cust-app .co-fields select.addr-select:focus,
+.cust-app .co-voucher input:focus,
+.cust-app .co-textarea:focus,
+.cust-app .addr-geo-search input:focus {
+  outline: 0;
+  border-color: var(--primary);
+  box-shadow: var(--cu-ring);
+}
+
+.cust-app .co-ship-price,
+.cust-app .pay-timer { font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+
+.cust-app .co-review dt {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cust-app .pay-amount strong { font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+.cust-app .proof-done { color: var(--ok); }
+
+@media (max-width: 900px) {
+  .cust-app .pd-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .shop-toolbar { flex-direction: column; }
+  .shop-sort { min-height: 46px; }
+  .shop-sort .cat-sort { flex: 1; }
+  .cust-app .pgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .cust-app .pcard-body { padding: 10px 10px 12px; }
+  .cust-app .pcard-meta > :last-child:not(:first-child) { display: none; }
+  .cust-app .pcard-add { width: 38px; height: 38px; }
+  .pd-buy-row { grid-template-columns: 1fr; }
+  .cust-app .pd-grid { padding: 12px; border-radius: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cust-app .pcard,
+  .cust-app .pcard-media img { transition: none; }
+}

@@ -8,6 +8,7 @@ import { I18nInput, MediaPicker, firstError, type FieldErrors } from '@/componen
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type GalleryItemData, type I18n, type MediaSummary } from '@/lib/cms';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 type GalleryType = GalleryItemData['type'];
 
@@ -133,7 +134,7 @@ export default function AdminGallery() {
   }
 
   async function remove(row: GalleryItemData) {
-    if (!window.confirm(t(`Hapus item galeri "${tr(row.title, lang)}"?`, `Delete gallery item "${tr(row.title, lang)}"?`))) return;
+    if (!await confirmDialog(t(`Hapus item galeri "${tr(row.title, lang)}"?`, `Delete gallery item "${tr(row.title, lang)}"?`))) return;
     setError('');
     try {
       await api(`/admin/gallery/${row.id}`, { method: 'DELETE' });

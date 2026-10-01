@@ -74,7 +74,7 @@ trait CatalogFixtures
     protected function makeRate(ShippingZone $zone, array $attributes = []): ShippingRate
     {
         return $zone->rates()->create(array_merge([
-            'name' => ['id' => 'Reguler'], 'type' => ShippingRate::TYPE_PER_KG,
+            'name' => ['id' => 'Reguler'], 'type' => ShippingRate::TYPE_CALCULATED,
             'base_amount' => 20000, 'per_kg_amount' => 2000, 'min_amount' => 0, 'free_above' => null,
             'eta' => ['id' => '2–4 hari'], 'is_active' => true, 'sort_order' => 0,
         ], $attributes));

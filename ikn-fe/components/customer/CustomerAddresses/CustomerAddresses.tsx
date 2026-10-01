@@ -7,6 +7,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage } from '@/lib/api';
 import type { CustomerAddress } from '@/lib/types';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 /** Baris alamat siap tampil (tanpa nilai kosong). */
 export function formatAddressLines(a: CustomerAddress): string[] {
@@ -57,8 +58,8 @@ export default function CustomerAddresses() {
   }
 
   const setPrimary = (id: number) => mutate(() => api(`/customer/addresses/${id}/primary`, { method: 'PUT' }));
-  const removeAddress = (id: number) => {
-    if (!window.confirm(t('Hapus alamat ini?', 'Delete this address?'))) return;
+  const removeAddress = async (id: number) => {
+    if (!await confirmDialog(t('Hapus alamat ini?', 'Delete this address?'))) return;
     void mutate(() => api(`/customer/addresses/${id}`, { method: 'DELETE' }));
   };
 

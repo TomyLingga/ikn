@@ -21,9 +21,11 @@ class ShippingRateRequest extends FormRequest
     {
         return array_merge([
             'zoneId' => ['nullable', 'integer', 'exists:shipping_zones,id'],
-            'type' => ['required', Rule::in(ShippingRate::TYPES)],
+            'type' => ['required', Rule::in([...ShippingRate::TYPES, ShippingRate::TYPE_PER_KG])],
             'baseAmount' => ['nullable', 'integer', 'min:0', 'max:9999999999999'],
+            'perKmAmount' => ['nullable', 'integer', 'min:0', 'max:9999999999999'],
             'perKgAmount' => ['nullable', 'integer', 'min:0', 'max:9999999999999'],
+            'perM3Amount' => ['nullable', 'integer', 'min:0', 'max:9999999999999'],
             'minAmount' => ['nullable', 'integer', 'min:0', 'max:9999999999999'],
             'freeAbove' => ['nullable', 'integer', 'min:0', 'max:9999999999999'],
             'isActive' => ['nullable', 'boolean'],

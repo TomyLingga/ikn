@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Http\Requests\Concerns\CatalogAttributes;
+use App\Models\User;
 use App\Models\Voucher;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -41,6 +42,10 @@ class VoucherRequest extends FormRequest
             'startsAt' => ['nullable', 'date'],
             'endsAt' => ['nullable', 'date', 'after_or_equal:startsAt'],
             'isActive' => ['nullable', 'boolean'],
+            // Sasaran: all = semua customer; customers = hanya customerIds[] (wajib minimal satu).
+            'audience' => ['nullable', Rule::in(Voucher::AUDIENCES)],
+            'customerIds' => [Rule::requiredIf($this->input('audience') === Voucher::AUDIENCE_CUSTOMERS), 'array', 'max:500'],
+            'customerIds.*' => ['integer', Rule::exists('users', 'id')->where('role', User::ROLE_CUSTOMER)],
         ];
     }
 }

@@ -1,6 +1,6 @@
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import WhatsAppButton from '@/components/WhatsAppButton';
+import FloatingContacts from '@/components/FloatingContacts';
 import PageTransition from '@/components/PageTransition';
 import { SiteProvider } from '@/components/SiteProvider';
 import { fetchSite } from '@/lib/server-data';
@@ -19,7 +19,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         <PageTransition>{children}</PageTransition>
       </main>
       <Footer />
-      <WhatsAppButton />
+      <FloatingContacts />
     </SiteProvider>
   );
 }

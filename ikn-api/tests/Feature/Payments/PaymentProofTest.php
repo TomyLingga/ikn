@@ -87,7 +87,7 @@ class PaymentProofTest extends TestCase
         $accept->assertJsonPath('data.payment.status', 'paid')
             ->assertJsonPath('data.payment.verifiedBy.id', $paymentsAdmin->id)
             ->assertJsonPath('data.order.status', 'paid');
-        $this->assertMatchesRegularExpression('/^INV\/\d{4}\/\d{2}\/00001$/', $accept->json('data.order.invoiceNumber'));
+        $this->assertMatchesRegularExpression('#^PMS/X/INV/RA/1/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)/\d{4}$#', $accept->json('data.order.invoiceNumber'));
         $this->assertNotNull($accept->json('data.order.paidAt'));
         $order->refresh();
         $this->assertSame('paid', $order->payment_status);
@@ -106,6 +106,26 @@ class PaymentProofTest extends TestCase
         $this->assertSame([6, 0], [$product->fresh()->stock_qty, $product->fresh()->reserved_qty]);
     }
 
+    public function test_reject_after_due_passed_extends_due_so_customer_can_reupload(): void
+    {
+        Mail::fake();
+        $this->setUpCommerce();
+        $order = $this->placeOrder($this->makeProduct([], 10), 2);
+        $paymentId = $order->payments()->first()->id;
+        $this->actingAs($this->buyer)->post($this->proofUrl($order), ['file' => $this->proofFile()], ['Accept' => 'application/json'])->assertOk();
+
+        // Admin baru memeriksa setelah batas waktu lewat (ASUMSI A-77).
+        $this->travelTo($order->fresh()->payment_due_at->copy()->addHour());
+        $this->actingAs($this->adminWith(['payments']))->postJson('/api/v1/admin/payments/'.$paymentId.'/reject', ['reason' => 'Bukti buram'])->assertOk();
+
+        $due = $order->fresh()->payment_due_at;
+        $this->assertTrue($due->greaterThan(now()->addHours(11)));
+        $this->artisan('orders:expire')->assertExitCode(0);
+        $this->assertSame('pending_payment', $order->fresh()->status);
+        $this->actingAs($this->buyer)->post($this->proofUrl($order), ['file' => $this->proofFile('ulang.pdf')], ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.order.status', 'payment_review');
+    }
+
     public function test_alias_by_order_number_and_admin_payment_list(): void
     {
         $this->setUpCommerce();
@@ -122,9 +142,16 @@ class PaymentProofTest extends TestCase
             ->assertJsonPath('data.0.order.customer.company', 'Coating Solutions Co.')
             ->assertJsonStructure(['data' => [['id', 'method', 'status', 'amount', 'proofUrl', 'proof' => ['mediaId', 'url'], 'order' => ['number', 'grandTotal', 'paymentDueAt', 'customer' => ['name', 'company', 'email']]]]]);
         $this->actingAs($admin)->getJson('/api/v1/admin/payments?q='.$a->number)->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.order.number', $a->number);
-        $this->actingAs($admin)->getJson('/api/v1/admin/payments?status=paid')->assertOk()->assertJsonCount(0, 'data');
+        $this->actingAs($admin)->getJson('/api/v1/admin/payments?status=paid')->assertOk()->assertJsonCount(0, 'data')
+            ->assertJsonPath('meta.counts.awaiting_verification', 2)->assertJsonPath('meta.counts.paid', 0); // angka tab sepanjang waktu
         $this->actingAs($admin)->getJson('/api/v1/admin/payments?status=all')->assertOk()->assertJsonCount(2, 'data');
         $this->actingAs($admin)->getJson('/api/v1/admin/payments?method=qris_static')->assertOk()->assertJsonCount(0, 'data');
+        // from/to menyaring tanggal bukti diunggah (atau dibuat bila belum ada bukti), zona aplikasi.
+        $today = now()->toDateString();
+        $this->actingAs($admin)->getJson("/api/v1/admin/payments?status=all&from={$today}&to={$today}")->assertOk()->assertJsonCount(2, 'data');
+        $this->actingAs($admin)->getJson('/api/v1/admin/payments?status=all&from='.now()->addDay()->toDateString())->assertOk()->assertJsonCount(0, 'data');
+        $this->actingAs($admin)->getJson('/api/v1/admin/payments?status=all&to='.now()->subDay()->toDateString())->assertOk()->assertJsonCount(0, 'data');
+        $this->actingAs($admin)->getJson('/api/v1/admin/payments?from=bukan-tanggal')->assertStatus(422);
 
         $this->actingAs($admin)->postJson('/api/v1/admin/orders/'.$a->number.'/payments/reject', ['reason' => 'blur'])
             ->assertOk()->assertJsonPath('data.order.status', 'pending_payment')->assertJsonPath('data.payment.status', 'rejected');

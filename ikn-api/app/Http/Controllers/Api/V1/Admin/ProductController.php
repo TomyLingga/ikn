@@ -12,7 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-// Produk (kontrak 11.3): CRUD + publish + gambar (images[] mediaId berurutan). Stok hanya lewat StockController/StockLedger.
+// Produk (kontrak 11.3): CRUD + publish + media (images[] mediaId foto/video berurutan + thumbnailMediaId).
+// Stok hanya lewat StockController/StockLedger.
 class ProductController extends ApiController
 {
     public function index(Request $request)
@@ -37,7 +38,7 @@ class ProductController extends ApiController
 
         $product = DB::transaction(function () use ($data) {
             $product = Product::create($this->attributes($data, null));
-            $this->syncImages($product, $data['images'] ?? []);
+            $this->syncImages($product, $data['images'] ?? [], $data['thumbnailMediaId'] ?? null, array_key_exists('thumbnailMediaId', $data));
 
             return $product;
         });
@@ -57,7 +58,7 @@ class ProductController extends ApiController
         DB::transaction(function () use ($product, $data) {
             $product->update($this->attributes($data, $product));
             if (array_key_exists('images', $data)) {
-                $this->syncImages($product, $data['images'] ?? []);
+                $this->syncImages($product, $data['images'] ?? [], $data['thumbnailMediaId'] ?? null, array_key_exists('thumbnailMediaId', $data));
             }
         });
 
@@ -103,6 +104,9 @@ class ProductController extends ApiController
             'unit' => isset($data['unit']) && trim($data['unit']) !== '' ? trim($data['unit']) : ($existing->unit ?? 'pcs'),
             'moq' => (int) ($data['moq'] ?? ($existing->moq ?? 1)),
             'weight_gram' => (int) ($data['weightGram'] ?? ($existing->weight_gram ?? 1000)),
+            'length_cm' => $this->dimension($data, 'lengthCm', $existing->length_cm ?? null),
+            'width_cm' => $this->dimension($data, 'widthCm', $existing->width_cm ?? null),
+            'height_cm' => $this->dimension($data, 'heightCm', $existing->height_cm ?? null),
             'is_taxable' => array_key_exists('isTaxable', $data) ? (bool) $data['isTaxable'] : ($existing->is_taxable ?? true),
             'is_published' => array_key_exists('isPublished', $data) ? (bool) $data['isPublished'] : ($existing->is_published ?? false),
         ];
@@ -118,6 +122,16 @@ class ProductController extends ApiController
     }
 
     /** [[k,v]] dengan pasangan kosong dibuang. */
+    /** Dimensi kemasan (cm, 1 desimal): kunci tidak dikirim = nilai lama dipertahankan; null/kosong = dikosongkan. */
+    private function dimension(array $data, string $key, $current): ?float
+    {
+        if (! array_key_exists($key, $data)) {
+            return $current === null ? null : (float) $current;
+        }
+
+        return $data[$key] === null ? null : round((float) $data[$key], 1);
+    }
+
     private function pairs(array $rows): array
     {
         $out = [];
@@ -135,18 +149,23 @@ class ProductController extends ApiController
         return $out;
     }
 
-    /** Sinkronkan gambar: urutan = sort_order; media yang tidak ada di daftar dilepas (media-nya tidak dihapus). */
-    private function syncImages(Product $product, array $mediaIds): void
+    /**
+     * Sinkronkan media produk (foto/video): urutan = sort_order; media yang tidak ada di daftar dilepas
+     * (berkasnya tidak dihapus). Thumbnail: bila `thumbnailMediaId` dikirim, tanda dipindah ke media itu
+     * (null = kembali ke foto pertama); bila tidak dikirim, tanda yang ada dipertahankan.
+     */
+    private function syncImages(Product $product, array $mediaIds, ?int $thumbnailId, bool $thumbnailGiven): void
     {
         $mediaIds = array_values(array_unique(array_map('intval', $mediaIds)));
 
         ProductImage::where('product_id', $product->id)->whereNotIn('media_id', $mediaIds ?: [0])->delete();
 
         foreach ($mediaIds as $sort => $mediaId) {
-            ProductImage::updateOrCreate(
-                ['product_id' => $product->id, 'media_id' => $mediaId],
-                ['sort_order' => $sort]
-            );
+            $values = ['sort_order' => $sort];
+            if ($thumbnailGiven) {
+                $values['is_thumbnail'] = $thumbnailId !== null && $mediaId === (int) $thumbnailId;
+            }
+            ProductImage::updateOrCreate(['product_id' => $product->id, 'media_id' => $mediaId], $values);
         }
     }
 

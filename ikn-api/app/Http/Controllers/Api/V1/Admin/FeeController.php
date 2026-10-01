@@ -7,13 +7,15 @@ use App\Http\Requests\Admin\FeeRequest;
 use App\Http\Resources\FeeResource;
 use App\Models\Fee;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
-// Biaya tambahan (kontrak 11.5): fee aktif ditambahkan OrderCalculator ke setiap order.
+// Biaya tambahan (kontrak 11.5): fee aktif ditambahkan OrderCalculator ke setiap order, atau hanya ke order
+// customer tertentu bila audience = customers (ASUMSI A-67).
 class FeeController extends ApiController
 {
     public function index(Request $request)
     {
-        $fees = Fee::query()
+        $fees = Fee::with('customers.profile')
             ->when($request->query('q'), function ($q, $s) {
                 $like = '%'.$s.'%';
                 $q->where(fn ($w) => $w->where('name->id', 'ilike', $like)->orWhere('name->en', 'ilike', $like));
@@ -25,16 +27,29 @@ class FeeController extends ApiController
 
     public function store(FeeRequest $request)
     {
-        $fee = Fee::create($this->attributes($request->validated()));
+        $data = $request->validated();
+        $fee = DB::transaction(function () use ($data) {
+            $fee = Fee::create($this->attributes($data, null));
+            $fee->syncAudience($fee->audience, $data['customerIds'] ?? []);
 
-        return $this->created(new FeeResource($fee));
+            return $fee;
+        });
+
+        return $this->created(new FeeResource($fee->load('customers.profile')));
     }
 
     public function update(FeeRequest $request, Fee $fee)
     {
-        $fee->update($this->attributes($request->validated()));
+        $data = $request->validated();
+        DB::transaction(function () use ($data, $fee) {
+            $fee->update($this->attributes($data, $fee));
+            // Sasaran hanya disentuh bila dikirim (PUT lama tanpa audience tidak menghapus daftar customer).
+            if (array_key_exists('audience', $data)) {
+                $fee->syncAudience($fee->audience, $data['customerIds'] ?? []);
+            }
+        });
 
-        return $this->data(new FeeResource($fee->fresh()));
+        return $this->data(new FeeResource($fee->fresh()->load('customers.profile')));
     }
 
     public function destroy(Fee $fee)
@@ -44,7 +59,7 @@ class FeeController extends ApiController
         return $this->deleted();
     }
 
-    private function attributes(array $data): array
+    private function attributes(array $data, ?Fee $existing): array
     {
         return [
             'name' => $data['name'],
@@ -52,6 +67,7 @@ class FeeController extends ApiController
             'amount' => (int) $data['amount'],
             'is_active' => (bool) ($data['isActive'] ?? true),
             'sort_order' => (int) ($data['sortOrder'] ?? 0),
+            'audience' => $data['audience'] ?? ($existing->audience ?? Fee::AUDIENCE_ALL),
         ];
     }
 }

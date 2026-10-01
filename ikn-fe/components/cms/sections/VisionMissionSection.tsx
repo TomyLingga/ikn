@@ -17,7 +17,7 @@ export default function VisionMissionSection({ section }: { section: PageSection
       <div className="container">
         <SecHead label={tr(c.label, lang)} heading={tr(c.heading, lang)} reveal={false} />
         <div className="vm-grid">
-          <Reveal className="vm-card">
+          <Reveal className="vm-card vm-card-vision">
             <span className="vm-card-tag">{tr(c.vision_tag, lang) || (lang === 'en' ? 'Vision' : 'Visi')}</span>
             <p className="vm-vision">{tr(c.vision, lang)}</p>
           </Reveal>

@@ -35,6 +35,9 @@ class ProductAdminTest extends TestCase
             'unit' => 'kg',
             'moq' => 25,
             'weightGram' => 1000,
+            'lengthCm' => 40,
+            'widthCm' => 30.25,
+            'heightCm' => 25,
             'highlights' => ['Cepat kering', 'Tahan air'],
             'specs' => [['Softening Point', '125–145 °C'], ['', '']],
             'applications' => ['id' => ['Protective coatings'], 'en' => ['Protective coatings']],
@@ -59,7 +62,9 @@ class ProductAdminTest extends TestCase
             ->assertJsonPath('data.images.0.id', $second->id)
             ->assertJsonPath('data.images.0.sort', 0)
             ->assertJsonPath('data.images.1.id', $first->id)
-            ->assertJsonPath('data.category.slug', 'resiprene');
+            ->assertJsonPath('data.category.slug', 'resiprene')
+            ->assertJsonPath('data.dimensions.widthCm', 30.3)
+            ->assertJsonPath('data.dimensions.volumeCm3', 30300);
 
         $this->assertIsInt($response->json('data.price'));
         $this->assertStringContainsString('/storage/', $response->json('data.image'));
@@ -99,6 +104,59 @@ class ProductAdminTest extends TestCase
 
         $this->assertDatabaseMissing('product_images', ['product_id' => $product->id, 'media_id' => $old->id]);
         $this->assertDatabaseHas('media', ['id' => $old->id]); // media tidak dihapus, hanya dilepas
+    }
+
+    public function test_product_media_accepts_videos_and_admin_picks_the_thumbnail(): void
+    {
+        $admin = $this->adminWith(['products']);
+        $product = $this->makeProduct(['slug' => 'sarung-egrek']);
+        $front = $this->makeMedia('depan.jpg');
+        $side = $this->makeMedia('samping.jpg');
+        $video = \App\Models\Media::create([
+            'disk' => 'public', 'path' => 'products/demo.mp4', 'original_name' => 'demo.mp4', 'mime' => 'video/mp4', 'size' => 9999, 'collection' => 'products',
+        ]);
+        $pdf = \App\Models\Media::create([
+            'disk' => 'public', 'path' => 'documents/brosur.pdf', 'original_name' => 'brosur.pdf', 'mime' => 'application/pdf', 'size' => 9999, 'collection' => 'documents',
+        ]);
+        $base = [
+            'code' => $product->code, 'categoryId' => $product->category_id, 'name' => ['id' => 'Sarung Egrek'],
+            'priceMode' => 'fixed', 'price' => 100000,
+        ];
+        $url = '/api/v1/admin/products/'.$product->id;
+
+        // Video di urutan pertama: thumbnail tetap foto (pilihan admin).
+        $this->actingAs($admin)->putJson($url, $base + ['images' => [$video->id, $front->id, $side->id], 'thumbnailMediaId' => $side->id])
+            ->assertOk()
+            ->assertJsonCount(3, 'data.images')
+            ->assertJsonPath('data.images.0.type', 'video')
+            ->assertJsonPath('data.images.0.mime', 'video/mp4')
+            ->assertJsonPath('data.images.0.isThumbnail', false)
+            ->assertJsonPath('data.images.2.isThumbnail', true)
+            ->assertJsonPath('data.thumbnailMediaId', $side->id)
+            ->assertJsonPath('data.image', $side->url())
+            ->assertJsonPath('data.hasVideo', true);
+        $this->assertSame($side->url(), $product->fresh()->primaryImageUrl());
+
+        $this->getJson('/api/v1/catalog/products/sarung-egrek')
+            ->assertOk()->assertJsonPath('data.image', $side->url())->assertJsonPath('data.images.0.type', 'video')->assertJsonPath('data.images.1.type', 'image');
+
+        // Tanpa thumbnailMediaId: tanda yang ada dipertahankan walau urutan berubah.
+        $this->actingAs($admin)->putJson($url, $base + ['images' => [$front->id, $side->id, $video->id]])
+            ->assertOk()->assertJsonPath('data.thumbnailMediaId', $side->id)->assertJsonPath('data.images.1.isThumbnail', true);
+        // thumbnailMediaId null: kembali ke foto pertama.
+        $this->actingAs($admin)->putJson($url, $base + ['images' => [$video->id, $front->id, $side->id], 'thumbnailMediaId' => null])
+            ->assertOk()->assertJsonPath('data.thumbnailMediaId', $front->id)->assertJsonPath('data.image', $front->url());
+        // Hanya video: tidak ada thumbnail.
+        $this->actingAs($admin)->putJson($url, $base + ['images' => [$video->id]])
+            ->assertOk()->assertJsonPath('data.image', null)->assertJsonPath('data.thumbnailMediaId', null);
+
+        // Thumbnail harus foto di dalam daftar; dokumen bukan media produk.
+        $this->actingAs($admin)->putJson($url, $base + ['images' => [$video->id, $front->id], 'thumbnailMediaId' => $video->id])
+            ->assertStatus(422)->assertJsonValidationErrors(['thumbnailMediaId']);
+        $this->actingAs($admin)->putJson($url, $base + ['images' => [$front->id], 'thumbnailMediaId' => $side->id])
+            ->assertStatus(422)->assertJsonValidationErrors(['thumbnailMediaId']);
+        $this->actingAs($admin)->putJson($url, $base + ['images' => [$front->id, $pdf->id]])
+            ->assertStatus(422)->assertJsonValidationErrors(['images.1']);
     }
 
     public function test_unpublished_and_soft_deleted_products_are_hidden_from_public(): void

@@ -21,6 +21,16 @@ class CommerceSettings
         'price_includes_tax' => ['bool', null, null],
         'auto_complete_days' => ['int', 0, 90],
         'reminder_hours_before_due' => ['int', 0, 168],
+        // Teks invoice (string, max = panjang maksimum).
+        'invoice_prefix' => ['string', 1, 40],
+        'invoice_signer_name' => ['string', 0, 120],
+        'invoice_signer_title' => ['string', 0, 120],
+        'invoice_cc' => ['string', 0, 120],
+        // Ongkir berbasis jarak (ASUMSI A-76): titik asal + faktor jalan.
+        'shipping_origin_label' => ['string', 0, 120],
+        'shipping_origin_lat' => ['coord', -90, 90],
+        'shipping_origin_lng' => ['coord', -180, 180],
+        'shipping_road_factor' => ['float', 1, 3],
     ];
 
     /** Nama kunci di JSON (camelCase) ↔ kunci setting (snake_case). */
@@ -31,12 +41,20 @@ class CommerceSettings
         'priceIncludesTax' => 'price_includes_tax',
         'autoCompleteDays' => 'auto_complete_days',
         'reminderHoursBeforeDue' => 'reminder_hours_before_due',
+        'invoicePrefix' => 'invoice_prefix',
+        'invoiceSignerName' => 'invoice_signer_name',
+        'invoiceSignerTitle' => 'invoice_signer_title',
+        'invoiceCc' => 'invoice_cc',
+        'shippingOriginLabel' => 'shipping_origin_label',
+        'shippingOriginLat' => 'shipping_origin_lat',
+        'shippingOriginLng' => 'shipping_origin_lng',
+        'shippingRoadFactor' => 'shipping_road_factor',
     ];
 
     /** @var array<string, mixed>|null cache per request */
     private ?array $cache = null;
 
-    /** @return int|float|bool */
+    /** @return int|float|bool|string|null */
     public function get(string $key)
     {
         $all = $this->all();
@@ -136,10 +154,30 @@ class CommerceSettings
         return config('ikn.commerce.defaults.'.$key);
     }
 
-    /** @return int|float|bool|null null = tidak valid */
+    /** @return int|float|bool|string|null null = tidak valid */
     private function validate(string $type, $value, $min, $max)
     {
         switch ($type) {
+            case 'string':
+                $value = $value ?? ''; // input kosong dikirim sebagai null (ConvertEmptyStringsToNull)
+                if (! is_string($value) && ! is_numeric($value)) {
+                    return null;
+                }
+                $string = trim(preg_replace('/\s+/u', ' ', (string) $value));
+                $length = mb_strlen($string);
+
+                return ($min !== null && $length < $min) || ($max !== null && $length > $max) ? null : $string;
+            case 'coord':
+                // Koordinat boleh dikosongkan ('' = belum diatur); selain itu dibulatkan 6 desimal.
+                if ($value === null || $value === '') {
+                    return '';
+                }
+                if (! is_numeric($value)) {
+                    return null;
+                }
+                $coord = round((float) $value, 6);
+
+                return $coord < $min || $coord > $max ? null : $coord;
             case 'bool':
                 $bool = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
 
@@ -163,10 +201,14 @@ class CommerceSettings
         return null;
     }
 
-    /** @return int|float|bool */
+    /** @return int|float|bool|string */
     private function cast(string $type, $value)
     {
         switch ($type) {
+            case 'coord':
+                return $value === null || $value === '' ? null : (float) $value;
+            case 'string':
+                return (string) $value;
             case 'bool':
                 return (bool) $value;
             case 'int':

@@ -224,7 +224,10 @@ class PaymentService
         });
     }
 
-    /** awaiting_verification → rejected (+alasan); order payment_review → pending_payment, batas waktu tetap. */
+    /**
+     * awaiting_verification → rejected (+alasan); order payment_review → pending_payment. Batas waktu tetap, kecuali sisa
+     * waktunya kurang dari `ikn.commerce.reupload_grace_hours`: diperpanjang agar customer sempat mengunggah ulang (A-77).
+     */
     public function reject(Payment $payment, User $admin, string $reason): Payment
     {
         return DB::transaction(function () use ($payment, $admin, $reason) {
@@ -238,10 +241,17 @@ class PaymentService
                 'verified_at' => now(),
             ])->save();
 
-            $this->stateMachine->transition($payment->order, Order::STATUS_PENDING_PAYMENT, $admin, [
+            $order = $this->stateMachine->transition($payment->order, Order::STATUS_PENDING_PAYMENT, $admin, [
                 'paymentId' => $payment->id,
                 'reason' => $reason,
             ]);
+
+            $grace = (int) config('ikn.commerce.reupload_grace_hours', 12);
+            if ($grace > 0 && (! $order->payment_due_at || $order->payment_due_at->lt(now()->addHours($grace)))) {
+                $order->payment_due_at = now()->addHours($grace);
+                $order->reminder_sent_at = null;
+                $order->save();
+            }
 
             return $payment->fresh();
         });

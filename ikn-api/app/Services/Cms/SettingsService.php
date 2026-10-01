@@ -28,10 +28,18 @@ class SettingsService
         'seo.default_title' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'PT Industri Karet Nusantara — Hilir Karet Berkualitas', 'en' => 'PT Industri Karet Nusantara — Quality Downstream Rubber']],
         'seo.default_description' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'PT Industri Karet Nusantara (PT IKN) adalah perusahaan hilir karet berpengalaman sejak 1965, memproduksi Resiprene 35 dan aneka barang karet dari Medan, Sumatera Utara.', 'en' => 'PT Industri Karet Nusantara (PT IKN) is a downstream rubber company established in 1965, producing Resiprene 35 and rubber articles in Medan, North Sumatra.']],
         // Kanal chat & analitik (checklist digital marketing klien: WhatsApp Business, Google Analytics, Search Console).
-        'contact.whatsapp' => ['type' => 'text', 'public' => true, 'default' => ''],
+        'contact.whatsapp' => ['type' => 'text', 'public' => true, 'default' => '628116123993'], // nomor uji pemilik 2026-10-01, ganti di Pengaturan Situs
         'contact.whatsapp_message' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'Halo PT IKN, saya ingin bertanya tentang produk Anda.', 'en' => 'Hello PT IKN, I would like to ask about your products.']],
+        // Nomor WhatsApp marketing tambahan [{label, number}] (maks. 10); bersama contact.whatsapp menjadi daftar
+        // pilihan di tombol melayang, footer, dan halaman Kontak. Label = nama tim/orang, mis. "Marketing Resiprene".
+        'contact.whatsapp_contacts' => ['type' => 'whatsapp_contacts', 'public' => true, 'default' => []],
         'analytics.ga_measurement_id' => ['type' => 'text', 'public' => true, 'default' => ''],
         'analytics.gsc_verification' => ['type' => 'text', 'public' => true, 'default' => ''],
+        // Tema warna situs (logo IKN: biru dan putih). Hex #rrggbb; kosong = warna bawaan di ikn-fe/app/globals.css.
+        // FE menyuntik nilai valid sebagai --theme-primary/--theme-primary-deep/--theme-accent di root layout (lib/theme.ts).
+        'theme.primary' => ['type' => 'color', 'public' => true, 'default' => '#0b6fb8'],
+        'theme.primary_deep' => ['type' => 'color', 'public' => true, 'default' => '#0a3f6b'],
+        'theme.accent' => ['type' => 'color', 'public' => true, 'default' => '#1785cc'],
         'admin.help_guide' => ['type' => 'json', 'public' => false, 'default' => ['title' => 'Panduan Admin', 'type' => 'url', 'url' => '', 'mediaId' => null]],
     ];
 
@@ -74,7 +82,7 @@ class SettingsService
             }
 
             $value = Arr::get($input, $key);
-            [$clean, $error] = $this->clean($def['type'], $value);
+            [$clean, $error] = $this->clean($def['type'], $value, $key);
             if ($error) {
                 $errors[$key] = [$error];
                 continue;
@@ -99,11 +107,21 @@ class SettingsService
         }
     }
 
-    private function clean(string $type, $value): array
+    private function clean(string $type, $value, string $key = ''): array
     {
         switch ($type) {
             case 'text':
                 return [is_scalar($value) || $value === null ? trim((string) $value) : '', null];
+            case 'color':
+                $value = is_scalar($value) || $value === null ? strtolower(trim((string) $value)) : null;
+                if ($value === '') {
+                    return ['', null];
+                }
+                if ($value === null || ! preg_match('/^#[0-9a-f]{6}$/', $value)) {
+                    return [null, __('validation.regex', ['attribute' => $key])];
+                }
+
+                return [$value, null];
             case 'i18n':
                 return [I18n::normalize($value), null];
             case 'media':
@@ -120,9 +138,50 @@ class SettingsService
                 return [(int) $value, null];
             case 'json':
                 return [is_array($value) ? $value : null, null];
+            case 'whatsapp_contacts':
+                return $this->cleanWhatsAppContacts($value, $key);
         }
 
         return [$value, null];
+    }
+
+    /** Daftar {label, number}: nomor dinormalkan ke 62…, baris kosong dibuang, nomor ganda ditolak. */
+    private function cleanWhatsAppContacts($value, string $key): array
+    {
+        if ($value === null || $value === '') {
+            return [[], null];
+        }
+        if (! is_array($value)) {
+            return [null, __('validation.array', ['attribute' => $key])];
+        }
+
+        $out = [];
+        foreach (array_values($value) as $i => $row) {
+            $label = is_array($row) ? trim((string) ($row['label'] ?? '')) : '';
+            $raw = is_array($row) ? (string) ($row['number'] ?? '') : (string) $row;
+            $number = preg_replace('/[^0-9]/', '', $raw);
+            if (str_starts_with($number, '0')) {
+                $number = '62'.substr($number, 1);
+            }
+            if ($label === '' && $number === '') {
+                continue;
+            }
+            if (strlen($number) < 9 || strlen($number) > 15) {
+                return [null, __('validation.regex', ['attribute' => "{$key}.{$i}.number"])];
+            }
+            if (mb_strlen($label) > 60) {
+                return [null, __('validation.max.string', ['attribute' => "{$key}.{$i}.label", 'max' => 60])];
+            }
+            if (in_array($number, array_column($out, 'number'), true)) {
+                return [null, __('validation.distinct', ['attribute' => "{$key}.{$i}.number"])];
+            }
+            $out[] = ['label' => $label, 'number' => $number];
+            if (count($out) > 10) {
+                return [null, __('validation.max.array', ['attribute' => $key, 'max' => 10])];
+            }
+        }
+
+        return [$out, null];
     }
 
     private function present(string $type, $value)
@@ -134,6 +193,9 @@ class SettingsService
             $media = $value ? Media::find((int) $value) : null;
 
             return $media ? $media->toSummary() : null;
+        }
+        if ($type === 'whatsapp_contacts') {
+            return is_array($value) ? array_values(array_map(fn ($row) => ['label' => (string) ($row['label'] ?? ''), 'number' => (string) ($row['number'] ?? '')], $value)) : [];
         }
 
         return $value;

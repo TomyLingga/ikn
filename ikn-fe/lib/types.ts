@@ -12,6 +12,13 @@ export type Tone = 'ok' | 'warn' | 'bad' | 'info';
 
 // Nama ikon yang tersedia di komponen Icon.
 export type IconName =
+  | 'microscope'
+  | 'diamond'
+  | 'award'
+  | 'globe'
+  | 'sparkle'
+  | 'factory'
+  | 'ruler'
   | 'arrow'
   | 'arrowDown'
   | 'chevronLeft'
@@ -47,7 +54,19 @@ export type IconName =
   | 'sun'
   | 'moon'
   | 'menu'
-  | 'panelLeft';
+  | 'panelLeft'
+  | 'bell'
+  | 'chat'
+  | 'send'
+  | 'star'
+  | 'search'
+  | 'video'
+  | 'clock'
+  | 'store'
+  | 'sort'
+  | 'expand'
+  | 'tag'
+  | 'minus';
 
 // Label bilingual + nada (dipakai orderStatus, paymentStatus, stockLabels).
 export interface StatusLabel {
@@ -222,10 +241,14 @@ export interface Category {
   productCount: number;
 }
 
+/** Media produk: foto atau video (ASUMSI A-72). `isThumbnail` = foto yang dipilih admin sebagai thumbnail. */
 export interface ProductImage {
   id: number;
   url: string;
   sort: number;
+  type?: 'image' | 'video';
+  mime?: string | null;
+  isThumbnail?: boolean;
 }
 
 export interface ProductCategoryRef {
@@ -250,13 +273,16 @@ export interface Product {
   unit: string;
   moq: number;
   weightGram: number;
+  dimensions?: ProductDimensions;
   stock: number;
   /** stock − reserved. */
   available: number;
   stockStatus: StockStatus;
   isTaxable: boolean;
   images: ProductImage[];
+  /** Thumbnail: foto pilihan admin atau foto pertama; tidak pernah video. */
   image: string | null;
+  hasVideo?: boolean;
   summary: I18n;
   highlights: I18nList;
   specs: string[][];
@@ -337,8 +363,12 @@ export interface ShippingRateQuote {
   label: I18n;
   eta: I18n | null;
   amount: number;
-  type: 'flat' | 'per_kg';
+  type: 'flat' | 'calculated';
+  available?: boolean;
+  distanceKm?: number | null;
   weightGram?: number;
+  volumeCm3?: number;
+  breakdown?: ShippingBreakdown;
 }
 
 export interface QuoteVoucher {
@@ -348,6 +378,17 @@ export interface QuoteVoucher {
   value: number;
 }
 
+/** GET /customer/vouchers: voucher yang ditujukan khusus ke customer ini dan masih bisa dipakai. */
+export interface AssignedVoucher {
+  code: string;
+  type: 'percent' | 'fixed';
+  value: number;
+  minSubtotal: number;
+  maxDiscount: number | null;
+  scope: 'all' | 'category';
+  endsAt: string | null;
+}
+
 export interface QuoteFee {
   id: number;
   name: I18n;
@@ -355,7 +396,25 @@ export interface QuoteFee {
   amount: number;
 }
 
-export type QuoteWarning = 'no_shipping_rate' | 'shipping_rate_ignored_without_address';
+/** distance_unavailable = ada tarif per km yang disembunyikan karena alamat belum punya titik peta. */
+export type QuoteWarning = 'no_shipping_rate' | 'shipping_rate_ignored_without_address' | 'distance_unavailable' | 'shipping_origin_unset';
+
+/** Rincian ongkir tiga parameter (ASUMSI A-76). */
+export interface ShippingBreakdown {
+  base: number;
+  distance: number;
+  weight: number;
+  volume: number;
+  minimumApplied: boolean;
+  free: boolean;
+}
+
+export interface ProductDimensions {
+  lengthCm: number | null;
+  widthCm: number | null;
+  heightCm: number | null;
+  volumeCm3: number;
+}
 
 export interface QuoteResult {
   items: QuoteItem[];
@@ -376,6 +435,7 @@ export interface QuoteResult {
   uniqueCode: number;
   grandTotal: number;
   weightGram: number;
+  volumeCm3?: number;
   warnings: QuoteWarning[];
 }
 
@@ -421,6 +481,8 @@ export interface CommerceConfig {
   priceIncludesTax: boolean;
   uniqueCodeEnabled: boolean;
   autoCompleteDays: number;
+  /** Teks cetakan invoice (penanda tangan, tembusan) dari pengaturan commerce. */
+  invoice?: { signerName: string; signerTitle: string; cc: string };
 }
 
 // ---- Order & pembayaran (kontrak bagian 9–10, BE-3) ----
@@ -461,6 +523,24 @@ export interface OrderItem {
   weightGram?: number;
   /** true/false bila order memuat relasi ulasan (detail); null pada ringkasan. */
   reviewed?: boolean | null;
+  /** Ulasan customer untuk produk ini pada order ini. */
+  review?: { rating: number; body: string | null; date: string | null } | null;
+}
+
+export interface OrderAttachment {
+  id: number;
+  label: string | null;
+  file: { mediaId: number; url: string; originalName: string; mime: string; size: number } | null;
+  at: string;
+  actor?: { id: number; name: string } | null;
+}
+
+/** Catatan perjalanan kiriman dari admin di antara "Dikirim" dan "Diterima" (ASUMSI A-70). */
+export interface TrackingUpdate {
+  id: number;
+  note: string;
+  at: string;
+  actor?: { id: number; name: string } | null;
 }
 
 export interface PaymentProofInfo {
@@ -523,8 +603,11 @@ export interface OrderShippingMethod {
   label: I18n;
   eta: I18n | null;
   amount?: number;
-  type?: 'flat' | 'per_kg' | null;
+  type?: 'flat' | 'calculated' | 'per_kg' | null;
   weightGram?: number;
+  volumeCm3?: number;
+  distanceKm?: number | null;
+  breakdown?: ShippingBreakdown | null;
 }
 
 /** Bentuk penuh order (OrderResource): GET /customer/orders/{number}, respons checkout dan aksi. */
@@ -567,6 +650,11 @@ export interface Order {
   payment?: Payment | null;
   payments: Payment[];
   timeline: TimelineEntry[];
+  trackingUpdates?: TrackingUpdate[];
+  canAddTracking?: boolean;
+  /** Lampiran dari admin (faktur pajak, surat jalan; berkas privat lewat /files/{media}). */
+  attachments?: OrderAttachment[];
+  canAttach?: boolean;
   canCancel: boolean;
   canUploadProof: boolean;
   canChangePayment: boolean;
@@ -577,11 +665,12 @@ export interface Order {
   updatedAt?: string;
 }
 
-/** Baris daftar order (OrderSummaryResource): GET /customer/orders, dashboard `recentOrders`. Tanpa flag can*. */
+/** Baris daftar order (OrderSummaryResource): GET /customer/orders, dashboard `recentOrders`. */
 export interface OrderSummaryItem {
   productSlug: string;
   name: I18n;
   code: string | null;
+  image?: string | null;
   qty: number;
   unit: string | null;
   unitPrice: number;
@@ -605,9 +694,18 @@ export interface OrderSummary {
   paidAt: string | null;
   courier: string | null;
   trackingNumber: string | null;
+  canCancel?: boolean;
+  canUploadProof?: boolean | null;
+  canConfirmReceived?: boolean;
+  canComplete?: boolean;
+  canReview?: boolean | null;
   createdAt?: string;
   updatedAt?: string;
 }
+
+/** Kelompok status untuk tab "Pesanan saya" (GET /customer/orders?group=, meta.groups). */
+export type OrderGroupKey = 'unpaid' | 'processing' | 'shipped' | 'completed' | 'cancelled' | 'to_review';
+export type OrderGroupCounts = Record<OrderGroupKey, number>;
 
 export interface CheckoutPayload extends QuoteRequest {
   addressId: number;
@@ -623,7 +721,7 @@ export interface InsufficientStockItem {
 export interface ReviewInput {
   productSlug: string;
   rating: number;
-  body: string;
+  body: string | null;
 }
 
 // ---- Dashboard customer (GET /customer/dashboard) ----
@@ -635,8 +733,66 @@ export interface CustomerDashboardStats {
   transactionValue: number;
 }
 
-/** GET /customer/dashboard: statistik datar + recentOrders[] (ringkasan) + status akun. */
+export interface MonthlySpend {
+  ym: string;
+  month: string;
+  monthIndex: number;
+  year: number;
+  total: number;
+  orders: number;
+}
+
+/**
+ * GET /customer/dashboard?from&to: totalOrders/completed/transactionValue/recentOrders mengikuti rentang tanggal;
+ * awaitingPayment/inProgress/toReview/actionOrders selalu sepanjang waktu (pekerjaan yang masih terbuka).
+ */
 export interface CustomerDashboardData extends CustomerDashboardStats {
+  range?: { from: string | null; to: string | null };
+  toReview?: number;
+  actionOrders?: OrderSummary[];
   recentOrders: OrderSummary[];
+  monthly?: MonthlySpend[];
   account: { status: AccountStatus; rejectionReason: string | null; canOrder: boolean };
+}
+
+// ---- Notifikasi dalam aplikasi (ASUMSI A-71) ----
+export interface UserNotification {
+  id: number;
+  type: string;
+  title: I18n;
+  body: I18n;
+  url: string | null;
+  data: Record<string, unknown> | null;
+  read: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+/** GET /customer/badges. */
+export interface CustomerBadges {
+  notifications: number;
+  chat: number;
+}
+
+// ---- Live chat (ASUMSI A-73) ----
+export type ChatRole = 'customer' | 'admin';
+
+export type ChatContext =
+  | { type: 'product'; slug: string; code?: string | null; name: I18n; image: string | null; price: number | null; unit?: string | null }
+  | { type: 'order'; number: string; status?: OrderStatusKey; grandTotal?: number };
+
+export interface ChatMessage {
+  id: number;
+  role: ChatRole;
+  body: string;
+  context: ChatContext | null;
+  senderName: string | null;
+  createdAt: string;
+}
+
+/** GET /customer/chat. */
+export interface CustomerChat {
+  conversation: { id: number; unread: number; lastMessageAt: string | null } | null;
+  messages: ChatMessage[];
+  hasMore: boolean;
 }

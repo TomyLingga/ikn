@@ -60,6 +60,12 @@ tags:
   description: Laporan penjualan (modul reports)
 - name: admin-audit
   description: Audit log (super_admin)
+- name: notifications
+  description: Notifikasi dalam aplikasi untuk customer (lonceng portal) dan penghitung badge
+- name: chat
+  description: Live chat customer dengan penjual (polling, tanpa websocket)
+- name: admin-chat
+  description: Kotak masuk live chat admin (modul chat)
 paths:
   /ping:
     get:
@@ -289,10 +295,11 @@ paths:
       tags:
       - content
       parameters:
-      - name: tag
+      - name: category
         in: query
         schema:
           type: string
+        description: slug kategori (lihat /content/news-categories)
       - name: limit
         in: query
         schema:
@@ -311,6 +318,23 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/PostSummary'
+  /content/news-categories:
+    get:
+      tags:
+      - content
+      summary: Kategori berita + jumlah berita terbit (filter di halaman Berita)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostCategory'
   /content/news/{slug}:
     get:
       tags:
@@ -323,7 +347,7 @@ paths:
           type: string
       responses:
         '200':
-          description: Detail + related (maks 3, tag sama diprioritaskan)
+          description: Detail + related (maks 3, kategori sama diprioritaskan)
           content:
             application/json:
               schema:
@@ -513,7 +537,9 @@ paths:
       - files
       security:
       - cookieAuth: []
-      summary: Unduh berkas privat (MediaPolicy; sementara admin saja)
+      summary: Unduh berkas privat (MediaPolicy - admin aktif, atau customer pemilik order untuk bukti bayarnya)
+      description: 'Bisa dibuka langsung di tab browser oleh pengguna yang sudah login: middleware `session.downloads` menyalakan sesi walau permintaan
+        tidak membawa Origin/Referer FE (tautan rel=noreferrer, alamat ditempel, muat ulang).'
       parameters:
       - name: media
         in: path
@@ -674,7 +700,10 @@ paths:
           type: string
           enum:
           - image
+          - video
+          - visual
           - document
+        description: visual = gambar + video; document = selain keduanya
       - name: q
         in: query
         schema:
@@ -796,7 +825,11 @@ paths:
       summary: Skema tipe section untuk form admin otomatis
       responses:
         '200':
-          description: '{ data: { types: { [type]: SectionTypeDef }, icons: string[] } }'
+          description: '{ data: { types: { [type]: SectionTypeDef }, groups: { [group]: I18n }, icons: string[] } }. SectionTypeDef = { name,
+            description, pages[] (petunjuk halaman bawaan, bukan pembatas), group (kunci di groups: header|content|showcase|data|contact), fields
+            }. Tipe: page_header, hero, marquee, stats, capabilities, product_highlights, video_gallery, cta, text_visual, timeline, vision_mission,
+            values, org_chart, contact_info, contact_form, contact_summary, link_cards, pillars, info_blocks, wbs_form, customer_logos, certificates,
+            brochures, gallery, news, latest_news, steps, icon_features, faq, spec_table, team, testimonials, image_grid, rich_text.'
   /admin/pages:
     get:
       tags:
@@ -1225,6 +1258,71 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Deleted'
+  /admin/news-categories:
+    get:
+      tags:
+      - admin-content
+      security:
+      - cookieAuth: []
+      summary: Kategori berita (modul news) + jumlah semua berita per kategori
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostCategory'
+    post:
+      tags:
+      - admin-content
+      security:
+      - cookieAuth: []
+      requestBody:
+        $ref: '#/components/requestBodies/PostCategory'
+      responses:
+        '201':
+          description: OK
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /admin/news-categories/{newsCategory}:
+    put:
+      tags:
+      - admin-content
+      security:
+      - cookieAuth: []
+      parameters:
+      - name: newsCategory
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        $ref: '#/components/requestBodies/PostCategory'
+      responses:
+        '200':
+          description: OK
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - admin-content
+      security:
+      - cookieAuth: []
+      summary: Hapus kategori; berita di dalamnya tetap ada dengan category null
+      parameters:
+      - name: newsCategory
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          $ref: '#/components/responses/Deleted'
   /admin/news:
     get:
       tags:
@@ -1237,6 +1335,11 @@ paths:
         schema:
           type: string
         description: ILIKE pada judul
+      - name: category
+        in: query
+        schema:
+          type: integer
+        description: id kategori
       responses:
         '200':
           description: '{ data: Post[] } (termasuk draf)'
@@ -2099,7 +2202,9 @@ paths:
                     items:
                       $ref: '#/components/schemas/AdminCustomerSummary'
                   meta:
-                    $ref: '#/components/schemas/PageMeta'
+                    allOf:
+                    - $ref: '#/components/schemas/PageMeta'
+                    - $ref: '#/components/schemas/StatusCountsMeta'
         '403':
           $ref: '#/components/responses/Forbidden'
   /admin/customers/{customer}:
@@ -2509,7 +2614,7 @@ paths:
       - admin-catalog
       security:
       - cookieAuth: []
-      summary: Buat produk (+ images[] mediaId berurutan). Stok awal lewat POST /admin/products/{product}/stock.
+      summary: Buat produk (+ images[] mediaId foto/video berurutan, thumbnailMediaId). Stok awal lewat POST /admin/products/{product}/stock.
       requestBody:
         required: true
         content:
@@ -2883,6 +2988,33 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Deleted'
+  /admin/customer-options:
+    get:
+      tags:
+      - admin-commerce-config
+      security:
+      - cookieAuth: []
+      summary: Daftar ringkas customer aktif untuk pemilih sasaran voucher/biaya (maks. 20; modul customers, vouchers, atau fees)
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+        description: ILIKE nama/email/perusahaan
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CustomerOption'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /admin/fees:
     get:
       tags:
@@ -3178,6 +3310,73 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Deleted'
+  /admin/shipping-origin:
+    get:
+      tags:
+      - admin-commerce-config
+      summary: Titik asal pengiriman untuk tarif per km (modul shipping, ASUMSI A-76)
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ShippingOrigin'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags:
+      - admin-commerce-config
+      summary: Ubah titik asal + faktor jalan (lat/lng null = belum diatur → tarif per km tidak ditawarkan)
+      security:
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - roadFactor
+              properties:
+                label:
+                  type: string
+                  maxLength: 120
+                  nullable: true
+                lat:
+                  type: number
+                  minimum: -90
+                  maximum: 90
+                  nullable: true
+                  description: wajib bersama lng
+                lng:
+                  type: number
+                  minimum: -180
+                  maximum: 180
+                  nullable: true
+                  description: wajib bersama lat
+                roadFactor:
+                  type: number
+                  minimum: 1
+                  maximum: 3
+                  example: 1.3
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ShippingOrigin'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /admin/shipping-methods:
     get:
       tags:
@@ -3218,6 +3417,14 @@ paths:
         in: query
         schema:
           type: boolean
+      - name: audience
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - customers
+        description: sasaran voucher
       - name: page
         in: query
         schema:
@@ -3475,7 +3682,24 @@ paths:
       - orders
       security:
       - cookieAuth: []
-      summary: Statistik order customer + 5 order terakhir + status akun
+      summary: Ringkasan portal customer; from/to menyaring totalOrders, completed, transactionValue, recentOrders
+      description: '`awaitingPayment`, `inProgress`, `toReview`, dan `actionOrders` selalu sepanjang waktu (pekerjaan yang masih terbuka
+
+        tidak boleh tersembunyi oleh filter tanggal). Tanpa from/to = sepanjang waktu.
+
+        '
+      parameters:
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
+        description: '>= from'
       responses:
         '200':
           description: OK
@@ -3488,18 +3712,92 @@ paths:
                     $ref: '#/components/schemas/CustomerDashboard'
         '401':
           $ref: '#/components/responses/Unauthenticated'
+  /customer/vouchers:
+    get:
+      tags:
+      - orders
+      security:
+      - cookieAuth: []
+      summary: Voucher yang ditujukan khusus ke customer ini dan masih bisa dipakai (aktif, dalam periode, kuota dan batas per akun belum habis)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code:
+                          type: string
+                        type:
+                          type: string
+                          enum:
+                          - percent
+                          - fixed
+                        value:
+                          type: number
+                        minSubtotal:
+                          type: integer
+                        maxDiscount:
+                          type: integer
+                          nullable: true
+                        scope:
+                          type: string
+                          enum:
+                          - all
+                          - category
+                        endsAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
   /customer/orders:
     get:
       tags:
       - orders
       security:
       - cookieAuth: []
-      summary: Daftar order milik sendiri (paginated, terbaru dulu)
+      summary: Daftar order milik sendiri (paginated, terbaru dulu); meta.groups = jumlah per kelompok status
       parameters:
       - name: status
         in: query
         schema:
           $ref: '#/components/schemas/OrderStatus'
+      - name: group
+        in: query
+        schema:
+          type: string
+          enum:
+          - unpaid
+          - processing
+          - shipped
+          - completed
+          - cancelled
+          - to_review
+        description: unpaid = pending_payment+payment_review; processing = paid+processing; shipped = shipped+delivered; cancelled = cancelled+expired;
+          to_review = completed dengan produk belum diulas
+      - name: q
+        in: query
+        schema:
+          type: string
+          maxLength: 120
+        description: nomor order, nomor invoice, nama atau kode produk
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
       - name: page
         in: query
         schema:
@@ -3524,7 +3822,12 @@ paths:
                     items:
                       $ref: '#/components/schemas/OrderSummary'
                   meta:
-                    $ref: '#/components/schemas/PageMeta'
+                    allOf:
+                    - $ref: '#/components/schemas/PageMeta'
+                    - type: object
+                      properties:
+                        groups:
+                          $ref: '#/components/schemas/OrderGroupCounts'
         '401':
           $ref: '#/components/responses/Unauthenticated'
     post:
@@ -3738,6 +4041,10 @@ paths:
                             type: string
                           canReview:
                             type: boolean
+                          reviewedProductIds:
+                            type: array
+                            items:
+                              type: integer
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -4008,7 +4315,9 @@ paths:
                     items:
                       $ref: '#/components/schemas/OrderSummary'
                   meta:
-                    $ref: '#/components/schemas/PageMeta'
+                    allOf:
+                    - $ref: '#/components/schemas/PageMeta'
+                    - $ref: '#/components/schemas/StatusCountsMeta'
         '403':
           $ref: '#/components/responses/Forbidden'
   /admin/orders/{number}:
@@ -4203,6 +4512,18 @@ paths:
         schema:
           type: string
         description: ILIKE external_id, nomor order/invoice, nama/perusahaan/email customer
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+        description: tanggal awal (zona aplikasi) atas COALESCE(bukti diunggah, dibuat)
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
+        description: tanggal akhir (inklusif)
       - name: page
         in: query
         schema:
@@ -4226,7 +4547,9 @@ paths:
                     items:
                       $ref: '#/components/schemas/AdminPayment'
                   meta:
-                    $ref: '#/components/schemas/PageMeta'
+                    allOf:
+                    - $ref: '#/components/schemas/PageMeta'
+                    - $ref: '#/components/schemas/StatusCountsMeta'
         '403':
           $ref: '#/components/responses/Forbidden'
   /admin/payments/{payment}:
@@ -4443,6 +4766,795 @@ paths:
                     $ref: '#/components/schemas/PageMeta'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /customer/badges:
+    get:
+      tags:
+      - notifications
+      security:
+      - cookieAuth: []
+      summary: Penghitung badge top bar portal (notifikasi belum dibaca + pesan chat admin belum dibaca)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      notifications:
+                        type: integer
+                      chat:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /customer/notifications:
+    get:
+      tags:
+      - notifications
+      security:
+      - cookieAuth: []
+      summary: Daftar notifikasi milik sendiri (terbaru dulu); meta.unread = jumlah belum dibaca
+      parameters:
+      - name: unread
+        in: query
+        schema:
+          type: boolean
+        description: hanya yang belum dibaca
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: perPage
+        in: query
+        schema:
+          type: integer
+          default: 15
+          maximum: 50
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserNotification'
+                  meta:
+                    allOf:
+                    - $ref: '#/components/schemas/PageMeta'
+                    - type: object
+                      properties:
+                        unread:
+                          type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /customer/notifications/read-all:
+    post:
+      tags:
+      - notifications
+      security:
+      - cookieAuth: []
+      summary: Tandai semua notifikasi sudah dibaca
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      updated:
+                        type: integer
+                      unread:
+                        type: integer
+  /customer/notifications/{id}/read:
+    post:
+      tags:
+      - notifications
+      security:
+      - cookieAuth: []
+      summary: Tandai satu notifikasi sudah dibaca (milik customer lain → 404)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserNotification'
+                  meta:
+                    type: object
+                    properties:
+                      unread:
+                        type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /customer/chat:
+    get:
+      tags:
+      - chat
+      security:
+      - cookieAuth: []
+      summary: Percakapan customer dengan penjual (satu per customer; null bila belum pernah mengirim pesan)
+      description: 'Tanpa parameter = 50 pesan terakhir. `after` = pesan dengan id lebih besar (polling), `before` = halaman lebih lama.
+
+        `senderName` pesan admin selalu null untuk customer (penjual tampil sebagai satu pihak).
+
+        '
+      parameters:
+      - name: after
+        in: query
+        schema:
+          type: integer
+      - name: before
+        in: query
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CustomerChat'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /customer/chat/messages:
+    post:
+      tags:
+      - chat
+      security:
+      - cookieAuth: []
+      summary: Kirim pesan (membuat percakapan bila belum ada); maks. 30 pesan per menit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - body
+              properties:
+                body:
+                  type: string
+                  maxLength: 2000
+                context:
+                  type: object
+                  nullable: true
+                  description: 'rujukan opsional: { type: product, slug } atau { type: order, number } (order harus milik sendiri); disimpan sebagai
+                    snapshot'
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                      - product
+                      - order
+                    slug:
+                      type: string
+                    number:
+                      type: string
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/CustomerChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: Terlalu banyak pesan
+  /customer/chat/read:
+    post:
+      tags:
+      - chat
+      security:
+      - cookieAuth: []
+      summary: Tandai pesan admin sudah dibaca
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      unread:
+                        type: integer
+  /customer/chat/claim:
+    post:
+      tags:
+      - chat
+      security:
+      - cookieAuth: []
+      summary: Tamu yang baru login mengambil alih percakapan tamunya (token dari browser) ke akun ini
+      description: Akun belum punya percakapan → percakapan tamu menjadi milik akun; sudah punya → pesan tamu dipindahkan dan percakapan tamu
+        dihapus. Token tak dikenal → claimed=false.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - token
+              properties:
+                token:
+                  type: string
+                  maxLength: 64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/CustomerChatConversation'
+                      claimed:
+                        type: boolean
+  /chat/guest:
+    post:
+      tags:
+      - chat
+      summary: Mulai percakapan sebagai tamu (formulir perkenalan + pesan pertama); maks. 10 per jam per IP
+      description: Mengembalikan `token` acak 48 karakter yang disimpan browser tamu; token tidak pernah muncul lagi di respons lain.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              - email
+              - body
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 120
+                email:
+                  type: string
+                  format: email
+                  maxLength: 160
+                phone:
+                  type: string
+                  maxLength: 40
+                  nullable: true
+                  description: angka, +, spasi, tanda kurung, titik, strip
+                body:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      conversation:
+                        $ref: '#/components/schemas/CustomerChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: Terlalu banyak percakapan baru
+    get:
+      tags:
+      - chat
+      summary: Percakapan tamu (token wajib; salah → 404), parameter after/before seperti /customer/chat
+      parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: after
+        in: query
+        schema:
+          type: integer
+      - name: before
+        in: query
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CustomerChat'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /chat/guest/messages:
+    post:
+      tags:
+      - chat
+      summary: Kirim pesan sebagai tamu; maks. 30 per menit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - token
+              - body
+              properties:
+                token:
+                  type: string
+                body:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/CustomerChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /chat/guest/read:
+    post:
+      tags:
+      - chat
+      summary: Tamu menandai pesan admin sudah dibaca
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - token
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      unread:
+                        type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/badges:
+    get:
+      tags:
+      - admin-dashboard
+      security:
+      - cookieAuth: []
+      summary: Penghitung badge sidebar admin; null = admin tidak punya modulnya
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      orders:
+                        type: integer
+                        nullable: true
+                        description: 'order sudah dibayar yang masih berjalan: paid, processing, shipped, delivered (modul orders); payment_review
+                          dihitung di payments'
+                      payments:
+                        type: integer
+                        nullable: true
+                        description: pembayaran awaiting_verification (modul payments)
+                      customers:
+                        type: integer
+                        nullable: true
+                        description: customer berstatus pending (modul customers)
+                      chat:
+                        type: integer
+                        nullable: true
+                        description: percakapan dengan pesan customer belum dibaca (modul chat)
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/chats:
+    get:
+      tags:
+      - admin-chat
+      security:
+      - cookieAuth: []
+      summary: Kotak masuk percakapan (pesan terbaru dulu); meta.unreadConversations untuk badge
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+          maxLength: 120
+        description: nama
+        email: null
+        atau perusahaan customer: null
+      - name: unread
+        in: query
+        schema:
+          type: boolean
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: perPage
+        in: query
+        schema:
+          type: integer
+          default: 30
+          maximum: 100
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminChatConversation'
+                  meta:
+                    allOf:
+                    - $ref: '#/components/schemas/PageMeta'
+                    - type: object
+                      properties:
+                        unreadConversations:
+                          type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - admin-chat
+      security:
+      - cookieAuth: []
+      summary: Buka (atau buat) percakapan dengan customer tertentu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - customerId
+              properties:
+                customerId:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminChatConversation'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /admin/chats/{conversation}:
+    get:
+      tags:
+      - admin-chat
+      security:
+      - cookieAuth: []
+      summary: Pesan dalam satu percakapan (after/before seperti sisi customer)
+      parameters:
+      - name: conversation
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: after
+        in: query
+        schema:
+          type: integer
+      - name: before
+        in: query
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/AdminChatConversation'
+                      messages:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ChatMessage'
+                      hasMore:
+                        type: boolean
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/chats/{conversation}/messages:
+    post:
+      tags:
+      - admin-chat
+      security:
+      - cookieAuth: []
+      summary: Balas customer (tidak dicatat audit log; pesan itu sendiri catatannya)
+      parameters:
+      - name: conversation
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - body
+              properties:
+                body:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/AdminChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /admin/chats/{conversation}/read:
+    post:
+      tags:
+      - admin-chat
+      security:
+      - cookieAuth: []
+      summary: Tandai pesan customer pada percakapan ini sudah dibaca
+      parameters:
+      - name: conversation
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      unread:
+                        type: integer
+                      unreadConversations:
+                        type: integer
+  /admin/orders/{number}/attachments:
+    post:
+      tags:
+      - admin-orders
+      security:
+      - cookieAuth: []
+      summary: Unggah lampiran order (faktur pajak, surat jalan) ke disk private; hanya order yang sudah dibayar; customer mendapat notifikasi
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: pdf/jpg/png/webp/xlsx/xls/docx/doc/csv/txt/zip ≤ 10 MB (ikn.commerce.attachment_*)
+                label:
+                  type: string
+                  maxLength: 120
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Order'
+        '409':
+          description: 'ATTACHMENT_NOT_ALLOWED: order belum dibayar (meta.status)'
+        '413':
+          description: Berkas terlalu besar
+        '415':
+          description: Jenis berkas tidak didukung
+  /admin/orders/{number}/attachments/{attachment}:
+    delete:
+      tags:
+      - admin-orders
+      security:
+      - cookieAuth: []
+      summary: Hapus lampiran (berkasnya ikut dihapus)
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: attachment
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/orders/{number}/tracking:
+    post:
+      tags:
+      - admin-orders
+      security:
+      - cookieAuth: []
+      summary: Tambah catatan perjalanan kiriman (hanya status shipped); customer mendapat notifikasi
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - note
+              properties:
+                note:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                  example: Pesanan tiba di gudang transit Pekanbaru
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Order'
+        '409':
+          description: 'TRACKING_NOT_ALLOWED: order tidak berstatus shipped (meta.status)'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /admin/orders/{number}/tracking/{update}:
+    delete:
+      tags:
+      - admin-orders
+      security:
+      - cookieAuth: []
+      summary: Hapus catatan perjalanan (hanya selama status shipped)
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: update
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: TRACKING_NOT_ALLOWED
 components:
   securitySchemes:
     cookieAuth:
@@ -4488,9 +5600,10 @@ components:
                 - $ref: '#/components/schemas/I18n'
                 description: HTML per bahasa dari editor. Server men-sanitasi dengan whitelist (p, br, h2-h4, strong, em, u, s, a, ul, ol, li,
                   blockquote, img, figure, figcaption, hr, table, iframe YouTube/Vimeo saja; style hanya text-align). Tag/atribut lain dibuang.
-              tag:
-                type: string
+              categoryId:
+                type: integer
                 nullable: true
+                description: id dari /admin/news-categories
               author:
                 type: string
                 nullable: true
@@ -4504,6 +5617,25 @@ components:
                 type: string
                 format: date-time
                 nullable: true
+    PostCategory:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - name
+            properties:
+              name:
+                $ref: '#/components/schemas/I18n'
+              slug:
+                type: string
+                nullable: true
+                maxLength: 80
+                description: otomatis dari nama bila kosong; unik
+              sortOrder:
+                type: integer
+                minimum: 0
     GalleryItem:
       required: true
       content:
@@ -4963,6 +6095,55 @@ components:
               $ref: '#/components/schemas/I18n'
             default_description:
               $ref: '#/components/schemas/I18n'
+        contact:
+          type: object
+          properties:
+            whatsapp:
+              type: string
+              description: nomor utama, internasional tanpa +; kosong = tombol WhatsApp tidak tampil
+            whatsapp_message:
+              $ref: '#/components/schemas/I18n'
+            whatsapp_contacts:
+              type: array
+              maxItems: 10
+              description: nomor marketing tambahan; bersama nomor utama menjadi daftar pilihan di tombol melayang/footer/Kontak; nomor dinormalkan
+                ke 62…, ganda ditolak
+              items:
+                type: object
+                properties:
+                  label:
+                    type: string
+                    maxLength: 60
+                    example: Marketing Resiprene
+                  number:
+                    type: string
+                    example: '628116480083'
+        analytics:
+          type: object
+          properties:
+            ga_measurement_id:
+              type: string
+              description: G-XXXXXXXXXX; kosong = tanpa GA4
+            gsc_verification:
+              type: string
+              description: token meta google-site-verification
+        theme:
+          type: object
+          description: 'Warna tema situs, hex #rrggbb (disimpan lowercase; kosong = warna bawaan CSS). FE menyuntik nilai valid sebagai --theme-primary
+            / --theme-primary-deep / --theme-accent di root layout; nilai lain → 422.'
+          properties:
+            primary:
+              type: string
+              example: '#0b6fb8'
+              description: tombol, tautan, label, ikon aktif
+            primary_deep:
+              type: string
+              example: '#0a3f6b'
+              description: footer dan blok latar gelap
+            accent:
+              type: string
+              example: '#1785cc'
+              description: nomor bagian, badge promo, sorotan kecil
         admin:
           type: object
           description: privat (hanya GET/PUT admin)
@@ -5160,6 +6341,21 @@ components:
           type: boolean
         sortOrder:
           type: integer
+    PostCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          $ref: '#/components/schemas/I18n'
+        sortOrder:
+          type: integer
+        postCount:
+          type: integer
+          nullable: true
+          description: publik = berita terbit; admin = semua berita
     PostSummary:
       type: object
       properties:
@@ -5171,9 +6367,11 @@ components:
           $ref: '#/components/schemas/I18n'
         excerpt:
           $ref: '#/components/schemas/I18n'
-        tag:
-          type: string
+        category:
           nullable: true
+          allOf:
+          - $ref: '#/components/schemas/PostCategory'
+          description: kategori berita (tanpa postCount); null bila belum dikategorikan
         author:
           type: string
           nullable: true
@@ -5204,7 +6402,7 @@ components:
           related:
             type: array
             maxItems: 3
-            description: berita terkait (tag sama diprioritaskan, lalu terbaru); hanya pada GET /content/news/{slug}
+            description: berita terkait (kategori sama diprioritaskan, lalu terbaru); hanya pada GET /content/news/{slug}
             items:
               $ref: '#/components/schemas/PostSummary'
     GalleryItem:
@@ -5853,6 +7051,7 @@ components:
             type: string
     ProductImage:
       type: object
+      description: Media produk, foto atau video (ASUMSI A-72)
       properties:
         id:
           type: integer
@@ -5861,6 +7060,17 @@ components:
           type: string
         sort:
           type: integer
+        type:
+          type: string
+          enum:
+          - image
+          - video
+        mime:
+          type: string
+          nullable: true
+        isThumbnail:
+          type: boolean
+          description: foto yang dipilih admin sebagai thumbnail
     Product:
       type: object
       description: Bentuk publik (kontrak bagian 6). Uang integer rupiah.
@@ -5912,6 +7122,8 @@ components:
           type: integer
         weightGram:
           type: integer
+        dimensions:
+          $ref: '#/components/schemas/ProductDimensions'
         stock:
           type: integer
         available:
@@ -5932,7 +7144,9 @@ components:
         image:
           type: string
           nullable: true
-          description: URL gambar pertama
+          description: 'URL thumbnail: foto pilihan admin atau foto pertama; tidak pernah video'
+        hasVideo:
+          type: boolean
         summary:
           $ref: '#/components/schemas/I18n'
         highlights:
@@ -6115,6 +7329,22 @@ components:
           type: integer
           minimum: 1
           default: 1000
+        lengthCm:
+          type: number
+          minimum: 0.1
+          maximum: 100000
+          nullable: true
+          description: dimensi kemasan per satuan jual (cm, 1 desimal); tidak dikirim = tetap, null = dikosongkan
+        widthCm:
+          type: number
+          minimum: 0.1
+          maximum: 100000
+          nullable: true
+        heightCm:
+          type: number
+          minimum: 0.1
+          maximum: 100000
+          nullable: true
         stockStatus:
           type: string
           enum:
@@ -6133,7 +7363,11 @@ components:
           maxItems: 20
           items:
             type: integer
-          description: media id berurutan (sort_order = indeks)
+          description: media id foto/video berurutan (sort_order = indeks); media harus disk public bertipe image/* atau video/*
+        thumbnailMediaId:
+          type: integer
+          nullable: true
+          description: foto di dalam images[] yang menjadi thumbnail; null = foto pertama; tidak dikirim = tanda yang ada dipertahankan
     Review:
       type: object
       properties:
@@ -6341,10 +7575,21 @@ components:
           type: string
           enum:
           - flat
-          - per_kg
+          - calculated
+        available:
+          type: boolean
+          description: false = tarif per km tanpa titik peta alamat/asal (tidak ikut availableShippingRates)
+        distanceKm:
+          type: integer
+          nullable: true
+          description: jarak jalan perkiraan (km, dibulatkan ke atas) = haversine titik asal → titik peta alamat × faktor jalan; null bila tarif
+            tidak memakai jarak
         weightGram:
           type: integer
-          description: hanya pada shipping terpilih
+        volumeCm3:
+          type: integer
+        breakdown:
+          $ref: '#/components/schemas/ShippingBreakdown'
     QuoteResult:
       type: object
       properties:
@@ -6417,6 +7662,9 @@ components:
           description: subtotal − diskon + ongkir + fee + (pajak bila eksklusif) + uniqueCode
         weightGram:
           type: integer
+        volumeCm3:
+          type: integer
+          description: Σ dimensi produk × qty (cm³); 0 bila dimensi produk kosong
         warnings:
           type: array
           items:
@@ -6424,6 +7672,8 @@ components:
             enum:
             - no_shipping_rate
             - shipping_rate_ignored_without_address
+            - distance_unavailable
+            - shipping_origin_unset
     PaymentMethodPublic:
       type: object
       properties:
@@ -6491,6 +7741,16 @@ components:
           type: boolean
         autoCompleteDays:
           type: integer
+        invoice:
+          type: object
+          description: teks cetakan invoice (penanda tangan, tembusan) untuk halaman cetak
+          properties:
+            signerName:
+              type: string
+            signerTitle:
+              type: string
+            cc:
+              type: string
     BankAccount:
       type: object
       properties:
@@ -6551,6 +7811,17 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        audience:
+          type: string
+          enum:
+          - all
+          - customers
+          description: all = setiap order; customers = hanya order customer di `customers` (bentuk admin saja)
+        customers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerOption'
+          description: bentuk admin saja
         createdAt:
           type: string
           format: date-time
@@ -6579,6 +7850,30 @@ components:
           default: true
         sortOrder:
           type: integer
+        audience:
+          type: string
+          enum:
+          - all
+          - customers
+          default: all
+          description: tidak dikirim saat PUT = sasaran tidak diubah
+        customerIds:
+          type: array
+          items:
+            type: integer
+          description: wajib minimal satu bila audience=customers; id user ber-role customer
+    CustomerOption:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        company:
+          type: string
+          nullable: true
+        email:
+          type: string
     ShippingZone:
       type: object
       properties:
@@ -6655,7 +7950,8 @@ components:
                 - village
     ShippingRate:
       type: object
-      description: amount = max(minAmount, baseAmount + perKgAmount × ceil(kg)); 0 bila subtotal − diskon ≥ freeAbove
+      description: 'flat: amount = baseAmount. calculated (ASUMSI A-76): amount = max(minAmount, baseAmount + perKmAmount × ⌈km⌉ + perKgAmount
+        × ⌈kg⌉ + perM3Amount × m³ (dibulatkan ke atas per 0,01 m³)); 0 bila subtotal − diskon ≥ freeAbove'
       properties:
         id:
           type: integer
@@ -6677,10 +7973,14 @@ components:
           type: string
           enum:
           - flat
-          - per_kg
+          - calculated
         baseAmount:
           type: integer
+        perKmAmount:
+          type: integer
         perKgAmount:
+          type: integer
+        perM3Amount:
           type: integer
         minAmount:
           type: integer
@@ -6700,6 +8000,53 @@ components:
         updatedAt:
           type: string
           format: date-time
+    ShippingOrigin:
+      type: object
+      properties:
+        label:
+          type: string
+          example: Pabrik Resiprene
+        lat:
+          type: number
+          nullable: true
+          example: 3.3495
+        lng:
+          type: number
+          nullable: true
+          example: 99.0862
+        roadFactor:
+          type: number
+          example: 1.3
+    ShippingBreakdown:
+      type: object
+      properties:
+        base:
+          type: integer
+        distance:
+          type: integer
+        weight:
+          type: integer
+        volume:
+          type: integer
+        minimumApplied:
+          type: boolean
+        free:
+          type: boolean
+    ProductDimensions:
+      type: object
+      properties:
+        lengthCm:
+          type: number
+          nullable: true
+        widthCm:
+          type: number
+          nullable: true
+        heightCm:
+          type: number
+          nullable: true
+        volumeCm3:
+          type: integer
+          description: L × W × H per satuan; 0 bila ada dimensi kosong
     ShippingRateInput:
       type: object
       required:
@@ -6715,12 +8062,22 @@ components:
           type: string
           enum:
           - flat
+          - calculated
           - per_kg
+          description: per_kg = nama lama, disimpan sebagai calculated
         baseAmount:
           type: integer
           minimum: 0
           default: 0
+        perKmAmount:
+          type: integer
+          minimum: 0
+          default: 0
         perKgAmount:
+          type: integer
+          minimum: 0
+          default: 0
+        perM3Amount:
           type: integer
           minimum: 0
           default: 0
@@ -6787,6 +8144,16 @@ components:
           nullable: true
         isActive:
           type: boolean
+        audience:
+          type: string
+          enum:
+          - all
+          - customers
+          description: all = semua customer; customers = hanya customer di `customers`
+        customers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerOption'
         createdAt:
           type: string
           format: date-time
@@ -6850,6 +8217,18 @@ components:
         isActive:
           type: boolean
           default: true
+        audience:
+          type: string
+          enum:
+          - all
+          - customers
+          default: all
+          description: tidak dikirim saat PUT = sasaran tidak diubah
+        customerIds:
+          type: array
+          items:
+            type: integer
+          description: wajib minimal satu bila audience=customers; id user ber-role customer
     PaymentMethod:
       type: object
       description: Bentuk admin (config non-rahasia apa adanya + qrisImageUrl terhidrasi)
@@ -6974,6 +8353,38 @@ components:
           minimum: 0
           maximum: 168
           example: 2
+        invoicePrefix:
+          type: string
+          maxLength: 40
+          example: PMS/X/INV/RA
+          description: nomor invoice = {prefix}/{urut per bulan}/{bulan Romawi}/{tahun}; huruf, angka, titik, strip, garis miring
+        invoiceSignerName:
+          type: string
+          maxLength: 120
+          example: Amalia Nasution
+        invoiceSignerTitle:
+          type: string
+          maxLength: 120
+          example: SEVP Operation
+        invoiceCc:
+          type: string
+          maxLength: 120
+          example: ATU, File
+          description: tembusan, dipisah koma
+        shippingOriginLabel:
+          type: string
+          maxLength: 120
+        shippingOriginLat:
+          type: number
+          nullable: true
+          description: sama dengan /admin/shipping-origin
+        shippingOriginLng:
+          type: number
+          nullable: true
+        shippingRoadFactor:
+          type: number
+          minimum: 1
+          maximum: 3
     OrderStatus:
       type: string
       enum:
@@ -7102,6 +8513,20 @@ components:
           type: boolean
           nullable: true
           description: sudah diulas untuk order ini (null bila tidak dimuat)
+        review:
+          type: object
+          nullable: true
+          description: ulasan customer untuk produk ini pada order ini
+          properties:
+            rating:
+              type: integer
+            body:
+              type: string
+              nullable: true
+            date:
+              type: string
+              format: date-time
+              nullable: true
     OrderTimelineEntry:
       type: object
       properties:
@@ -7373,12 +8798,106 @@ components:
         trackingNumber:
           type: string
           nullable: true
+        canCancel:
+          type: boolean
+        canUploadProof:
+          type: boolean
+          nullable: true
+        canConfirmReceived:
+          type: boolean
+        canComplete:
+          type: boolean
+        canReview:
+          type: boolean
+          nullable: true
+          description: order selesai dan masih ada produk yang belum diulas
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+    StatusCountsMeta:
+      type: object
+      description: Angka tab daftar admin — jumlah baris per status sepanjang waktu, tidak ikut filter tanggal/pencarian
+      properties:
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+          example:
+            payment_review: 2
+            paid: 3
+    OrderGroupCounts:
+      type: object
+      description: Jumlah order per kelompok status (sepanjang waktu) untuk tab "Pesanan saya"
+      properties:
+        unpaid:
+          type: integer
+        processing:
+          type: integer
+        shipped:
+          type: integer
+        completed:
+          type: integer
+        cancelled:
+          type: integer
+        to_review:
+          type: integer
+    OrderAttachment:
+      type: object
+      description: Lampiran admin (ASUMSI A-74); berkas privat diunduh lewat GET /files/{media} oleh admin atau pemilik order
+      properties:
+        id:
+          type: integer
+        label:
+          type: string
+          nullable: true
+        file:
+          type: object
+          nullable: true
+          properties:
+            mediaId:
+              type: integer
+            url:
+              type: string
+            originalName:
+              type: string
+            mime:
+              type: string
+            size:
+              type: integer
+        at:
+          type: string
+          format: date-time
+        actor:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+    TrackingUpdate:
+      type: object
+      description: Catatan perjalanan kiriman dari admin selama order berstatus shipped (ASUMSI A-70)
+      properties:
+        id:
+          type: integer
+        note:
+          type: string
+          maxLength: 200
+        at:
+          type: string
+          format: date-time
+        actor:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
     Order:
       type: object
       description: Bentuk Order lengkap (kontrak bagian 9, superset tipe FE). Uang integer rupiah, tanggal ISO-8601 +07:00.
@@ -7461,8 +8980,19 @@ components:
               type: integer
             type:
               type: string
+              enum:
+              - flat
+              - calculated
+              - per_kg
             weightGram:
               type: integer
+            volumeCm3:
+              type: integer
+            distanceKm:
+              type: integer
+              nullable: true
+            breakdown:
+              $ref: '#/components/schemas/ShippingBreakdown'
         shippingAddress:
           type: object
           description: 'CustomerAddress::toSnapshot(): label, recipientName, phone, addressLine, provinceCode…villageCode, region{province,regency,district,village},
@@ -7525,6 +9055,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderTimelineEntry'
+        trackingUpdates:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrackingUpdate'
+        canAddTracking:
+          type: boolean
+          description: true hanya saat status shipped
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderAttachment'
+        canAttach:
+          type: boolean
+          description: true untuk order yang sudah dibayar (paid … completed)
         canCancel:
           type: boolean
         canUploadProof:
@@ -7635,10 +9179,35 @@ components:
         transactionValue:
           type: integer
           description: Σ grandTotal order paid_at ≠ null, status ≥ paid
-        recentOrders:
+        range:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date
+              nullable: true
+            to:
+              type: string
+              format: date
+              nullable: true
+        toReview:
+          type: integer
+          description: order selesai yang masih punya produk belum diulas (sepanjang waktu)
+        actionOrders:
           type: array
+          description: maks. 6 order yang masih terbuka (sepanjang waktu)
           items:
             $ref: '#/components/schemas/OrderSummary'
+        recentOrders:
+          type: array
+          description: 5 order terakhir pada rentang tanggal
+          items:
+            $ref: '#/components/schemas/OrderSummary'
+        monthly:
+          type: array
+          description: belanja 6 bulan terakhir (paid_at)
+          items:
+            $ref: '#/components/schemas/SalesChartPoint'
         account:
           type: object
           properties:
@@ -7838,6 +9407,141 @@ components:
         createdAt:
           type: string
           format: date-time
+    UserNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          example: order.shipped
+          description: order.placed | order.payment_accepted | order.payment_rejected | order.payment_reminder | order.expired | order.cancelled
+            | order.shipped | order.tracking | order.delivered | order.completed | account.approved | account.rejected | voucher.assigned
+        title:
+          $ref: '#/components/schemas/I18n'
+        body:
+          $ref: '#/components/schemas/I18n'
+        url:
+          type: string
+          nullable: true
+          description: path FE tujuan
+          example: /dashboard/pesanan/IKN-20260922-00001
+        data:
+          type: object
+          nullable: true
+        read:
+          type: boolean
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        role:
+          type: string
+          enum:
+          - customer
+          - admin
+        body:
+          type: string
+        context:
+          type: object
+          nullable: true
+          description: 'snapshot rujukan: { type: product, slug, code, name, image, price, unit } atau { type: order, number, status, grandTotal
+            }'
+        senderName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    CustomerChatConversation:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: integer
+        unread:
+          type: integer
+          description: pesan admin yang belum dibaca customer
+        lastMessageAt:
+          type: string
+          format: date-time
+          nullable: true
+    CustomerChat:
+      type: object
+      properties:
+        conversation:
+          $ref: '#/components/schemas/CustomerChatConversation'
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        hasMore:
+          type: boolean
+    AdminChatConversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum:
+          - customer
+          - guest
+        guest:
+          type: object
+          nullable: true
+          description: terisi untuk percakapan tamu (customer null)
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+            phone:
+              type: string
+              nullable: true
+        customer:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            company:
+              type: string
+              nullable: true
+            email:
+              type: string
+            status:
+              type: string
+        unread:
+          type: integer
+          description: pesan customer yang belum dibaca admin
+        lastMessagePreview:
+          type: string
+          nullable: true
+        lastSenderRole:
+          type: string
+          enum:
+          - customer
+          - admin
+          nullable: true
+        lastMessageAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
   parameters:
     OrderNumber:
       name: number

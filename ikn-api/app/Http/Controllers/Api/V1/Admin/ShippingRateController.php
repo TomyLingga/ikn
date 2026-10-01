@@ -57,9 +57,11 @@ class ShippingRateController extends ApiController
     {
         return [
             'name' => $data['name'],
-            'type' => $data['type'],
+            'type' => $data['type'] === ShippingRate::TYPE_PER_KG ? ShippingRate::TYPE_CALCULATED : $data['type'],
             'base_amount' => (int) ($data['baseAmount'] ?? 0),
+            'per_km_amount' => (int) ($data['perKmAmount'] ?? 0),
             'per_kg_amount' => (int) ($data['perKgAmount'] ?? 0),
+            'per_m3_amount' => (int) ($data['perM3Amount'] ?? 0),
             'min_amount' => (int) ($data['minAmount'] ?? 0),
             'free_above' => array_key_exists('freeAbove', $data) && $data['freeAbove'] !== null ? (int) $data['freeAbove'] : null,
             'eta' => $data['eta'] ?? null,

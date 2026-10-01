@@ -9,6 +9,7 @@ import { api, errorMessage } from '@/lib/api';
 import { tr, type PostDetail, type PostSummary } from '@/lib/cms';
 import { formatDate } from '@/lib/format';
 import { formFromPost, toPayload } from './newsForm';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 // News list: GET /admin/news[?q=]. Writing happens in /admin/news/{id|new}.
 export default function AdminNews() {
@@ -65,7 +66,7 @@ export default function AdminNews() {
   }
 
   async function remove(row: PostSummary) {
-    if (!window.confirm(t(`Hapus berita "${tr(row.title, lang)}"?`, `Delete post "${tr(row.title, lang)}"?`))) return;
+    if (!await confirmDialog(t(`Hapus berita "${tr(row.title, lang)}"?`, `Delete post "${tr(row.title, lang)}"?`))) return;
     setError('');
     try {
       await api(`/admin/news/${row.id}`, { method: 'DELETE' });
@@ -99,7 +100,7 @@ export default function AdminNews() {
         </div>
       ),
     },
-    { key: 'tag', label: t('Kategori', 'Tag'), render: (n) => n.tag || '—' },
+    { key: 'category', label: t('Kategori', 'Category'), render: (n) => (n.category ? tr(n.category.name, lang) : '—') },
     { key: 'author', label: t('Penulis', 'Author'), render: (n) => n.author || '—' },
     { key: 'publishedAt', label: t('Tanggal', 'Date'), render: (n) => formatDate(n.publishedAt, lang) },
     {

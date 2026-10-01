@@ -2,10 +2,14 @@
 
 import Link from 'next/link';
 import Icon from '@/components/Icon';
+import SocialIcon from '@/components/SocialIcon';
+import ContactMap from '@/components/ContactMap';
 import { useLang } from '@/components/LanguageProvider';
 import { useSite } from '@/components/SiteProvider';
 import { t } from '@/lib/i18n';
 import { tr } from '@/lib/cms';
+import { contactMapPoints } from '@/components/cms/utils';
+import { isWhatsAppLink, whatsappContacts, whatsappHref } from '@/lib/whatsapp';
 import styles from './Footer.module.css';
 
 // Footer: nav from the CMS footer menu, contact from the shared contact block,
@@ -21,6 +25,13 @@ export default function Footer() {
   const emails = site.contact?.emails ?? [];
   const phones = site.contact?.locations[0]?.phones ?? [];
   const social = site.contact?.social ?? [];
+  // Nomor WhatsApp dari Pengaturan Situs: tautan langsung membuka percakapan (wa.me + pesan awal).
+  const waMessage = tr(site.settings.contact?.whatsapp_message ?? { id: '', en: '' }, lang);
+  const waContacts = whatsappContacts(site.settings, waMessage, lang === 'en' ? 'Marketing' : 'Marketing');
+  const waHref = waContacts[0]?.href ?? '';
+  const socialHref = (label: string, url: string) => (isWhatsAppLink(label, url) ? waHref || whatsappHref(url, waMessage) || url : url);
+  // Pin lokasi pertama (kantor pusat) sebagai peta kecil; kosong bila admin belum menempatkan pin.
+  const mapPoints = site.contact ? contactMapPoints(site.contact, lang).slice(0, 1) : [];
 
   const headline = tr(siteText.footer_headline, lang) || ui.footer.headline;
   const ctaLabel = tr(siteText.footer_cta_label, lang) || ui.footer.startConvo;
@@ -43,6 +54,7 @@ export default function Footer() {
             <Link href="/kontak" className="btn btn-amber">
               {ctaLabel} <Icon name="arrow" />
             </Link>
+            {mapPoints.length > 0 && <ContactMap points={mapPoints} compact lang={lang} />}
           </div>
 
           <div className={styles.columns}>
@@ -70,6 +82,14 @@ export default function Footer() {
                     <a href={`tel:${p.number.replace(/\s/g, '')}`}>{p.number}</a>
                   </li>
                 ))}
+                {waContacts.map((contact) => (
+                  <li key={contact.number}>
+                    <a href={contact.href} target="_blank" rel="noopener noreferrer" className={styles.whatsapp} title={`WhatsApp ${contact.label}`}>
+                      <SocialIcon label="WhatsApp" url={contact.href} /> {waContacts.length > 1 ? `${contact.label} · ` : 'WhatsApp '}
+                      {contact.display}
+                    </a>
+                  </li>
+                ))}
               </ul>
             </div>
 
@@ -78,8 +98,11 @@ export default function Footer() {
               <ul>
                 {social.map((s) => (
                   <li key={s.url || s.label}>
-                    <a href={s.url} target="_blank" rel="noreferrer">
-                      {s.label} <span className={styles.handle}>{s.handle}</span>
+                    <a href={socialHref(s.label, s.url)} target="_blank" rel="noopener noreferrer" className="social-link social-link--footer">
+                      <SocialIcon label={s.label} url={s.url} icon={s.icon} />
+                      <span>
+                        {s.label} <span className={styles.handle}>{s.handle}</span>
+                      </span>
                     </a>
                   </li>
                 ))}

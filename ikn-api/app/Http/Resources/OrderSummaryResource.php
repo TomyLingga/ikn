@@ -7,7 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Baris daftar order (customer & admin, dashboard, laporan): tanpa payments/timeline penuh.
- * Butuh with(['items', 'payments']) untuk itemsCount/activePayment yang murah.
+ * Butuh with(self::eager()) untuk itemsCount/activePayment/canReview yang murah.
  */
 class OrderSummaryResource extends JsonResource
 {
@@ -37,6 +37,7 @@ class OrderSummaryResource extends JsonResource
                 'productSlug' => $item->productSlug(),
                 'name' => $item->productName(),
                 'code' => $item->product_snapshot['code'] ?? null,
+                'image' => $item->product_snapshot['image'] ?? null,
                 'qty' => $item->qty,
                 'unit' => $item->product_snapshot['unit'] ?? null,
                 'unitPrice' => $item->unitPriceInt(),
@@ -49,6 +50,12 @@ class OrderSummaryResource extends JsonResource
             'paidAt' => optional($order->paid_at)->toApiString(),
             'courier' => $order->courier,
             'trackingNumber' => $order->tracking_number,
+            // Flag aksi untuk tombol cepat di daftar "Pesanan saya" (sama artinya dengan OrderResource).
+            'canCancel' => $order->canCancel(),
+            'canUploadProof' => $order->relationLoaded('payments') ? $order->canUploadProof() : null,
+            'canConfirmReceived' => $order->canConfirmReceived(),
+            'canComplete' => $order->canComplete(),
+            'canReview' => $order->relationLoaded('reviews') && $order->relationLoaded('items') ? $order->canReview() : null,
             'createdAt' => optional($order->created_at)->toApiString(),
             'updatedAt' => optional($order->updated_at)->toApiString(),
         ];
@@ -56,6 +63,6 @@ class OrderSummaryResource extends JsonResource
 
     public static function eager(): array
     {
-        return ['items', 'payments'];
+        return ['items', 'payments', 'reviews'];
     }
 }

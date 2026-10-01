@@ -7,7 +7,7 @@ import { Pager } from '@/components/admin/cms';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { apiPaged, errorMessage } from '@/lib/api';
-import { queryString, type AuditLogRow } from '@/lib/admin';
+import { defaultDateRange, queryString, type AuditLogRow } from '@/lib/admin';
 import { formatDateTime } from '@/lib/format';
 import type { PagedMeta } from '@/lib/cms';
 
@@ -36,7 +36,8 @@ export default function AdminAuditLogs() {
   const [page, setPage] = useState(1);
   const [userInput, setUserInput] = useState('');
   const [actionInput, setActionInput] = useState('');
-  const [filters, setFilters] = useState({ user: '', action: '', from: '', to: '' });
+  // Rentang tanggal bawaan: awal bulan s.d. hari ini (kosongkan untuk semua tanggal).
+  const [filters, setFilters] = useState(() => ({ user: '', action: '', ...defaultDateRange() }));
   const [detail, setDetail] = useState<AuditLogRow | null>(null);
 
   const refresh = useCallback(async () => {

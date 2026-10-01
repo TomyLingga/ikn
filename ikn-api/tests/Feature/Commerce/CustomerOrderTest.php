@@ -203,4 +203,95 @@ class CustomerOrderTest extends TestCase
             ->assertJsonPath('data.account.status', 'active')
             ->assertJsonPath('data.account.canOrder', true);
     }
+
+    public function test_dashboard_date_range_does_not_hide_open_orders(): void
+    {
+        Mail::fake();
+        $this->setUpCommerce();
+        $product = $this->makeProduct(['price' => 100000], 100);
+        $oldPending = $this->placeOrder($product, 1);
+        $oldPaid = $this->payOrder($this->placeOrder($product, 2));
+        // Dua order lama (bulan lalu): dibuat dan dibayar di luar rentang bulan ini.
+        $lastMonth = now()->subMonthNoOverflow()->startOfMonth()->addDays(3);
+        Order::whereKey([$oldPending->id, $oldPaid->id])->update(['created_at' => $lastMonth]);
+        Order::whereKey($oldPaid->id)->update(['paid_at' => $lastMonth]);
+        $newPaid = $this->payOrder($this->placeOrder($product, 1));
+
+        $from = now()->startOfMonth()->toDateString();
+        $to = now()->toDateString();
+        $this->actingAs($this->buyer)->getJson("/api/v1/customer/dashboard?from=$from&to=$to")
+            ->assertOk()
+            ->assertJsonPath('data.range.from', $from)
+            ->assertJsonPath('data.totalOrders', 1)
+            ->assertJsonPath('data.transactionValue', $newPaid->grandTotalInt())
+            // Sepanjang waktu: order lama yang belum dibayar/masih berjalan tetap terhitung dan tampil.
+            ->assertJsonPath('data.awaitingPayment', 1)
+            ->assertJsonPath('data.inProgress', 2)
+            ->assertJsonPath('data.toReview', 0)
+            ->assertJsonCount(3, 'data.actionOrders')
+            ->assertJsonPath('data.actionOrders.0.number', $oldPending->number)
+            ->assertJsonCount(1, 'data.recentOrders')
+            ->assertJsonPath('data.recentOrders.0.number', $newPaid->number)
+            ->assertJsonCount(6, 'data.monthly')
+            ->assertJsonPath('data.monthly.5.total', $newPaid->grandTotalInt())
+            ->assertJsonPath('data.monthly.5.orders', 1)
+            ->assertJsonPath('data.monthly.4.total', $oldPaid->grandTotalInt());
+
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/dashboard?from=2026-02-01&to=2026-01-01')->assertStatus(422);
+    }
+
+    public function test_order_list_groups_search_date_range_and_quick_action_flags(): void
+    {
+        Mail::fake();
+        $this->setUpCommerce();
+        $product = $this->makeProduct(['slug' => 'sarung-egrek', 'name' => ['id' => 'Sarung Egrek', 'en' => 'Harvesting Sickle Cover']], 100);
+        $media = $this->makeMedia('egrek.jpg');
+        $product->images()->create(['media_id' => $media->id, 'sort_order' => 0]);
+        $other = $this->makeProduct(['slug' => 'rubber-ring'], 100);
+
+        $pending = $this->placeOrder($product, 1);
+        $done = $this->payOrder($this->placeOrder($other, 1));
+        $sm = app(OrderStateMachine::class);
+        $admin = $this->superAdmin();
+        $sm->transition($done, Order::STATUS_PROCESSING, $admin);
+        $sm->transition($done, Order::STATUS_SHIPPED, $admin, ['courier' => 'JNE', 'trackingNumber' => 'X1']);
+        $shipped = $this->payOrder($this->placeOrder($product, 1));
+        $sm->transition($shipped, Order::STATUS_PROCESSING, $admin);
+        $sm->transition($shipped, Order::STATUS_SHIPPED, $admin, ['courier' => 'JNE', 'trackingNumber' => 'X2']);
+        $sm->transition($done, Order::STATUS_DELIVERED, $this->buyer);
+        $sm->transition($done, Order::STATUS_COMPLETED, $this->buyer);
+
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders')
+            ->assertOk()->assertJsonCount(3, 'data')
+            ->assertJsonPath('meta.groups.unpaid', 1)
+            ->assertJsonPath('meta.groups.processing', 0)
+            ->assertJsonPath('meta.groups.shipped', 1)
+            ->assertJsonPath('meta.groups.completed', 1)
+            ->assertJsonPath('meta.groups.cancelled', 0)
+            ->assertJsonPath('meta.groups.to_review', 1);
+
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders?group=unpaid')
+            ->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.number', $pending->number)
+            ->assertJsonPath('data.0.canCancel', true)
+            ->assertJsonPath('data.0.canUploadProof', true)
+            ->assertJsonPath('data.0.canReview', false)
+            ->assertJsonPath('data.0.items.0.image', $media->url());
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders?group=shipped')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.canConfirmReceived', true);
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders?group=to_review')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.number', $done->number)->assertJsonPath('data.0.canReview', true);
+
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders?q=egrek')->assertOk()->assertJsonCount(2, 'data');
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders?q='.$done->number)->assertOk()->assertJsonCount(1, 'data');
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders?from='.now()->addDay()->toDateString())->assertOk()->assertJsonCount(0, 'data');
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders?group=bogus')->assertStatus(422);
+
+        // Setelah diulas: keluar dari "perlu diulas", detail memuat ulasannya (rating saja tanpa teks boleh).
+        $this->actingAs($this->buyer)->postJson('/api/v1/customer/orders/'.$done->number.'/reviews', [['productSlug' => 'rubber-ring', 'rating' => 4]])
+            ->assertStatus(201)->assertJsonPath('data.order.canReview', false);
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders?group=to_review')->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('meta.groups.to_review', 0);
+        $this->actingAs($this->buyer)->getJson('/api/v1/customer/orders/'.$done->number)
+            ->assertOk()->assertJsonPath('data.items.0.reviewed', true)->assertJsonPath('data.items.0.review.rating', 4)->assertJsonPath('data.items.0.review.body', null);
+    }
 }

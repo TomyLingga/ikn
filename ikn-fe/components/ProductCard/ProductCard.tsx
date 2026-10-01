@@ -12,6 +12,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { stockLabels } from '@/lib/commerce';
 import { formatIDR } from '@/lib/format';
 import { tr } from '@/lib/cms';
+import { useShopPaths } from '@/lib/shop';
 import type { Product } from '@/lib/types';
 
 // Kartu produk katalog: harga efektif (+ coret harga normal saat promo), status stok, tombol keranjang.
@@ -19,13 +20,15 @@ export default function ProductCard({ product }: { product: Product }) {
   const { add } = useCart();
   const { customer } = useAuth();
   const { lang } = useLang();
+  const shop = useShopPaths();
   const [added, setAdded] = useState(false);
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
   const stock = stockLabels[product.stockStatus] || stockLabels.out_of_stock;
   const sellable = isSellable(product);
   const name = tr(product.name, lang);
-  const href = `/catalog/${product.slug}`;
+  // Di portal customer tautan tetap di portal (/dashboard/katalog/{slug}); di situs publik ke /catalog/{slug}.
+  const href = shop.product(product.slug);
   const promo = product.promoPrice != null && product.price != null && product.promoPrice < product.price;
 
   function handleAdd() {
@@ -44,6 +47,11 @@ export default function ProductCard({ product }: { product: Product }) {
         )}
         <span className="pcard-code">{product.code}</span>
         {promo && <span className="pcard-promo">{t('Promo', 'Promo')}</span>}
+        {product.hasVideo && (
+          <span className="pcard-video" title={t('Ada video produk', 'Has a product video')}>
+            <Icon name="play" size={11} /> Video
+          </span>
+        )}
       </Link>
 
       <div className="pcard-body">

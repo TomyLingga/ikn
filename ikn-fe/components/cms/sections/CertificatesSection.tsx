@@ -5,6 +5,7 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { CertificateData, PageSection } from '@/lib/cms';
+import SecHead from './SecHead';
 import { pad2, type EmptyTextContent } from '../utils';
 
 interface Props {
@@ -12,15 +13,18 @@ interface Props {
   items: CertificateData[];
 }
 
-// Certificate list; the rows come from GET /content/certificates (passed via `extra`).
+// Certificate list; the rows come from GET /content/certificates (passed via `extra`). Section id = key (#sertifikat).
 export default function CertificatesSection({ section, items }: Props) {
   const { lang } = useLang();
   const c = section.content as EmptyTextContent;
   const emptyText = tr(c.empty_text, lang) || (lang === 'en' ? 'No certificates published yet.' : 'Belum ada sertifikat yang dipublikasikan.');
+  const label = tr(c.label, lang);
+  const heading = tr(c.heading, lang);
 
   return (
-    <section className="section-tight">
+    <section className="section-tight" id={section.key || undefined}>
       <div className="container">
+        {(label || heading) && <SecHead label={label} heading={heading} />}
         {items.length === 0 ? (
           <p className="form-note">{emptyText}</p>
         ) : (

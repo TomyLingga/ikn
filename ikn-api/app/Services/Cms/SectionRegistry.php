@@ -17,7 +17,7 @@ use App\Support\I18n;
 class SectionRegistry
 {
     public const FIELD_TYPES = [
-        'text', 'textarea', 'number', 'boolean', 'url', 'icon', 'select', 'media', 'color',
+        'text', 'textarea', 'number', 'boolean', 'url', 'icon', 'select', 'media', 'color', 'geo',
         'i18n_text', 'i18n_textarea', 'i18n_richtext', 'list',
     ];
 
@@ -27,6 +27,7 @@ class SectionRegistry
         'compass', 'gear', 'pin', 'phone', 'mail', 'bag', 'image', 'trash', 'orders', 'wallet', 'shieldCheck',
         'package', 'truck', 'checkCircle', 'cancelCircle', 'trendUp', 'users', 'paymentCheck', 'drop', 'check',
         'plus', 'close', 'quote', 'sun', 'moon', 'menu', 'panelLeft',
+        'microscope', 'diamond', 'award', 'globe', 'sparkle', 'factory', 'bell', 'chat', 'video', 'clock', 'store', 'tag', 'search', 'ruler',
     ];
 
     private ?array $definitions = null;
@@ -100,6 +101,12 @@ class SectionRegistry
                 case 'media':
                     $rules[$fieldPath] = [$req, 'integer', 'exists:media,id'];
                     break;
+                case 'geo':
+                    // Titik peta { lat, lng }; keduanya boleh null (tanpa pin).
+                    $rules[$fieldPath] = [$req, 'array'];
+                    $rules["$fieldPath.lat"] = ['nullable', 'numeric', 'between:-90,90'];
+                    $rules["$fieldPath.lng"] = ['nullable', 'numeric', 'between:-180,180'];
+                    break;
                 case 'i18n_text':
                 case 'i18n_textarea':
                 case 'i18n_richtext':
@@ -158,6 +165,12 @@ class SectionRegistry
                 }
 
                 return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+            case 'geo':
+                // Nilai numerik dibulatkan 6 desimal (~0,1 m); nilai di luar rentang dibiarkan agar validator menolak.
+                $lat = is_array($value) && isset($value['lat']) && is_numeric($value['lat']) ? round((float) $value['lat'], 6) : null;
+                $lng = is_array($value) && isset($value['lng']) && is_numeric($value['lng']) ? round((float) $value['lng'], 6) : null;
+
+                return ['lat' => $lat, 'lng' => $lng];
             case 'i18n_text':
             case 'i18n_textarea':
                 return I18n::normalize($value);

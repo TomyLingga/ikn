@@ -9,9 +9,12 @@ import { useLang } from '@/components/LanguageProvider';
 import Icon from '@/components/Icon';
 import { tr } from '@/lib/cms';
 import { formatIDR } from '@/lib/format';
+import { CART_OPEN_EVENT, shopPaths } from '@/lib/shop';
 import styles from './CustomerCart.module.css';
 
-// Laci keranjang di topbar portal customer.
+const paths = shopPaths(true);
+
+// Laci keranjang di topbar portal customer. Tautan produk dan checkout tetap di dalam portal.
 export default function CustomerCart() {
   const [isOpen, setIsOpen] = useState(false);
   const { items, count, subtotal, remove, updateQty, ready } = useCart();
@@ -34,6 +37,13 @@ export default function CustomerCart() {
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [isOpen]);
+
+  // Komponen lain (mis. tombol "Lihat keranjang" di detail produk) membuka laci lewat openCartDrawer().
+  useEffect(() => {
+    const onOpen = () => setIsOpen(true);
+    window.addEventListener(CART_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(CART_OPEN_EVENT, onOpen);
+  }, []);
 
   if (!ready) return null;
 
@@ -86,7 +96,7 @@ export default function CustomerCart() {
                           )}
                         </div>
                         <div className={styles.info}>
-                          <Link href={`/catalog/${item.slug}`} className={styles.name} onClick={() => setIsOpen(false)}>
+                          <Link href={paths.product(item.slug)} className={styles.name} onClick={() => setIsOpen(false)}>
                             {name}
                           </Link>
                           <div className={styles.price}>{formatIDR(item.unitPrice || 0)}/{item.unit}</div>
@@ -114,7 +124,7 @@ export default function CustomerCart() {
                   <span>{t('Estimasi subtotal', 'Estimated subtotal')}</span>
                   <strong>{formatIDR(subtotal)}</strong>
                 </div>
-                <Link href="/checkout" className="btn btn-solid btn-full" onClick={() => setIsOpen(false)}>
+                <Link href={paths.checkout} className="btn btn-solid btn-full" onClick={() => setIsOpen(false)}>
                   {t('Checkout', 'Checkout')} <Icon name="arrow" />
                 </Link>
               </div>

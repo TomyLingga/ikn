@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -9,9 +9,11 @@ import ThemeToggle from '@/components/ThemeToggle';
 import LangToggle from '@/components/LangToggle';
 import SidebarToggle from '@/components/SidebarToggle';
 import SessionLoader from '@/components/SessionLoader';
+import AdminFieldHelp from '@/components/admin/AdminFieldHelp';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api } from '@/lib/api';
+import { ADMIN_BADGES_EVENT } from '@/lib/admin';
 import type { IconName } from '@/lib/types';
 import styles from './AdminShell.module.css';
 
@@ -28,11 +30,13 @@ const moduleByHref: Record<string, string> = {
   '/admin/product-categories': 'categories',
   '/admin/reviews': 'products',
   '/admin/customers': 'customers',
+  '/admin/chat': 'chat',
   '/admin/shipping': 'shipping',
   '/admin/vouchers': 'vouchers',
   '/admin/payment-methods': 'payment_methods',
   '/admin/bank-accounts': 'bank_accounts',
-  '/admin/checkout-settings': 'fees',
+  '/admin/additional-fees': 'fees',
+  '/admin/checkout-settings': 'settings',
   '/admin/reports/sales': 'reports',
   '/admin/audit-logs': 'audit',
   '/admin/pages': 'cms',
@@ -41,6 +45,7 @@ const moduleByHref: Record<string, string> = {
   '/admin/content/media': 'media',
   '/admin/gallery': 'gallery',
   '/admin/news': 'news',
+  '/admin/news-categories': 'news',
   '/admin/certificates': 'certificates',
   '/admin/brochures': 'brochures',
   '/admin/whistleblowing': 'wbs',
@@ -60,111 +65,137 @@ interface HelpGuide {
   file: { url: string; originalName: string } | null;
 }
 
+type Label = Record<'id' | 'en', string>;
+
 interface NavItem {
   href: string;
-  label: string;
-  icon: IconName;
+  label: Label;
 }
-interface NavGroup {
-  title: string;
+// Menu yang bisa dibuka-tutup (akordeon); `items` kosong setelah disaring izin = menu disembunyikan.
+interface NavMenu {
+  key: string;
+  label: Label;
+  icon: IconName;
   items: NavItem[];
 }
+interface NavSection {
+  key: string;
+  title: Label;
+  menus: NavMenu[];
+}
 
-// Grup menu navigasi admin ID.
-const groupsId: NavGroup[] = [
+const dashboardLink = { href: '/admin', label: { id: 'Dashboard', en: 'Dashboard' }, icon: 'target' as IconName };
+
+// Sidebar admin: tiga bagian, tiap bagian berisi beberapa menu berakordeon (hanya satu menu terbuka).
+const navSections: NavSection[] = [
   {
-    title: 'Utama',
-    items: [{ href: '/admin', label: 'Dashboard', icon: 'target' }],
-  },
-  {
-    title: 'Commerce',
-    items: [
-      { href: '/admin/orders', label: 'Order', icon: 'orders' },
-      { href: '/admin/payments', label: 'Pembayaran', icon: 'paymentCheck' },
-      { href: '/admin/products', label: 'Produk', icon: 'flask' },
-      { href: '/admin/product-categories', label: 'Kategori Produk', icon: 'package' },
-      { href: '/admin/reviews', label: 'Ulasan', icon: 'quote' },
-      { href: '/admin/customers', label: 'Customer', icon: 'handshake' },
-      { href: '/admin/shipping', label: 'Ongkir', icon: 'truck' },
-      { href: '/admin/vouchers', label: 'Voucher', icon: 'target' },
-      { href: '/admin/payment-methods', label: 'Metode Bayar', icon: 'wallet' },
-      { href: '/admin/bank-accounts', label: 'Rekening Bank', icon: 'shieldCheck' },
-      { href: '/admin/checkout-settings', label: 'Pengaturan Checkout', icon: 'gear' },
-      { href: '/admin/reports/sales', label: 'Laporan Penjualan', icon: 'trendUp' },
+    key: 'commerce',
+    title: { id: 'Toko', en: 'Store' },
+    menus: [
+      {
+        key: 'sales',
+        label: { id: 'Penjualan', en: 'Sales' },
+        icon: 'orders',
+        items: [
+          { href: '/admin/orders', label: { id: 'Order', en: 'Orders' } },
+          { href: '/admin/payments', label: { id: 'Pembayaran', en: 'Payments' } },
+          { href: '/admin/customers', label: { id: 'Customer', en: 'Customers' } },
+          { href: '/admin/chat', label: { id: 'Live Chat', en: 'Live Chat' } },
+          { href: '/admin/reports/sales', label: { id: 'Laporan Penjualan', en: 'Sales Reports' } },
+        ],
+      },
+      {
+        key: 'catalog',
+        label: { id: 'Katalog', en: 'Catalog' },
+        icon: 'package',
+        items: [
+          { href: '/admin/products', label: { id: 'Produk', en: 'Products' } },
+          { href: '/admin/product-categories', label: { id: 'Kategori Produk', en: 'Product Categories' } },
+          { href: '/admin/reviews', label: { id: 'Ulasan', en: 'Reviews' } },
+        ],
+      },
+      {
+        key: 'store-settings',
+        label: { id: 'Pengaturan Toko', en: 'Store Settings' },
+        icon: 'wallet',
+        items: [
+          { href: '/admin/shipping', label: { id: 'Ongkir', en: 'Shipping Rates' } },
+          { href: '/admin/vouchers', label: { id: 'Voucher', en: 'Vouchers' } },
+          { href: '/admin/additional-fees', label: { id: 'Biaya Tambahan', en: 'Additional Fees' } },
+          { href: '/admin/payment-methods', label: { id: 'Metode Bayar', en: 'Payment Methods' } },
+          { href: '/admin/bank-accounts', label: { id: 'Rekening Bank', en: 'Bank Accounts' } },
+          { href: '/admin/checkout-settings', label: { id: 'Pengaturan Checkout', en: 'Checkout Settings' } },
+        ],
+      },
     ],
   },
   {
-    title: 'Konten',
-    items: [
-      { href: '/admin/pages', label: 'Halaman', icon: 'panelLeft' },
-      { href: '/admin/navigation', label: 'Menu Navigasi', icon: 'compass' },
-      { href: '/admin/content/media', label: 'Video & Gambar', icon: 'image' },
-      { href: '/admin/news', label: 'Berita', icon: 'quote' },
-      { href: '/admin/gallery', label: 'Galeri Foto', icon: 'play' },
-      { href: '/admin/certificates', label: 'Sertifikat', icon: 'shieldCheck' },
-      { href: '/admin/brochures', label: 'Brosur Unduhan', icon: 'package' },
-      { href: '/admin/customer-logos', label: 'Logo Pelanggan', icon: 'handshake' },
-      { href: '/admin/contact-messages', label: 'Pesan Kontak', icon: 'mail' },
-      { href: '/admin/whistleblowing', label: 'Pelaporan WBS', icon: 'leaf' },
+    key: 'content',
+    title: { id: 'Konten', en: 'Content' },
+    menus: [
+      {
+        key: 'pages',
+        label: { id: 'Halaman & Menu', en: 'Pages & Menus' },
+        icon: 'panelLeft',
+        items: [
+          { href: '/admin/pages', label: { id: 'Halaman', en: 'Pages' } },
+          { href: '/admin/navigation', label: { id: 'Menu Navigasi', en: 'Navigation' } },
+          { href: '/admin/content/media', label: { id: 'Video & Gambar', en: 'Media Library' } },
+        ],
+      },
+      {
+        key: 'news',
+        label: { id: 'Berita & Galeri', en: 'News & Gallery' },
+        icon: 'image',
+        items: [
+          { href: '/admin/news', label: { id: 'Berita', en: 'News' } },
+          { href: '/admin/news-categories', label: { id: 'Kategori Berita', en: 'News Categories' } },
+          { href: '/admin/gallery', label: { id: 'Galeri Foto', en: 'Gallery' } },
+        ],
+      },
+      {
+        key: 'documents',
+        label: { id: 'Dokumen & Mitra', en: 'Documents & Partners' },
+        icon: 'shieldCheck',
+        items: [
+          { href: '/admin/certificates', label: { id: 'Sertifikat', en: 'Certificates' } },
+          { href: '/admin/brochures', label: { id: 'Brosur Unduhan', en: 'Brochures' } },
+          { href: '/admin/customer-logos', label: { id: 'Logo Pelanggan', en: 'Customer Logos' } },
+        ],
+      },
+      {
+        key: 'inbox',
+        label: { id: 'Kotak Masuk', en: 'Inbox' },
+        icon: 'mail',
+        items: [
+          { href: '/admin/contact-messages', label: { id: 'Pesan Kontak', en: 'Contact Messages' } },
+          { href: '/admin/whistleblowing', label: { id: 'Pelaporan WBS', en: 'WBS Reports' } },
+        ],
+      },
     ],
   },
   {
-    title: 'Sistem',
-    items: [
-      { href: '/admin/site-settings', label: 'Pengaturan Situs', icon: 'gear' },
-      { href: '/admin/users', label: 'Akun Admin', icon: 'users' },
-      { href: '/admin/audit-logs', label: 'Audit Log', icon: 'shieldCheck' },
+    key: 'system',
+    title: { id: 'Sistem', en: 'System' },
+    menus: [
+      {
+        key: 'settings',
+        label: { id: 'Pengaturan', en: 'Settings' },
+        icon: 'gear',
+        items: [
+          { href: '/admin/site-settings', label: { id: 'Pengaturan Situs', en: 'Site Settings' } },
+          { href: '/admin/users', label: { id: 'Akun Admin', en: 'Admin Accounts' } },
+          { href: '/admin/audit-logs', label: { id: 'Audit Log', en: 'Audit Log' } },
+        ],
+      },
     ],
   },
 ];
 
-// Grup menu navigasi admin EN.
-const groupsEn: NavGroup[] = [
-  {
-    title: 'Main',
-    items: [{ href: '/admin', label: 'Dashboard', icon: 'target' }],
-  },
-  {
-    title: 'Commerce',
-    items: [
-      { href: '/admin/orders', label: 'Orders', icon: 'orders' },
-      { href: '/admin/payments', label: 'Payments', icon: 'paymentCheck' },
-      { href: '/admin/products', label: 'Products', icon: 'flask' },
-      { href: '/admin/product-categories', label: 'Product Categories', icon: 'package' },
-      { href: '/admin/reviews', label: 'Reviews', icon: 'quote' },
-      { href: '/admin/customers', label: 'Customers', icon: 'handshake' },
-      { href: '/admin/shipping', label: 'Shipping Rates', icon: 'truck' },
-      { href: '/admin/vouchers', label: 'Vouchers', icon: 'target' },
-      { href: '/admin/payment-methods', label: 'Payment Methods', icon: 'wallet' },
-      { href: '/admin/bank-accounts', label: 'Bank Accounts', icon: 'shieldCheck' },
-      { href: '/admin/checkout-settings', label: 'Checkout Settings', icon: 'gear' },
-      { href: '/admin/reports/sales', label: 'Sales Reports', icon: 'trendUp' },
-    ],
-  },
-  {
-    title: 'Content',
-    items: [
-      { href: '/admin/pages', label: 'Pages', icon: 'panelLeft' },
-      { href: '/admin/navigation', label: 'Navigation', icon: 'compass' },
-      { href: '/admin/content/media', label: 'Media Library', icon: 'image' },
-      { href: '/admin/news', label: 'News', icon: 'quote' },
-      { href: '/admin/gallery', label: 'Gallery', icon: 'play' },
-      { href: '/admin/certificates', label: 'Certificates', icon: 'shieldCheck' },
-      { href: '/admin/brochures', label: 'Brochures', icon: 'package' },
-      { href: '/admin/customer-logos', label: 'Customer Logos', icon: 'handshake' },
-      { href: '/admin/contact-messages', label: 'Contact Messages', icon: 'mail' },
-      { href: '/admin/whistleblowing', label: 'WBS Reports', icon: 'leaf' },
-    ],
-  },
-  {
-    title: 'System',
-    items: [
-      { href: '/admin/site-settings', label: 'Site Settings', icon: 'gear' },
-      { href: '/admin/users', label: 'Admin Accounts', icon: 'users' },
-      { href: '/admin/audit-logs', label: 'Audit Log', icon: 'shieldCheck' },
-    ],
-  },
-];
+// Aktif bila persis sama atau berada di bawahnya ("/admin/news" tidak ikut aktif di "/admin/news-categories").
+function isActivePath(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export default function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -172,8 +203,10 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [allowed, setAllowed] = useState<string[] | null>(null);
+  // Badge jumlah per href menu: pembayaran menunggu verifikasi, customer menunggu persetujuan, chat belum dibaca.
+  const [badges, setBadges] = useState<Record<string, number>>({});
   const [profileOpen, setProfileOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [helpGuideData, setHelpGuideData] = useState<HelpGuide | null>(null);
@@ -182,7 +215,6 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const { lang } = useLang();
 
   const isLoginPage = pathname === '/admin/login';
-  const groups = lang === 'en' ? groupsEn : groupsId;
 
   // Auto-close profile dropdown when clicking outside
   useEffect(() => {
@@ -218,30 +250,65 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     };
   }, [admin]);
 
-  // Filter menu berdasarkan permission admin.
-  const visibleGroups: NavGroup[] = useMemo(
-    () =>
-      groups
-        .map((g) => ({
-          ...g,
-          items: g.items.filter((it) => {
-            if (!admin) return false;
-            if (admin.role === 'super_admin') return true;
-            if (superAdminOnly.has(it.href)) return false;
-            if (it.href === '/admin') return true;
-            const requiredModule = moduleByHref[it.href];
-            if (!requiredModule) return true;
-            return (allowed ?? []).includes(requiredModule);
-          }),
-        }))
-        .filter((g) => g.items.length > 0),
-    [groups, admin, allowed],
-  );
+  // Badge sidebar dari GET /admin/badges: order dibayar yang masih berjalan, bukti bayar menunggu verifikasi, customer menunggu persetujuan, dan
+  // percakapan chat yang belum dibaca (null = admin tidak punya modulnya). Dihitung ulang saat pindah halaman,
+  // tiap 30 detik, saat jendela kembali aktif, dan ketika halaman lain memanggil refreshAdminBadges().
+  const loadBadges = useCallback(async () => {
+    if (!admin) {
+      setBadges({});
+      return;
+    }
+    try {
+      const result = await api<{ orders?: number | null; payments: number | null; customers: number | null; chat: number | null }>('/admin/badges');
+      setBadges({
+        '/admin/orders': result.orders ?? 0,
+        '/admin/payments': result.payments ?? 0,
+        '/admin/customers': result.customers ?? 0,
+        '/admin/chat': result.chat ?? 0,
+      });
+    } catch {
+      // Badge bukan fitur kritis: biarkan nilai terakhir bila API sedang gagal.
+    }
+  }, [admin]);
+
+  useEffect(() => {
+    void loadBadges();
+  }, [loadBadges, pathname]);
+
+  useEffect(() => {
+    const refresh = () => void loadBadges();
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener(ADMIN_BADGES_EVENT, refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(ADMIN_BADGES_EVENT, refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [loadBadges]);
+
+  // Saring item menurut izin admin; menu dan bagian yang kosong ikut hilang.
+  const visibleSections: NavSection[] = useMemo(() => {
+    const allowedItem = (it: NavItem) => {
+      if (!admin) return false;
+      if (admin.role === 'super_admin') return true;
+      if (superAdminOnly.has(it.href)) return false;
+      const requiredModule = moduleByHref[it.href];
+      if (!requiredModule) return true;
+      return (allowed ?? []).includes(requiredModule);
+    };
+    return navSections
+      .map((section) => ({
+        ...section,
+        menus: section.menus.map((menu) => ({ ...menu, items: menu.items.filter(allowedItem) })).filter((menu) => menu.items.length > 0),
+      }))
+      .filter((section) => section.menus.length > 0);
+  }, [admin, allowed]);
 
   // Responsif & keyboard shortcut
   useEffect(() => {
     const checkMobile = () => {
-      const mobile = window.innerWidth <= 900;
+      const mobile = window.innerWidth <= 1000; // sama dengan breakpoint drawer di AdminShell.module.css
       setIsMobile(mobile);
       if (mobile) setCollapsed(false);
     };
@@ -270,28 +337,20 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     setOpen(false);
   }, [pathname]);
 
-  // Auto-expand group yang berisi halaman aktif
+  // Menu yang memuat halaman aktif terbuka otomatis saat rute berganti (akordeon: yang lain tertutup).
   useEffect(() => {
-    const activeGroup = visibleGroups.find((g) =>
-      g.items.some((it) =>
-        it.href === '/admin'
-          ? pathname === '/admin'
-          : pathname.startsWith(it.href)
-      )
-    );
-    if (activeGroup) {
-      setExpandedGroups((prev) => ({
-        ...prev,
-        [activeGroup.title]: true,
-      }));
-    }
-  }, [pathname, visibleGroups]);
+    const active = visibleSections.flatMap((section) => section.menus).find((menu) => menu.items.some((it) => isActivePath(pathname, it.href)));
+    if (active) setOpenMenu(active.key);
+  }, [pathname, visibleSections]);
 
-  const toggleGroup = (title: string) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [title]: !prev[title],
-    }));
+  const toggleMenu = (key: string) => {
+    // Sidebar ciut hanya menampilkan ikon: klik ikon melebarkan sidebar dan membuka menunya.
+    if (collapsed && !isMobile) {
+      setCollapsed(false);
+      setOpenMenu(key);
+      return;
+    }
+    setOpenMenu((current) => (current === key ? null : key));
   };
 
   const handleLogout = async () => {
@@ -359,10 +418,11 @@ export default function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className={`${styles.shell} ${open ? styles.open : ''} ${
+      className={`${styles.shell} admin-app ${open ? styles.open : ''} ${
         collapsed ? styles.collapsed : ''
       }`}
     >
+      <AdminFieldHelp />
       {/* ASIDE / SIDEBAR */}
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
@@ -381,67 +441,70 @@ export default function AdminShell({ children }: { children: ReactNode }) {
           </Link>
         </div>
 
-        <nav className={styles.nav} aria-label="Navigasi admin">
-          {visibleGroups.map((g) => {
-            const isGroupOpen = expandedGroups[g.title] !== false; // Default open
-            const hasActiveChild = g.items.some((it) =>
-              it.href === '/admin'
-                ? pathname === '/admin'
-                : pathname.startsWith(it.href)
-            );
+        <nav className={styles.nav} aria-label={lang === 'en' ? 'Admin navigation' : 'Navigasi admin'}>
+          <Link
+            href={dashboardLink.href}
+            className={`${styles.menuHead} ${pathname === dashboardLink.href ? styles.active : ''}`}
+            onClick={() => setOpen(false)}
+            title={collapsed && !isMobile ? dashboardLink.label[lang] : undefined}
+          >
+            <Icon name={dashboardLink.icon} size={17} />
+            <span className={styles.menuLabel}>{dashboardLink.label[lang]}</span>
+          </Link>
 
-            return (
-              <div
-                key={g.title}
-                className={`${styles.navGroup} ${
-                  hasActiveChild ? styles.groupHasActive : ''
-                }`}
-              >
-                <button
-                  type="button"
-                  className={styles.groupHead}
-                  onClick={() => toggleGroup(g.title)}
-                  title={collapsed && !isMobile ? g.title : undefined}
-                >
-                  <span className={styles.groupTitle}>{g.title}</span>
-                  {!collapsed && (
-                    <Icon
-                      name="chevronRight"
-                      size={14}
-                      className={`${styles.groupChevron} ${
-                        isGroupOpen ? styles.chevronOpen : ''
-                      }`}
-                    />
-                  )}
-                </button>
-
-                <div
-                  className={`${styles.groupItems} ${
-                    isGroupOpen ? styles.itemsOpen : styles.itemsClosed
-                  }`}
-                >
-                  {g.items.map((it) => {
-                    const active =
-                      it.href === '/admin'
-                        ? pathname === '/admin'
-                        : pathname.startsWith(it.href);
-                    return (
-                      <Link
-                        key={it.href}
-                        href={it.href}
-                        className={`${styles.navLink} ${active ? styles.active : ''}`}
-                        onClick={() => setOpen(false)}
-                        title={collapsed && !isMobile ? it.label : undefined}
-                      >
-                        <Icon name={it.icon} size={17} />
-                        <span>{it.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+          {visibleSections.map((section) => (
+            <div key={section.key} className={styles.navSection}>
+              <span className={styles.sectionTitle}>{section.title[lang]}</span>
+              {section.menus.map((menu) => {
+                const isOpen = openMenu === menu.key;
+                const hasActive = menu.items.some((it) => isActivePath(pathname, it.href));
+                const menuBadge = menu.items.reduce((sum, it) => sum + (badges[it.href] || 0), 0);
+                const panelId = `admin-menu-${menu.key}`;
+                return (
+                  <div key={menu.key} className={`${styles.menu} ${isOpen ? styles.menuOpen : ''}`}>
+                    <button
+                      type="button"
+                      className={`${styles.menuHead} ${hasActive ? styles.menuHasActive : ''}`}
+                      onClick={() => toggleMenu(menu.key)}
+                      aria-expanded={isOpen}
+                      aria-controls={panelId}
+                      title={collapsed && !isMobile ? menu.label[lang] : undefined}
+                    >
+                      <Icon name={menu.icon} size={17} />
+                      <span className={styles.menuLabel}>{menu.label[lang]}</span>
+                      {/* Menu tertutup (atau sidebar ciut) tetap memperlihatkan jumlah yang menunggu di dalamnya. */}
+                      {menuBadge > 0 && (!isOpen || collapsed) && (
+                        <span className={`${styles.badge} ${styles.menuBadge}`} aria-label={`${menuBadge} ${lang === 'en' ? 'waiting' : 'menunggu'}`}>
+                          {menuBadge > 99 ? '99+' : menuBadge}
+                        </span>
+                      )}
+                      <Icon name="chevronRight" size={14} className={styles.menuChevron} />
+                    </button>
+                    <div id={panelId} className={styles.menuPanel}>
+                      <div className={styles.menuItems}>
+                        {menu.items.map((it) => (
+                          <Link
+                            key={it.href}
+                            href={it.href}
+                            className={`${styles.navLink} ${isActivePath(pathname, it.href) ? styles.active : ''}`}
+                            onClick={() => setOpen(false)}
+                            tabIndex={isOpen ? undefined : -1}
+                          >
+                            <span>{it.label[lang]}</span>
+                            {(badges[it.href] || 0) > 0 && (
+                              <span className={styles.badge} aria-label={`${badges[it.href]} ${lang === 'en' ? 'waiting' : 'menunggu'}`}>
+                                {(badges[it.href] || 0) > 99 ? '99+' : badges[it.href]}
+                              </span>
+                            )}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <button

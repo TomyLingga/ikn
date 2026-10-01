@@ -10,12 +10,16 @@ import MediaGrid, { formatBytes, isImageMedia } from './MediaGrid';
 import Pager from './Pager';
 import { mediaId, mediaSummary, type MediaValue } from './schema';
 
-export type MediaKind = 'image' | 'document';
+export type MediaKind = 'image' | 'document' | 'video' | 'visual';
 
 const ACCEPT_ATTR: Record<MediaKind, string> = {
   image: 'image/*',
   document: '.pdf,application/pdf',
+  video: 'video/mp4,video/webm',
+  visual: 'image/*,video/mp4,video/webm', // gambar atau video (kepala halaman)
 };
+
+const isVideoMedia = (media: { mime: string }) => media.mime.startsWith('video/');
 
 // Media field: shows the current file, uploads a new one, or picks from the library.
 // `value` may be a hydrated summary, `{ id }`, a raw id, or null; onChange gives the summary.
@@ -65,6 +69,8 @@ export default function MediaPicker({
   if (summary && isImageMedia(summary)) {
     // eslint-disable-next-line @next/next/no-img-element
     preview = <img className="admin-image-preview" src={summary.url} alt={summary.originalName} />;
+  } else if (summary && isVideoMedia(summary)) {
+    preview = <video className="admin-image-preview" src={summary.url} muted controls preload="metadata" />;
   } else if (id) {
     preview = (
       <div className="admin-image-placeholder">

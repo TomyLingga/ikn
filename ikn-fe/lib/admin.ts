@@ -3,7 +3,7 @@
 // audit) sesuai Resource di ikn-api. Tipe customer/publik ada di lib/types.ts (milik FE-A) dan
 // tidak diduplikasi di sini; file ini hanya menambah superset admin + label UI + helper kecil.
 
-import type { I18n, MediaSummary } from '@/lib/cms';
+import type { I18n, MediaSummary, PagedMeta } from '@/lib/cms';
 import type {
   AccountStatus,
   BankAccountInfo,
@@ -109,6 +109,10 @@ export interface AdminProductImage {
   id: number;
   url: string | null;
   sort: number;
+  /** Media produk bisa foto atau video (ASUMSI A-72). */
+  type?: 'image' | 'video';
+  mime?: string | null;
+  isThumbnail?: boolean;
   mediaId: number;
   media: MediaSummary | null;
 }
@@ -124,6 +128,8 @@ export interface AdminProduct extends Omit<Product, 'images' | 'category'> {
   reserved: number;
   isPublished: boolean;
   images: AdminProductImage[];
+  /** Foto yang menjadi thumbnail (pilihan admin, atau foto pertama); null bila belum ada foto. */
+  thumbnailMediaId?: number | null;
   createdAt: string | null;
   updatedAt: string | null;
   deletedAt: string | null;
@@ -150,10 +156,16 @@ export interface ProductPayload {
   unit: string;
   moq: number;
   weightGram: number;
+  lengthCm: number | null;
+  widthCm: number | null;
+  heightCm: number | null;
   stockStatus: StockStatus | null;
   isTaxable: boolean;
   isPublished: boolean;
+  /** Id media foto/video berurutan. */
   images: number[];
+  /** Foto di dalam `images` yang menjadi thumbnail; null = foto pertama. */
+  thumbnailMediaId: number | null;
 }
 
 export type StockMovementType = 'in' | 'adjust' | 'reserve' | 'release' | 'commit';
@@ -228,6 +240,17 @@ export interface BankAccountRow extends BankAccountInfo {
 
 export type FeeType = 'admin' | 'other';
 
+/** Sasaran voucher/biaya tambahan: semua customer atau hanya yang dipilih (ASUMSI A-67). */
+export type Audience = 'all' | 'customers';
+
+/** Baris GET /admin/customer-options dan isi `customers[]` pada voucher/biaya. */
+export interface CustomerOption {
+  id: number;
+  name: string;
+  company: string | null;
+  email: string;
+}
+
 export interface FeeRow {
   id: number;
   name: I18n;
@@ -235,6 +258,8 @@ export interface FeeRow {
   amount: number;
   isActive: boolean;
   sortOrder: number;
+  audience: Audience;
+  customers: CustomerOption[];
 }
 
 export interface CommerceSettingsData {
@@ -244,9 +269,36 @@ export interface CommerceSettingsData {
   priceIncludesTax: boolean;
   autoCompleteDays: number;
   reminderHoursBeforeDue: number;
+  /** Nomor invoice: {invoicePrefix}/{urut per bulan}/{bulan Romawi}/{tahun}. */
+  invoicePrefix: string;
+  invoiceSignerName: string;
+  invoiceSignerTitle: string;
+  invoiceCc: string;
 }
 
-export type ShippingRateType = 'flat' | 'per_kg';
+/** flat = tarif tetap; calculated = dasar + jarak (km) + berat (kg) + volume (m³), ASUMSI A-76. */
+export type ShippingRateType = 'flat' | 'calculated';
+
+export interface ShippingOrigin {
+  label: string;
+  lat: number | null;
+  lng: number | null;
+  roadFactor: number;
+}
+
+/** Rincian ongkir yang sama dengan ShippingRate::breakdown() di server (untuk pratinjau form tarif). */
+export function previewShippingAmount(
+  rate: { type: ShippingRateType; baseAmount: number; perKmAmount: number; perKgAmount: number; perM3Amount: number; minAmount: number },
+  input: { km: number; kg: number; m3: number },
+): { base: number; distance: number; weight: number; volume: number; total: number; minimumApplied: boolean } {
+  const base = rate.baseAmount;
+  const calc = rate.type === 'calculated';
+  const distance = calc ? rate.perKmAmount * Math.max(0, Math.ceil(input.km)) : 0;
+  const weight = calc ? rate.perKgAmount * Math.max(0, Math.ceil(input.kg)) : 0;
+  const volume = calc ? Math.round(rate.perM3Amount * (Math.ceil(Math.max(0, input.m3) * 100 - 1e-9) / 100)) : 0;
+  const sum = base + distance + weight + volume;
+  return { base, distance, weight, volume, total: Math.max(rate.minAmount, sum), minimumApplied: rate.minAmount > sum };
+}
 
 export interface ShippingRateRow {
   id: number;
@@ -254,7 +306,9 @@ export interface ShippingRateRow {
   name: I18n;
   type: ShippingRateType;
   baseAmount: number;
+  perKmAmount: number;
   perKgAmount: number;
+  perM3Amount: number;
   minAmount: number;
   freeAbove: number | null;
   eta: I18n | null;
@@ -295,6 +349,8 @@ export interface VoucherRow {
   startsAt: string | null;
   endsAt: string | null;
   isActive: boolean;
+  audience: Audience;
+  customers: CustomerOption[];
 }
 
 export type PaymentDriver = 'manual' | 'xendit';
@@ -361,13 +417,27 @@ export const feeTypeLabels: Record<FeeType, { id: string; en: string }> = {
 
 export const shippingRateTypeLabels: Record<ShippingRateType, { id: string; en: string }> = {
   flat: { id: 'Tarif tetap', en: 'Flat rate' },
-  per_kg: { id: 'Per kg', en: 'Per kg' },
+  calculated: { id: 'Dihitung (jarak, berat, volume)', en: 'Calculated (distance, weight, volume)' },
 };
 
 export const voucherTypeLabels: Record<VoucherType, { id: string; en: string }> = {
   percent: { id: 'Persentase (%)', en: 'Percentage (%)' },
   fixed: { id: 'Nominal tetap (Rp)', en: 'Fixed amount (Rp)' },
 };
+
+export const audienceLabels: Record<Audience, { id: string; en: string }> = {
+  all: { id: 'Semua customer', en: 'All customers' },
+  customers: { id: 'Customer tertentu', en: 'Selected customers' },
+};
+
+/** Ringkasan sasaran untuk sel tabel: "Semua customer" atau "PT A, PT B +2". */
+export function audienceSummary(row: { audience: Audience; customers: CustomerOption[] }, lang: 'id' | 'en'): string {
+  if (row.audience !== 'customers') return audienceLabels.all[lang];
+  const names = row.customers.map((c) => c.company || c.name);
+  if (names.length === 0) return lang === 'en' ? 'No customer selected' : 'Belum ada customer';
+  const shown = names.slice(0, 2).join(', ');
+  return names.length > 2 ? `${shown} +${names.length - 2}` : shown;
+}
 
 export const voucherScopeLabels: Record<VoucherScope, { id: string; en: string }> = {
   all: { id: 'Semua produk', en: 'All products' },
@@ -398,6 +468,27 @@ export function queryString(params: Record<string, string | number | boolean | n
   }
   const out = search.toString();
   return out ? `?${out}` : '';
+}
+
+/** Tanggal `YYYY-MM-DD` menurut zona browser (nilai input `date`). */
+export function isoDate(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Rentang bawaan filter daftar admin: awal bulan berjalan sampai hari ini. */
+/** Meta daftar admin + `counts` per status sepanjang waktu (angka tab), dari GET /admin/{orders,payments,customers}. */
+export type CountsMeta = PagedMeta & { counts?: Record<string, number> };
+
+export function defaultDateRange(now: Date = new Date()): { from: string; to: string } {
+  return { from: isoDate(new Date(now.getFullYear(), now.getMonth(), 1)), to: isoDate(now) };
+}
+
+/** Event jendela untuk meminta sidebar admin menghitung ulang badge (mis. setelah verifikasi pembayaran). */
+export const ADMIN_BADGES_EVENT = 'ikn:admin-badges';
+
+export function refreshAdminBadges(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(ADMIN_BADGES_EVENT));
 }
 
 /** ISO-8601 (+07:00) → nilai input `datetime-local` (zona browser). */
@@ -448,4 +539,20 @@ export function paymentMethodSummary(payment: Payment, lang: 'id' | 'en'): strin
   if (payment.type === 'qris_static' || payment.type === 'qris_dynamic') return `${name} · QRIS`;
   if (payment.gateway?.bankCode) return `${name} · ${String(payment.gateway.bankCode)}`;
   return name;
+}
+
+// ---- Live chat (ASUMSI A-73) ----
+/** Baris kotak masuk chat admin: GET /admin/chats. */
+export interface AdminChatConversation {
+  id: number;
+  /** guest = pengunjung belum login (identitas dari formulir), customer = akun. */
+  kind: 'customer' | 'guest';
+  customer: { id: number; name: string; company: string | null; email: string; status: string } | null;
+  guest: { name: string; email: string; phone: string | null } | null;
+  /** Pesan customer yang belum dibaca admin. */
+  unread: number;
+  lastMessagePreview: string | null;
+  lastSenderRole: 'customer' | 'admin' | null;
+  lastMessageAt: string | null;
+  createdAt: string | null;
 }

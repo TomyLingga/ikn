@@ -145,7 +145,7 @@ paths:
     post:
       tags: [admin-catalog]
       security: [{ cookieAuth: [] }]
-      summary: Buat produk (+ images[] mediaId berurutan). Stok awal lewat POST /admin/products/{product}/stock.
+      summary: Buat produk (+ images[] mediaId foto/video berurutan, thumbnailMediaId). Stok awal lewat POST /admin/products/{product}/stock.
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProductInput' } } } }
       responses:
         '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminProduct' } } } } } }
@@ -288,6 +288,15 @@ paths:
       parameters: [{ name: bankAccount, in: path, required: true, schema: { type: integer } }]
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
+  /admin/customer-options:
+    get:
+      tags: [admin-commerce-config]
+      security: [{ cookieAuth: [] }]
+      summary: Daftar ringkas customer aktif untuk pemilih sasaran voucher/biaya (maks. 20; modul customers, vouchers, atau fees)
+      parameters: [{ name: q, in: query, schema: { type: string }, description: ILIKE nama/email/perusahaan }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/CustomerOption' } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /admin/fees:
     get:
       tags: [admin-commerce-config]
@@ -382,6 +391,33 @@ paths:
       parameters: [{ name: shippingRate, in: path, required: true, schema: { type: integer } }]
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
+  /admin/shipping-origin:
+    get:
+      tags: [admin-commerce-config]
+      summary: Titik asal pengiriman untuk tarif per km (modul shipping, ASUMSI A-76)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingOrigin' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [admin-commerce-config]
+      summary: Ubah titik asal + faktor jalan (lat/lng null = belum diatur → tarif per km tidak ditawarkan)
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roadFactor]
+              properties:
+                label: { type: string, maxLength: 120, nullable: true }
+                lat: { type: number, minimum: -90, maximum: 90, nullable: true, description: wajib bersama lng }
+                lng: { type: number, minimum: -180, maximum: 180, nullable: true, description: wajib bersama lat }
+                roadFactor: { type: number, minimum: 1, maximum: 3, example: 1.3 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingOrigin' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /admin/shipping-methods:
     get:
       tags: [admin-commerce-config]
@@ -397,6 +433,7 @@ paths:
       parameters:
         - { name: q, in: query, schema: { type: string }, description: kode }
         - { name: active, in: query, schema: { type: boolean } }
+        - { name: audience, in: query, schema: { type: string, enum: [all, customers] }, description: sasaran voucher }
         - { name: page, in: query, schema: { type: integer } }
         - { name: perPage, in: query, schema: { type: integer, default: 20 } }
       responses:
@@ -508,10 +545,14 @@ components:
         en: { type: array, items: { type: string } }
     ProductImage:
       type: object
+      description: Media produk, foto atau video (ASUMSI A-72)
       properties:
         id: { type: integer, description: media id }
         url: { type: string }
         sort: { type: integer }
+        type: { type: string, enum: [image, video] }
+        mime: { type: string, nullable: true }
+        isThumbnail: { type: boolean, description: foto yang dipilih admin sebagai thumbnail }
     Product:
       type: object
       description: Bentuk publik (kontrak bagian 6). Uang integer rupiah.
@@ -530,12 +571,14 @@ components:
         unit: { type: string }
         moq: { type: integer }
         weightGram: { type: integer }
+        dimensions: { $ref: '#/components/schemas/ProductDimensions' }
         stock: { type: integer }
         available: { type: integer, description: stock − reserved }
         stockStatus: { type: string, enum: [in_stock, made_to_order, out_of_stock] }
         isTaxable: { type: boolean }
         images: { type: array, items: { $ref: '#/components/schemas/ProductImage' } }
-        image: { type: string, nullable: true, description: URL gambar pertama }
+        image: { type: string, nullable: true, description: 'URL thumbnail: foto pilihan admin atau foto pertama; tidak pernah video' }
+        hasVideo: { type: boolean }
         summary: { $ref: '#/components/schemas/I18n' }
         highlights: { $ref: '#/components/schemas/I18nList' }
         specs: { type: array, items: { type: array, items: { type: string }, minItems: 2, maxItems: 2 } }
@@ -599,10 +642,14 @@ components:
         unit: { type: string, maxLength: 32, default: pcs }
         moq: { type: integer, minimum: 1, default: 1 }
         weightGram: { type: integer, minimum: 1, default: 1000 }
+        lengthCm: { type: number, minimum: 0.1, maximum: 100000, nullable: true, description: 'dimensi kemasan per satuan jual (cm, 1 desimal); tidak dikirim = tetap, null = dikosongkan' }
+        widthCm: { type: number, minimum: 0.1, maximum: 100000, nullable: true }
+        heightCm: { type: number, minimum: 0.1, maximum: 100000, nullable: true }
         stockStatus: { type: string, enum: [in_stock, made_to_order, out_of_stock], description: 'hanya made_to_order yang bertahan; lainnya diturunkan dari available' }
         isTaxable: { type: boolean, default: true }
         isPublished: { type: boolean, default: false }
-        images: { type: array, maxItems: 20, items: { type: integer }, description: media id berurutan (sort_order = indeks) }
+        images: { type: array, maxItems: 20, items: { type: integer }, description: 'media id foto/video berurutan (sort_order = indeks); media harus disk public bertipe image/* atau video/*' }
+        thumbnailMediaId: { type: integer, nullable: true, description: 'foto di dalam images[] yang menjadi thumbnail; null = foto pertama; tidak dikirim = tanda yang ada dipertahankan' }
     Review:
       type: object
       properties:
@@ -688,8 +735,12 @@ components:
         label: { $ref: '#/components/schemas/I18n' }
         eta: { $ref: '#/components/schemas/I18n', nullable: true }
         amount: { type: integer }
-        type: { type: string, enum: [flat, per_kg] }
-        weightGram: { type: integer, description: hanya pada shipping terpilih }
+        type: { type: string, enum: [flat, calculated] }
+        available: { type: boolean, description: 'false = tarif per km tanpa titik peta alamat/asal (tidak ikut availableShippingRates)' }
+        distanceKm: { type: integer, nullable: true, description: 'jarak jalan perkiraan (km, dibulatkan ke atas) = haversine titik asal → titik peta alamat × faktor jalan; null bila tarif tidak memakai jarak' }
+        weightGram: { type: integer }
+        volumeCm3: { type: integer }
+        breakdown: { $ref: '#/components/schemas/ShippingBreakdown' }
     QuoteResult:
       type: object
       properties:
@@ -710,7 +761,8 @@ components:
         uniqueCode: { type: integer, description: 'sementara 1–999 (0 bila tidak berlaku); final ditetapkan saat checkout' }
         grandTotal: { type: integer, description: subtotal − diskon + ongkir + fee + (pajak bila eksklusif) + uniqueCode }
         weightGram: { type: integer }
-        warnings: { type: array, items: { type: string, enum: [no_shipping_rate, shipping_rate_ignored_without_address] } }
+        volumeCm3: { type: integer, description: 'Σ dimensi produk × qty (cm³); 0 bila dimensi produk kosong' }
+        warnings: { type: array, items: { type: string, enum: [no_shipping_rate, shipping_rate_ignored_without_address, distance_unavailable, shipping_origin_unset] } }
     PaymentMethodPublic:
       type: object
       properties:
@@ -733,6 +785,7 @@ components:
         priceIncludesTax: { type: boolean }
         uniqueCodeEnabled: { type: boolean }
         autoCompleteDays: { type: integer }
+        invoice: { type: object, description: 'teks cetakan invoice (penanda tangan, tembusan) untuk halaman cetak', properties: { signerName: { type: string }, signerTitle: { type: string }, cc: { type: string } } }
     BankAccount:
       type: object
       properties:
@@ -762,6 +815,8 @@ components:
         amount: { type: integer }
         isActive: { type: boolean }
         sortOrder: { type: integer }
+        audience: { type: string, enum: [all, customers], description: 'all = setiap order; customers = hanya order customer di `customers` (bentuk admin saja)' }
+        customers: { type: array, items: { $ref: '#/components/schemas/CustomerOption' }, description: bentuk admin saja }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     FeeInput:
@@ -773,6 +828,15 @@ components:
         amount: { type: integer, minimum: 0 }
         isActive: { type: boolean, default: true }
         sortOrder: { type: integer }
+        audience: { type: string, enum: [all, customers], default: all, description: 'tidak dikirim saat PUT = sasaran tidak diubah' }
+        customerIds: { type: array, items: { type: integer }, description: 'wajib minimal satu bila audience=customers; id user ber-role customer' }
+    CustomerOption:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        company: { type: string, nullable: true }
+        email: { type: string }
     ShippingZone:
       type: object
       properties:
@@ -796,16 +860,18 @@ components:
         regions: { type: array, items: { type: object, required: [code, level], properties: { code: { type: string, maxLength: 16 }, level: { type: string, enum: [province, regency, district, village] } } } }
     ShippingRate:
       type: object
-      description: 'amount = max(minAmount, baseAmount + perKgAmount × ceil(kg)); 0 bila subtotal − diskon ≥ freeAbove'
+      description: 'flat: amount = baseAmount. calculated (ASUMSI A-76): amount = max(minAmount, baseAmount + perKmAmount × ⌈km⌉ + perKgAmount × ⌈kg⌉ + perM3Amount × m³ (dibulatkan ke atas per 0,01 m³)); 0 bila subtotal − diskon ≥ freeAbove'
       properties:
         id: { type: integer }
         zoneId: { type: integer }
         zone: { type: object, properties: { id: { type: integer }, name: { $ref: '#/components/schemas/I18n' } } }
         name: { $ref: '#/components/schemas/I18n' }
         label: { $ref: '#/components/schemas/I18n', description: sama dengan name (alias FE lama) }
-        type: { type: string, enum: [flat, per_kg] }
+        type: { type: string, enum: [flat, calculated] }
         baseAmount: { type: integer }
+        perKmAmount: { type: integer }
         perKgAmount: { type: integer }
+        perM3Amount: { type: integer }
         minAmount: { type: integer }
         freeAbove: { type: integer, nullable: true }
         eta: { $ref: '#/components/schemas/I18n', nullable: true }
@@ -813,15 +879,40 @@ components:
         sortOrder: { type: integer }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    ShippingOrigin:
+      type: object
+      properties:
+        label: { type: string, example: Pabrik Resiprene }
+        lat: { type: number, nullable: true, example: 3.3495 }
+        lng: { type: number, nullable: true, example: 99.0862 }
+        roadFactor: { type: number, example: 1.3 }
+    ShippingBreakdown:
+      type: object
+      properties:
+        base: { type: integer }
+        distance: { type: integer }
+        weight: { type: integer }
+        volume: { type: integer }
+        minimumApplied: { type: boolean }
+        free: { type: boolean }
+    ProductDimensions:
+      type: object
+      properties:
+        lengthCm: { type: number, nullable: true }
+        widthCm: { type: number, nullable: true }
+        heightCm: { type: number, nullable: true }
+        volumeCm3: { type: integer, description: 'L × W × H per satuan; 0 bila ada dimensi kosong' }
     ShippingRateInput:
       type: object
       required: [name, type]
       properties:
         zoneId: { type: integer, description: hanya pada PUT untuk memindahkan rate }
         name: { $ref: '#/components/schemas/I18n' }
-        type: { type: string, enum: [flat, per_kg] }
+        type: { type: string, enum: [flat, calculated, per_kg], description: 'per_kg = nama lama, disimpan sebagai calculated' }
         baseAmount: { type: integer, minimum: 0, default: 0 }
+        perKmAmount: { type: integer, minimum: 0, default: 0 }
         perKgAmount: { type: integer, minimum: 0, default: 0 }
+        perM3Amount: { type: integer, minimum: 0, default: 0 }
         minAmount: { type: integer, minimum: 0, default: 0 }
         freeAbove: { type: integer, minimum: 0, nullable: true }
         eta: { $ref: '#/components/schemas/I18n' }
@@ -844,6 +935,8 @@ components:
         startsAt: { type: string, format: date-time, nullable: true }
         endsAt: { type: string, format: date-time, nullable: true }
         isActive: { type: boolean }
+        audience: { type: string, enum: [all, customers], description: 'all = semua customer; customers = hanya customer di `customers`' }
+        customers: { type: array, items: { $ref: '#/components/schemas/CustomerOption' } }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     VoucherInput:
@@ -862,6 +955,8 @@ components:
         startsAt: { type: string, format: date-time, nullable: true }
         endsAt: { type: string, format: date-time, nullable: true }
         isActive: { type: boolean, default: true }
+        audience: { type: string, enum: [all, customers], default: all, description: 'tidak dikirim saat PUT = sasaran tidak diubah' }
+        customerIds: { type: array, items: { type: integer }, description: 'wajib minimal satu bila audience=customers; id user ber-role customer' }
     PaymentMethod:
       type: object
       description: Bentuk admin (config non-rahasia apa adanya + qrisImageUrl terhidrasi)
@@ -909,3 +1004,11 @@ components:
         priceIncludesTax: { type: boolean, example: true }
         autoCompleteDays: { type: integer, minimum: 0, maximum: 90, example: 7 }
         reminderHoursBeforeDue: { type: integer, minimum: 0, maximum: 168, example: 2 }
+        invoicePrefix: { type: string, maxLength: 40, example: PMS/X/INV/RA, description: 'nomor invoice = {prefix}/{urut per bulan}/{bulan Romawi}/{tahun}; huruf, angka, titik, strip, garis miring' }
+        invoiceSignerName: { type: string, maxLength: 120, example: Amalia Nasution }
+        invoiceSignerTitle: { type: string, maxLength: 120, example: SEVP Operation }
+        invoiceCc: { type: string, maxLength: 120, example: 'ATU, File', description: 'tembusan, dipisah koma' }
+        shippingOriginLabel: { type: string, maxLength: 120 }
+        shippingOriginLat: { type: number, nullable: true, description: 'sama dengan /admin/shipping-origin' }
+        shippingOriginLng: { type: number, nullable: true }
+        shippingRoadFactor: { type: number, minimum: 1, maximum: 3 }

@@ -10,7 +10,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { orderLabel, paymentLabel } from '@/lib/commerce';
 import { api, API_URL, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { queryString, type SalesReport, type SalesReportProduct } from '@/lib/admin';
+import { defaultDateRange, queryString, type SalesReport, type SalesReportProduct } from '@/lib/admin';
 import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
 import type { OrderSummary } from '@/lib/types';
 
@@ -30,8 +30,9 @@ export default function AdminSalesReport() {
   const [mode, setMode] = useState<FilterMode>('year');
   const [year, setYear] = useState(CURRENT_YEAR);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  // Mode rentang tanggal: bawaan awal bulan s.d. hari ini.
+  const [from, setFrom] = useState(() => defaultDateRange().from);
+  const [to, setTo] = useState(() => defaultDateRange().to);
   const [report, setReport] = useState<SalesReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -82,6 +83,7 @@ export default function AdminSalesReport() {
     {
       key: 'name',
       label: t('Produk', 'Product'),
+      sortValue: (p) => tr(p.name, lang),
       render: (p) => (
         <span>
           {p.productSlug ? (
@@ -95,11 +97,12 @@ export default function AdminSalesReport() {
         </span>
       ),
     },
-    { key: 'orders', label: t('Order', 'Orders'), align: 'right', render: (p) => String(p.orders) },
+    { key: 'orders', label: t('Order', 'Orders'), align: 'right', sortValue: (p) => p.orders, render: (p) => String(p.orders) },
     {
       key: 'qty',
       label: t('Terjual', 'Qty sold'),
       align: 'right',
+      sortValue: (p) => p.qty,
       render: (p) => (
         <span className="admin-bar-cell">
           <span className="admin-bar-track">
@@ -109,7 +112,7 @@ export default function AdminSalesReport() {
         </span>
       ),
     },
-    { key: 'revenue', label: t('Nilai penjualan', 'Sales value'), align: 'right', render: (p) => <strong>{formatIDR(p.revenue)}</strong> },
+    { key: 'revenue', label: t('Nilai penjualan', 'Sales value'), align: 'right', sortValue: (p) => p.revenue, render: (p) => <strong>{formatIDR(p.revenue)}</strong> },
   ];
 
   const orderColumns: Column<OrderSummary>[] = [
@@ -254,8 +257,14 @@ export default function AdminSalesReport() {
           </div>
 
           <div style={{ marginBottom: 22 }}>
-            <AdminCard title={t('Produk terlaris', 'Top products')} desc={t('Diurutkan dari nilai penjualan tertinggi (setelah diskon).', 'Sorted by highest sales value (after discounts).')}>
-              <DataTable columns={productColumns} rows={report.byProduct} rowKey="productId" empty={t('Belum ada produk terjual pada periode ini.', 'No products sold in this period.')} />
+            <AdminCard
+              title={t('Produk terlaris', 'Top products')}
+              desc={t(
+                'Awalnya diurutkan dari nilai penjualan tertinggi (setelah diskon). Klik judul kolom Order, Terjual, atau Nilai penjualan untuk mengubah urutan.',
+                'Initially sorted by highest sales value (after discounts). Click the Orders, Qty sold, or Sales value heading to change the order.',
+              )}
+            >
+              <DataTable columns={productColumns} rows={report.byProduct} rowKey="productId" defaultSort={{ key: 'revenue', dir: 'desc' }} empty={t('Belum ada produk terjual pada periode ini.', 'No products sold in this period.')} />
             </AdminCard>
           </div>
 

@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Icon from '@/components/Icon';
 import { useCart, isSellable } from '@/components/CartProvider';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
+import { openCartDrawer, openChat, useShopPaths } from '@/lib/shop';
+import { tr } from '@/lib/cms';
 import type { Product } from '@/lib/types';
 
 // Kontrol qty + tombol tambah keranjang di halaman detail produk.
@@ -14,7 +17,10 @@ export default function AddToCart({ product }: { product: Product }) {
   const { add } = useCart();
   const { customer } = useAuth();
   const { lang } = useLang();
+  const router = useRouter();
+  const shop = useShopPaths();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
+  const askSeller = () => openChat({ type: 'product', slug: product.slug, label: tr(product.name, lang), image: product.image });
   const moq = Math.max(1, product.moq || 1);
   const [qty, setQty] = useState(moq);
   const [added, setAdded] = useState(false);
@@ -34,7 +40,7 @@ export default function AddToCart({ product }: { product: Product }) {
           </p>
         </div>
         <div className="pd-buy-actions">
-          <Link href={`/login?redirect=${encodeURIComponent(`/catalog/${product.slug}`)}`} className="btn btn-solid btn-block">
+          <Link href={`/login?redirect=${encodeURIComponent(shop.product(product.slug))}`} className="btn btn-solid btn-block">
             {t('Login untuk memesan', 'Login to order')} <Icon name="arrow" />
           </Link>
         </div>
@@ -51,9 +57,15 @@ export default function AddToCart({ product }: { product: Product }) {
             'This product is sold to specification. Contact our marketing team for a quotation and availability.',
           )}
         </p>
-        <Link href={`/kontak?type=quote&product=${encodeURIComponent(product.slug)}`} className="btn btn-solid btn-block">
-          {t('Minta penawaran', 'Request a quote')} <Icon name="arrow" />
-        </Link>
+        {shop.portal ? (
+          <button type="button" className="btn btn-solid btn-block" onClick={askSeller}>
+            <Icon name="chat" /> {t('Minta penawaran lewat chat', 'Request a quote via chat')}
+          </button>
+        ) : (
+          <Link href={`/kontak?type=quote&product=${encodeURIComponent(product.slug)}`} className="btn btn-solid btn-block">
+            {t('Minta penawaran', 'Request a quote')} <Icon name="arrow" />
+          </Link>
+        )}
       </div>
     );
   }
@@ -68,9 +80,15 @@ export default function AddToCart({ product }: { product: Product }) {
             'This product is currently out of stock. Contact our team for availability.',
           )}
         </p>
-        <Link href={`/kontak?type=stock&product=${encodeURIComponent(product.slug)}`} className="btn btn-line btn-block">
-          {t('Tanya ketersediaan', 'Ask about availability')} <Icon name="arrow" />
-        </Link>
+        {shop.portal ? (
+          <button type="button" className="btn btn-line btn-block" onClick={askSeller}>
+            <Icon name="chat" /> {t('Tanya ketersediaan lewat chat', 'Ask about availability via chat')}
+          </button>
+        ) : (
+          <Link href={`/kontak?type=stock&product=${encodeURIComponent(product.slug)}`} className="btn btn-line btn-block">
+            {t('Tanya ketersediaan', 'Ask about availability')} <Icon name="arrow" />
+          </Link>
+        )}
       </div>
     );
   }
@@ -82,6 +100,12 @@ export default function AddToCart({ product }: { product: Product }) {
     if (!add(product, clamp(qty))) return;
     setAdded(true);
     window.setTimeout(() => setAdded(false), 2200);
+  }
+
+  // "Beli sekarang": masukkan ke keranjang lalu langsung ke checkout (di portal tetap di dalam portal).
+  function handleBuyNow() {
+    if (!add(product, clamp(qty))) return;
+    router.push(shop.checkout);
   }
 
   return (
@@ -109,14 +133,35 @@ export default function AddToCart({ product }: { product: Product }) {
           : <>{t('Tersedia', 'Available')}: {product.available.toLocaleString('id-ID')} {product.unit}.</>}
       </p>
 
-      <div className="pd-buy-actions">
-        <button type="button" className="btn btn-solid btn-block" onClick={handleAdd}>
-          {added ? <>{t('Ditambahkan', 'Added')} <Icon name="check" /></> : <>{t('Tambah ke keranjang', 'Add to cart')} <Icon name="plus" /></>}
-        </button>
-        <Link href="/cart" className="btn btn-line btn-block">
-          {t('Lihat keranjang', 'View cart')} <Icon name="arrow" />
-        </Link>
-      </div>
+      {shop.portal ? (
+        <>
+          <div className="pd-buy-actions pd-buy-row">
+            <button type="button" className="btn btn-line btn-block" onClick={handleAdd}>
+              {added ? <>{t('Ditambahkan', 'Added')} <Icon name="check" /></> : <><Icon name="bag" /> {t('Tambah ke keranjang', 'Add to cart')}</>}
+            </button>
+            <button type="button" className="btn btn-solid btn-block" onClick={handleBuyNow}>
+              {t('Beli sekarang', 'Buy now')} <Icon name="arrow" />
+            </button>
+          </div>
+          <div className="pd-buy-links">
+            <button type="button" className="pd-text-btn" onClick={askSeller}>
+              <Icon name="chat" size={16} /> {t('Chat penjual', 'Chat with seller')}
+            </button>
+            <button type="button" className="pd-text-btn" onClick={openCartDrawer}>
+              <Icon name="bag" size={16} /> {t('Lihat keranjang', 'View cart')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="pd-buy-actions">
+          <button type="button" className="btn btn-solid btn-block" onClick={handleAdd}>
+            {added ? <>{t('Ditambahkan', 'Added')} <Icon name="check" /></> : <>{t('Tambah ke keranjang', 'Add to cart')} <Icon name="plus" /></>}
+          </button>
+          <Link href={shop.cart} className="btn btn-line btn-block">
+            {t('Lihat keranjang', 'View cart')} <Icon name="arrow" />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

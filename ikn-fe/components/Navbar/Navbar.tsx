@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -15,17 +15,25 @@ import { isPrimaryMenuItem, tr, type MenuNode } from '@/lib/cms';
 import Icon from '@/components/Icon';
 import styles from './Navbar.module.css';
 
+const pathOf = (href: string) => href.split('#')[0] || '/';
+const hashOf = (href: string) => href.split('#')[1] || '';
+// Halaman aplikasi yang "milik" menu tertentu walau tidak ada di daftar anak (toko = bagian Bisnis).
+const RELATED_PATHS: Record<string, string[]> = { '/bisnis': ['/catalog', '/cart', '/checkout'] };
+
 // Navbar: menu tree from the CMS header menu (site.menus.header). Doc links
 // (site.docLinks) are appended to the top-level item whose key equals their category.
 // Menu utama ditata dalam kisi 6 kolom (NAV_COLUMNS): enam menu bawaan selalu mengisi baris
 // pertama, item tambahan turun ke baris berikutnya tepat di bawah kolom yang sama.
 // Tinggi bilah diukur dan ditulis ke --nav-h agar offset halaman ikut menyesuaikan saat 2 baris.
+// Sorotan aktif: item utama menyala bila halaman saat ini (atau salah satu anaknya) sedang dibuka;
+// anak menu ber-anchor (mis. /keberlanjutan#sertifikat) menyala mengikuti section yang sedang terlihat (IntersectionObserver).
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null); // dropdown terbuka di mobile
+  const [activeHash, setActiveHash] = useState('');
   const innerRef = useRef<HTMLDivElement>(null);
-  const pathname = usePathname();
+  const pathname = usePathname() || '/';
   const { lang } = useLang();
   const { customer, admin } = useAuth();
   const site = useSite();
@@ -37,9 +45,17 @@ export default function Navbar() {
       : 'Dashboard Admin'
     : 'Dashboard';
 
-  const active = site.menus.header.items.filter((item) => item.isActive !== false);
-  const items = [...active.filter(isPrimaryMenuItem), ...active.filter((item) => !isPrimaryMenuItem(item))];
+  const items = useMemo(() => {
+    const active = site.menus.header.items.filter((item) => item.isActive !== false);
+    return [...active.filter(isPrimaryMenuItem), ...active.filter((item) => !isPrimaryMenuItem(item))];
+  }, [site.menus.header.items]);
   const ui = t[lang] || t.id;
+
+  // Id section yang dirujuk anchor menu pada halaman ini (untuk scroll spy).
+  const anchorIds = useMemo(() => {
+    const urls = items.flatMap((item) => [item.url || '', ...(item.children ?? []).map((child) => child.url || '')]);
+    return Array.from(new Set(urls.filter((url) => url.includes('#') && pathOf(url) === pathname).map(hashOf))).filter(Boolean);
+  }, [items, pathname]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -52,6 +68,39 @@ export default function Navbar() {
     setOpen(false);
     setOpenGroup(null);
   }, [pathname]);
+
+  // Scroll spy: section paling atas yang terlihat di sepertiga tengah layar menjadi anchor aktif.
+  useEffect(() => {
+    setActiveHash(window.location.hash.replace('#', ''));
+    if (anchorIds.length === 0 || typeof IntersectionObserver === 'undefined') return;
+
+    const visible = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) visible.set(entry.target.id, entry.boundingClientRect.top);
+          else visible.delete(entry.target.id);
+        }
+        const top = [...visible.entries()].sort((a, b) => a[1] - b[1])[0];
+        if (top) setActiveHash(top[0]);
+      },
+      { rootMargin: '-30% 0px -55% 0px', threshold: 0 },
+    );
+    const observe = () => anchorIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    observe();
+    // Konten halaman bisa dipasang sesaat setelah navigasi (transisi halaman); amati ulang.
+    const timer = window.setTimeout(observe, 500);
+    const onHash = () => setActiveHash(window.location.hash.replace('#', ''));
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('hashchange', onHash);
+      observer.disconnect();
+    };
+  }, [anchorIds, pathname]);
 
   // Sinkronkan --nav-h dengan tinggi bilah sebenarnya (baris kedua menu, layar sempit, dsb.).
   useEffect(() => {
@@ -68,9 +117,17 @@ export default function Navbar() {
     };
   }, []);
 
-  function isActivePath(href: string): boolean {
-    const itemPath = href.split('#')[0] || href;
-    return href === '/' ? pathname === '/' : pathname.startsWith(itemPath);
+  function isCurrentPage(href: string): boolean {
+    const itemPath = pathOf(href);
+    if (itemPath === '/') return pathname === '/';
+    return pathname === itemPath || pathname.startsWith(itemPath + '/');
+  }
+
+  function isActiveChild(child: MenuNode): boolean {
+    const href = child.url || '';
+    if (!href || !isCurrentPage(href)) return false;
+    const hash = hashOf(href);
+    return hash ? hash === activeHash : true;
   }
 
   function docLinks(item: MenuNode) {
@@ -96,10 +153,14 @@ export default function Navbar() {
     const groupKey = String(item.id ?? item.key ?? idx);
     const children = (item.children ?? []).filter((child) => child.isActive !== false);
     const docs = docLinks(item);
+    const activeTop =
+      isCurrentPage(href) ||
+      children.some((child) => !!child.url && isCurrentPage(child.url)) ||
+      (RELATED_PATHS[pathOf(href)] ?? []).some((path) => pathname === path || pathname.startsWith(path + '/'));
 
     if (children.length === 0 && docs.length === 0) {
       return (
-        <Link key={groupKey} href={href} className={`${styles.link} ${isActivePath(href) ? styles.active : ''}`}>
+        <Link key={groupKey} href={href} className={`${styles.link} ${activeTop ? styles.active : ''}`} aria-current={activeTop ? 'page' : undefined}>
           {label}
         </Link>
       );
@@ -109,7 +170,8 @@ export default function Navbar() {
       <div key={groupKey} className={`${styles.itemDrop} ${openGroup === groupKey ? styles.expanded : ''}`}>
         <Link
           href={href}
-          className={`${styles.link} ${styles.linkParent} ${isActivePath(href) ? styles.active : ''}`}
+          className={`${styles.link} ${styles.linkParent} ${activeTop ? styles.active : ''}`}
+          aria-current={activeTop ? 'page' : undefined}
           onClick={(e) => {
             // Di mobile, klik pertama membuka panel alih-alih navigasi.
             if (window.matchMedia('(max-width: 900px)').matches && openGroup !== groupKey) {
@@ -126,8 +188,15 @@ export default function Navbar() {
           <div className={styles.dropdownInner}>
             {children.map((child, ci) => {
               const desc = tr(child.description, lang);
+              const activeChild = isActiveChild(child);
               return (
-                <Link key={String(child.id ?? `${groupKey}-${ci}`)} href={child.url || href} className={styles.dropLink} role="menuitem">
+                <Link
+                  key={String(child.id ?? `${groupKey}-${ci}`)}
+                  href={child.url || href}
+                  className={`${styles.dropLink} ${activeChild ? styles.dropActive : ''}`}
+                  role="menuitem"
+                  aria-current={activeChild ? 'location' : undefined}
+                >
                   <span className={styles.dropLabel}>{tr(child.label, lang)}</span>
                   {desc && <span className={styles.dropDescription}>{desc}</span>}
                 </Link>

@@ -19,7 +19,7 @@ class PostRequest extends FormRequest
 
         return array_merge([
             'slug' => ['nullable', 'string', 'max:160', Rule::unique('posts', 'slug')->ignore($post?->id)],
-            'tag' => ['nullable', 'string', 'max:64'],
+            'categoryId' => ['nullable', 'integer', 'exists:post_categories,id'],
             'author' => ['nullable', 'string', 'max:120'],
             'coverMediaId' => ['nullable', 'integer', 'exists:media,id'],
             'isPublished' => ['nullable', 'boolean'],

@@ -8,6 +8,7 @@ import { I18nInput, MediaPicker, firstError, type FieldErrors } from '@/componen
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type CertificateData, type I18n, type MediaSummary } from '@/lib/cms';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 interface CertificateForm {
   name: I18n;
@@ -131,7 +132,7 @@ export default function AdminCertificates() {
   }
 
   async function remove(row: CertificateData) {
-    if (!window.confirm(t(`Hapus sertifikat "${tr(row.name, lang)}"?`, `Delete certificate "${tr(row.name, lang)}"?`))) return;
+    if (!await confirmDialog(t(`Hapus sertifikat "${tr(row.name, lang)}"?`, `Delete certificate "${tr(row.name, lang)}"?`))) return;
     setError('');
     try {
       await api(`/admin/certificates/${row.id}`, { method: 'DELETE' });

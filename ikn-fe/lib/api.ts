@@ -122,7 +122,16 @@ async function request(path: string, options: ApiOptions, retried = false): Prom
     );
   }
 
+  if (method !== 'GET' && cleanPath(path).startsWith('/admin/') && !cleanPath(path).startsWith('/admin/chats')) flushPublicCache();
+
   return payload;
+}
+
+// Aksi tulis admin mengubah konten publik: kosongkan cache konten server Next (app/cache/flush, lib/server-data.ts)
+// supaya situs publik langsung memuat isi terbaru. Gagal pun tidak apa-apa; cache kedaluwarsa sendiri.
+function flushPublicCache(): void {
+  if (typeof window === 'undefined') return;
+  void fetch('/cache/flush', { method: 'POST', keepalive: true }).catch(() => undefined);
 }
 
 /** Panggil API dan kembalikan isi envelope `data` (atau envelope utuh bila `raw`). */

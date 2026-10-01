@@ -1,17 +1,17 @@
 'use client';
 
+import SocialIcon from '@/components/SocialIcon';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import { asList, asText, pad2, type ContactInfoContent } from '../utils';
 
-// Locations, phones, emails, social links (left column of /kontak). Rendered inside ContactGrid.
-export default function ContactInfoSection({ section }: { section: PageSection }) {
+// Locations, phones, emails, social links (with icons). Also reused by ContactSummarySection with the site-wide contact data.
+export function ContactInfoBlocks({ content }: { content: ContactInfoContent }) {
   const { lang } = useLang();
-  const c = section.content as ContactInfoContent;
-  const locations = asList<ContactInfoContent['locations'][number]>(c.locations);
-  const emails = asList<{ address: string }>(c.emails).filter((e) => asText(e.address));
-  const social = asList<ContactInfoContent['social'][number]>(c.social).filter((s) => asText(s.url));
+  const locations = asList<ContactInfoContent['locations'][number]>(content.locations);
+  const emails = asList<{ address: string }>(content.emails).filter((e) => asText(e.address));
+  const social = asList<ContactInfoContent['social'][number]>(content.social).filter((s) => asText(s.url));
 
   return (
     <>
@@ -63,12 +63,13 @@ export default function ContactInfoSection({ section }: { section: PageSection }
       {social.length > 0 && (
         <div className="contact-block">
           <span className="label label-green">{lang === 'en' ? '/ Social media' : '/ Media sosial'}</span>
-          <ul className="link-list" style={{ marginTop: 12 }}>
+          <ul className="social-list">
             {social.map((s) => (
               <li key={s.url}>
-                <a href={s.url} target="_blank" rel="noreferrer">
-                  {asText(s.label)}
-                  <span className="handle">{asText(s.handle)}</span>
+                <a href={s.url} target="_blank" rel="noreferrer" className="social-link">
+                  <SocialIcon label={asText(s.label)} url={asText(s.url)} icon={s.icon} />
+                  <span className="social-name">{asText(s.label)}</span>
+                  {asText(s.handle) && <span className="handle">{asText(s.handle)}</span>}
                 </a>
               </li>
             ))}
@@ -77,4 +78,9 @@ export default function ContactInfoSection({ section }: { section: PageSection }
       )}
     </>
   );
+}
+
+// Left column of /kontak (section contact_info). Rendered inside ContactGrid.
+export default function ContactInfoSection({ section }: { section: PageSection }) {
+  return <ContactInfoBlocks content={section.content as ContactInfoContent} />;
 }

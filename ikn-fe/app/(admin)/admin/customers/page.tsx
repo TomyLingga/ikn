@@ -6,20 +6,22 @@ import { useSearchParams } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
+import AdminTabs, { type AdminTab } from '@/components/admin/AdminTabs';
 import { Pager } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { accountStatusLabels, orderLabel, paymentLabel } from '@/lib/commerce';
 import { api, apiPaged, ApiError, errorMessage } from '@/lib/api';
-import { queryString, type AdminCustomerDetail, type AdminCustomerOrder, type AdminCustomerRow } from '@/lib/admin';
+import { queryString, refreshAdminBadges, type AdminCustomerDetail, type AdminCustomerOrder, type AdminCustomerRow, type CountsMeta } from '@/lib/admin';
 import { formatAddressLines } from '@/components/customer/CustomerAddresses';
 import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
-import type { PagedMeta } from '@/lib/cms';
-import type { AccountStatus } from '@/lib/types';
+import type { AccountStatus, IconName } from '@/lib/types';
 
-type StatusTab = AccountStatus | '';
+type StatusTab = AccountStatus | ''; // '' = semua status
 type Action = { status: 'active' | 'rejected' | 'inactive'; customer: AdminCustomerRow | AdminCustomerDetail } | null;
 
 const TABS: StatusTab[] = ['pending', 'active', 'rejected', 'inactive', ''];
+const DEFAULT_STATUS: StatusTab = 'pending';
+const TAB_ICONS: Record<StatusTab, IconName> = { pending: 'clock', active: 'checkCircle', rejected: 'cancelCircle', inactive: 'close', '': 'users' };
 const PER_PAGE = 20;
 
 function statusBadge(status: AccountStatus, lang: 'id' | 'en') {
@@ -41,14 +43,15 @@ function AdminCustomers() {
   const params = useSearchParams();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
-  // Tab awal: ?status= bila valid; datang dengan ?q= saja (dari detail order) → cari di semua status.
+  // Status awal: ?status= bila valid (mis. ?status=pending dari dashboard); datang dengan ?q= saja (dari detail order)
+  // → cari di semua status; selain itu pendaftaran yang menunggu persetujuan (pekerjaan admin yang paling mendesak).
   const initialStatus = params.get('status') as StatusTab | null;
-  const [tab, setTab] = useState<StatusTab>(initialStatus && TABS.includes(initialStatus) ? initialStatus : params.get('q') ? '' : 'pending');
+  const [tab, setTab] = useState<StatusTab>(initialStatus && TABS.includes(initialStatus) ? initialStatus : params.get('q') ? '' : DEFAULT_STATUS);
   const [search, setSearch] = useState(params.get('q') || '');
   const [q, setQ] = useState(params.get('q') || '');
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<AdminCustomerRow[]>([]);
-  const [meta, setMeta] = useState<PagedMeta>({ page: 1, perPage: PER_PAGE, total: 0, lastPage: 1 });
+  const [meta, setMeta] = useState<CountsMeta>({ page: 1, perPage: PER_PAGE, total: 0, lastPage: 1 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -65,7 +68,7 @@ function AdminCustomers() {
     try {
       const result = await apiPaged<AdminCustomerRow>(`/admin/customers${queryString({ status: tab, q, page, perPage: PER_PAGE })}`);
       setRows(result.items);
-      setMeta(result.meta);
+      setMeta(result.meta as CountsMeta);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -124,6 +127,7 @@ function AdminCustomers() {
       setNotice(t(msgId, msgEn));
       setAction(null);
       if (detail?.id === updated.id) setDetail(updated);
+      refreshAdminBadges();
       await refresh();
     } catch (err) {
       setActionError(err instanceof ApiError && err.status === 422 ? Object.values(err.errors)[0]?.[0] || err.message : errorMessage(err));
@@ -139,6 +143,14 @@ function AdminCustomers() {
   }
 
   const tabLabel = (key: StatusTab) => (key === '' ? t('Semua', 'All') : accountStatusLabels[key][lang]);
+  const counts = meta.counts || {};
+  const tabs: AdminTab<StatusTab>[] = TABS.map((key) => ({
+    key,
+    label: tabLabel(key),
+    icon: TAB_ICONS[key],
+    count: key === '' ? Object.values(counts).reduce((sum, n) => sum + n, 0) : counts[key] || 0,
+    badge: key === 'pending',
+  }));
 
   const rowActions = (c: AdminCustomerRow | AdminCustomerDetail) => {
     const list: Array<{ label: string; tone?: 'danger' | 'success' | 'default'; onClick: () => void; disabled?: boolean }> = [];
@@ -246,23 +258,15 @@ function AdminCustomers() {
       )}
       {error && <p className="form-error">{error}</p>}
 
-      <div className="admin-tabs" role="tablist">
-        {TABS.map((key) => (
-          <button
-            key={key || 'all'}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            className={`admin-tab ${tab === key ? 'is-active' : ''}`}
-            onClick={() => {
-              setTab(key);
-              setPage(1);
-            }}
-          >
-            {tabLabel(key)}
-          </button>
-        ))}
-      </div>
+      <AdminTabs
+        tabs={tabs}
+        value={tab}
+        label={t('Status customer', 'Customer status')}
+        onChange={(key) => {
+          setTab(key);
+          setPage(1);
+        }}
+      />
 
       <form className="admin-toolbar" onSubmit={submitSearch}>
         <label className="admin-search">

@@ -59,6 +59,9 @@ class OrderResource extends JsonResource
                 'amount' => (int) ($shipping['amount'] ?? $order->shippingTotalInt()),
                 'type' => $shipping['type'] ?? null,
                 'weightGram' => (int) ($shipping['weightGram'] ?? 0),
+                'volumeCm3' => (int) ($shipping['volumeCm3'] ?? 0),
+                'distanceKm' => isset($shipping['distanceKm']) ? (int) $shipping['distanceKm'] : null,
+                'breakdown' => $shipping['breakdown'] ?? null,
             ] : null,
             'shippingAddress' => $order->shipping_address_snapshot,
             'courier' => $order->courier,
@@ -85,6 +88,12 @@ class OrderResource extends JsonResource
                 'actor' => $h->actor ? ['id' => $h->actor->id, 'name' => $h->actor->name] : null,
                 'meta' => $h->meta,
             ])->values()->all(),
+            // Catatan perjalanan dari admin di antara "Dikirim" dan "Diterima" (ASUMSI A-70).
+            'trackingUpdates' => $order->trackingUpdates->map(fn ($u) => $u->toSummary())->values()->all(),
+            // Lampiran admin (ASUMSI A-74); berkas privat, diunduh lewat GET /files/{media}.
+            'attachments' => $order->attachments->map(fn ($a) => $a->toSummary())->values()->all(),
+            'canAttach' => in_array($order->status, Order::PAID_STATUSES, true),
+            'canAddTracking' => $order->canAddTracking(),
             'canCancel' => $order->canCancel(),
             'canUploadProof' => $order->canUploadProof(),
             'canChangePayment' => $order->canChangePayment(),
@@ -99,7 +108,7 @@ class OrderResource extends JsonResource
     public static function eager(): array
     {
         return [
-            'items', 'reviews', 'histories.actor',
+            'items', 'reviews', 'histories.actor', 'trackingUpdates.author', 'attachments.media', 'attachments.author',
             'payments.paymentMethod', 'payments.bankAccount', 'payments.proof', 'payments.verifier',
         ];
     }

@@ -24,6 +24,7 @@ return [
     'gateway_unavailable' => 'Payment gateway is not configured.',
     'gateway_error' => 'Payment gateway returned an error.',
     'gateway_unsupported_type' => 'Payment method type is not supported by this gateway.',
+    'attachment_not_allowed' => 'Attachments can only be added to paid orders.',
     'idempotency_replay' => 'An order with the same Idempotency-Key already exists.',
 
     'status' => [

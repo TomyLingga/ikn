@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Satu-satunya tempat hitung harga (arsitektur bagian 9):
  * 1 harga satuan (promo bila aktif) → 2 subtotal (+ validasi moq) → 3 diskon voucher (alokasi proporsional)
- * → 4 ongkir → 5 fee aktif → 6 pajak (inklusif = informasi, eksklusif = ditambah; hanya item taxable)
+ * → 4 ongkir → 5 fee aktif (umum + khusus customer) → 6 pajak (inklusif = informasi, eksklusif = ditambah; hanya item taxable)
  * → 7 kode unik (manual_transfer + setting) → 8 grand total. Semua rupiah bulat (half-up).
  */
 class OrderCalculator
@@ -70,6 +70,7 @@ class OrderCalculator
                 'discountAmount' => 0,
                 'taxAmount' => 0,
                 'weightGram' => (int) $product->weight_gram * $qty,
+                'volumeCm3' => $product->volumeCm3() * $qty,
             ];
         }
 
@@ -79,6 +80,7 @@ class OrderCalculator
 
         $result->subtotal = array_sum(array_column($result->items, 'lineTotal'));
         $result->weightGram = array_sum(array_column($result->items, 'weightGram'));
+        $result->volumeCm3 = array_sum(array_column($result->items, 'volumeCm3'));
 
         // 3. Voucher.
         if ($voucherCode !== null && trim($voucherCode) !== '') {
@@ -102,7 +104,13 @@ class OrderCalculator
 
         // 4. Ongkir.
         if ($address !== null) {
-            $result->availableShippingRates = $this->shipping->ratesFor($address, $result->weightGram, $afterDiscount);
+            // Tarif berbasis jarak tanpa titik peta (alamat atau asal) tidak ditawarkan; customer diminta menandai lokasi.
+            $rates = $this->shipping->ratesFor($address, $result->weightGram, $afterDiscount, $result->volumeCm3);
+            $result->availableShippingRates = array_values(array_filter($rates, fn ($rate) => $rate['available'] ?? true));
+            if (count($result->availableShippingRates) < count($rates)) {
+                $originSet = $this->settings->get('shipping_origin_lat') !== null && $this->settings->get('shipping_origin_lng') !== null;
+                $result->warnings[] = $originSet ? 'distance_unavailable' : 'shipping_origin_unset';
+            }
             if ($result->availableShippingRates === []) {
                 $result->warnings[] = 'no_shipping_rate';
             }
@@ -117,15 +125,15 @@ class OrderCalculator
                 if (! $selected) {
                     throw ValidationException::withMessages(['shippingRateId' => [__('catalog.quote.shipping_rate_invalid')]]);
                 }
-                $result->shipping = $selected + ['weightGram' => $result->weightGram];
+                $result->shipping = $selected + ['weightGram' => $result->weightGram, 'volumeCm3' => $result->volumeCm3];
                 $result->shippingTotal = $selected['amount'];
             }
         } elseif ($shippingRateId !== null) {
             $result->warnings[] = 'shipping_rate_ignored_without_address';
         }
 
-        // 5. Fee aktif.
-        foreach (Fee::active()->orderBy('sort_order')->orderBy('id')->get() as $fee) {
+        // 5. Fee aktif: yang berlaku untuk semua customer + yang ditujukan khusus ke customer ini (ASUMSI A-67).
+        foreach (Fee::active()->forCustomer($user)->orderBy('sort_order')->orderBy('id')->get() as $fee) {
             $result->fees[] = ['id' => $fee->id, 'name' => $fee->name, 'type' => $fee->type, 'amount' => $fee->amountInt()];
         }
         $result->feeTotal = array_sum(array_column($result->fees, 'amount'));

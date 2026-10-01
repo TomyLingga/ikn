@@ -24,6 +24,8 @@ interface CatalogBrowserProps {
   basePath: string;
   /** Halaman kategori: kategori tidak bisa diganti dari sidebar. */
   lockCategory?: boolean;
+  /** `side` = filter di kolom kiri (situs publik); `top` = pencarian + chip kategori di atas (portal customer). */
+  layout?: 'side' | 'top';
 }
 
 function buildHref(basePath: string, query: Partial<CatalogQuery>, lockCategory: boolean): string {
@@ -38,7 +40,7 @@ function buildHref(basePath: string, query: Partial<CatalogQuery>, lockCategory:
 
 // Katalog: filter kategori, pencarian, urutan, dan paginasi dikerjakan server lewat query string
 // (GET /catalog/products?q&category&sort&page). Komponen ini hanya menavigasi ke URL baru.
-export default function CatalogBrowser({ products, meta, categories, query, basePath, lockCategory = false }: CatalogBrowserProps) {
+export default function CatalogBrowser({ products, meta, categories, query, basePath, lockCategory = false, layout = 'side' }: CatalogBrowserProps) {
   const router = useRouter();
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
@@ -54,6 +56,124 @@ export default function CatalogBrowser({ products, meta, categories, query, base
   const pages = Array.from({ length: Math.max(1, meta.lastPage) }, (_, i) => i + 1);
   const current = Math.min(Math.max(1, meta.page), Math.max(1, meta.lastPage));
   const pageWindow = pages.filter((n) => n === 1 || n === meta.lastPage || Math.abs(n - current) <= 2);
+  const allActive = !query.category || query.category === 'all';
+
+  const sortSelect = (
+    <select className="cat-sort" value={query.sort} onChange={(e) => go({ sort: e.target.value as CatalogSort })} aria-label={t('Urutkan', 'Sort by')}>
+      <option value="">{t('Unggulan', 'Featured')}</option>
+      <option value="name">{t('Nama A–Z', 'Name A–Z')}</option>
+      <option value="price">{t('Harga terendah', 'Lowest price')}</option>
+      <option value="newest">{t('Terbaru', 'Newest')}</option>
+    </select>
+  );
+
+  const results =
+    products.length === 0 ? (
+      <EmptyState
+        icon="search"
+        title={t('Tidak ada hasil', 'No results')}
+        body={t('Coba kata kunci lain atau pilih kategori berbeda.', 'Try another keyword or category.')}
+      />
+    ) : (
+      <>
+        <div className="pgrid">
+          {products.map((p) => (
+            <ProductCard key={p.slug} product={p} />
+          ))}
+        </div>
+
+        {meta.lastPage > 1 && (
+          <nav className="cat-pagination" aria-label={t('Navigasi halaman', 'Pagination')}>
+            <Link
+              href={buildHref(basePath, { ...query, page: Math.max(1, current - 1) }, lockCategory)}
+              className={`btn btn-line btn-sm ${current === 1 ? 'is-disabled' : ''}`}
+              aria-disabled={current === 1}
+              aria-label={t('Halaman sebelumnya', 'Previous page')}
+            >
+              <Icon name="chevronLeft" size={16} />
+            </Link>
+            {pageWindow.map((n, i) => (
+              <span key={n} className="cat-page-item">
+                {i > 0 && pageWindow[i - 1] !== n - 1 && <span className="cat-ellipsis">…</span>}
+                <Link
+                  href={buildHref(basePath, { ...query, page: n }, lockCategory)}
+                  className={`btn btn-sm ${n === current ? 'btn-solid' : 'btn-line'}`}
+                  aria-current={n === current ? 'page' : undefined}
+                >
+                  {n}
+                </Link>
+              </span>
+            ))}
+            <Link
+              href={buildHref(basePath, { ...query, page: Math.min(meta.lastPage, current + 1) }, lockCategory)}
+              className={`btn btn-line btn-sm ${current === meta.lastPage ? 'is-disabled' : ''}`}
+              aria-disabled={current === meta.lastPage}
+              aria-label={t('Halaman berikutnya', 'Next page')}
+            >
+              <Icon name="chevronRight" size={16} />
+            </Link>
+          </nav>
+        )}
+      </>
+    );
+
+  // Portal customer: satu bilah pencarian besar, chip kategori yang bisa digeser, lalu kisi produk.
+  if (layout === 'top') {
+    return (
+      <div className="shop">
+        <div className="shop-toolbar">
+          <form className="shop-search" onSubmit={submitSearch} role="search">
+            <Icon name="search" size={19} />
+            <input
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t('Cari nama atau kode produk', 'Search product name or code')}
+              aria-label={t('Cari produk', 'Search products')}
+            />
+            <button type="submit">{t('Cari', 'Search')}</button>
+          </form>
+          <label className="shop-sort">
+            <Icon name="sort" size={17} />
+            <span className="sr-only">{t('Urutkan', 'Sort by')}</span>
+            {sortSelect}
+          </label>
+        </div>
+
+        <nav className="shop-chips" aria-label={t('Kategori produk', 'Product categories')}>
+          <Link href={buildHref(basePath, { ...query, category: 'all', page: 1 }, false)} className={`shop-chip ${allActive ? 'is-active' : ''}`} aria-current={allActive ? 'true' : undefined}>
+            {t('Semua produk', 'All products')}
+          </Link>
+          {categories.map((c) => (
+            <Link
+              key={c.slug}
+              href={buildHref(basePath, { ...query, category: c.slug, page: 1 }, false)}
+              className={`shop-chip ${query.category === c.slug ? 'is-active' : ''}`}
+              aria-current={query.category === c.slug ? 'true' : undefined}
+            >
+              {tr(c.name, lang)}
+              {typeof c.productCount === 'number' && <small>{c.productCount}</small>}
+            </Link>
+          ))}
+        </nav>
+
+        <p className="shop-meta">
+          <strong>{meta.total}</strong> {t('produk', 'products')}
+          {query.q && (
+            <>
+              {' '}
+              {t('untuk', 'for')} “{query.q}”{' '}
+              <button type="button" className="cat-clear" onClick={() => { setQ(''); go({ q: '' }); }}>
+                {t('hapus pencarian', 'clear search')}
+              </button>
+            </>
+          )}
+        </p>
+
+        {results}
+      </div>
+    );
+  }
 
   return (
     <div className="cat-layout">
@@ -107,67 +227,10 @@ export default function CatalogBrowser({ products, meta, categories, query, base
             {meta.total} {t('produk', 'products')}
             {query.q && <> · “{query.q}” <button type="button" className="cat-clear" onClick={() => { setQ(''); go({ q: '' }); }}>{t('hapus', 'clear')}</button></>}
           </span>
-          <select
-            className="cat-sort"
-            value={query.sort}
-            onChange={(e) => go({ sort: e.target.value as CatalogSort })}
-            aria-label={t('Urutkan', 'Sort by')}
-          >
-            <option value="">{t('Unggulan', 'Featured')}</option>
-            <option value="name">{t('Nama A–Z', 'Name A–Z')}</option>
-            <option value="price">{t('Harga terendah', 'Lowest price')}</option>
-            <option value="newest">{t('Terbaru', 'Newest')}</option>
-          </select>
+          {sortSelect}
         </div>
 
-        {products.length === 0 ? (
-          <EmptyState
-            icon="compass"
-            title={t('Tidak ada hasil', 'No results')}
-            body={t('Coba kata kunci lain atau pilih kategori berbeda.', 'Try another keyword or category.')}
-          />
-        ) : (
-          <>
-            <div className="pgrid">
-              {products.map((p) => (
-                <ProductCard key={p.slug} product={p} />
-              ))}
-            </div>
-
-            {meta.lastPage > 1 && (
-              <nav className="cat-pagination" aria-label={t('Navigasi halaman', 'Pagination')}>
-                <Link
-                  href={buildHref(basePath, { ...query, page: Math.max(1, current - 1) }, lockCategory)}
-                  className={`btn btn-line btn-sm ${current === 1 ? 'is-disabled' : ''}`}
-                  aria-disabled={current === 1}
-                  aria-label={t('Halaman sebelumnya', 'Previous page')}
-                >
-                  <Icon name="chevronLeft" size={16} />
-                </Link>
-                {pageWindow.map((n, i) => (
-                  <span key={n} className="cat-page-item">
-                    {i > 0 && pageWindow[i - 1] !== n - 1 && <span className="cat-ellipsis">…</span>}
-                    <Link
-                      href={buildHref(basePath, { ...query, page: n }, lockCategory)}
-                      className={`btn btn-sm ${n === current ? 'btn-solid' : 'btn-line'}`}
-                      aria-current={n === current ? 'page' : undefined}
-                    >
-                      {n}
-                    </Link>
-                  </span>
-                ))}
-                <Link
-                  href={buildHref(basePath, { ...query, page: Math.min(meta.lastPage, current + 1) }, lockCategory)}
-                  className={`btn btn-line btn-sm ${current === meta.lastPage ? 'is-disabled' : ''}`}
-                  aria-disabled={current === meta.lastPage}
-                  aria-label={t('Halaman berikutnya', 'Next page')}
-                >
-                  <Icon name="chevronRight" size={16} />
-                </Link>
-              </nav>
-            )}
-          </>
-        )}
+        {results}
       </div>
     </div>
   );

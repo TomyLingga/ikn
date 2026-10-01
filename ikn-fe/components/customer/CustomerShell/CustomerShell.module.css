@@ -45,7 +45,7 @@
 
 @media (max-width: 620px) {
   .topbarInner { gap: 10px; padding-inline: 14px; }
-  .topUser strong, .siteLink { display: none; }
+  .topUser strong, .topUserInfo, .siteLink { display: none; }
   .pageTitle small { display: none; }
   .topActions { gap: 8px; }
   .content { padding: 18px 14px 28px; }
@@ -75,3 +75,8 @@
 .dropdownLinks { display: flex; flex-direction: column; padding: 8px; }
 .dropdownItem { display: block; padding: 10px 14px; font-size: 0.9rem; color: var(--ink); text-decoration: none; border-radius: 0; transition: background 0.2s var(--ease); }
 .dropdownItem:hover { background: var(--green-tint); color: var(--green); }
+
+/* Ponsel: identitas user cukup avatar (aturan di atas menimpa display:none media query sebelumnya). */
+@media (max-width: 620px) {
+  .topUserInfo { display: none; }
+}

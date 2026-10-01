@@ -39,6 +39,20 @@ class Order extends Model
     /** Status akhir (tidak ada transisi lagi). */
     public const FINAL_STATUSES = [self::STATUS_COMPLETED, self::STATUS_CANCELLED, self::STATUS_EXPIRED];
 
+    /** Status yang sedang berjalan setelah dibayar (dashboard customer). */
+    public const IN_PROGRESS_STATUSES = [self::STATUS_PAID, self::STATUS_PROCESSING, self::STATUS_SHIPPED, self::STATUS_DELIVERED];
+
+    /** Kelompok status untuk tab "Pesanan saya" (GET /customer/orders?group=). `to_review` ditangani scopeAwaitingReview. */
+    public const GROUPS = [
+        'unpaid' => self::AWAITING_PAYMENT_STATUSES,
+        'processing' => [self::STATUS_PAID, self::STATUS_PROCESSING],
+        'shipped' => [self::STATUS_SHIPPED, self::STATUS_DELIVERED],
+        'completed' => [self::STATUS_COMPLETED],
+        'cancelled' => [self::STATUS_CANCELLED, self::STATUS_EXPIRED],
+    ];
+
+    public const GROUP_TO_REVIEW = 'to_review';
+
     protected $guarded = [];
 
     protected $casts = [
@@ -90,6 +104,18 @@ class Order extends Model
         return $this->hasOne(VoucherUsage::class);
     }
 
+    /** Catatan perjalanan kiriman dari admin selama status shipped (ASUMSI A-70). */
+    public function trackingUpdates()
+    {
+        return $this->hasMany(OrderTrackingUpdate::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    /** Lampiran dari admin (faktur pajak, surat jalan; ASUMSI A-74). */
+    public function attachments()
+    {
+        return $this->hasMany(OrderAttachment::class)->orderBy('created_at')->orderBy('id');
+    }
+
     // ---- Scope ----
 
     public function scopeOwnedBy(Builder $query, User $user): Builder
@@ -100,6 +126,31 @@ class Order extends Model
     public function scopeRevenue(Builder $query): Builder
     {
         return $query->whereNotNull('paid_at')->whereIn('status', self::PAID_STATUSES);
+    }
+
+    /** Order selesai yang masih punya produk belum diulas (ASUMSI A-13: satu ulasan per produk per order). */
+    public function scopeAwaitingReview(Builder $query): Builder
+    {
+        return $query->where('orders.status', self::STATUS_COMPLETED)
+            ->whereExists(function ($items) {
+                $items->selectRaw('1')->from('order_items')
+                    ->whereColumn('order_items.order_id', 'orders.id')
+                    ->whereNotExists(function ($reviews) {
+                        $reviews->selectRaw('1')->from('reviews')
+                            ->whereColumn('reviews.order_id', 'orders.id')
+                            ->whereColumn('reviews.product_id', 'order_items.product_id');
+                    });
+            });
+    }
+
+    /** Filter kelompok status (lihat GROUPS); nilai tak dikenal diabaikan. */
+    public function scopeInGroup(Builder $query, ?string $group): Builder
+    {
+        if ($group === self::GROUP_TO_REVIEW) {
+            return $query->awaitingReview();
+        }
+
+        return isset(self::GROUPS[$group]) ? $query->whereIn('orders.status', self::GROUPS[$group]) : $query;
     }
 
     // ---- Payment helpers ----
@@ -171,6 +222,12 @@ class Order extends Model
     public function canComplete(): bool
     {
         return $this->status === self::STATUS_DELIVERED;
+    }
+
+    /** Admin boleh menambah/menghapus catatan perjalanan hanya selama kiriman di jalan. */
+    public function canAddTracking(): bool
+    {
+        return $this->status === self::STATUS_SHIPPED;
     }
 
     /** Ulasan hanya order completed, satu per produk per order (ASUMSI A-13). */

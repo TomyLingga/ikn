@@ -245,25 +245,25 @@
   cursor: pointer;
   padding-right: 22px;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a49d8f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right center;
 }
 
 [data-theme='dark'] .admin-filter {
-  background: #141f1a;
+  background: var(--surface);
   border-color: rgba(255, 255, 255, 0.16);
-  color: #a49d8f;
+  color: var(--ink-soft);
 }
 
 [data-theme='dark'] .admin-filter select {
-  color: #f3efe6;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  color: var(--ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
 [data-theme='dark'] .admin-filter select option {
-  background: #121a16;
-  color: #f3efe6;
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .admin-result-count {
@@ -827,14 +827,14 @@
 .bar-col-item .bar-fill-bar {
   width: 100%;
   max-width: 38px;
-  background: linear-gradient(180deg, #10b981 0%, #047857 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 70%, #ffffff) 0%, var(--primary) 100%);
   border-radius: 4px 4px 0 0;
   transition: height 0.4s var(--ease), background 0.2s var(--ease);
 }
 
 .bar-col-item:hover .bar-fill-bar {
-  background: linear-gradient(180deg, #34d399 0%, #059669 100%);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 50%, #ffffff) 0%, var(--primary) 100%);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 40%, transparent);
 }
 
 .bar-col-item .bar-x-label {
@@ -1339,15 +1339,58 @@
   accent-color: var(--green);
 }
 
+/* Pemilih tipe section: kotak cari + kelompok tipe */
+.cms-type-picker {
+  display: grid;
+  gap: 22px;
+  padding: 22px;
+}
+
+.cms-type-search {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.cms-type-search:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+.cms-type-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.cms-type-group h3 span {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 0.66rem;
+  letter-spacing: 0;
+}
+
 .cms-type-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 12px;
-  padding: 22px;
 }
 
 .cms-type-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   text-align: left;
   border: 1px solid var(--line-strong);
@@ -1361,6 +1404,7 @@
 
 .cms-type-card:hover {
   border-color: var(--green);
+  background: var(--surface);
 }
 
 .cms-type-card.is-suggested {
@@ -1379,23 +1423,13 @@
   color: var(--ink-soft);
 }
 
-.cms-type-pages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.cms-type-pages span {
+.cms-type-tag {
+  margin-top: auto;
+  padding-top: 6px;
   font-family: var(--font-mono);
   font-size: 0.62rem;
-  padding: 2px 6px;
-  border: 1px solid var(--line-strong);
-  color: var(--ink-soft);
-}
-
-.cms-type-pages span.is-match {
-  border-color: var(--green);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--green);
 }
 
@@ -2339,7 +2373,7 @@ div.media-thumb {
 
 @media (max-width: 900px) {
   .admin-split {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-split-side {
@@ -2368,4 +2402,1274 @@ div.media-thumb {
   .admin-tab {
     padding: 8px 12px;
   }
+}
+
+/* ---------- Pengaturan Situs: pratinjau tema warna ---------- */
+.theme-swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.theme-swatch { min-height: 56px; display: flex; align-items: flex-end; padding: 8px 10px; border: 1px solid var(--line); color: #fff; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
+@media (max-width: 640px) { .theme-swatches { grid-template-columns: 1fr; } }
+
+/* ---------- Field geo (pin peta) ---------- */
+.geo-picker { display: grid; gap: 10px; }
+.geo-picker-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.geo-picker-row > input { flex: 1 1 240px; }
+.geo-picker-row > label { flex: 1 1 140px; display: grid; gap: 6px; }
+.geo-picker-results { list-style: none; margin: 0; padding: 0; max-height: 200px; overflow: auto; border: 1px solid var(--line); background: var(--surface); }
+.geo-picker-results button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font: inherit; font-size: 0.86rem; text-align: left; cursor: pointer; }
+.geo-picker-results li:last-child button { border-bottom: 0; }
+.geo-picker-results button:hover { background: var(--primary-tint); color: var(--primary); }
+.geo-picker .addr-map { width: 100%; height: 280px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.geo-picker .addr-map-loading { display: grid; place-items: center; color: var(--ink-soft); font-size: 0.86rem; background: var(--paper-2); }
+
+/* ---------- Pemilih customer sasaran (voucher, biaya tambahan) ---------- */
+.customer-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.customer-picker-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.customer-picker-chips li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--green);
+  background: var(--green-tint);
+}
+
+.customer-picker-chips li span,
+.customer-picker-option {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.customer-picker-chips strong,
+.customer-picker-option strong {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.customer-picker-chips small,
+.customer-picker-option small {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-picker-chips button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.customer-picker-chips button:hover {
+  color: #b23c32;
+}
+
+.customer-picker-search input {
+  width: 100%;
+}
+
+/* Daftar hasil mengalir di bawah kotak cari (bukan melayang) agar tidak terpotong tepi modal. */
+.customer-picker-results {
+  display: grid;
+  max-height: 232px;
+  margin-top: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.customer-picker-results p {
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.customer-picker-option {
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.customer-picker-option:last-child {
+  border-bottom: 0;
+}
+
+.customer-picker-option:hover,
+.customer-picker-option:focus-visible {
+  background: var(--green-tint);
+}
+
+/* Catatan kecil di bawah toolbar filter (mis. arti kolom tanggal) */
+.admin-filter-note {
+  margin: -8px 0 14px;
+}
+
+/* =====================================================================
+   LAPISAN RAPI ADMIN (2026-10-01)
+   Satu bahasa bentuk untuk seluruh panel: kontrol setinggi 40px beradius 8px, kartu/tabel/modal beradius 12px,
+   teks antarmuka memakai huruf sans (mono hanya untuk kode dan angka), tombol utama berwarna merek.
+   Cakupan: .admin-app (AdminShell), .admin-modal-backdrop (modal lewat portal), .row-menu (menu aksi lewat portal).
+   ===================================================================== */
+:is(.admin-app, .admin-modal-backdrop, .row-menu) {
+  --adm-r: 8px;
+  --adm-r-lg: 12px;
+  --adm-ctl: 40px;
+  --adm-primary: var(--theme-primary);
+  --adm-primary-deep: var(--theme-primary-deep);
+  --adm-ring: 0 0 0 3px color-mix(in srgb, var(--theme-primary) 24%, transparent);
+  --adm-danger: #b42318;
+  --adm-danger-tint: #fdecea;
+  --adm-field: var(--surface);
+  --adm-hover: color-mix(in srgb, var(--ink) 5%, transparent);
+  --adm-row-hover: color-mix(in srgb, var(--ink) 3.5%, var(--surface));
+}
+
+[data-theme='dark'] :is(.admin-app, .admin-modal-backdrop, .row-menu) {
+  --adm-danger: #f0877c;
+  --adm-danger-tint: #3a1f1c;
+  --adm-field: var(--paper);
+  --adm-hover: color-mix(in srgb, #ffffff 7%, transparent);
+  --adm-row-hover: color-mix(in srgb, #ffffff 5%, var(--surface));
+}
+
+/* ---------- Tombol ---------- */
+:is(.admin-app, .admin-modal-backdrop) .btn {
+  min-height: var(--adm-ctl);
+  padding: 0 18px;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--adm-r);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  transition: background 0.18s var(--ease), border-color 0.18s var(--ease), color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .btn.btn-sm {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 0.84rem;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .btn:hover:not(:disabled) svg {
+  transform: none;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .btn:focus-visible {
+  outline: 0;
+  box-shadow: var(--adm-ring);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .btn-solid {
+  border-color: var(--adm-primary);
+  background: var(--adm-primary);
+  color: #fff;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .btn-solid:hover:not(:disabled) {
+  border-color: var(--adm-primary-deep);
+  background: var(--adm-primary-deep);
+  color: #fff;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .btn-line:hover:not(:disabled) {
+  border-color: var(--ink-soft);
+  background: var(--adm-hover);
+  color: var(--ink);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .btn-danger {
+  border-color: var(--adm-danger);
+  background: var(--adm-danger);
+  color: #fff;
+}
+
+[data-theme='dark'] :is(.admin-app, .admin-modal-backdrop) .btn-danger {
+  border-color: #c0392b;
+  background: #c0392b;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .btn-danger:hover:not(:disabled) {
+  border-color: #8f1d14;
+  background: #8f1d14;
+}
+
+/* ---------- Kepala halaman ---------- */
+.admin-app .admin-head {
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.admin-app .admin-title {
+  font-size: clamp(1.4rem, 2.4vw, 1.7rem);
+  letter-spacing: -0.02em;
+}
+
+.admin-app .admin-desc {
+  margin-top: 4px;
+  font-size: 0.93rem;
+  line-height: 1.55;
+  max-width: 72ch;
+}
+
+/* ---------- Bilah filter ---------- */
+.admin-app .admin-toolbar {
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--adm-r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-app .admin-filter-note {
+  margin: -4px 2px 14px;
+  font-size: 0.82rem;
+}
+
+.admin-app .admin-search {
+  flex: 1 1 240px;
+  max-width: 360px;
+  min-height: var(--adm-ctl);
+  padding: 0 12px;
+  border-color: var(--line-strong);
+  border-radius: var(--adm-r);
+  background: var(--adm-field);
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.admin-app .admin-search:focus-within {
+  border-color: var(--adm-primary);
+  box-shadow: var(--adm-ring);
+}
+
+.admin-app .admin-search input {
+  min-height: calc(var(--adm-ctl) - 2px);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+}
+
+.admin-app .admin-filter {
+  min-height: var(--adm-ctl);
+  padding: 0 12px;
+  gap: 8px;
+  border-color: var(--line-strong);
+  border-radius: var(--adm-r);
+  background: var(--adm-field);
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.admin-app .admin-filter:hover {
+  border-color: var(--ink-soft);
+}
+
+.admin-app .admin-filter:focus-within {
+  border-color: var(--adm-primary);
+  box-shadow: var(--adm-ring);
+}
+
+.admin-app .admin-filter select,
+.admin-app .admin-filter-input {
+  min-height: calc(var(--adm-ctl) - 2px);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.admin-app .admin-toolbar .cms-check.admin-filter {
+  font-size: 0.86rem;
+  color: var(--ink);
+}
+
+.admin-app .admin-result-count {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Tabel ---------- */
+.admin-app .admin-table-wrap {
+  border-radius: var(--adm-r-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-app .admin-table {
+  font-size: 0.88rem;
+}
+
+.admin-app .admin-table th {
+  padding: 11px 16px;
+  background: color-mix(in srgb, var(--paper-2) 55%, var(--surface));
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.admin-app .admin-table td {
+  padding: 12px 16px;
+}
+
+.admin-app .admin-table tbody tr:hover {
+  background: var(--adm-row-hover);
+}
+
+/* Kolom aksi menempel di kanan saat tabel lebih lebar dari layar. Latar harus pekat agar isi kolom lain tidak tembus. */
+.admin-app .admin-table :is(th, td).admin-col-actions {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  border-left: 1px solid var(--line);
+}
+
+.admin-app .admin-table td.admin-col-actions {
+  background: var(--surface);
+}
+
+.admin-app .admin-table tbody tr:hover td.admin-col-actions {
+  background: var(--adm-row-hover);
+}
+
+/* Tautan teks di panel admin (nomor order, "lihat ...", kembali): warna merek tanpa garis bawah tebal dan
+   huruf kapital bawaan .link situs publik. */
+:is(.admin-app, .admin-modal-backdrop) a.link {
+  gap: 4px;
+  padding-bottom: 0;
+  border-bottom: 0;
+  color: var(--primary);
+  font-family: var(--font-sans);
+  font-size: inherit;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:is(.admin-app, .admin-modal-backdrop) a.link.mono {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+:is(.admin-app, .admin-modal-backdrop) a.link:hover {
+  gap: 4px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-app .admin-cell-sub {
+  font-family: var(--font-sans);
+}
+
+.admin-app .admin-empty {
+  border-radius: var(--adm-r-lg);
+  background: var(--surface);
+  font-size: 0.92rem;
+}
+
+/* ---------- Aksi baris ---------- */
+:is(.admin-app, .admin-modal-backdrop) .row-actions {
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .row-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .row-act:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--adm-hover);
+  color: var(--ink);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .row-act-danger {
+  color: var(--adm-danger);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .row-act-danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--adm-danger) 45%, transparent);
+  background: var(--adm-danger-tint);
+  color: var(--adm-danger);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .row-act-success {
+  color: var(--ok);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .row-act-success:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  background: var(--ok-tint);
+  color: var(--ok);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .row-act:focus-visible {
+  outline: 0;
+  box-shadow: var(--adm-ring);
+}
+
+/* Tombol "aksi lainnya" (tiga titik) + menunya */
+.row-act-more {
+  width: 30px;
+  padding: 0 !important;
+}
+
+.row-act-more.is-open {
+  border-color: var(--line-strong) !important;
+  background: var(--adm-hover) !important;
+}
+
+.row-act-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.row-act-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.row-menu {
+  position: fixed;
+  z-index: 1300;
+  min-width: 176px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: rowMenuIn 0.14s var(--ease);
+}
+
+@keyframes rowMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.row-menu-item {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-menu-item:hover:not(:disabled),
+.row-menu-item:focus-visible {
+  outline: 0;
+  background: var(--adm-hover);
+}
+
+.row-menu-item.is-danger {
+  color: var(--adm-danger);
+}
+
+.row-menu-item.is-danger:hover:not(:disabled),
+.row-menu-item.is-danger:focus-visible {
+  background: var(--adm-danger-tint);
+}
+
+.row-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row-menu {
+    animation: none;
+  }
+}
+
+/* ---------- Badge status ---------- */
+:is(.admin-app, .admin-modal-backdrop) [class*='StatusBadge_badge'] {
+  padding: 3px 10px;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+/* ---------- Kartu ---------- */
+.admin-app .admin-card {
+  border-radius: var(--adm-r-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-app .admin-card-title {
+  font-size: 1rem;
+}
+
+.admin-app .admin-card .admin-desc {
+  font-size: 0.86rem;
+}
+
+.admin-app .stat-card {
+  border-radius: var(--adm-r-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Notifikasi ---------- */
+:is(.admin-app, .admin-modal-backdrop) .admin-toast {
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+  border-radius: var(--adm-r);
+  background: var(--ok-tint);
+  color: var(--ok);
+  font-weight: 500;
+}
+
+:is(.admin-app, .admin-modal-backdrop) :is(.form-error, .admin-form-error) {
+  border-radius: var(--adm-r);
+}
+
+/* ---------- Formulir ---------- */
+:is(.admin-app, .admin-modal-backdrop) .field-label {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-form :is(input, textarea, select) {
+  border-radius: var(--adm-r);
+  padding: 9px 12px;
+  background: var(--adm-field);
+  font-size: 0.9rem;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-form :is(input:not([type='checkbox'], [type='radio'], [type='color'], [type='file'], [type='range']), select) {
+  min-height: var(--adm-ctl);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-form :is(input, textarea, select):hover:not(:disabled, :focus) {
+  border-color: var(--ink-soft);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-form :is(input, textarea, select):focus {
+  border-color: var(--adm-primary);
+  box-shadow: var(--adm-ring);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-form input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--adm-primary);
+  box-shadow: none;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .cms-check input[type='checkbox'] {
+  accent-color: var(--adm-primary);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-input-suffix input {
+  border-radius: var(--adm-r) 0 0 var(--adm-r);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-input-suffix span {
+  border-radius: 0 var(--adm-r) var(--adm-r) 0;
+}
+
+:is(.admin-app, .admin-modal-backdrop) :is(.cms-type-search, .customer-picker-search input, .admin-region-search input) {
+  min-height: var(--adm-ctl);
+  border-radius: var(--adm-r);
+  background: var(--adm-field);
+}
+
+/* Layar sempit: kolom aksi ikut bergulir (kalau menempel, ia menutupi isi baris). */
+@media (max-width: 760px) {
+  .admin-app .admin-table :is(th, td).admin-col-actions {
+    position: static;
+    border-left: 0;
+  }
+}
+
+/* Baris tiga kolom: aturan lama tertimpa .admin-form-row (dua kolom) yang ditulis sesudahnya. */
+:is(.admin-app, .admin-modal-backdrop) .admin-form-row.admin-form-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 760px) {
+  :is(.admin-app, .admin-modal-backdrop) .admin-form-row.admin-form-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Select di luar formulir/filter (mis. grafik dashboard) ikut beradius sama. */
+:is(.admin-app, .admin-modal-backdrop) select {
+  border-radius: var(--adm-r);
+}
+
+/* ---------- Modal ---------- */
+.admin-modal-backdrop {
+  background: rgba(8, 14, 26, 0.5);
+}
+
+.admin-modal-backdrop .admin-modal {
+  border-radius: 14px;
+}
+
+.admin-modal-backdrop .admin-modal-head h2 {
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.admin-modal-backdrop .admin-modal-close {
+  border-color: var(--line);
+  border-radius: var(--adm-r);
+}
+
+.admin-modal-backdrop .admin-modal-close:hover {
+  border-color: var(--line-strong);
+  background: var(--adm-hover);
+}
+
+/* ---------- Tab, paginasi ---------- */
+.admin-app .admin-tab {
+  padding: 10px 16px;
+  border-radius: var(--adm-r) var(--adm-r) 0 0;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.admin-app .admin-tab:hover {
+  background: var(--adm-hover);
+}
+
+.admin-app .admin-tab.is-active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+  background: transparent;
+}
+
+.admin-app .pagination-wrap {
+  margin-top: 14px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.admin-app .pagination-info {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-app .pagination-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border-color: var(--line);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.admin-app .pagination-btn:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--adm-hover);
+  color: var(--ink);
+}
+
+.admin-app .pagination-btn.is-active {
+  border-color: var(--adm-primary);
+  background: var(--adm-primary);
+  color: #fff;
+}
+
+/* ---------- Kartu CMS, media, menu ---------- */
+:is(.admin-app, .admin-modal-backdrop) :is(.cms-section-card, .cms-type-card, .media-card, .menu-item, .cms-list-item, .admin-zone-item, .admin-image-box, .cms-hint, .admin-proof-image, .admin-product-facts, .admin-json) {
+  border-radius: 10px;
+}
+
+:is(.admin-app, .admin-modal-backdrop) :is(.customer-picker-chips li, .customer-picker-results, .admin-chip, .cms-tag) {
+  border-radius: var(--adm-r);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .media-card,
+:is(.admin-app, .admin-modal-backdrop) .admin-product-facts {
+  overflow: hidden;
+}
+
+/* ---------- Teks antarmuka kecil: sans, bukan mono ---------- */
+:is(.admin-app, .admin-modal-backdrop) :is(.filter-pill, .cms-switch, .admin-zone-item small, .cms-type-tag, .customer-picker-chips small, .customer-picker-option small) {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .filter-pill {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .filter-pill.is-active {
+  border-color: var(--adm-primary);
+  background: var(--adm-primary);
+  color: #fff;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .cms-switch {
+  font-size: 0.8rem;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .cms-switch input {
+  accent-color: var(--adm-primary);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-zone-list {
+  border-radius: var(--adm-r-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-zone-item {
+  border-radius: 0;
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-zone-item small {
+  font-size: 0.78rem;
+}
+
+/* ---------- Dropdown (select) ----------
+   Chrome/Edge 135+: appearance base-select membuat daftar pilihan bisa ditata (popover membulat, sorotan, centang).
+   Peramban lain tetap memakai daftar bawaan sistem; tampilan tertutupnya sama. */
+@supports (appearance: base-select) {
+  :is(.admin-app, .admin-modal-backdrop) select {
+    appearance: base-select;
+    align-items: center;
+    gap: 8px;
+    background-image: none !important;
+    cursor: pointer;
+  }
+
+  :is(.admin-app, .admin-modal-backdrop) .admin-filter select {
+    padding-right: 0;
+  }
+
+  :is(.admin-app, .admin-modal-backdrop) select::picker-icon {
+    color: var(--ink-soft);
+    font-size: 0.7em;
+    transition: rotate 0.2s var(--ease);
+  }
+
+  :is(.admin-app, .admin-modal-backdrop) select:open::picker-icon {
+    rotate: 180deg;
+  }
+
+  :is(.admin-app, .admin-modal-backdrop) select::picker(select) {
+    appearance: base-select;
+    min-width: max(anchor-size(width), 180px);
+    max-height: min(340px, 60vh);
+    margin-block: 6px;
+    padding: 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    color: var(--ink);
+    overflow-y: auto;
+    opacity: 0;
+    translate: 0 -4px;
+    transition: opacity 0.14s var(--ease), translate 0.14s var(--ease), display 0.14s allow-discrete, overlay 0.14s allow-discrete;
+  }
+
+  :is(.admin-app, .admin-modal-backdrop) select::picker(select):popover-open {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  @starting-style {
+    :is(.admin-app, .admin-modal-backdrop) select::picker(select):popover-open {
+      opacity: 0;
+      translate: 0 -4px;
+    }
+  }
+
+  :is(.admin-app, .admin-modal-backdrop) select option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 34px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  :is(.admin-app, .admin-modal-backdrop) select option:is(:hover, :focus-visible) {
+    outline: 0;
+    background: var(--adm-hover);
+  }
+
+  :is(.admin-app, .admin-modal-backdrop) select option:checked {
+    background: var(--primary-tint);
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  /* Centang di kanan baris terpilih. */
+  :is(.admin-app, .admin-modal-backdrop) select option::checkmark {
+    order: 1;
+    margin-left: auto;
+    color: var(--primary);
+    font-size: 0.8em;
+  }
+
+  :is(.admin-app, .admin-modal-backdrop) select option:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(.admin-app, .admin-modal-backdrop) select::picker(select) {
+      transition: none;
+    }
+  }
+}
+
+/* ---- Judul kolom yang bisa diurutkan (DataTable sortValue) ---- */
+:is(.admin-app, .admin-modal-backdrop) .admin-th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-th-sort:hover,
+:is(.admin-app, .admin-modal-backdrop) .admin-th-sort.is-sorted {
+  color: var(--ink);
+  background: var(--adm-hover, var(--paper-2));
+}
+
+:is(.admin-app, .admin-modal-backdrop) .admin-th-sort:focus-visible {
+  outline: 2px solid var(--adm-primary, var(--primary));
+  outline-offset: 1px;
+}
+
+/* Dua segitiga (naik/turun) dari border; arah yang aktif berwarna primer. */
+.admin-th-sort-arrow {
+  position: relative;
+  width: 8px;
+  height: 12px;
+  flex: none;
+  display: inline-block;
+}
+
+.admin-th-sort-arrow::before,
+.admin-th-sort-arrow::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  border: 4px solid transparent;
+  opacity: 0.35;
+}
+
+.admin-th-sort-arrow::before {
+  top: -4px;
+  border-bottom-color: currentColor;
+}
+
+.admin-th-sort-arrow::after {
+  bottom: -4px;
+  border-top-color: currentColor;
+}
+
+.admin-th-sort-arrow.is-asc::before,
+.admin-th-sort-arrow.is-desc::after {
+  opacity: 1;
+  color: var(--adm-primary, var(--primary));
+}
+
+/* ---- Media produk: pilihan thumbnail per foto ---- */
+.product-media-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-media-item .admin-field-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.product-thumb-choice {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  width: fit-content;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.product-thumb-choice input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--adm-primary, var(--primary));
+}
+
+.product-thumb-choice span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-thumb-choice em {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ok-tint);
+  color: var(--ok);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+/* ---- Tab status daftar admin (AdminTabs): sama rasa dengan tab "Pesanan saya" portal ---- */
+.admin-app .admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--adm-r-lg, 12px);
+  background: var(--surface);
+  scrollbar-width: none;
+}
+
+.admin-app .admin-tabs::-webkit-scrollbar { display: none; }
+
+.admin-app .admin-tab {
+  flex: 1 1 auto;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--adm-r, 8px);
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s var(--ease), color 0.16s var(--ease);
+}
+
+.admin-app .admin-tab:hover { background: var(--adm-hover, var(--paper-2)); color: var(--ink); }
+.admin-app .admin-tab:focus-visible { outline: 0; box-shadow: var(--adm-ring); }
+
+.admin-app .admin-tab.is-active,
+.admin-app .admin-tab.is-active:hover {
+  background: color-mix(in srgb, var(--adm-primary, var(--primary)) 12%, var(--surface));
+  color: var(--adm-primary, var(--primary));
+}
+
+.admin-app .admin-tab-badge {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.admin-app .admin-tab-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.admin-app .admin-tab.is-active .admin-tab-count {
+  background: var(--surface);
+  color: var(--adm-primary, var(--primary));
+}
+
+/* Tab berkelompok: tiap kelompok satu baris (judul kiri, tab kiri-rata), digeser horizontal di layar sempit. */
+.admin-app .admin-tab-groups {
+  display: grid;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--adm-r-lg, 12px);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.admin-app .admin-tab-group {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 16px;
+}
+
+.admin-app .admin-tab-group + .admin-tab-group { border-top: 1px solid var(--line); }
+
+.admin-app .admin-tab-group-label {
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.admin-app .admin-tab-group-label small {
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.admin-app .admin-tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.admin-app .admin-tab-row::-webkit-scrollbar { display: none; }
+.admin-app .admin-tab-row .admin-tab { flex: 0 0 auto; justify-content: flex-start; }
+
+@media (max-width: 720px) {
+  .admin-app .admin-tab-group { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 10px 6px 6px; }
+  .admin-app .admin-tab-group-label { flex-direction: row; gap: 6px; align-items: baseline; padding-left: 8px; }
+  .admin-app .admin-tab-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .admin-app .admin-tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .admin-app .admin-tabs .admin-tab { flex: 0 0 auto; }
+}
+
+/* Catatan di bawah toolbar: ada baris di luar rentang tanggal → tautan untuk menampilkan semua tanggal. */
+.admin-app .admin-filter-note button {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--adm-primary, var(--primary));
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.admin-app .admin-filter-note button:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---- Ongkir: titik asal + tiga parameter tarif + simulasi ---- */
+.admin-app .ship-origin { margin-bottom: 18px; }
+.admin-app .ship-origin-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.admin-app .ship-origin-head > div { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; }
+.admin-app .ship-origin-head small { color: var(--ink-soft); font-size: 0.82rem; }
+.admin-app .ship-origin-icon {
+  width: 36px; height: 36px; display: grid; place-items: center; flex: none;
+  border-radius: 50%; background: color-mix(in srgb, var(--adm-primary, var(--primary)) 12%, var(--surface)); color: var(--adm-primary, var(--primary));
+}
+.admin-app .ship-origin-form { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.admin-modal-backdrop .ship-params,
+.admin-app .ship-params { margin: 4px 0 8px; padding: 14px 16px 16px; border: 1px solid var(--line); border-radius: var(--adm-r-lg, 12px); }
+.admin-modal-backdrop .ship-params legend,
+.admin-app .ship-params legend { padding: 0 6px; font-size: 0.82rem; font-weight: 700; }
+.admin-modal-backdrop .ship-preview,
+.admin-app .ship-preview { margin-top: 12px; padding: 12px; border-radius: var(--adm-r, 8px); background: var(--paper-2); }
+.admin-modal-backdrop .ship-preview-inputs,
+.admin-app .ship-preview-inputs { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0; }
+.admin-modal-backdrop .admin-form .ship-preview-inputs label,
+.admin-app .admin-form .ship-preview-inputs label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; font-size: 0.85rem; }
+.admin-modal-backdrop .ship-preview-inputs input,
+.admin-app .ship-preview-inputs input { width: 96px; }
+.admin-modal-backdrop .ship-preview-result,
+.admin-app .ship-preview-result { margin: 0; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.admin-modal-backdrop .ship-preview-result small,
+.admin-app .ship-preview-result small { color: var(--ink-soft); }
+
+/* ---- Ponsel: DataTable menjadi kartu (label kolom dari data-label) ---- */
+@media (max-width: 640px) {
+  .admin-app .admin-table-wrap:has(> .admin-table-cards) { overflow: visible; border: 0; background: transparent; }
+  .admin-app .admin-table.admin-table-cards { display: block; min-width: 0; width: 100%; }
+  .admin-app .admin-table-cards thead { display: none; }
+  .admin-app .admin-table-cards tbody { display: grid; gap: 10px; }
+  .admin-app .admin-table-cards tr {
+    display: block;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--adm-r-lg, 12px);
+    background: var(--surface);
+  }
+  .admin-app .admin-table-cards tbody tr:hover { background: var(--surface); }
+  .admin-app .admin-table-cards td {
+    display: grid;
+    grid-template-columns: minmax(84px, 34%) minmax(0, 1fr);
+    gap: 10px;
+    align-items: baseline;
+    justify-items: start;
+    padding: 5px 0;
+    border: 0;
+    text-align: left !important;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .admin-app .admin-table-cards td::before {
+    content: attr(data-label);
+    color: var(--ink-soft);
+    font-size: 0.74rem;
+    font-weight: 600;
+  }
+  .admin-app .admin-table-cards td:first-child { grid-template-columns: minmax(0, 1fr); padding-bottom: 8px; }
+  .admin-app .admin-table-cards td:first-child::before { display: none; }
+  .admin-app .admin-table-cards td.admin-col-actions,
+  .admin-app .admin-table-cards tbody tr:hover td.admin-col-actions {
+    position: static;
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    background: transparent;
+    box-shadow: none;
+  }
+  .admin-app .admin-table-cards td.admin-col-actions::before { display: none; }
+}
+
+/* ---- Tombol "?" penjelasan field (components/admin/AdminFieldHelp) ---- */
+:is(.admin-app, .admin-modal-backdrop) .fhelp { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 2px; }
+:is(.admin-app, .admin-modal-backdrop) .fhelp-btn {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: 700 0.7rem/1 var(--font-sans, inherit);
+  cursor: pointer;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+:is(.admin-app, .admin-modal-backdrop) .fhelp-btn:hover,
+:is(.admin-app, .admin-modal-backdrop) .fhelp.is-open .fhelp-btn {
+  border-color: var(--adm-primary, var(--primary));
+  background: var(--adm-primary, var(--primary));
+  color: #fff;
+}
+:is(.admin-app, .admin-modal-backdrop) .fhelp-btn:focus-visible { outline: 0; box-shadow: var(--adm-ring); }
+:is(.admin-app, .admin-modal-backdrop) .fhelp-text {
+  max-width: 62ch;
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--adm-primary, var(--primary));
+  border-radius: 0 var(--adm-r, 8px) var(--adm-r, 8px) 0;
+  background: color-mix(in srgb, var(--adm-primary, var(--primary)) 8%, var(--surface));
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: normal;
 }

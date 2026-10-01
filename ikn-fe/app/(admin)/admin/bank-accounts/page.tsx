@@ -8,6 +8,7 @@ import { firstError, type FieldErrors } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import type { BankAccountRow } from '@/lib/admin';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 interface BankForm {
   bankName: string;
@@ -98,7 +99,7 @@ export default function AdminBankAccounts() {
   }
 
   async function remove(row: BankAccountRow) {
-    if (!window.confirm(t(`Hapus rekening ${row.bankName} ${row.accountNumber}?`, `Delete account ${row.bankName} ${row.accountNumber}?`))) return;
+    if (!await confirmDialog(t(`Hapus rekening ${row.bankName} ${row.accountNumber}?`, `Delete account ${row.bankName} ${row.accountNumber}?`))) return;
     setError('');
     try {
       await api(`/admin/bank-accounts/${row.id}`, { method: 'DELETE' });

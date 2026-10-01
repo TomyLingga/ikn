@@ -2,33 +2,11 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import StatusBadge from '@/components/StatusBadge';
-import AdminModal from '@/components/admin/AdminModal';
-import { AdminCard, AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
-import { I18nInput, firstError, type FieldErrors } from '@/components/admin/cms';
+import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
+import { firstError, type FieldErrors } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
-import { emptyI18n, tr, type I18n } from '@/lib/cms';
-import { feeTypeLabels, type CommerceSettingsData, type FeeRow, type FeeType } from '@/lib/admin';
-import { formatIDR } from '@/lib/format';
-
-interface FeeForm {
-  name: I18n;
-  type: FeeType;
-  amount: string;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-const emptyFee = (sortOrder: number): FeeForm => ({ name: emptyI18n(), type: 'admin', amount: '', isActive: true, sortOrder });
-
-function feeFormFromRow(row: FeeRow): FeeForm {
-  return { name: { ...row.name }, type: row.type, amount: String(row.amount), isActive: row.isActive, sortOrder: row.sortOrder };
-}
-
-function feePayload(form: FeeForm) {
-  return { name: { id: form.name.id.trim(), en: form.name.en.trim() }, type: form.type, amount: Number(form.amount) || 0, isActive: form.isActive, sortOrder: form.sortOrder };
-}
+import type { CommerceSettingsData } from '@/lib/admin';
 
 type SettingsForm = Record<keyof CommerceSettingsData, string | boolean>;
 
@@ -40,41 +18,26 @@ function settingsToForm(s: CommerceSettingsData): SettingsForm {
     priceIncludesTax: s.priceIncludesTax,
     autoCompleteDays: String(s.autoCompleteDays),
     reminderHoursBeforeDue: String(s.reminderHoursBeforeDue),
+    invoicePrefix: s.invoicePrefix ?? 'PMS/X/INV/RA',
+    invoiceSignerName: s.invoiceSignerName ?? '',
+    invoiceSignerTitle: s.invoiceSignerTitle ?? '',
+    invoiceCc: s.invoiceCc ?? '',
   };
 }
 
-// Pengaturan checkout: biaya tambahan (GET/POST/PUT/DELETE /admin/fees) + setting commerce (GET/PUT /admin/settings).
-// Menggantikan halaman lama /admin/additional-fees.
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+// Pengaturan checkout: setting commerce (GET/PUT /admin/settings). Biaya tambahan punya halaman sendiri
+// (/admin/additional-fees) sejak bisa ditujukan ke customer tertentu.
 export default function AdminCheckoutSettings() {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
-
-  const [fees, setFees] = useState<FeeRow[]>([]);
-  const [feesLoading, setFeesLoading] = useState(true);
-  const [feesError, setFeesError] = useState('');
-  const [feeOpen, setFeeOpen] = useState(false);
-  const [editingFee, setEditingFee] = useState<FeeRow | null>(null);
-  const [feeForm, setFeeForm] = useState<FeeForm>(() => emptyFee(0));
-  const [feeErrors, setFeeErrors] = useState<FieldErrors>({});
-  const [feeError, setFeeError] = useState('');
-  const [feeSaving, setFeeSaving] = useState(false);
 
   const [settings, setSettings] = useState<SettingsForm | null>(null);
   const [settingsErrors, setSettingsErrors] = useState<FieldErrors>({});
   const [settingsError, setSettingsError] = useState('');
   const [settingsNotice, setSettingsNotice] = useState('');
   const [settingsSaving, setSettingsSaving] = useState(false);
-
-  const loadFees = useCallback(async () => {
-    setFeesError('');
-    try {
-      setFees(await api<FeeRow[]>('/admin/fees'));
-    } catch (err) {
-      setFeesError(errorMessage(err));
-    } finally {
-      setFeesLoading(false);
-    }
-  }, []);
 
   const loadSettings = useCallback(async () => {
     setSettingsError('');
@@ -86,70 +49,14 @@ export default function AdminCheckoutSettings() {
   }, []);
 
   useEffect(() => {
-    void loadFees();
     void loadSettings();
-  }, [loadFees, loadSettings]);
+  }, [loadSettings]);
 
   useEffect(() => {
     if (!settingsNotice) return;
     const timer = window.setTimeout(() => setSettingsNotice(''), 3500);
     return () => window.clearTimeout(timer);
   }, [settingsNotice]);
-
-  function openFee(row: FeeRow | null) {
-    setEditingFee(row);
-    setFeeForm(row ? feeFormFromRow(row) : emptyFee(fees.length));
-    setFeeErrors({});
-    setFeeError('');
-    setFeeOpen(true);
-  }
-
-  async function submitFee(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (feeSaving) return;
-    setFeeSaving(true);
-    setFeeError('');
-    setFeeErrors({});
-    try {
-      if (editingFee) {
-        await api(`/admin/fees/${editingFee.id}`, { method: 'PUT', body: feePayload(feeForm) });
-      } else {
-        await api('/admin/fees', { method: 'POST', body: feePayload(feeForm) });
-      }
-      await loadFees();
-      setFeeOpen(false);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 422) {
-        setFeeErrors(err.errors);
-        setFeeError(err.message);
-      } else {
-        setFeeError(errorMessage(err));
-      }
-    } finally {
-      setFeeSaving(false);
-    }
-  }
-
-  async function toggleFee(row: FeeRow) {
-    setFeesError('');
-    try {
-      await api(`/admin/fees/${row.id}`, { method: 'PUT', body: feePayload({ ...feeFormFromRow(row), isActive: !row.isActive }) });
-      await loadFees();
-    } catch (err) {
-      setFeesError(errorMessage(err));
-    }
-  }
-
-  async function removeFee(row: FeeRow) {
-    if (!window.confirm(t(`Hapus biaya "${tr(row.name, lang)}"?`, `Delete fee "${tr(row.name, lang)}"?`))) return;
-    setFeesError('');
-    try {
-      await api(`/admin/fees/${row.id}`, { method: 'DELETE' });
-      await loadFees();
-    } catch (err) {
-      setFeesError(errorMessage(err));
-    }
-  }
 
   async function submitSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -167,6 +74,10 @@ export default function AdminCheckoutSettings() {
           priceIncludesTax: settings.priceIncludesTax === true,
           autoCompleteDays: Number(settings.autoCompleteDays),
           reminderHoursBeforeDue: Number(settings.reminderHoursBeforeDue),
+          invoicePrefix: String(settings.invoicePrefix).trim(),
+          invoiceSignerName: String(settings.invoiceSignerName).trim(),
+          invoiceSignerTitle: String(settings.invoiceSignerTitle).trim(),
+          invoiceCc: String(settings.invoiceCc).trim(),
         },
       });
       setSettings(settingsToForm(saved));
@@ -182,33 +93,6 @@ export default function AdminCheckoutSettings() {
       setSettingsSaving(false);
     }
   }
-
-  const feeColumns: Column<FeeRow>[] = [
-    { key: 'name', label: t('Nama biaya', 'Fee name'), render: (f) => tr(f.name, lang) },
-    { key: 'type', label: t('Jenis', 'Type'), render: (f) => feeTypeLabels[f.type]?.[lang] || f.type },
-    { key: 'amount', label: t('Nominal', 'Amount'), align: 'right', render: (f) => formatIDR(f.amount) },
-    { key: 'sortOrder', label: t('Urutan', 'Order'), align: 'right', render: (f) => String(f.sortOrder) },
-    {
-      key: 'isActive',
-      label: 'Status',
-      render: (f) => <StatusBadge label={f.isActive ? t('Aktif', 'Active') : t('Nonaktif', 'Inactive')} tone={f.isActive ? 'ok' : 'bad'} small />,
-    },
-    {
-      key: 'act',
-      label: t('Aksi', 'Action'),
-      render: (f) => (
-        <RowActions
-          actions={[
-            { label: 'Edit', onClick: () => openFee(f) },
-            f.isActive
-              ? { label: t('Nonaktifkan', 'Deactivate'), tone: 'danger', onClick: () => void toggleFee(f) }
-              : { label: t('Aktifkan', 'Activate'), tone: 'success', onClick: () => void toggleFee(f) },
-            { label: t('Hapus', 'Delete'), tone: 'danger', onClick: () => void removeFee(f) },
-          ]}
-        />
-      ),
-    },
-  ];
 
   const numberField = (key: keyof CommerceSettingsData, label: string, hint: string, opts: { min: number; max: number; step?: number; suffix?: string }) =>
     settings && (
@@ -227,26 +111,10 @@ export default function AdminCheckoutSettings() {
     <div>
       <AdminPageHead
         title={t('Pengaturan Checkout', 'Checkout Settings')}
-        desc={t('Biaya tambahan yang dibebankan ke setiap order dan aturan pembayaran/pajak saat checkout.', 'Additional fees charged on every order plus payment and tax rules at checkout.')}
+        desc={t('Aturan batas waktu pembayaran, kode unik, dan pajak saat checkout.', 'Payment deadline, unique code, and tax rules at checkout.')}
       />
 
-      <div className="admin-grid-2 admin-grid-settings">
-        <AdminCard
-          title={t('Biaya tambahan', 'Additional fees')}
-          desc={t('Biaya aktif otomatis ditambahkan ke ringkasan checkout dan total order.', 'Active fees are added automatically to the checkout summary and order total.')}
-          action={{ label: t('Tambah biaya', 'Add fee'), icon: 'plus', onClick: () => openFee(null) }}
-        >
-          {feesError && <p className="form-error">{feesError}</p>}
-          <DataTable columns={feeColumns} rows={fees} pagination={false} empty={feesLoading ? t('Memuat biaya...', 'Loading fees...') : t('Belum ada biaya tambahan.', 'No additional fees yet.')} />
-          <p className="admin-field-hint" style={{ marginTop: 12 }}>
-            {t('Ongkos kirim diatur per zona wilayah di menu', 'Shipping costs are configured per region zone under')}{' '}
-            <Link href="/admin/shipping" className="link">
-              {t('Ongkir', 'Shipping Rates')}
-            </Link>
-            .
-          </p>
-        </AdminCard>
-
+      <div style={{ maxWidth: 720 }}>
         <AdminCard title={t('Pengaturan checkout', 'Checkout settings')} desc={t('Berlaku untuk order baru; order yang sudah dibuat tidak berubah.', 'Applies to new orders; existing orders are not changed.')}>
           {settingsError && <p className="form-error">{settingsError}</p>}
           {settingsNotice && (
@@ -280,6 +148,32 @@ export default function AdminCheckoutSettings() {
                 </span>
               </label>
               {numberField('autoCompleteDays', t('Selesai otomatis setelah diterima', 'Auto-complete after delivery'), t('Order berstatus "Diterima" ditutup otomatis setelah sekian hari bila customer tidak mengonfirmasi (0 = manual).', 'Delivered orders are closed automatically after this many days if the customer does not confirm (0 = manual).'), { min: 0, max: 90, suffix: t('hari', 'days') })}
+
+              <h3 className="admin-subtitle" style={{ marginTop: 8 }}>{t('Invoice', 'Invoice')}</h3>
+              <label>
+                <span className="field-label">{t('Awalan nomor invoice', 'Invoice number prefix')}</span>
+                <input value={String(settings.invoicePrefix)} onChange={(e) => setSettings({ ...settings, invoicePrefix: e.target.value })} maxLength={40} />
+                <small className="admin-field-hint">
+                  {t('Nomor lengkap:', 'Full number:')} <span className="mono">{String(settings.invoicePrefix).trim().replace(/\/+$/, '') || 'PMS/X/INV/RA'}/{'{urut}'}/{ROMAN[new Date().getMonth()]}/{new Date().getFullYear()}</span>{' '}
+                  {t('— urutan dimulai dari 1 tiap bulan dan diterbitkan saat pembayaran diverifikasi; invoice yang sudah terbit tidak berubah.', '— the sequence restarts at 1 every month and is issued when the payment is verified; existing invoices do not change.')}
+                </small>
+                {firstError(settingsErrors, 'invoicePrefix') && <small className="form-error">{firstError(settingsErrors, 'invoicePrefix')}</small>}
+              </label>
+              <div className="admin-form-row">
+                <label>
+                  <span className="field-label">{t('Nama penanda tangan', 'Signatory name')}</span>
+                  <input value={String(settings.invoiceSignerName)} onChange={(e) => setSettings({ ...settings, invoiceSignerName: e.target.value })} maxLength={120} />
+                </label>
+                <label>
+                  <span className="field-label">{t('Jabatan penanda tangan', 'Signatory title')}</span>
+                  <input value={String(settings.invoiceSignerTitle)} onChange={(e) => setSettings({ ...settings, invoiceSignerTitle: e.target.value })} maxLength={120} />
+                </label>
+              </div>
+              <label>
+                <span className="field-label">{t('Tembusan (cc)', 'Copies (cc)')}</span>
+                <input value={String(settings.invoiceCc)} onChange={(e) => setSettings({ ...settings, invoiceCc: e.target.value })} maxLength={120} placeholder="ATU, File" />
+                <small className="admin-field-hint">{t('Dipisah koma; tampil di kiri bawah cetakan invoice.', 'Comma-separated; shown at the bottom left of the printed invoice.')}</small>
+              </label>
               <div className="admin-modal-actions" style={{ borderTop: 0, paddingTop: 0 }}>
                 <button type="submit" className="btn btn-solid btn-sm" disabled={settingsSaving}>
                   {settingsSaving ? t('Menyimpan...', 'Saving...') : t('Simpan pengaturan', 'Save settings')}
@@ -288,55 +182,19 @@ export default function AdminCheckoutSettings() {
             </form>
           )}
         </AdminCard>
-      </div>
 
-      {feeOpen && (
-        <AdminModal title={editingFee ? t('Edit biaya', 'Edit fee') : t('Tambah biaya', 'Add fee')} onClose={() => setFeeOpen(false)} small>
-          <form className="admin-form" onSubmit={(e) => void submitFee(e)}>
-            {feeError && (
-              <p className="admin-form-error" role="alert">
-                {feeError}
-              </p>
-            )}
-            <I18nInput label={t('Nama biaya', 'Fee name')} value={feeForm.name} onChange={(v) => setFeeForm({ ...feeForm, name: v })} required errorId={firstError(feeErrors, 'name.id', 'name')} errorEn={firstError(feeErrors, 'name.en')} />
-            <div className="admin-form-row">
-              <label>
-                <span className="field-label">{t('Jenis', 'Type')}</span>
-                <select value={feeForm.type} onChange={(e) => setFeeForm({ ...feeForm, type: e.target.value as FeeType })}>
-                  {(Object.keys(feeTypeLabels) as FeeType[]).map((key) => (
-                    <option key={key} value={key}>
-                      {feeTypeLabels[key][lang]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="field-label">{t('Nominal (Rp)', 'Amount (Rp)')} *</span>
-                <input type="number" min={0} step={1} value={feeForm.amount} onChange={(e) => setFeeForm({ ...feeForm, amount: e.target.value })} required />
-                {firstError(feeErrors, 'amount') && <small className="cms-field-error">{firstError(feeErrors, 'amount')}</small>}
-              </label>
-            </div>
-            <div className="admin-form-row">
-              <label>
-                <span className="field-label">{t('Urutan', 'Order')}</span>
-                <input type="number" min={0} value={feeForm.sortOrder} onChange={(e) => setFeeForm({ ...feeForm, sortOrder: Number(e.target.value) || 0 })} />
-              </label>
-              <label className="cms-check" style={{ alignSelf: 'end' }}>
-                <input type="checkbox" checked={feeForm.isActive} onChange={(e) => setFeeForm({ ...feeForm, isActive: e.target.checked })} />
-                <span>{t('Aktif', 'Active')}</span>
-              </label>
-            </div>
-            <div className="admin-modal-actions">
-              <button type="button" className="btn btn-line btn-sm" onClick={() => setFeeOpen(false)}>
-                {t('Batal', 'Cancel')}
-              </button>
-              <button type="submit" className="btn btn-solid btn-sm" disabled={feeSaving}>
-                {feeSaving ? t('Menyimpan...', 'Saving...') : editingFee ? t('Simpan perubahan', 'Save changes') : t('Tambah biaya', 'Add fee')}
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
+        <p className="admin-field-hint" style={{ marginTop: 14 }}>
+          {t('Biaya yang ditambahkan ke order diatur di menu', 'Fees added to orders are managed under')}{' '}
+          <Link href="/admin/additional-fees" className="link">
+            {t('Biaya Tambahan', 'Additional Fees')}
+          </Link>
+          {t(', ongkos kirim di menu', ', shipping costs under')}{' '}
+          <Link href="/admin/shipping" className="link">
+            {t('Ongkir', 'Shipping Rates')}
+          </Link>
+          .
+        </p>
+      </div>
     </div>
   );
 }

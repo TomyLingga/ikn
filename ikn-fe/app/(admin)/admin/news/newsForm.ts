@@ -9,7 +9,7 @@ export interface NewsForm {
   title: I18n;
   excerpt: I18n;
   body: I18n;
-  tag: string;
+  categoryId: number | null; // dari /admin/news-categories
   author: string;
   cover: MediaSummary | null;
   isPublished: boolean;
@@ -21,7 +21,7 @@ export const emptyForm = (): NewsForm => ({
   title: emptyI18n(),
   excerpt: emptyI18n(),
   body: emptyI18n(),
-  tag: '',
+  categoryId: null,
   author: '',
   cover: null,
   isPublished: false,
@@ -34,7 +34,7 @@ export function formFromPost(post: PostDetail): NewsForm {
     title: post.title ?? emptyI18n(),
     excerpt: post.excerpt ?? emptyI18n(),
     body: post.body ?? emptyI18n(),
-    tag: post.tag ?? '',
+    categoryId: post.category?.id ?? null,
     author: post.author ?? '',
     cover: post.cover,
     isPublished: post.isPublished,
@@ -64,7 +64,7 @@ export function toPayload(form: NewsForm) {
     title: form.title,
     excerpt: form.excerpt,
     body: form.body,
-    tag: form.tag.trim() || null,
+    categoryId: form.categoryId,
     author: form.author.trim() || null,
     coverMediaId: form.cover?.id ?? null,
     isPublished: form.isPublished,

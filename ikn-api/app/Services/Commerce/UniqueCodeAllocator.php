@@ -27,7 +27,8 @@ class UniqueCodeAllocator
     public function allocate(string $seedSource, ?int $excludeOrderId = null): int
     {
         $used = Order::query()
-            ->where('status', Order::STATUS_PENDING_PAYMENT)
+            // Termasuk order yang buktinya sedang diverifikasi: admin mencocokkan nominal + kode unik di mutasi.
+            ->whereIn('status', Order::AWAITING_PAYMENT_STATUSES)
             ->where('unique_code', '>', 0)
             ->whereDate('created_at', now()->setTimezone(config('app.timezone'))->toDateString())
             ->when($excludeOrderId, fn ($q) => $q->where('id', '!=', $excludeOrderId))

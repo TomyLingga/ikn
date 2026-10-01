@@ -260,7 +260,8 @@ export default function AddressForm({ initial, onSaved, onCancel, defaults, subm
         {regionError && <p className="form-error co-full" role="alert">{regionError}</p>}
 
         <div className="co-full addr-map-block">
-          <span className="label">{t('Titik lokasi (opsional)', 'Map location (optional)')}</span>
+          <span className="label">{t('Titik lokasi (disarankan)', 'Map location (recommended)')}</span>
+          <small className="addr-map-why">{t('Ongkir dihitung dari jarak gudang ke titik ini; tanpa titik, tarif berbasis jarak tidak tersedia.', 'Shipping is calculated from our warehouse to this point; without it, distance-based rates are unavailable.')}</small>
           <div className="addr-geo-search">
             <input
               value={geoQuery}

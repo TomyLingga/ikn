@@ -19,6 +19,10 @@ export interface PageHeaderContent {
   title: I18n;
   lead: I18n;
   breadcrumb: boolean;
+  // Slideshow foto/video (fade): kosong = tata letak teks saja; video berjalan sepanjang durasinya.
+  layout?: 'split' | 'cover' | string;
+  media?: { file: MediaSummary | null; caption: I18n }[];
+  interval?: number | null; // detik per foto
 }
 
 export interface HeroSlideItem {
@@ -57,7 +61,7 @@ export interface MarqueeContent {
   items: { text: string }[];
 }
 
-export interface StatsContent {
+export interface StatsContent extends SectionHeadContent {
   items: { value: string; unit: string; label: I18n }[];
 }
 
@@ -72,7 +76,7 @@ export interface ProductHighlightsContent {
   heading: I18n;
   link_label: I18n;
   link_url: string;
-  items: { code: string; name: string; kind: string; summary: I18n; url: string }[];
+  items: { image?: MediaSummary | null; code: string; name: string; kind: string; summary: I18n; url: string }[];
 }
 
 export interface VideoGalleryContent {
@@ -84,8 +88,12 @@ export interface VideoGalleryContent {
 export interface CtaContent {
   label: I18n;
   title: I18n;
+  body?: I18n;
   button_label: I18n;
   button_url: string;
+  secondary_label?: I18n;
+  secondary_url?: string;
+  background?: MediaSummary | null;
 }
 
 export interface TextVisualContent {
@@ -94,6 +102,10 @@ export interface TextVisualContent {
   body: I18n;
   button_label: I18n;
   button_url: string;
+  // Foto opsional; tanpa foto tampil panel tema berisi visual_label + visual_mark.
+  image?: MediaSummary | null;
+  image_alt?: I18n;
+  image_side?: 'right' | 'left' | string;
   visual_label: string;
   visual_mark: string;
 }
@@ -101,7 +113,8 @@ export interface TextVisualContent {
 export interface TimelineContent {
   label: I18n;
   heading: I18n;
-  items: { year: string; title: I18n; body: I18n }[];
+  /** `name` (di atas pin) dan `products` opsional; konten lama hanya year/title/body. */
+  items: { year: string; name?: I18n; title: I18n; body: I18n; products?: I18n }[];
 }
 
 export interface VisionMissionContent {
@@ -120,9 +133,57 @@ export interface ValuesContent {
 }
 
 export interface ContactInfoContent {
-  locations: { name: I18n; address: string; phones: { number: string }[] }[];
+  locations: { name: I18n; address: string; phones: { number: string }[]; geo?: { lat: number | null; lng: number | null } | null }[];
   emails: { address: string }[];
-  social: { label: string; handle: string; url: string }[];
+  social: { label: string; handle: string; url: string; icon?: MediaSummary | null }[];
+  background?: MediaSummary | null;
+}
+
+// Titik peta dari lokasi kontak yang punya koordinat (Kontak: semua; footer: lokasi pertama).
+export interface MapPoint {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+export function contactMapPoints(content: Pick<ContactInfoContent, 'locations'>, lang: Lang): MapPoint[] {
+  return asList<ContactInfoContent['locations'][number]>(content.locations).flatMap((loc) => {
+    const lat = loc.geo?.lat;
+    const lng = loc.geo?.lng;
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+    return [{ name: tr(loc.name, lang), address: asText(loc.address), lat, lng }];
+  });
+}
+
+export function mapsUrl(lat: number, lng: number): string {
+  return `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
+// org_chart: daftar simpul datar (key, parent) yang dirakit FE menjadi pohon.
+export interface OrgChartContent {
+  label: I18n;
+  heading: I18n;
+  lead: I18n;
+  expand_depth: number | null;
+  nodes: { key: string; parent: string; title: I18n; holder: string; level?: string }[];
+}
+
+// link_cards: kisi kartu berikon menuju halaman lain.
+export interface LinkCardsContent {
+  label: I18n;
+  heading: I18n;
+  lead: I18n;
+  items: { icon: string; title: I18n; body: I18n; url: string; link_label: I18n }[];
+}
+
+// contact_summary: teks sendiri, data kontak dari halaman Kontak (useSite().contact).
+export interface ContactSummaryContent {
+  label: I18n;
+  heading: I18n;
+  lead: I18n;
+  button_label: I18n;
+  button_url: string;
 }
 
 export interface FormContent {
@@ -131,19 +192,25 @@ export interface FormContent {
   success_body: I18n;
 }
 
-export interface PillarsContent {
+// Label/judul opsional (SecHead) untuk section yang berdiri di halaman satu-halaman (Keberlanjutan, Bisnis).
+export interface SectionHeadContent {
+  label?: I18n;
+  heading?: I18n;
+}
+
+export interface PillarsContent extends SectionHeadContent {
   items: { key: string; icon: string; title: I18n; body: I18n; points: I18nItem[] }[];
 }
 
-export interface InfoBlocksContent {
+export interface InfoBlocksContent extends SectionHeadContent {
   blocks: { label: I18n; body: I18n; points: I18nItem[] }[];
 }
 
-export interface CustomerLogosContent {
+export interface CustomerLogosContent extends SectionHeadContent {
   lead: I18n;
 }
 
-export interface EmptyTextContent {
+export interface EmptyTextContent extends SectionHeadContent {
   empty_text: I18n;
 }
 
@@ -156,6 +223,52 @@ export interface RichTextContent {
   label: I18n;
   heading: I18n;
   body: I18n;
+}
+
+// ---- Tipe tambahan (2026-09-30) ----
+
+export interface LatestNewsContent extends SectionHeadContent {
+  count?: number | null; // 1-6, bawaan 3
+  link_label?: I18n;
+  link_url?: string;
+}
+
+export interface IconFeaturesContent extends SectionHeadContent {
+  lead?: I18n;
+  columns?: '' | 'auto' | '2' | '3' | '4';
+  icon_style?: '' | 'outline' | 'soft' | 'solid' | 'plain';
+  align?: '' | 'center' | 'left';
+  items: { icon: string; image: MediaSummary | null; title: I18n; body: I18n }[];
+}
+
+export interface StepsContent extends SectionHeadContent {
+  lead?: I18n;
+  items: { icon: string; title: I18n; body: I18n }[];
+}
+
+export interface FaqContent extends SectionHeadContent {
+  lead?: I18n;
+  items: { question: I18n; answer: I18n }[];
+}
+
+export interface SpecTableContent extends SectionHeadContent {
+  lead?: I18n;
+  rows: { label: I18n; value: I18n }[];
+  note?: I18n;
+}
+
+export interface TeamContent extends SectionHeadContent {
+  lead?: I18n;
+  items: { photo: MediaSummary | null; name: string; position: I18n; bio: I18n }[];
+}
+
+export interface TestimonialsContent extends SectionHeadContent {
+  items: { quote: I18n; name: string; role: I18n; company: string; photo: MediaSummary | null }[];
+}
+
+export interface ImageGridContent extends SectionHeadContent {
+  lead?: I18n;
+  items: { image: MediaSummary | null; caption: I18n }[];
 }
 
 // ---------------------------------------------------------------- Defensive accessors
@@ -177,6 +290,7 @@ const ICON_NAMES: IconName[] = [
   'compass', 'gear', 'pin', 'phone', 'mail', 'bag', 'image', 'trash', 'orders', 'wallet', 'shieldCheck',
   'package', 'truck', 'checkCircle', 'cancelCircle', 'trendUp', 'users', 'paymentCheck', 'drop', 'check',
   'plus', 'close', 'quote', 'sun', 'moon', 'menu', 'panelLeft',
+  'microscope', 'diamond', 'award', 'globe', 'sparkle', 'factory', 'bell', 'chat', 'video', 'clock', 'store', 'tag', 'search', 'ruler',
 ];
 
 /** Coerce an icon name from the CMS; unknown names fall back. */
@@ -219,6 +333,8 @@ export const ANCHOR_BY_TYPE: Record<string, string> = {
   timeline: 'sejarah',
   vision_mission: 'visi-misi',
   values: 'nilai',
+  contact_summary: 'hubungi-kami',
+  org_chart: 'struktur-organisasi',
 };
 
 // ---------------------------------------------------------------- Breadcrumb

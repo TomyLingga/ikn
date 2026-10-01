@@ -8,6 +8,42 @@ const paths: Record<IconName, ReactNode> = {
   chevronLeft: <path d="m15 18-6-6 6-6" />,
   chevronRight: <path d="m9 18 6-6-6-6" />,
   play: <path d="M6 4.5v15l13-7.5-13-7.5Z" fill="currentColor" stroke="none" />,
+  microscope: (
+    <>
+      <path d="M6 18h8M3 22h18M14 22a7 7 0 1 0 0-14h-1M9 14h2" />
+      <path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2ZM12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3" />
+    </>
+  ),
+  diamond: (
+    <>
+      <path d="M6 3h12l4 6-10 13L2 9Z" />
+      <path d="M11 3 8 9l4 13 4-13-3-6M2 9h20" />
+    </>
+  ),
+  award: (
+    <>
+      <circle cx="12" cy="8" r="6" />
+      <path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" />
+    </>
+  ),
+  sparkle: (
+    <>
+      <path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2Z" />
+      <path d="M19 3v4M17 5h4" />
+    </>
+  ),
+  factory: (
+    <>
+      <path d="M2 20h20M4 20V10l5 3v-3l5 3V6h6v14" />
+      <path d="M8 17h1M12 17h1M16 17h1" />
+    </>
+  ),
   leaf: (
     <>
       <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
@@ -104,6 +140,12 @@ const paths: Record<IconName, ReactNode> = {
       <path d="m4 7 8 4 8-4M12 11v10M8 5l8 4" />
     </>
   ),
+  ruler: (
+    <>
+      <path d="M3 17 17 3l4 4L7 21l-4-4Z" />
+      <path d="m7 13 2 2M10 10l2 2M13 7l2 2" />
+    </>
+  ),
   truck: (
     <>
       <path d="M3 5h11v12H3V5ZM14 9h4l3 4v4h-7V9Z" />
@@ -169,6 +211,54 @@ const paths: Record<IconName, ReactNode> = {
       <path d="M9 3v18" />
     </>
   ),
+  bell: (
+    <>
+      <path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Z" />
+      <path d="M10 20a2.2 2.2 0 0 0 4 0" />
+    </>
+  ),
+  chat: (
+    <>
+      <path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+      <path d="M8 10h8M8 13h5" />
+    </>
+  ),
+  send: <path d="M21 3 10.5 13.5M21 3l-6.5 18-4-7.5L3 9.5 21 3Z" />,
+  star: <path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3Z" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="3" y="6" width="13" height="12" rx="2" />
+      <path d="m16 10.5 5-3v9l-5-3" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  store: (
+    <>
+      <path d="M4 10v10h16V10" />
+      <path d="M3 10 5 4h14l2 6a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0Z" />
+      <path d="M10 20v-5h4v5" />
+    </>
+  ),
+  sort: <path d="M8 5v14M8 5 5 8M8 5l3 3M16 19V5M16 19l-3-3M16 19l3-3" />,
+  expand: <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />,
+  tag: (
+    <>
+      <path d="M3 12V4h8l10 10-8 8L3 12Z" />
+      <circle cx="7.5" cy="8.5" r="1.2" />
+    </>
+  ),
+  minus: <path d="M5 12h14" />,
 };
 
 interface IconProps {

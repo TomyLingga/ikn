@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import Icon from '@/components/Icon';
 import AdminModal from '@/components/admin/AdminModal';
-import { I18nInput, ListField, MediaPicker, firstError, mediaId, type FieldErrors, type MediaValue } from '@/components/admin/cms';
+import { I18nInput, ListField, MediaPicker, firstError, mediaId, mediaSummary, type FieldErrors, type MediaValue } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n } from '@/lib/cms';
@@ -39,12 +39,20 @@ interface ProductFormState {
   unit: string;
   moq: string;
   weightGram: string;
+  lengthCm: string;
+  widthCm: string;
+  heightCm: string;
   /** '' = otomatis dari stok, 'made_to_order' = manual. */
   stockStatus: '' | 'made_to_order';
   isTaxable: boolean;
   isPublished: boolean;
+  /** Foto dan video produk, urut tampil. */
   images: MediaValue[];
+  /** Id media foto yang dipilih sebagai thumbnail; null = foto pertama. */
+  thumbnailId: number | null;
 }
+
+const isVideo = (value: MediaValue): boolean => (mediaSummary(value)?.mime || '').startsWith('video/');
 
 const emptyForm = (categoryId: string): ProductFormState => ({
   code: '',
@@ -66,10 +74,14 @@ const emptyForm = (categoryId: string): ProductFormState => ({
   unit: 'kg',
   moq: '1',
   weightGram: '1000',
+  lengthCm: '',
+  widthCm: '',
+  heightCm: '',
   stockStatus: '',
   isTaxable: true,
   isPublished: false,
   images: [],
+  thumbnailId: null,
 });
 
 function formFromProduct(product: AdminProduct): ProductFormState {
@@ -93,10 +105,14 @@ function formFromProduct(product: AdminProduct): ProductFormState {
     unit: product.unit,
     moq: String(product.moq),
     weightGram: String(product.weightGram),
+    lengthCm: product.dimensions?.lengthCm == null ? '' : String(product.dimensions.lengthCm),
+    widthCm: product.dimensions?.widthCm == null ? '' : String(product.dimensions.widthCm),
+    heightCm: product.dimensions?.heightCm == null ? '' : String(product.dimensions.heightCm),
     stockStatus: product.stockStatus === 'made_to_order' ? 'made_to_order' : '',
     isTaxable: product.isTaxable,
     isPublished: product.isPublished,
     images: product.images.map((image) => image.media ?? { id: image.mediaId }),
+    thumbnailId: product.images.find((image) => image.isThumbnail)?.mediaId ?? null,
   };
 }
 
@@ -130,10 +146,15 @@ function toPayload(form: ProductFormState, editing: AdminProduct | null): Produc
     unit: form.unit.trim() || 'pcs',
     moq: Math.max(1, Number(form.moq) || 1),
     weightGram: Math.max(1, Number(form.weightGram) || 1),
+    lengthCm: numberOrNull(form.lengthCm),
+    widthCm: numberOrNull(form.widthCm),
+    heightCm: numberOrNull(form.heightCm),
     stockStatus,
     isTaxable: form.isTaxable,
     isPublished: form.isPublished,
     images: form.images.map(mediaId).filter((id): id is number => id !== null),
+    // Thumbnail hanya sah bila masih ada di daftar dan berupa foto; selain itu server memakai foto pertama.
+    thumbnailMediaId: form.images.some((item) => mediaId(item) === form.thumbnailId && !isVideo(item)) ? form.thumbnailId : null,
   };
 }
 
@@ -322,6 +343,32 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
 
         <div className="admin-form-row admin-form-row-3">
           <label>
+            <span className="field-label">{t('Panjang kemasan (cm)', 'Package length (cm)')}</span>
+            <input type="number" min={0.1} step={0.1} value={form.lengthCm} onChange={(e) => update('lengthCm', e.target.value)} placeholder="40" />
+            {firstError(errors, 'lengthCm') && <small className="cms-field-error">{firstError(errors, 'lengthCm')}</small>}
+          </label>
+          <label>
+            <span className="field-label">{t('Lebar kemasan (cm)', 'Package width (cm)')}</span>
+            <input type="number" min={0.1} step={0.1} value={form.widthCm} onChange={(e) => update('widthCm', e.target.value)} placeholder="30" />
+            {firstError(errors, 'widthCm') && <small className="cms-field-error">{firstError(errors, 'widthCm')}</small>}
+          </label>
+          <label>
+            <span className="field-label">{t('Tinggi kemasan (cm)', 'Package height (cm)')}</span>
+            <input type="number" min={0.1} step={0.1} value={form.heightCm} onChange={(e) => update('heightCm', e.target.value)} placeholder="25" />
+            {firstError(errors, 'heightCm') && <small className="cms-field-error">{firstError(errors, 'heightCm')}</small>}
+          </label>
+        </div>
+        <p className="admin-field-hint">
+          {(() => {
+            const volume = (Number(form.lengthCm) || 0) * (Number(form.widthCm) || 0) * (Number(form.heightCm) || 0);
+            return volume > 0
+              ? t(`Volume per satuan ${(volume / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 4 })} m³ — dipakai untuk ongkir per m³.`, `Volume per unit ${(volume / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 4 })} m³ — used for per-m³ shipping.`)
+              : t('Isi ketiga dimensi kemasan per satuan jual agar volume ikut dihitung di ongkir; kosong = volume tidak dihitung.', 'Fill in all three package dimensions per sale unit so volume counts toward shipping; empty = volume ignored.');
+          })()}
+        </p>
+
+        <div className="admin-form-row admin-form-row-3">
+          <label>
             <span className="field-label">{t('Minimum order (MOQ)', 'Minimum order (MOQ)')}</span>
             <input type="number" min={1} step={1} value={form.moq} onChange={(e) => update('moq', e.target.value)} required />
             {firstError(errors, 'moq') && <small className="cms-field-error">{firstError(errors, 'moq')}</small>}
@@ -329,7 +376,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
           <label>
             <span className="field-label">{t('Berat per satuan (gram)', 'Weight per unit (gram)')}</span>
             <input type="number" min={1} step={1} value={form.weightGram} onChange={(e) => update('weightGram', e.target.value)} required />
-            <small className="admin-field-hint">{t('Dipakai untuk menghitung ongkir per kg.', 'Used for per-kg shipping rates.')}</small>
+            <small className="admin-field-hint">{t('Dipakai untuk ongkir per kg.', 'Used for per-kg shipping.')}</small>
             {firstError(errors, 'weightGram') && <small className="cms-field-error">{firstError(errors, 'weightGram')}</small>}
           </label>
           <label>
@@ -354,16 +401,48 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
         </div>
 
         <ListField<MediaValue>
-          label={t('Gambar produk (urutan = tampilan)', 'Product images (order = display order)')}
+          label={t('Foto & video produk (urutan = urutan geser di halaman produk)', 'Product photos & videos (order = swipe order on the product page)')}
           items={form.images}
           onChange={(items) => update('images', items)}
           createItem={() => null}
           maxItems={20}
-          addLabel={t('Tambah gambar', 'Add image')}
-          error={firstError(errors, 'images')}
+          addLabel={t('Tambah foto / video', 'Add photo / video')}
+          error={firstError(errors, 'images', 'thumbnailMediaId')}
           itemHasError={(index) => !!firstError(errors, `images.${index}`)}
-          renderItem={(item, _index, set) => <MediaPicker value={item} onChange={set} accept="image" collection="products" />}
+          renderItem={(item, index, set) => {
+            const id = mediaId(item);
+            const video = isVideo(item);
+            // Tanpa pilihan, thumbnail = foto pertama di daftar (sama dengan perilaku server).
+            const firstPhoto = form.images.find((entry) => mediaId(entry) !== null && !isVideo(entry));
+            const chosen = form.images.some((entry) => mediaId(entry) === form.thumbnailId && !isVideo(entry)) ? form.thumbnailId : mediaId(firstPhoto);
+            return (
+              <div className="product-media-item">
+                <MediaPicker value={item} onChange={set} accept="visual" collection="products" />
+                {id !== null &&
+                  (video ? (
+                    <span className="admin-field-hint">
+                      <Icon name="video" size={15} /> {t('Video: tampil di galeri geser, tidak bisa menjadi thumbnail.', 'Video: shown in the swipe gallery, cannot be the thumbnail.')}
+                    </span>
+                  ) : (
+                    <label className="product-thumb-choice">
+                      <input type="radio" name="product-thumbnail" checked={chosen === id} onChange={() => update('thumbnailId', id)} />
+                      <span>
+                        {t('Jadikan thumbnail', 'Use as thumbnail')}
+                        {chosen === id && <em>{t('Thumbnail', 'Thumbnail')}</em>}
+                      </span>
+                    </label>
+                  ))}
+                {firstError(errors, `images.${index}`) && <small className="form-error">{firstError(errors, `images.${index}`)}</small>}
+              </div>
+            );
+          }}
         />
+        <p className="admin-field-hint">
+          {t(
+            'Thumbnail adalah foto yang tampil di kartu produk, keranjang, dan pesanan. Customer dapat menggeser semua foto dan video di halaman produk. Video: MP4/WebM.',
+            'The thumbnail is the photo shown on product cards, in the cart, and on orders. Customers can swipe through every photo and video on the product page. Video: MP4/WebM.',
+          )}
+        </p>
 
         <footer className="admin-modal-actions">
           <button type="button" className="btn btn-line btn-sm" onClick={onClose}>

@@ -4,6 +4,8 @@
 return [
     'insufficient_stock' => 'Stok tidak mencukupi.',
     'category_in_use' => 'Kategori masih dipakai oleh produk.',
+    'product_media_invalid' => 'Media produk harus berupa foto atau video dari media library.',
+    'product_thumbnail_invalid' => 'Thumbnail harus salah satu foto pada daftar media produk.',
     'stock_qty_positive' => 'Jumlah harus lebih dari 0.',
     'stock_qty_zero' => 'Jumlah penyesuaian tidak boleh 0.',
     'stock_adjust_negative' => 'Penyesuaian membuat stok tersedia negatif (tersedia :available).',
@@ -19,6 +21,7 @@ return [
         'per_user_limit' => 'Batas pemakaian voucher per akun sudah tercapai.',
         'min_subtotal' => 'Minimum belanja untuk voucher ini belum terpenuhi.',
         'scope' => 'Voucher tidak berlaku untuk produk di keranjang.',
+        'not_eligible' => 'Voucher ini tidak berlaku untuk akun Anda.',
     ],
 
     'quote' => [

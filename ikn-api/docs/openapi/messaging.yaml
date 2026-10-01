@@ -1,0 +1,380 @@
+# Fragmen OpenAPI notifikasi dalam aplikasi, live chat, badge, dan catatan perjalanan kiriman
+# (ASUMSI A-70, A-71, A-73). Digabung oleh docs/openapi/merge.py.
+tags:
+  - name: notifications
+    description: Notifikasi dalam aplikasi untuk customer (lonceng portal) dan penghitung badge
+  - name: chat
+    description: Live chat customer dengan penjual (polling, tanpa websocket)
+  - name: admin-chat
+    description: Kotak masuk live chat admin (modul chat)
+
+paths:
+  # ---------------------------------------------------------------- notifikasi customer
+  /customer/badges:
+    get:
+      tags: [notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Penghitung badge top bar portal (notifikasi belum dibaca + pesan chat admin belum dibaca)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { notifications: { type: integer }, chat: { type: integer } } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /customer/notifications:
+    get:
+      tags: [notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Daftar notifikasi milik sendiri (terbaru dulu); meta.unread = jumlah belum dibaca
+      parameters:
+        - { name: unread, in: query, schema: { type: boolean }, description: hanya yang belum dibaca }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: perPage, in: query, schema: { type: integer, default: 15, maximum: 50 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/UserNotification' } }, meta: { allOf: [{ $ref: '#/components/schemas/PageMeta' }, { type: object, properties: { unread: { type: integer } } }] } } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /customer/notifications/read-all:
+    post:
+      tags: [notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Tandai semua notifikasi sudah dibaca
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { updated: { type: integer }, unread: { type: integer } } } } } } } }
+  /customer/notifications/{id}/read:
+    post:
+      tags: [notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Tandai satu notifikasi sudah dibaca (milik customer lain → 404)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/UserNotification' }, meta: { type: object, properties: { unread: { type: integer } } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ---------------------------------------------------------------- live chat customer
+  /customer/chat:
+    get:
+      tags: [chat]
+      security: [{ cookieAuth: [] }]
+      summary: Percakapan customer dengan penjual (satu per customer; null bila belum pernah mengirim pesan)
+      description: |
+        Tanpa parameter = 50 pesan terakhir. `after` = pesan dengan id lebih besar (polling), `before` = halaman lebih lama.
+        `senderName` pesan admin selalu null untuk customer (penjual tampil sebagai satu pihak).
+      parameters:
+        - { name: after, in: query, schema: { type: integer } }
+        - { name: before, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/CustomerChat' } } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+  /customer/chat/messages:
+    post:
+      tags: [chat]
+      security: [{ cookieAuth: [] }]
+      summary: Kirim pesan (membuat percakapan bila belum ada); maks. 30 pesan per menit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, maxLength: 2000 }
+                context:
+                  type: object
+                  nullable: true
+                  description: 'rujukan opsional: { type: product, slug } atau { type: order, number } (order harus milik sendiri); disimpan sebagai snapshot'
+                  properties:
+                    type: { type: string, enum: [product, order] }
+                    slug: { type: string }
+                    number: { type: string }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { description: Terlalu banyak pesan }
+  /customer/chat/read:
+    post:
+      tags: [chat]
+      security: [{ cookieAuth: [] }]
+      summary: Tandai pesan admin sudah dibaca
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { unread: { type: integer } } } } } } } }
+
+  /customer/chat/claim:
+    post:
+      tags: [chat]
+      security: [{ cookieAuth: [] }]
+      summary: Tamu yang baru login mengambil alih percakapan tamunya (token dari browser) ke akun ini
+      description: Akun belum punya percakapan → percakapan tamu menjadi milik akun; sudah punya → pesan tamu dipindahkan dan percakapan tamu dihapus. Token tak dikenal → claimed=false.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string, maxLength: 64 } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, claimed: { type: boolean } } } } } } } }
+
+  # ---------------------------------------------------------------- live chat tamu (belum login)
+  /chat/guest:
+    post:
+      tags: [chat]
+      summary: Mulai percakapan sebagai tamu (formulir perkenalan + pesan pertama); maks. 10 per jam per IP
+      description: Mengembalikan `token` acak 48 karakter yang disimpan browser tamu; token tidak pernah muncul lagi di respons lain.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, body]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 120 }
+                email: { type: string, format: email, maxLength: 160 }
+                phone: { type: string, maxLength: 40, nullable: true, description: 'angka, +, spasi, tanda kurung, titik, strip' }
+                body: { type: string, maxLength: 2000 }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { token: { type: string }, conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { description: Terlalu banyak percakapan baru }
+    get:
+      tags: [chat]
+      summary: Percakapan tamu (token wajib; salah → 404), parameter after/before seperti /customer/chat
+      parameters:
+        - { name: token, in: query, required: true, schema: { type: string } }
+        - { name: after, in: query, schema: { type: integer } }
+        - { name: before, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/CustomerChat' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /chat/guest/messages:
+    post:
+      tags: [chat]
+      summary: Kirim pesan sebagai tamu; maks. 30 per menit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token, body], properties: { token: { type: string }, body: { type: string, maxLength: 2000 } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /chat/guest/read:
+    post:
+      tags: [chat]
+      summary: Tamu menandai pesan admin sudah dibaca
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { unread: { type: integer } } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ---------------------------------------------------------------- admin: badge, chat, catatan perjalanan
+  /admin/badges:
+    get:
+      tags: [admin-dashboard]
+      security: [{ cookieAuth: [] }]
+      summary: Penghitung badge sidebar admin; null = admin tidak punya modulnya
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      orders: { type: integer, nullable: true, description: 'order sudah dibayar yang masih berjalan: paid, processing, shipped, delivered (modul orders); payment_review dihitung di payments' }
+                      payments: { type: integer, nullable: true, description: pembayaran awaiting_verification (modul payments) }
+                      customers: { type: integer, nullable: true, description: customer berstatus pending (modul customers) }
+                      chat: { type: integer, nullable: true, description: percakapan dengan pesan customer belum dibaca (modul chat) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/chats:
+    get:
+      tags: [admin-chat]
+      security: [{ cookieAuth: [] }]
+      summary: Kotak masuk percakapan (pesan terbaru dulu); meta.unreadConversations untuk badge
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 120 }, description: nama, email, atau perusahaan customer }
+        - { name: unread, in: query, schema: { type: boolean } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: perPage, in: query, schema: { type: integer, default: 30, maximum: 100 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminChatConversation' } }, meta: { allOf: [{ $ref: '#/components/schemas/PageMeta' }, { type: object, properties: { unreadConversations: { type: integer } } }] } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-chat]
+      security: [{ cookieAuth: [] }]
+      summary: Buka (atau buat) percakapan dengan customer tertentu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [customerId], properties: { customerId: { type: integer } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminChatConversation' } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/chats/{conversation}:
+    get:
+      tags: [admin-chat]
+      security: [{ cookieAuth: [] }]
+      summary: Pesan dalam satu percakapan (after/before seperti sisi customer)
+      parameters:
+        - { name: conversation, in: path, required: true, schema: { type: integer } }
+        - { name: after, in: query, schema: { type: integer } }
+        - { name: before, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/AdminChatConversation' }, messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }, hasMore: { type: boolean } } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/chats/{conversation}/messages:
+    post:
+      tags: [admin-chat]
+      security: [{ cookieAuth: [] }]
+      summary: Balas customer (tidak dicatat audit log; pesan itu sendiri catatannya)
+      parameters:
+        - { name: conversation, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [body], properties: { body: { type: string, maxLength: 2000 } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/AdminChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/chats/{conversation}/read:
+    post:
+      tags: [admin-chat]
+      security: [{ cookieAuth: [] }]
+      summary: Tandai pesan customer pada percakapan ini sudah dibaca
+      parameters:
+        - { name: conversation, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { unread: { type: integer }, unreadConversations: { type: integer } } } } } } } }
+  /admin/orders/{number}/attachments:
+    post:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: Unggah lampiran order (faktur pajak, surat jalan) ke disk private; hanya order yang sudah dibayar; customer mendapat notifikasi
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: 'pdf/jpg/png/webp/xlsx/xls/docx/doc/csv/txt/zip ≤ 10 MB (ikn.commerce.attachment_*)' }
+                label: { type: string, maxLength: 120 }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '409': { description: 'ATTACHMENT_NOT_ALLOWED: order belum dibayar (meta.status)' }
+        '413': { description: Berkas terlalu besar }
+        '415': { description: Jenis berkas tidak didukung }
+  /admin/orders/{number}/attachments/{attachment}:
+    delete:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: Hapus lampiran (berkasnya ikut dihapus)
+      parameters:
+        - { name: number, in: path, required: true, schema: { type: string } }
+        - { name: attachment, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/orders/{number}/tracking:
+    post:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: Tambah catatan perjalanan kiriman (hanya status shipped); customer mendapat notifikasi
+      parameters:
+        - { name: number, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [note], properties: { note: { type: string, minLength: 3, maxLength: 200, example: Pesanan tiba di gudang transit Pekanbaru } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '409': { description: 'TRACKING_NOT_ALLOWED: order tidak berstatus shipped (meta.status)' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/orders/{number}/tracking/{update}:
+    delete:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: Hapus catatan perjalanan (hanya selama status shipped)
+      parameters:
+        - { name: number, in: path, required: true, schema: { type: string } }
+        - { name: update, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'TRACKING_NOT_ALLOWED' }
+
+components:
+  schemas:
+    UserNotification:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { type: string, example: order.shipped, description: 'order.placed | order.payment_accepted | order.payment_rejected | order.payment_reminder | order.expired | order.cancelled | order.shipped | order.tracking | order.delivered | order.completed | account.approved | account.rejected | voucher.assigned' }
+        title: { $ref: '#/components/schemas/I18n' }
+        body: { $ref: '#/components/schemas/I18n' }
+        url: { type: string, nullable: true, description: path FE tujuan, example: /dashboard/pesanan/IKN-20260922-00001 }
+        data: { type: object, nullable: true }
+        read: { type: boolean }
+        readAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    ChatMessage:
+      type: object
+      properties:
+        id: { type: integer }
+        role: { type: string, enum: [customer, admin] }
+        body: { type: string }
+        context:
+          type: object
+          nullable: true
+          description: 'snapshot rujukan: { type: product, slug, code, name, image, price, unit } atau { type: order, number, status, grandTotal }'
+        senderName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    CustomerChatConversation:
+      type: object
+      nullable: true
+      properties:
+        id: { type: integer }
+        unread: { type: integer, description: pesan admin yang belum dibaca customer }
+        lastMessageAt: { type: string, format: date-time, nullable: true }
+    CustomerChat:
+      type: object
+      properties:
+        conversation: { $ref: '#/components/schemas/CustomerChatConversation' }
+        messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }
+        hasMore: { type: boolean }
+    AdminChatConversation:
+      type: object
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [customer, guest] }
+        guest:
+          type: object
+          nullable: true
+          description: terisi untuk percakapan tamu (customer null)
+          properties:
+            name: { type: string }
+            email: { type: string }
+            phone: { type: string, nullable: true }
+        customer:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            company: { type: string, nullable: true }
+            email: { type: string }
+            status: { type: string }
+        unread: { type: integer, description: pesan customer yang belum dibaca admin }
+        lastMessagePreview: { type: string, nullable: true }
+        lastSenderRole: { type: string, enum: [customer, admin], nullable: true }
+        lastMessageAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time, nullable: true }

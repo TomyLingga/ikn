@@ -10,24 +10,33 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Services\Payment\PaymentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 // Admin pembayaran (kontrak 11.2), modul `payments`: daftar per payment + order ringkas, accept/reject, alias by nomor order.
 class PaymentController extends ApiController
 {
-    /** Default status awaiting_verification; `status=all` untuk semua. q: nomor order, nama/perusahaan/email customer. */
+    /**
+     * Default status awaiting_verification; `status=all` untuk semua. q: nomor order, nama/perusahaan/email customer.
+     * from/to (tanggal, zona aplikasi) menyaring tanggal yang tampil di daftar: bukti diunggah, atau dibuat bila belum ada bukti.
+     */
     public function index(Request $request)
     {
         $request->validate([
             'status' => ['nullable', 'string', Rule::in(array_merge(Payment::STATUSES, ['all']))],
             'method' => ['nullable', 'string', 'max:64'],
             'q' => ['nullable', 'string', 'max:120'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
         ]);
         $status = $request->query('status', Payment::STATUS_AWAITING_VERIFICATION);
+        $tz = config('app.timezone');
 
         $query = Payment::with(AdminPaymentResource::eager())
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
             ->when($request->query('method'), fn ($q, $method) => $q->where('method', strtolower(trim($method))))
+            ->when($request->query('from'), fn ($q, $from) => $q->whereRaw('COALESCE(proof_uploaded_at, created_at) >= ?', [Carbon::parse($from, $tz)->startOfDay()]))
+            ->when($request->query('to'), fn ($q, $to) => $q->whereRaw('COALESCE(proof_uploaded_at, created_at) <= ?', [Carbon::parse($to, $tz)->endOfDay()]))
             ->when(trim((string) $request->query('q')), function ($q, $term) {
                 $like = '%'.addcslashes($term, '%_\\').'%';
                 $q->where(function ($w) use ($like) {
@@ -44,7 +53,7 @@ class PaymentController extends ApiController
             ->orderByRaw("CASE status WHEN 'awaiting_verification' THEN 0 ELSE 1 END")
             ->orderByDesc('proof_uploaded_at')->orderByDesc('id');
 
-        return $this->paginated($query->paginate($this->perPage()), AdminPaymentResource::class);
+        return $this->paginated($query->paginate($this->perPage()), AdminPaymentResource::class, ['counts' => $this->statusCounts(Payment::query(), Payment::STATUSES)]);
     }
 
     public function show(Payment $payment)

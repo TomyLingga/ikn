@@ -5,6 +5,7 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { BrochureData, PageSection } from '@/lib/cms';
+import SecHead from './SecHead';
 import { fileKind, formatBytes, type EmptyTextContent } from '../utils';
 
 interface Props {
@@ -12,19 +13,22 @@ interface Props {
   items: BrochureData[];
 }
 
-// Download cards; the rows come from GET /content/brochures (passed via `extra`).
+// Download cards; the rows come from GET /content/brochures (passed via `extra`). Section id = key (#unduhan).
 export default function BrochuresSection({ section, items }: Props) {
   const { lang } = useLang();
   const c = section.content as EmptyTextContent;
   const emptyText = tr(c.empty_text, lang) || (lang === 'en' ? 'No documents published yet.' : 'Belum ada dokumen yang dipublikasikan.');
+  const label = tr(c.label, lang);
+  const heading = tr(c.heading, lang);
   const archiveNote =
     lang === 'en'
       ? 'Archived file — contact us to obtain this document.'
       : 'Berkas dari arsip — hubungi kami untuk mendapatkan dokumen ini.';
 
   return (
-    <section className="section-tight">
+    <section className="section-tight" id={section.key || undefined}>
       <div className="container">
+        {(label || heading) && <SecHead label={label} heading={heading} />}
         {items.length === 0 ? (
           <p className="form-note">{emptyText}</p>
         ) : (

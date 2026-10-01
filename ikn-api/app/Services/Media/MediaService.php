@@ -41,14 +41,18 @@ class MediaService
         $mime = (string) $file->getMimeType(); // deteksi finfo, bukan ekstensi klien
         $imageMimes = config('ikn.media.image_mimes', []);
         $documentMimes = config('ikn.media.document_mimes', []);
-        $allowed = $allowedMimes ?? array_merge($imageMimes, $documentMimes);
+        $videoMimes = config('ikn.media.video_mimes', []);
+        $allowed = $allowedMimes ?? array_merge($imageMimes, $documentMimes, $videoMimes);
 
         if (! in_array($mime, $allowed, true)) {
             throw ApiException::unsupportedMedia();
         }
 
         $isImage = in_array($mime, $imageMimes, true);
-        $limitKb = $maxKb ?? ($isImage ? config('ikn.media.image_max_kb') : config('ikn.media.document_max_kb'));
+        $isVideo = in_array($mime, $videoMimes, true);
+        $limitKb = $maxKb ?? ($isImage
+            ? config('ikn.media.image_max_kb')
+            : ($isVideo ? config('ikn.media.video_max_kb') : config('ikn.media.document_max_kb')));
 
         if ($file->getSize() > $limitKb * 1024) {
             throw ApiException::tooLarge();

@@ -5,6 +5,7 @@ namespace App\Services\Account;
 use App\Mail\Account\AccountApproved;
 use App\Mail\Account\AccountRejected;
 use App\Models\User;
+use App\Services\Notification\InAppNotifier;
 use Illuminate\Support\Facades\Mail;
 
 // Transisi status customer oleh admin (kontrak 11.4). Semua transisi diizinkan kecuali kembali ke pending
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\Mail;
 class CustomerStatusService
 {
     public const TARGET_STATUSES = [User::STATUS_ACTIVE, User::STATUS_REJECTED, User::STATUS_INACTIVE];
+
+    public function __construct(private InAppNotifier $inApp)
+    {
+    }
 
     public function transition(User $customer, string $status, ?string $reason, User $admin): User
     {
@@ -39,10 +44,12 @@ class CustomerStatusService
         if ($status === User::STATUS_ACTIVE && in_array($from, [User::STATUS_PENDING, User::STATUS_REJECTED], true)) {
             $customer->loadMissing('profile');
             Mail::to($customer)->send(new AccountApproved($customer));
+            $this->inApp->notify($customer, 'account.approved', [], '/dashboard/katalog');
         }
 
         if ($status === User::STATUS_REJECTED && $from !== User::STATUS_REJECTED) {
             Mail::to($customer)->send(new AccountRejected($customer, $reason));
+            $this->inApp->notify($customer, 'account.rejected', ['reason' => $reason ?: '-'], '/dashboard/perusahaan');
         }
 
         return $customer;

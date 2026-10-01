@@ -22,6 +22,7 @@ class AdminProductResource extends JsonResource
             'promoActive' => $this->promoActive(),
             'reserved' => (int) $this->reserved_qty,
             'isPublished' => $this->is_published,
+            'thumbnailMediaId' => optional($this->thumbnailImage())->media_id,
             'images' => $images->map(fn ($image) => $image->toSummary() + ['mediaId' => $image->media_id, 'media' => $image->media ? $image->media->toSummary() : null])->values()->all(),
             'createdAt' => optional($this->created_at)->toApiString(),
             'updatedAt' => optional($this->updated_at)->toApiString(),

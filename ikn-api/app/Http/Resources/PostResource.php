@@ -14,7 +14,9 @@ class PostResource extends JsonResource
             'title' => $this->title,
             'excerpt' => $this->excerpt,
             'body' => $this->when(! $request->boolean('summary'), $this->body),
-            'tag' => $this->tag,
+            'category' => $this->category
+                ? ['id' => $this->category->id, 'slug' => $this->category->slug, 'name' => $this->category->name]
+                : null,
             'author' => $this->author,
             'readingMinutes' => $this->readingMinutes(),
             'cover' => $this->cover ? $this->cover->toSummary() : null,

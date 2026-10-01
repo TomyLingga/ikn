@@ -6,20 +6,24 @@ import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, RowActions } from '@/components/admin/AdminPage';
 import { I18nInput, firstError, type FieldErrors } from '@/components/admin/cms';
+import GeoPicker from '@/components/admin/cms/GeoPicker';
 import RegionPicker, { useRegionNames } from '@/components/admin/RegionPicker';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n } from '@/lib/cms';
 import {
   numberOrNull,
+  previewShippingAmount,
   regionLevelLabels,
   shippingRateTypeLabels,
+  type ShippingOrigin,
   type ShippingRateRow,
   type ShippingRateType,
   type ShippingZoneRow,
   type ZoneRegionRef,
 } from '@/lib/admin';
 import { formatIDR } from '@/lib/format';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 interface ZoneForm {
   name: I18n;
@@ -33,7 +37,9 @@ interface RateForm {
   name: I18n;
   type: ShippingRateType;
   baseAmount: string;
+  perKmAmount: string;
   perKgAmount: string;
+  perM3Amount: string;
   minAmount: string;
   freeAbove: string;
   eta: I18n;
@@ -45,12 +51,26 @@ type Modal = { type: 'zone'; zone: ShippingZoneRow | null } | { type: 'rate'; zo
 
 const emptyZone = (): ZoneForm => ({ name: emptyI18n(), priority: '10', isActive: true, isDefault: false, regions: [] });
 const zoneFormFrom = (z: ShippingZoneRow): ZoneForm => ({ name: { ...z.name }, priority: String(z.priority), isActive: z.isActive, isDefault: z.isDefault, regions: [...z.regions] });
-const emptyRate = (sortOrder: number): RateForm => ({ name: emptyI18n(), type: 'per_kg', baseAmount: '', perKgAmount: '', minAmount: '0', freeAbove: '', eta: emptyI18n(), isActive: true, sortOrder: String(sortOrder) });
+const emptyRate = (sortOrder: number): RateForm => ({
+  name: emptyI18n(),
+  type: 'calculated',
+  baseAmount: '',
+  perKmAmount: '0',
+  perKgAmount: '0',
+  perM3Amount: '0',
+  minAmount: '0',
+  freeAbove: '',
+  eta: emptyI18n(),
+  isActive: true,
+  sortOrder: String(sortOrder),
+});
 const rateFormFrom = (r: ShippingRateRow): RateForm => ({
   name: { ...r.name },
   type: r.type,
   baseAmount: String(r.baseAmount),
+  perKmAmount: String(r.perKmAmount ?? 0),
   perKgAmount: String(r.perKgAmount),
+  perM3Amount: String(r.perM3Amount ?? 0),
   minAmount: String(r.minAmount),
   freeAbove: r.freeAbove === null ? '' : String(r.freeAbove),
   eta: r.eta ? { ...r.eta } : emptyI18n(),
@@ -93,6 +113,10 @@ export default function AdminShipping() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [origin, setOrigin] = useState<ShippingOrigin | null>(null);
+  const [originOpen, setOriginOpen] = useState(false);
+  const [originErrors, setOriginErrors] = useState<FieldErrors>({});
+  const [preview, setPreview] = useState({ km: '100', kg: '50', m3: '0.25' });
 
   const refresh = useCallback(async () => {
     setError('');
@@ -109,7 +133,27 @@ export default function AdminShipping() {
 
   useEffect(() => {
     void refresh();
+    api<ShippingOrigin>('/admin/shipping-origin')
+      .then(setOrigin)
+      .catch(() => setOrigin(null));
   }, [refresh]);
+
+  async function saveOrigin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!origin || saving) return;
+    setSaving(true);
+    setOriginErrors({});
+    try {
+      setOrigin(await api<ShippingOrigin>('/admin/shipping-origin', { method: 'PUT', body: origin }));
+      setNotice(t('Titik asal pengiriman disimpan.', 'Shipping origin saved.'));
+      setOriginOpen(false);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 422) setOriginErrors(err.errors);
+      else setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     if (!notice) return;
@@ -171,7 +215,7 @@ export default function AdminShipping() {
   }
 
   async function removeZone(zone: ShippingZoneRow) {
-    if (!window.confirm(t(`Hapus zona "${tr(zone.name, lang)}" beserta ${zone.rates.length} tarifnya?`, `Delete zone "${tr(zone.name, lang)}" and its ${zone.rates.length} rates?`))) return;
+    if (!await confirmDialog(t(`Hapus zona "${tr(zone.name, lang)}" beserta ${zone.rates.length} tarifnya?`, `Delete zone "${tr(zone.name, lang)}" and its ${zone.rates.length} rates?`))) return;
     setBusy(true);
     setError('');
     try {
@@ -208,7 +252,9 @@ export default function AdminShipping() {
       name: { id: rateForm.name.id.trim(), en: rateForm.name.en.trim() },
       type: rateForm.type,
       baseAmount: Number(rateForm.baseAmount) || 0,
-      perKgAmount: rateForm.type === 'per_kg' ? Number(rateForm.perKgAmount) || 0 : 0,
+      perKmAmount: rateForm.type === 'calculated' ? Number(rateForm.perKmAmount) || 0 : 0,
+      perKgAmount: rateForm.type === 'calculated' ? Number(rateForm.perKgAmount) || 0 : 0,
+      perM3Amount: rateForm.type === 'calculated' ? Number(rateForm.perM3Amount) || 0 : 0,
       minAmount: Number(rateForm.minAmount) || 0,
       freeAbove: numberOrNull(rateForm.freeAbove),
       eta: { id: rateForm.eta.id.trim(), en: rateForm.eta.en.trim() },
@@ -237,7 +283,7 @@ export default function AdminShipping() {
     try {
       await api(`/admin/shipping-rates/${rate.id}`, {
         method: 'PUT',
-        body: { name: rate.name, type: rate.type, baseAmount: rate.baseAmount, perKgAmount: rate.perKgAmount, minAmount: rate.minAmount, freeAbove: rate.freeAbove, eta: rate.eta, isActive: !rate.isActive, sortOrder: rate.sortOrder },
+        body: { name: rate.name, type: rate.type, baseAmount: rate.baseAmount, perKmAmount: rate.perKmAmount, perKgAmount: rate.perKgAmount, perM3Amount: rate.perM3Amount, minAmount: rate.minAmount, freeAbove: rate.freeAbove, eta: rate.eta, isActive: !rate.isActive, sortOrder: rate.sortOrder },
       });
       await refresh();
     } catch (err) {
@@ -248,7 +294,7 @@ export default function AdminShipping() {
   }
 
   async function removeRate(rate: ShippingRateRow) {
-    if (!window.confirm(t(`Hapus tarif "${tr(rate.name, lang)}"?`, `Delete rate "${tr(rate.name, lang)}"?`))) return;
+    if (!await confirmDialog(t(`Hapus tarif "${tr(rate.name, lang)}"?`, `Delete rate "${tr(rate.name, lang)}"?`))) return;
     setBusy(true);
     setError('');
     try {
@@ -262,16 +308,33 @@ export default function AdminShipping() {
     }
   }
 
-  const rateSummary = (r: ShippingRateRow) =>
-    r.type === 'flat'
-      ? formatIDR(r.baseAmount)
-      : `${formatIDR(r.baseAmount)} + ${formatIDR(r.perKgAmount)}/kg`;
+  const rateSummary = (r: ShippingRateRow) => {
+    if (r.type === 'flat') return formatIDR(r.baseAmount);
+    const parts = [formatIDR(r.baseAmount)];
+    if (r.perKmAmount > 0) parts.push(`${formatIDR(r.perKmAmount)}/km`);
+    if (r.perKgAmount > 0) parts.push(`${formatIDR(r.perKgAmount)}/kg`);
+    if (r.perM3Amount > 0) parts.push(`${formatIDR(r.perM3Amount)}/m³`);
+    return parts.join(' + ');
+  };
+  const rateNumbers = {
+    type: rateForm.type,
+    baseAmount: Number(rateForm.baseAmount) || 0,
+    perKmAmount: Number(rateForm.perKmAmount) || 0,
+    perKgAmount: Number(rateForm.perKgAmount) || 0,
+    perM3Amount: Number(rateForm.perM3Amount) || 0,
+    minAmount: Number(rateForm.minAmount) || 0,
+  };
+  const previewResult = previewShippingAmount(rateNumbers, { km: Number(preview.km) || 0, kg: Number(preview.kg) || 0, m3: Number(preview.m3) || 0 });
+  const originSet = origin !== null && origin.lat !== null && origin.lng !== null;
 
   return (
     <div>
       <AdminPageHead
         title={t('Ongkos Kirim', 'Shipping Rates')}
-        desc={t('Zona wilayah dan tarif pengiriman. Ongkir dihitung server dari alamat customer dan berat produk.', 'Region zones and delivery rates. Shipping is calculated server-side from the customer address and product weight.')}
+        desc={t(
+          'Zona wilayah menentukan tarif yang ditawarkan; tarif "Dihitung" memakai tiga parameter: jarak (km dari titik asal ke titik peta alamat), berat (kg), dan volume (m³) pesanan.',
+          'Region zones decide which rates are offered; "Calculated" rates use three parameters: distance (km from the origin to the address map pin), weight (kg), and volume (m³) of the order.',
+        )}
         action={{ label: t('Tambah zona', 'Add zone'), icon: 'plus', onClick: () => openZone(null) }}
       />
 
@@ -281,6 +344,52 @@ export default function AdminShipping() {
         </div>
       )}
       {error && <p className="form-error">{error}</p>}
+
+      {origin && (
+        <div className="admin-card ship-origin">
+          <div className="ship-origin-head">
+            <span className="ship-origin-icon">
+              <Icon name="pin" size={18} />
+            </span>
+            <div>
+              <strong>{t('Titik asal pengiriman', 'Shipping origin')}</strong>
+              <small>
+                {originSet
+                  ? `${origin.label || t('Tanpa nama', 'Unnamed')} · ${origin.lat?.toFixed(5)}, ${origin.lng?.toFixed(5)} · ${t('faktor jalan', 'road factor')} ×${origin.roadFactor}`
+                  : t('Belum diatur — tarif per km tidak ditawarkan sampai titik asal diisi.', 'Not set — per-km rates are not offered until an origin is set.')}
+              </small>
+            </div>
+            <button type="button" className="btn btn-line btn-sm" onClick={() => setOriginOpen((v) => !v)}>
+              {originOpen ? t('Tutup', 'Close') : t('Ubah titik asal', 'Edit origin')}
+            </button>
+          </div>
+          {originOpen && (
+            <form className="admin-form ship-origin-form" onSubmit={(e) => void saveOrigin(e)}>
+              <div className="admin-form-row">
+                <label>
+                  <span className="field-label">{t('Nama lokasi', 'Location name')}</span>
+                  <input value={origin.label} maxLength={120} onChange={(e) => setOrigin({ ...origin, label: e.target.value })} placeholder={t('mis. Pabrik Resiprene', 'e.g. Resiprene plant')} />
+                </label>
+                <label>
+                  <span className="field-label">{t('Faktor jalan', 'Road factor')}</span>
+                  <input type="number" min={1} max={3} step={0.05} value={origin.roadFactor} onChange={(e) => setOrigin({ ...origin, roadFactor: Number(e.target.value) })} />
+                  <small className="admin-field-hint">
+                    {t('Jarak jalan ≈ jarak garis lurus × faktor ini (1,3 cocok untuk jalan darat Sumatra).', 'Road distance ≈ straight-line distance × this factor (1.3 suits overland roads).')}
+                  </small>
+                  {firstError(originErrors, 'roadFactor') && <small className="cms-field-error">{firstError(originErrors, 'roadFactor')}</small>}
+                </label>
+              </div>
+              <GeoPicker value={{ lat: origin.lat, lng: origin.lng }} onChange={(geo) => setOrigin({ ...origin, lat: geo.lat, lng: geo.lng })} />
+              {(firstError(originErrors, 'lat') || firstError(originErrors, 'lng')) && <small className="cms-field-error">{firstError(originErrors, 'lat') || firstError(originErrors, 'lng')}</small>}
+              <div className="admin-modal-actions">
+                <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>
+                  {saving ? t('Menyimpan...', 'Saving...') : t('Simpan titik asal', 'Save origin')}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <p className="admin-field-hint">{t('Memuat zona...', 'Loading zones...')}</p>
@@ -478,18 +587,56 @@ export default function AdminShipping() {
                 {firstError(formErrors, 'baseAmount') && <small className="cms-field-error">{firstError(formErrors, 'baseAmount')}</small>}
               </label>
               <label>
-                <span className="field-label">{t('Tarif per kg (Rp)', 'Per-kg amount (Rp)')}</span>
-                <input type="number" min={0} step={1} value={rateForm.perKgAmount} onChange={(e) => setRateForm({ ...rateForm, perKgAmount: e.target.value })} disabled={rateForm.type !== 'per_kg'} />
-                <small className="admin-field-hint">{t('Berat dibulatkan ke atas per kg.', 'Weight is rounded up per kg.')}</small>
-                {firstError(formErrors, 'perKgAmount') && <small className="cms-field-error">{firstError(formErrors, 'perKgAmount')}</small>}
-              </label>
-            </div>
-            <div className="admin-form-row">
-              <label>
                 <span className="field-label">{t('Ongkir minimum (Rp)', 'Minimum charge (Rp)')}</span>
                 <input type="number" min={0} step={1} value={rateForm.minAmount} onChange={(e) => setRateForm({ ...rateForm, minAmount: e.target.value })} />
                 <small className="admin-field-hint">{t('Hasil hitung di bawah ini dinaikkan ke minimum.', 'Calculated amounts below this are raised to the minimum.')}</small>
               </label>
+            </div>
+            {rateForm.type === 'calculated' && (
+              <fieldset className="ship-params">
+                <legend>{t('Tiga parameter tarif', 'Three rate parameters')}</legend>
+                <div className="admin-form-row admin-form-row-3">
+                  <label>
+                    <span className="field-label">{t('Per km jarak (Rp)', 'Per km of distance (Rp)')}</span>
+                    <input type="number" min={0} step={1} value={rateForm.perKmAmount} onChange={(e) => setRateForm({ ...rateForm, perKmAmount: e.target.value })} />
+                    <small className="admin-field-hint">{t('Dari titik asal ke titik peta alamat, dibulatkan ke atas per km. 0 = jarak tidak dihitung.', 'From the origin to the address pin, rounded up per km. 0 = distance ignored.')}</small>
+                    {firstError(formErrors, 'perKmAmount') && <small className="cms-field-error">{firstError(formErrors, 'perKmAmount')}</small>}
+                  </label>
+                  <label>
+                    <span className="field-label">{t('Per kg berat (Rp)', 'Per kg of weight (Rp)')}</span>
+                    <input type="number" min={0} step={1} value={rateForm.perKgAmount} onChange={(e) => setRateForm({ ...rateForm, perKgAmount: e.target.value })} />
+                    <small className="admin-field-hint">{t('Berat produk × qty, dibulatkan ke atas per kg.', 'Product weight × qty, rounded up per kg.')}</small>
+                    {firstError(formErrors, 'perKgAmount') && <small className="cms-field-error">{firstError(formErrors, 'perKgAmount')}</small>}
+                  </label>
+                  <label>
+                    <span className="field-label">{t('Per m³ volume (Rp)', 'Per m³ of volume (Rp)')}</span>
+                    <input type="number" min={0} step={1} value={rateForm.perM3Amount} onChange={(e) => setRateForm({ ...rateForm, perM3Amount: e.target.value })} />
+                    <small className="admin-field-hint">{t('Dimensi kemasan produk × qty, dibulatkan ke atas per 0,01 m³.', 'Product package size × qty, rounded up per 0.01 m³.')}</small>
+                    {firstError(formErrors, 'perM3Amount') && <small className="cms-field-error">{firstError(formErrors, 'perM3Amount')}</small>}
+                  </label>
+                </div>
+                <div className="ship-preview">
+                  <span className="field-label">{t('Simulasi', 'Simulation')}</span>
+                  <div className="ship-preview-inputs">
+                    <label>
+                      <input type="number" min={0} value={preview.km} onChange={(e) => setPreview({ ...preview, km: e.target.value })} /> km
+                    </label>
+                    <label>
+                      <input type="number" min={0} value={preview.kg} onChange={(e) => setPreview({ ...preview, kg: e.target.value })} /> kg
+                    </label>
+                    <label>
+                      <input type="number" min={0} step={0.01} value={preview.m3} onChange={(e) => setPreview({ ...preview, m3: e.target.value })} /> m³
+                    </label>
+                  </div>
+                  <p className="ship-preview-result">
+                    {formatIDR(previewResult.base)} + {formatIDR(previewResult.distance)} + {formatIDR(previewResult.weight)} + {formatIDR(previewResult.volume)} ={' '}
+                    <strong>{formatIDR(previewResult.total)}</strong>
+                    {previewResult.minimumApplied && <small> ({t('naik ke minimum', 'raised to minimum')})</small>}
+                  </p>
+                </div>
+              </fieldset>
+            )}
+            <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Gratis ongkir di atas subtotal (Rp)', 'Free shipping above subtotal (Rp)')}</span>
                 <input type="number" min={0} step={1} value={rateForm.freeAbove} onChange={(e) => setRateForm({ ...rateForm, freeAbove: e.target.value })} placeholder={t('kosong = tidak ada', 'empty = none')} />

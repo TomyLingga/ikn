@@ -8,6 +8,7 @@ use App\Models\CustomerLogo;
 use App\Models\DocLink;
 use App\Models\GalleryItem;
 use App\Models\Post;
+use App\Models\PostCategory;
 use Illuminate\Database\Seeder;
 
 // Berita, galeri, sertifikat, brosur, logo pelanggan, doc-links dari mock-data.ts dan site.ts.
@@ -30,9 +31,21 @@ class ContentSeeder extends Seeder
             'en' => '<p>PT Industri Karet Nusantara is dedicated to providing high quality downstream rubber products for domestic and global markets.</p>',
         ];
 
+        // Kategori berita (tabel post_categories); berita demo memakai slug kategori di bawah.
+        $categories = [
+            'berita-perusahaan' => ['Berita Perusahaan', 'Company News'],
+            'produk' => ['Produk', 'Products'],
+            'kemitraan' => ['Kemitraan', 'Partnerships'],
+            'kegiatan' => ['Kegiatan', 'Events'],
+        ];
+        $position = 0;
+        foreach ($categories as $slug => [$id, $en]) {
+            PostCategory::firstOrCreate(['slug' => $slug], ['name' => ['id' => $id, 'en' => $en], 'sort_order' => $position++]);
+        }
+
         $posts = [
             [
-                'slug' => 'resiprene-pasar-ekspor', 'tag' => 'Produk', 'published_at' => '2026-06-18', 'cover' => 'produksi-karet-1.webp',
+                'slug' => 'resiprene-pasar-ekspor', 'category' => 'produk', 'published_at' => '2026-06-18', 'cover' => 'produksi-karet-1.webp',
                 'body' => [
                     'id' => '<h2>Kapasitas produksi ditingkatkan</h2><p>Lini produksi Resiprene 35 di Tanjung Morawa kini beroperasi tiga shift. Investasi difokuskan pada:</p>'
                         .'<ul><li>reaktor siklisasi baru berkapasitas 2 ton per batch,</li><li>sistem kontrol suhu otomatis,</li><li>laboratorium uji mutu bersertifikat.</li></ul>'
@@ -50,7 +63,7 @@ class ContentSeeder extends Seeder
                 ],
             ],
             [
-                'slug' => 'nilai-akhlak-sdm', 'tag' => 'Perusahaan', 'published_at' => '2026-05-02', 'cover' => 'pabrik-2-1.png',
+                'slug' => 'nilai-akhlak-sdm', 'category' => 'berita-perusahaan', 'published_at' => '2026-05-02', 'cover' => 'pabrik-2-1.png',
                 'title' => ['id' => 'Penguatan budaya AKHLAK di lingkungan kerja', 'en' => 'Strengthening the AKHLAK culture at work'],
                 'excerpt' => [
                     'id' => 'Program pengembangan SDM berlandaskan nilai Amanah, Kompeten, Harmonis, Loyal, Adaptif, dan Kolaboratif digelar sepanjang tahun.',
@@ -58,7 +71,7 @@ class ContentSeeder extends Seeder
                 ],
             ],
             [
-                'slug' => 'kemitraan-hilir-karet', 'tag' => 'Kemitraan', 'published_at' => '2026-03-14', 'cover' => 'karet-1-1-scaled.jpg',
+                'slug' => 'kemitraan-hilir-karet', 'category' => 'kemitraan', 'published_at' => '2026-03-14', 'cover' => 'karet-1-1-scaled.jpg',
                 'title' => ['id' => 'IKN perkuat kemitraan hilir karet Sumatera Utara', 'en' => 'IKN strengthens downstream rubber partnerships in North Sumatra'],
                 'excerpt' => [
                     'id' => 'Sebagai anak perusahaan PTPN III, IKN membangun kolaborasi rantai pasok karet alam yang saling menguntungkan dengan mitra lokal.',
@@ -75,7 +88,7 @@ class ContentSeeder extends Seeder
                     'id' => '<p>'.$post['excerpt']['id'].'</p>'.($post['body']['id'] ?? '').$tail['id'],
                     'en' => '<p>'.$post['excerpt']['en'].'</p>'.($post['body']['en'] ?? '').$tail['en'],
                 ],
-                'tag' => $post['tag'],
+                'category_id' => PostCategory::where('slug', $post['category'])->value('id'),
                 'author' => 'Humas PT IKN',
                 'cover_media_id' => MediaSeeder::id($post['cover']),
                 'is_published' => true,

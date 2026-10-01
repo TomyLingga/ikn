@@ -26,6 +26,11 @@ class Media extends Model
         return str_starts_with($this->mime, 'image/');
     }
 
+    public function isVideo(): bool
+    {
+        return str_starts_with($this->mime, 'video/');
+    }
+
     // URL publik untuk disk public; endpoint ber-Policy untuk disk private.
     public function url(): string
     {

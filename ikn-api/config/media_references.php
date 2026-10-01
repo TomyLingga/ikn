@@ -16,6 +16,7 @@ return [
         ['categories', 'image_media_id'],
         ['product_images', 'media_id'],
         ['payments', 'proof_media_id'],
+        ['order_attachments', 'media_id'],
     ],
 
     // [tabel, kolom jsonb, kunci] yang menyimpan id media di dalam JSON (mis. gambar QRIS metode bayar).

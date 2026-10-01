@@ -58,25 +58,29 @@ class MenuSeeder extends Seeder
             self::i('tentang', 'Tentang Kami', 'About Us', '/tentang', [
                 self::c('Sejarah', 'History', '/tentang#sejarah', 'Perjalanan sejak 1965', 'Our journey since 1965'),
                 self::c('Visi & Misi', 'Vision & Mission', '/tentang#visi-misi', 'Arah dan tujuan kami', 'Our direction and goals'),
+                self::c('Struktur Organisasi', 'Organisation Structure', '/tentang#struktur-organisasi', 'Susunan jabatan', 'Positions and units'),
                 self::c('Nilai AKHLAK', 'AKHLAK Values', '/tentang#nilai', 'Cara kami bekerja', 'How we work'),
-                self::c('Hubungi Kami', 'Contact Us', '/kontak', 'Lokasi & kontak', 'Locations & contact'),
             ]),
-            self::i('bisnis', 'Bisnis', 'Business', '/produk', [
-                self::c('Katalog Produk', 'Product Catalog', '/catalog', 'Belanja & lihat semua produk', 'Shop & browse all products'),
-                self::c('Resiprene 35', 'Resiprene 35', '/produk#resiprene-35', 'Cyclised natural rubber', 'Cyclised natural rubber'),
-                self::c('Aneka Barang Karet', 'Rubber Articles', '/produk#barang-karet', 'Rubber article products', 'Rubber article products'),
-                self::c('Unduhan', 'Downloads', '/unduhan', 'Brosur produk (PDF)', 'Product brochures (PDF)'),
+            // Halaman Bisnis (/bisnis): lini bisnis + produk dari katalog; anchor resiprene-35 / barang-karet = key section.
+            self::i('bisnis', 'Bisnis', 'Business', '/bisnis', [
+                self::c('Resiprene 35', 'Resiprene 35', '/bisnis#resiprene-35', 'Cyclised natural rubber', 'Cyclised natural rubber'),
+                self::c('Aneka Barang Karet', 'Rubber Articles', '/bisnis#barang-karet', 'Produk karet siap pakai', 'Ready-to-use rubber products'),
+                // Menuju blok produk di halaman Bisnis; tombol di blok itu membawa ke toko (/catalog).
+                self::c('Katalog Produk', 'Product Catalog', '/bisnis#produk', 'Produk kami & pemesanan online', 'Our products & online ordering'),
+                self::c('Unduhan', 'Downloads', '/bisnis#unduhan', 'Brosur produk (PDF)', 'Product brochures (PDF)'),
             ]),
-            self::i('media', 'Media', 'Media', '/berita', [
-                self::c('Berita Terbaru', 'Latest News', '/berita', 'Kabar & rilis terkini', 'Recent updates & releases'),
+            // Media = halaman hub (/media) dengan kartu ke Berita dan Galeri.
+            self::i('media', 'Media', 'Media', '/media', [
+                self::c('Berita', 'News', '/berita', 'Kabar & rilis terkini', 'Recent updates & releases'),
                 self::c('Galeri', 'Gallery', '/galeri', 'Foto & video', 'Photos & videos'),
             ]),
+            // Keberlanjutan = satu halaman; anak menu menunjuk anchor section (key section).
             self::i('keberlanjutan', 'Keberlanjutan', 'Sustainability', '/keberlanjutan', [
-                self::c('Lingkungan, Sosial, Tata Kelola', 'Environment, Social, Governance', '/keberlanjutan', 'Komitmen ESG kami', 'Our ESG commitment'),
-                self::c('Sertifikat', 'Certificates', '/keberlanjutan/sertifikat', 'ISO 37001 & REACH', 'ISO 37001 & REACH'),
-                self::c('Pelanggan Kami', 'Our Customers', '/keberlanjutan/pelanggan', 'Mitra lintas industri', 'Partners across industries'),
-                self::c('Whistle Blowing System', 'Whistle Blowing System', '/keberlanjutan/whistleblowing', 'Kanal pelaporan resmi', 'Official reporting channel'),
-                self::c('REACH Compliance', 'REACH Compliance', '/keberlanjutan/reach', 'Kepatuhan pasar Eropa', 'EU market compliance'),
+                self::c('Lingkungan, Sosial, Tata Kelola', 'Environment, Social, Governance', '/keberlanjutan#esg', 'Komitmen ESG kami', 'Our ESG commitment'),
+                self::c('Sertifikat', 'Certificates', '/keberlanjutan#sertifikat', 'ISO 37001 & REACH', 'ISO 37001 & REACH'),
+                self::c('Pelanggan Kami', 'Our Customers', '/keberlanjutan#pelanggan', 'Mitra lintas industri', 'Partners across industries'),
+                self::c('Whistle Blowing System', 'Whistle Blowing System', '/keberlanjutan#whistleblowing', 'Kanal pelaporan resmi', 'Official reporting channel'),
+                self::c('REACH Compliance', 'REACH Compliance', '/keberlanjutan#reach', 'Kepatuhan pasar Eropa', 'EU market compliance'),
             ]),
             self::i('kontak', 'Kontak', 'Contact', '/kontak'),
         ];

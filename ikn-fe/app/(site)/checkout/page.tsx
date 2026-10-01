@@ -18,8 +18,10 @@ import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { formatIDR } from '@/lib/format';
-import type { CommerceConfig, CustomerAddress, InsufficientStockItem, Order, QuoteResult } from '@/lib/types';
+import { formatDate, formatIDR } from '@/lib/format';
+import { openCartDrawer, useShopPaths } from '@/lib/shop';
+import type { AssignedVoucher, CommerceConfig, CustomerAddress, InsufficientStockItem, Order, QuoteResult } from '@/lib/types';
+import { shippingBreakdownText } from '@/lib/commerce';
 
 type Step = 'address' | 'shipping' | 'payment' | 'review';
 const STEPS: Step[] = ['address', 'shipping', 'payment', 'review'];
@@ -34,13 +36,28 @@ const voucherReasons: Record<string, { id: string; en: string }> = {
   inactive: { id: 'Voucher tidak aktif.', en: 'Voucher is inactive.' },
   expired: { id: 'Voucher sudah kedaluwarsa.', en: 'Voucher has expired.' },
   not_started: { id: 'Voucher belum berlaku.', en: 'Voucher is not valid yet.' },
-  quota_exceeded: { id: 'Kuota voucher sudah habis.', en: 'Voucher quota is exhausted.' },
+  quota: { id: 'Kuota voucher sudah habis.', en: 'Voucher quota is exhausted.' },
+  not_eligible: { id: 'Voucher ini tidak berlaku untuk akun Anda.', en: 'This voucher is not available for your account.' },
   per_user_limit: { id: 'Batas pemakaian voucher untuk akun Anda sudah tercapai.', en: 'You have reached the usage limit for this voucher.' },
   min_subtotal: { id: 'Subtotal belum memenuhi minimum belanja voucher.', en: 'Subtotal does not meet the voucher minimum.' },
   scope: { id: 'Voucher tidak berlaku untuk produk di keranjang.', en: 'Voucher does not apply to the products in your cart.' },
 };
 
 function PageHead({ title, t }: { title: string; t: (id: string, en: string) => string }) {
+  const shop = useShopPaths();
+
+  // Di portal customer (/dashboard/checkout) kepala halaman ringkas; navbar situs tidak ada di sana.
+  if (shop.portal) {
+    return (
+      <header className="portal-head">
+        <Link href={shop.catalog} className="portal-back">
+          <Icon name="chevronLeft" size={16} /> {t('Kembali belanja', 'Back to shopping')}
+        </Link>
+        <h1>{title.replace(/\.$/, '')}</h1>
+      </header>
+    );
+  }
+
   return (
     <section className="pagehead commerce-head">
       <div className="container">
@@ -54,6 +71,7 @@ function PageHead({ title, t }: { title: string; t: (id: string, en: string) => 
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const shop = useShopPaths();
   const { items, clear, ready } = useCart();
   const { customer, ready: authReady } = useAuth();
   const { lang } = useLang();
@@ -72,6 +90,8 @@ export default function CheckoutPage() {
   const [voucherInput, setVoucherInput] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [voucherError, setVoucherError] = useState('');
+  // Voucher yang ditujukan khusus ke customer ini (GET /customer/vouchers); voucher umum tetap diketik manual.
+  const [myVouchers, setMyVouchers] = useState<AssignedVoucher[]>([]);
   const [note, setNote] = useState('');
 
   const [quote, setQuote] = useState<QuoteResult | null>(null);
@@ -82,6 +102,8 @@ export default function CheckoutPage() {
   const [submitError, setSubmitError] = useState('');
   const [stockIssues, setStockIssues] = useState<InsufficientStockItem[]>([]);
   const idempotencyKey = useRef<string>(newIdempotencyKey());
+  // Kunci dipakai ulang hanya untuk isi pesanan yang sama (retry); isi berubah → kunci baru agar server tidak memutar ulang order lama.
+  const idempotencyBody = useRef<string>('');
 
   const isActive = customer?.status === 'active';
   const itemsKey = items.map((i) => `${i.slug}:${i.qty}`).join('|');
@@ -102,6 +124,20 @@ export default function CheckoutPage() {
       .catch((err) => {
         if (active) setLoadError(errorMessage(err));
       });
+    return () => {
+      active = false;
+    };
+  }, [customer, isActive]);
+
+  // Voucher khusus akun ini; gagal memuat tidak menghalangi checkout.
+  useEffect(() => {
+    if (!customer || !isActive) return;
+    let active = true;
+    api<AssignedVoucher[]>('/customer/vouchers')
+      .then((rows) => {
+        if (active) setMyVouchers(rows);
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
@@ -142,6 +178,11 @@ export default function CheckoutPage() {
           setVoucherCode('');
           return;
         }
+        // Tarif terpilih tidak berlaku lagi (dinonaktifkan admin / alamat pindah zona) → kosongkan agar quote diulang.
+        if (err instanceof ApiError && err.status === 422 && err.errors?.shippingRateId && shippingRateId) {
+          setShippingRateId(null);
+          return;
+        }
         setQuote(null);
         setQuoteError(errorMessage(err));
       })
@@ -171,23 +212,29 @@ export default function CheckoutPage() {
     setSubmitting(true);
     setSubmitError('');
     setStockIssues([]);
+    const body = {
+      items: items.map((i) => ({ productSlug: i.slug, qty: i.qty })),
+      addressId,
+      shippingRateId,
+      paymentMethodCode,
+      bankAccountId: needsBank ? bankAccountId : undefined,
+      voucherCode: voucherCode || undefined,
+      note: note.trim() || undefined,
+    };
+    const signature = JSON.stringify(body);
+    if (idempotencyBody.current && idempotencyBody.current !== signature) idempotencyKey.current = newIdempotencyKey();
+    idempotencyBody.current = signature;
     try {
       const order = await api<Order>('/customer/orders', {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey.current },
-        body: {
-          items: items.map((i) => ({ productSlug: i.slug, qty: i.qty })),
-          addressId,
-          shippingRateId,
-          paymentMethodCode,
-          bankAccountId: needsBank ? bankAccountId : undefined,
-          voucherCode: voucherCode || undefined,
-          note: note.trim() || undefined,
-        },
+        body,
       });
       clear();
       idempotencyKey.current = newIdempotencyKey();
-      router.push(`/checkout/success/${encodeURIComponent(order.number)}`);
+      idempotencyBody.current = '';
+      // Di portal langsung ke detail pesanan (instruksi bayar + unggah bukti ada di sana); di situs publik ke halaman sukses.
+      router.push(shop.portal ? `${shop.order(order.number)}?placed=1` : `/checkout/success/${encodeURIComponent(order.number)}`);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'INSUFFICIENT_STOCK') {
         const list = (err.meta?.items as InsufficientStockItem[] | undefined) || [];
@@ -243,7 +290,7 @@ export default function CheckoutPage() {
           <div className="container" style={{ maxWidth: 720 }}>
             <AccountStatusBanner context="checkout" />
             <div className="co-done-actions" style={{ marginTop: 22, justifyContent: 'flex-start' }}>
-              <Link href="/cart" className="btn btn-line">{t('Kembali ke keranjang', 'Back to cart')}</Link>
+              <Link href={shop.cart} className="btn btn-line">{shop.portal ? t('Kembali belanja', 'Back to shopping') : t('Kembali ke keranjang', 'Back to cart')}</Link>
               <Link href="/dashboard" className="btn btn-solid">{t('Ke dashboard', 'Go to dashboard')} <Icon name="arrow" /></Link>
             </div>
           </div>
@@ -262,7 +309,7 @@ export default function CheckoutPage() {
               icon="drop"
               title={t('Tidak ada yang di-checkout', 'Nothing to check out')}
               body={t('Keranjang Anda kosong.', 'Your cart is empty.')}
-              action={{ href: '/catalog', label: t('Lihat katalog', 'View catalog') }}
+              action={{ href: shop.catalog, label: t('Lihat katalog', 'View catalog') }}
             />
           </div>
         </section>
@@ -363,7 +410,40 @@ export default function CheckoutPage() {
                   {selectedAddress && (
                     <p className="form-note" style={{ marginBottom: 14 }}>
                       {t('Dikirim ke', 'Ship to')}: <strong>{selectedAddress.label}</strong> — {formatAddressLines(selectedAddress).join(', ')}
-                      {quote?.weightGram ? <> · {t('Berat', 'Weight')} {(quote.weightGram / 1000).toLocaleString('id-ID')} kg</> : null}
+                    </p>
+                  )}
+                  {quote && (
+                    <div className="co-ship-metrics">
+                      {rates.find((r) => r.distanceKm) && (
+                        <span>
+                          <Icon name="pin" size={14} /> {t('Jarak', 'Distance')} ±{rates.find((r) => r.distanceKm)?.distanceKm?.toLocaleString('id-ID')} km
+                        </span>
+                      )}
+                      <span>
+                        <Icon name="package" size={14} /> {t('Berat', 'Weight')} {(quote.weightGram / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg
+                      </span>
+                      {!!quote.volumeCm3 && (
+                        <span>
+                          <Icon name="ruler" size={14} /> {t('Volume', 'Volume')} {(quote.volumeCm3 / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 3 })} m³
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {quote?.warnings.includes('shipping_origin_unset') && (
+                    <p className="co-ship-warn" role="status">
+                      {t(
+                        'Sebagian tarif berbasis jarak belum bisa dihitung karena titik asal pengiriman belum diatur penjual. Pilih tarif lain atau hubungi kami.',
+                        'Some distance-based rates are unavailable because the seller has not set a shipping origin yet. Choose another rate or contact us.',
+                      )}
+                    </p>
+                  )}
+                  {quote?.warnings.includes('distance_unavailable') && (
+                    <p className="co-ship-warn" role="status">
+                      {t(
+                        'Sebagian tarif dihitung dari jarak dan baru muncul setelah alamat ini punya titik lokasi di peta. ',
+                        'Some rates are distance-based and appear once this address has a map pin. ',
+                      )}
+                      <Link href="/dashboard/alamat">{t('Tandai lokasi alamat', 'Pin the address location')}</Link>
                     </p>
                   )}
                   {quoting && rates.length === 0 && <p className="form-note">{t('Menghitung ongkir…', 'Calculating shipping…')}</p>}
@@ -375,6 +455,9 @@ export default function CheckoutPage() {
                         <span className="co-ship-label">
                           {tr(rate.label, lang)}
                           {rate.eta && <small className="co-ship-eta"> · {tr(rate.eta, lang)}</small>}
+                          {rate.type === 'calculated' && rate.breakdown && !rate.breakdown.free && (
+                            <small className="co-ship-break">{shippingBreakdownText(rate.breakdown, lang)}</small>
+                          )}
                         </span>
                         <span className="co-ship-price">{rate.amount === 0 ? t('Gratis', 'Free') : formatIDR(rate.amount)}</span>
                       </label>
@@ -453,6 +536,34 @@ export default function CheckoutPage() {
                         </button>
                       )}
                     </div>
+                    {myVouchers.length > 0 && !quote?.voucher && (
+                      <div className="co-my-vouchers">
+                        <span className="label">{t('Voucher untuk Anda', 'Vouchers for you')}</span>
+                        <div className="co-my-voucher-list">
+                          {myVouchers.map((v) => (
+                            <button
+                              key={v.code}
+                              type="button"
+                              className="co-my-voucher"
+                              disabled={quoting}
+                              onClick={() => {
+                                setVoucherError('');
+                                setVoucherInput(v.code);
+                                setVoucherCode(v.code);
+                              }}
+                            >
+                              <strong>{v.code}</strong>
+                              <span>
+                                {t('Potongan', 'Discount')} {v.type === 'percent' ? `${v.value}%` : formatIDR(v.value)}
+                                {v.maxDiscount !== null && v.type === 'percent' ? ` (${t('maks.', 'max')} ${formatIDR(v.maxDiscount)})` : ''}
+                                {v.minSubtotal > 0 ? `, ${t('min. belanja', 'min. spend')} ${formatIDR(v.minSubtotal)}` : ''}
+                              </span>
+                              {v.endsAt && <small>{t('Berlaku sampai', 'Valid until')} {formatDate(v.endsAt, lang)}</small>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {voucherError && <p className="form-error" role="alert">{voucherError}</p>}
                     {quote?.voucher && (
                       <p className="proof-done">
@@ -517,7 +628,11 @@ export default function CheckoutPage() {
                           );
                         })}
                       </ul>
-                      <Link href="/cart" className="link">{t('Sesuaikan keranjang', 'Adjust cart')}</Link>
+                      {shop.portal ? (
+                        <button type="button" className="link" onClick={openCartDrawer}>{t('Sesuaikan keranjang', 'Adjust cart')}</button>
+                      ) : (
+                        <Link href="/cart" className="link">{t('Sesuaikan keranjang', 'Adjust cart')}</Link>
+                      )}
                     </div>
                   )}
                   {submitError && stockIssues.length === 0 && <p className="form-error" role="alert">{submitError}</p>}

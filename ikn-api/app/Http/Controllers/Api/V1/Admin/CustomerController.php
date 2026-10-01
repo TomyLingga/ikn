@@ -37,7 +37,7 @@ class CustomerController extends ApiController
             });
         }
 
-        return $this->paginated($query->orderByDesc('created_at')->paginate($this->perPage()), AdminCustomerListResource::class);
+        return $this->paginated($query->orderByDesc('created_at')->paginate($this->perPage()), AdminCustomerListResource::class, ['counts' => $this->statusCounts(User::customers(), User::STATUSES)]);
     }
 
     public function show(User $customer)

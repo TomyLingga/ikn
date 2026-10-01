@@ -23,6 +23,7 @@ class VoucherService
     public const REASON_PER_USER_LIMIT = 'per_user_limit';
     public const REASON_MIN_SUBTOTAL = 'min_subtotal';
     public const REASON_SCOPE = 'scope';
+    public const REASON_NOT_ELIGIBLE = 'not_eligible';
 
     /**
      * @param  Voucher|string  $code
@@ -35,6 +36,10 @@ class VoucherService
         $voucher = $code instanceof Voucher ? $code : Voucher::where('code', strtoupper(trim((string) $code)))->first();
         if (! $voucher) {
             throw $this->invalid(self::REASON_NOT_FOUND);
+        }
+        // Voucher khusus customer tertentu (ASUMSI A-67): akun lain ditolak sebelum status voucher diungkap.
+        if (! $voucher->eligibleFor($user)) {
+            throw $this->invalid(self::REASON_NOT_ELIGIBLE, $voucher);
         }
         if (! $voucher->is_active) {
             throw $this->invalid(self::REASON_INACTIVE, $voucher);
@@ -115,6 +120,10 @@ class VoucherService
             if ($locked->quota !== null && $locked->used_count >= $locked->quota) {
                 throw $this->invalid(self::REASON_QUOTA, $locked);
             }
+            // Cek ulang batas per akun di bawah kunci baris voucher: dua checkout bersamaan tidak bisa sama-sama lolos.
+            if ($locked->per_user_limit !== null && $this->userUsageCount($locked, $user) >= $locked->per_user_limit) {
+                throw $this->invalid(self::REASON_PER_USER_LIMIT, $locked);
+            }
 
             $usage = VoucherUsage::create([
                 'voucher_id' => $locked->id,
@@ -160,6 +169,28 @@ class VoucherService
 
             return $usage;
         });
+    }
+
+    /**
+     * Voucher yang ditujukan khusus ke customer ini dan masih bisa dipakai sekarang
+     * (aktif, dalam periode, kuota dan batas per akun belum habis). Untuk GET /customer/vouchers.
+     *
+     * @return \Illuminate\Support\Collection<int, Voucher>
+     */
+    public function assignedTo(User $user)
+    {
+        $now = now();
+
+        return Voucher::active()
+            ->where('audience', Voucher::AUDIENCE_CUSTOMERS)
+            ->whereHas('customers', fn ($q) => $q->whereKey($user->id))
+            ->where(fn ($q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
+            ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', $now))
+            ->where(fn ($q) => $q->whereNull('quota')->orWhereColumn('used_count', '<', 'quota'))
+            ->orderByRaw('ends_at IS NULL')->orderBy('ends_at')->orderBy('id')
+            ->get()
+            ->filter(fn (Voucher $voucher) => $voucher->per_user_limit === null || $this->userUsageCount($voucher, $user) < $voucher->per_user_limit)
+            ->values();
     }
 
     private function userUsageCount(Voucher $voucher, User $user): int

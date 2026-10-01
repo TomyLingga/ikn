@@ -7,7 +7,7 @@
 .form label { display: flex; flex-direction: column; gap: 8px; }
 .form .label { color: var(--ink); }
 .form input, .form textarea { padding: 13px 0; border: 0; border-bottom: 1px solid var(--line-strong); background: transparent; color: var(--ink); resize: vertical; font-family: var(--font-sans); font-size: 0.98rem; transition: border-color 0.2s var(--ease); }
-.form input::placeholder, .form textarea::placeholder { color: #a49d8f; }
+.form input::placeholder, .form textarea::placeholder { color: color-mix(in srgb, var(--ink-soft) 65%, transparent); }
 .form input:focus, .form textarea:focus { outline: none; border-color: var(--green); }
 .form .btn { align-self: flex-start; margin-top: 8px; }
 .form-note { color: var(--ink-soft); font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.04em; }

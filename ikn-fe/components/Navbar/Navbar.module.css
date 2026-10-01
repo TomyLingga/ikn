@@ -72,7 +72,13 @@
   transition: color 0.2s var(--ease);
 }
 .link:hover { color: var(--ink); }
-.active { color: var(--green); }
+/* Item utama aktif: halaman ini (atau anaknya) sedang dibuka; garis pendek di bawah label. */
+.active { color: var(--green); position: relative; }
+.active::after { content: ''; position: absolute; left: 13px; right: 13px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--green); }
+.linkParent.active::after { right: 30px; }
+/* Anak menu aktif: halaman/section yang sedang terlihat. */
+.dropActive { background: var(--primary-tint); box-shadow: inset 3px 0 0 var(--primary); }
+.dropActive .dropLabel { color: var(--primary); }
 
 .itemDrop { position: relative; display: inline-flex; }
 .caret { opacity: 0.55; transition: transform 0.25s var(--ease); }
@@ -191,7 +197,7 @@
   background: var(--green-tint);
   border-color: var(--green);
   color: var(--green);
-  box-shadow: 0 4px 14px rgba(31, 81, 52, 0.16);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 16%, transparent);
 }
 
 .actions { display: flex; align-items: center; gap: 12px; margin-left: 18px; }

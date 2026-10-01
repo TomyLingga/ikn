@@ -9,6 +9,7 @@ import type {
   GalleryItemData,
   I18n,
   PageSection,
+  PostCategory,
   PostSummary,
 } from '@/lib/cms';
 import PageHeaderSection from './sections/PageHeaderSection';
@@ -24,6 +25,12 @@ import TimelineSection from './sections/TimelineSection';
 import VisionMissionSection from './sections/VisionMissionSection';
 import ValuesSection from './sections/ValuesSection';
 import ContactInfoSection from './sections/ContactInfoSection';
+import ContactInfoBand from './sections/ContactInfoBand';
+import ContactMap from '@/components/ContactMap';
+import ContactSummarySection from './sections/ContactSummarySection';
+import LinkCardsSection from './sections/LinkCardsSection';
+import OrgChartSection from './sections/OrgChartSection';
+import { contactMapPoints, type ContactInfoContent } from './utils';
 import ContactFormSection from './sections/ContactFormSection';
 import PillarsSection from './sections/PillarsSection';
 import InfoBlocksSection from './sections/InfoBlocksSection';
@@ -35,10 +42,21 @@ import GallerySection from './sections/GallerySection';
 import NewsSection from './sections/NewsSection';
 import RichTextSection from './sections/RichTextSection';
 import ContactGrid from './sections/ContactGrid';
+import LatestNewsSection from './sections/LatestNewsSection';
+import StepsSection from './sections/StepsSection';
+import IconFeaturesSection from './sections/IconFeaturesSection';
+import FaqSection from './sections/FaqSection';
+import SpecTableSection from './sections/SpecTableSection';
+import TeamSection from './sections/TeamSection';
+import TestimonialsSection from './sections/TestimonialsSection';
+import ImageGridSection from './sections/ImageGridSection';
 
-// Lists for the data-backed sections, fetched by the RSC page and handed down here.
+// Lists for the data-backed sections, fetched by the RSC page (lib/section-data.ts) and handed down here.
 export interface SectionExtra {
   news?: PostSummary[];
+  latestNews?: PostSummary[]; // berita terbaru tanpa filter, untuk section latest_news
+  newsCategories?: PostCategory[]; // filter kategori di /berita
+  activeCategory?: string | null; // slug dari ?category=
   gallery?: GalleryItemData[];
   certificates?: CertificateData[];
   brochures?: BrochureData[];
@@ -56,8 +74,8 @@ interface SectionRendererProps {
   page?: PageMeta | null;
 }
 
-// Section types that share one two-column "contact-grid" block when adjacent.
-const LEFT_COLUMN = new Set(['contact_info', 'info_blocks']);
+// Section types that share one two-column "contact-grid" block when adjacent (contact_info punya blok sendiri).
+const LEFT_COLUMN = new Set(['info_blocks']);
 const RIGHT_COLUMN = new Set(['contact_form', 'wbs_form']);
 
 function columnContent(section: PageSection): ReactNode {
@@ -112,15 +130,38 @@ function renderSection(section: PageSection, extra: SectionExtra, page: PageMeta
     case 'gallery':
       return <GallerySection section={section} items={extra.gallery ?? []} />;
     case 'news':
-      return <NewsSection section={section} items={extra.news ?? []} />;
+      return <NewsSection section={section} items={extra.news ?? []} categories={extra.newsCategories ?? []} activeCategory={extra.activeCategory ?? null} />;
+    case 'latest_news':
+      return <LatestNewsSection section={section} items={extra.latestNews ?? extra.news ?? []} />;
+    case 'steps':
+      return <StepsSection section={section} />;
+    case 'icon_features':
+      return <IconFeaturesSection section={section} />;
+    case 'faq':
+      return <FaqSection section={section} />;
+    case 'spec_table':
+      return <SpecTableSection section={section} />;
+    case 'team':
+      return <TeamSection section={section} />;
+    case 'testimonials':
+      return <TestimonialsSection section={section} />;
+    case 'image_grid':
+      return <ImageGridSection section={section} />;
+    case 'link_cards':
+      return <LinkCardsSection section={section} />;
     case 'rich_text':
       return <RichTextSection section={section} />;
+    case 'contact_summary':
+      return <ContactSummarySection section={section} />;
+    case 'org_chart':
+      return <OrgChartSection section={section} />;
     case 'contact_info':
+      return <ContactInfoBand section={section} />;
     case 'info_blocks':
-      return <ContactGrid left={columnContent(section)} />;
+      return <ContactGrid id={section.key || undefined} left={columnContent(section)} />;
     case 'contact_form':
     case 'wbs_form':
-      return <ContactGrid right={columnContent(section)} />;
+      return <ContactGrid id={section.key || undefined} right={columnContent(section)} />;
     default:
       // Unknown type (e.g. added in the API before the renderer): skip silently.
       return null;
@@ -148,8 +189,25 @@ export default function SectionRenderer({ sections, extra = {}, page = null }: S
       continue;
     }
 
+    // Halaman Kontak: band kontak, lalu peta pin di kiri dan formulir di kanan.
+    if (section.type === 'contact_info' && next?.type === 'contact_form') {
+      const points = contactMapPoints(section.content as ContactInfoContent, 'id');
+      nodes.push(
+        <Fragment key={section.id}>
+          <ContactInfoBand section={section} map={false} />
+          <ContactGrid
+            id={next.key || undefined}
+            left={points.length > 0 ? <ContactMap points={points} /> : <ContactInfoSection section={section} />}
+            right={columnContent(next)}
+          />
+        </Fragment>,
+      );
+      i += 1;
+      continue;
+    }
+
     if (LEFT_COLUMN.has(section.type) && next && RIGHT_COLUMN.has(next.type)) {
-      nodes.push(<ContactGrid key={section.id} left={columnContent(section)} right={columnContent(next)} />);
+      nodes.push(<ContactGrid key={section.id} id={section.key || undefined} left={columnContent(section)} right={columnContent(next)} />);
       i += 1;
       continue;
     }

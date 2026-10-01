@@ -6,21 +6,37 @@ use App\Models\Order;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-// Nomor invoice INV/YYYY/MM/NNNNN (ASUMSI A-7), diterbitkan saat order paid. Dipanggil di dalam transaksi.
+/**
+ * Nomor invoice format klien: {prefix}/{urut}/{bulan Romawi}/{tahun}, mis. PMS/X/INV/RA/77/IV/2026
+ * (ASUMSI A-7 diperbarui 2026-10-01). Urutan dimulai dari 1 tiap bulan (tanpa nol di depan), prefix dari
+ * pengaturan commerce `invoice_prefix`. Diterbitkan saat order paid; dipanggil di dalam transaksi.
+ */
 class InvoiceNumberGenerator
 {
     public const LOCK_KEY = 'invoice_number';
 
+    public const ROMAN_MONTHS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+    public function __construct(private CommerceSettings $settings)
+    {
+    }
+
     public function next(?Carbon $date = null): string
     {
         $date = ($date ?? now())->copy()->setTimezone(config('app.timezone'));
-        $prefix = config('ikn.commerce.invoice_number_prefix', 'INV').'/'.$date->format('Y').'/'.$date->format('m').'/';
+        $suffix = '/'.self::ROMAN_MONTHS[$date->month - 1].'/'.$date->format('Y');
+        $prefix = trim((string) $this->settings->get('invoice_prefix'), '/ ');
 
         DB::statement("SELECT pg_advisory_xact_lock(hashtext(?))", [self::LOCK_KEY]);
 
-        $last = Order::where('invoice_number', 'like', $prefix.'%')->orderByDesc('invoice_number')->value('invoice_number');
-        $sequence = $last ? ((int) substr($last, strlen($prefix))) + 1 : 1;
+        // Urutan bulan ini = nomor terbesar yang berakhiran /{Romawi}/{tahun}, apa pun prefix-nya (prefix bisa diubah admin).
+        $sequence = 0;
+        foreach (Order::where('invoice_number', 'like', '%'.$suffix)->pluck('invoice_number') as $existing) {
+            if (preg_match('#/(\d+)'.preg_quote($suffix, '#').'$#', $existing, $m)) {
+                $sequence = max($sequence, (int) $m[1]);
+            }
+        }
 
-        return $prefix.str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
+        return $prefix.'/'.($sequence + 1).$suffix;
     }
 }

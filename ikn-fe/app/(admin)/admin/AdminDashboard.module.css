@@ -5,28 +5,28 @@
 .updated svg { color: var(--green); }
 
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.statCard { min-width: 0; display: flex; flex-direction: column; padding: 20px 20px 17px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink); }
+.statCard { min-width: 0; display: flex; flex-direction: column; padding: 20px 20px 17px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); overflow: hidden; }
 .attention { border-left: 3px solid var(--amber); }
 
-/* Card Verifikasi Pembayaran Highlight (Orange Border & Tinted Fill) */
-.warningStatCard {
-  border: 2px solid #f97316 !important;
-  background: color-mix(in srgb, #f97316 9%, var(--surface)) !important;
-  box-shadow: 0 4px 18px rgba(249, 115, 22, 0.15);
-  position: relative;
-}
-.warningStatCard .statHeading svg {
-  color: #ea580c !important;
-}
-
+/* Kartu "perlu tindakan": garis aksen di kiri + latar bernuansa peringatan, tanpa bingkai tebal dan cahaya. */
+.warningStatCard,
 .warningCard {
-  border: 2px solid #f97316 !important;
-  background: color-mix(in srgb, #f97316 6%, var(--surface)) !important;
-  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.15);
   position: relative;
+  border-color: color-mix(in srgb, var(--warn) 42%, var(--line)) !important;
+  background: color-mix(in srgb, var(--warn-tint) 55%, var(--surface)) !important;
 }
+.warningStatCard::before,
+.warningCard::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 12px 0 0 12px;
+  background: var(--warn);
+}
+.warningStatCard .statHeading svg,
 .warningCard .eyebrow {
-  color: #ea580c !important;
+  color: var(--warn) !important;
 }
 .statHeading { display: flex; align-items: center; gap: 9px; margin-bottom: 18px; color: var(--ink); }
 .statHeading svg { flex-shrink: 0; color: var(--green); }
@@ -46,7 +46,7 @@
 .statLink:focus-visible { outline: 3px solid color-mix(in srgb, var(--green) 36%, transparent); outline-offset: 2px; }
 
 .analyticsGrid { min-width: 0; display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(290px, 0.8fr); gap: 18px; align-items: stretch; }
-.pipelineCard, .listCard { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); }
+.pipelineCard, .listCard { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); overflow: hidden; }
 .sectionHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .eyebrow { color: var(--green); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; }
 .sectionHead h2 { margin-top: 5px; font-size: 1.1rem; line-height: 1.35; }
@@ -68,8 +68,8 @@
 
 .operationsGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .orderList { display: flex; flex-direction: column; }
-.orderRow { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px; padding: 13px 3px; border-top: 1px solid var(--line); color: var(--ink); transition: background 0.2s var(--ease); }
-.orderRow:hover { background: var(--paper-2); }
+.orderRow { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px; padding: 13px 10px; margin-inline: -10px; border-radius: 8px; border-top: 1px solid var(--line); color: var(--ink); transition: background 0.2s var(--ease); }
+.orderRow:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .orderMain { min-width: 0; }
 .orderMain strong, .orderMain small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .orderMain strong { font-family: var(--font-mono); font-size: 0.8rem; }

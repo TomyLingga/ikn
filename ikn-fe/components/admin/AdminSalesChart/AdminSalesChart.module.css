@@ -1,10 +1,20 @@
+/* Dua seri harus bisa dibedakan sekilas apa pun warna temanya: pendapatan memakai warna primer,
+   jumlah order memakai jingga tetap (bukan --accent, yang pada tema biru nyaris sama dengan primer). */
 .card {
+  --c-revenue: var(--primary);
+  --c-orders: #e08a00;
+  --axis-left: 52px;
+  --axis-right: 38px;
+  --readout-h: 66px;
+  --label-h: 30px;
   min-width: 0;
   padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 12px;
   background: var(--surface);
 }
+
+:global([data-theme='dark']) .card { --c-orders: #f1bf62; }
 
 .header {
   display: flex;
@@ -15,7 +25,7 @@
 }
 
 .eyebrow {
-  color: var(--green);
+  color: var(--primary);
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.09em;
@@ -54,7 +64,7 @@
   min-height: 42px;
   padding: 8px 34px 8px 11px;
   border: 1px solid var(--line-strong);
-  border-radius: 0;
+  border-radius: 8px;
   background: var(--paper);
   color: var(--ink);
   font: inherit;
@@ -62,7 +72,7 @@
 }
 
 .filters select:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--green) 34%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--primary) 34%, transparent);
   outline-offset: 1px;
 }
 
@@ -71,9 +81,9 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   overflow: hidden;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 10px;
   background: var(--line);
 }
 
@@ -104,31 +114,117 @@
   white-space: nowrap;
 }
 
-.summary .positive { color: var(--green); }
-.summary .negative { color: #a43a32; }
+.summary .positive { color: var(--ok); }
+.summary .negative { color: var(--red); }
 
+/* ---- Legenda: dua seri, dua sumbu ---- */
+/* Legenda menempati pita rincian selama tidak ada bulan yang disorot, jadi ruang itu tidak kosong. */
+.legend {
+  position: absolute;
+  top: 0;
+  left: var(--axis-left);
+  right: var(--axis-right);
+  z-index: 1;
+  min-height: calc(var(--readout-h) - 10px);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  transition: opacity 0.16s var(--ease);
+}
+
+.legendDim { opacity: 0.25; }
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.swatchRevenue,
+.swatchOrders {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  display: inline-block;
+  border-radius: 3px;
+}
+
+.swatchRevenue { background: var(--c-revenue); }
+.swatchOrders { background: var(--c-orders); }
+
+/* ---- Area grafik ---- */
 .chartViewport {
   width: 100%;
   overflow-x: auto;
-  scrollbar-width: none; /* Hide scrollbar Firefox */
-  -ms-overflow-style: none; /* Hide scrollbar IE/Edge */
-  padding-top: 58px;
-}
-
-.chartViewport::-webkit-scrollbar {
-  display: none; /* Hide scrollbar Chrome/Safari/Edge */
+  scrollbar-width: thin;
 }
 
 .plot {
   position: relative;
   width: 100%;
-  min-width: 0;
-  height: 290px;
+  min-width: 560px;
+  height: 360px;
+}
+
+/* Pita rincian di atas batang: tinggi tetap, posisi mendatar dijepit agar tidak pernah keluar dari grafik. */
+.readout {
+  --half: 92px;
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: clamp(
+    var(--half),
+    calc(var(--axis-left) + (100% - var(--axis-left) - var(--axis-right)) * var(--pos, 0.5)),
+    calc(100% - var(--half))
+  );
+  width: calc(var(--half) * 2);
+  min-height: calc(var(--readout-h) - 10px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--surface);
+  box-shadow: var(--shadow-md);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.16s var(--ease), transform 0.16s var(--ease), left 0.16s var(--ease);
+}
+
+.readoutOn {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.readout strong {
+  font-size: 0.8rem;
+}
+
+.readout span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.readout .swatchRevenue,
+.readout .swatchOrders {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
 }
 
 .grid {
   position: absolute;
-  inset: 0 0 34px 48px;
+  inset: var(--readout-h) var(--axis-right) var(--label-h) var(--axis-left);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -141,106 +237,113 @@
   border-top: 1px dashed var(--line);
 }
 
+.gridLine:last-child {
+  border-top-style: solid;
+  border-top-color: var(--line-strong);
+}
+
 .gridLine em {
   position: absolute;
-  top: -9px;
-  right: calc(100% + 9px);
+  top: -8px;
+  white-space: nowrap;
   color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: 0.67rem;
   font-style: normal;
+  line-height: 1.4;
 }
+
+.axisLeft { right: calc(100% + 8px); }
+.axisRight { left: calc(100% + 8px); color: color-mix(in srgb, var(--c-orders) 70%, var(--ink)) !important; }
 
 .bars {
   position: absolute;
-  inset: 0 0 0 48px;
+  inset: var(--readout-h) var(--axis-right) 0 var(--axis-left);
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  align-items: end;
-  gap: clamp(2px, 1vw, 8px);
+  gap: 2px;
 }
 
-.bar {
+.col {
   position: relative;
+  min-width: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 34px;
-  align-items: end;
+  grid-template-rows: minmax(0, 1fr) var(--label-h);
   padding: 0;
   border: 0;
+  border-radius: 6px 6px 0 0;
   background: transparent;
   color: var(--ink-soft);
   cursor: pointer;
+  transition: background 0.18s var(--ease);
 }
 
-.barTrack {
-  position: relative;
-  width: min(38px, 72%);
+.col:hover,
+.col.active {
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+}
+
+.col.selected {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.col:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.colBars {
   height: 100%;
-  justify-self: center;
   display: flex;
   align-items: flex-end;
-  overflow: hidden;
-  border-radius: 0;
-  background: var(--paper-2);
+  justify-content: center;
+  gap: clamp(2px, 0.5vw, 5px);
+  padding: 0 clamp(2px, 12%, 10px);
 }
 
 .barFill {
-  width: 100%;
-  height: var(--bar-height);
+  flex: 1 1 0;
+  max-width: 22px;
+  min-width: 5px;
   display: block;
-  border-radius: 0;
-  background: var(--green);
-  transition: height 0.45s var(--ease), background 0.2s var(--ease), transform 0.2s var(--ease);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.45s var(--ease), filter 0.18s var(--ease);
 }
 
-.bar:hover .barFill,
-.bar:focus-visible .barFill,
-.selected .barFill {
-  background: var(--amber);
-  transform: scaleX(1.08);
+.barRevenue {
+  height: var(--h-revenue);
+  background: var(--c-revenue);
 }
 
-.bar:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--green) 34%, transparent);
-  outline-offset: 2px;
+.barOrders {
+  height: var(--h-orders);
+  background: var(--c-orders);
 }
 
-.barLabel {
+/* Bulan tanpa nilai tetap punya tanda tipis, supaya jelas "nol" bukan "data belum dimuat". */
+.barZero {
+  height: 2px;
+  background: var(--line-strong);
+}
+
+.col:hover .barFill:not(.barZero),
+.col.active .barFill:not(.barZero) {
+  filter: brightness(1.12);
+}
+
+.colLabel {
   align-self: center;
   justify-self: center;
   font-family: var(--font-mono);
   font-size: 0.72rem;
 }
 
-.tooltip {
-  position: absolute;
-  z-index: 5;
-  bottom: calc(var(--bar-height) + 42px);
-  left: 50%;
-  width: max-content;
-  max-width: 180px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 9px 11px;
-  border: 1px solid var(--line-strong);
-  border-radius: 0;
-  background: var(--ink);
-  color: var(--surface);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
-  font-size: 0.78rem;
-  line-height: 1.35;
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, 7px);
-  transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
+.col.selected .colLabel,
+.col.active .colLabel {
+  color: var(--ink);
+  font-weight: 600;
 }
-
-.tooltip strong { font-size: 0.82rem; }
-.bar:hover .tooltip,
-.bar:focus-visible .tooltip,
-.selected .tooltip { opacity: 1; transform: translate(-50%, 0); }
 
 .hint {
   display: flex;
@@ -264,4 +367,11 @@
   .card { padding: 18px 14px; }
   .filters { flex-direction: column; }
   .summary { grid-template-columns: 1fr; }
+  .plot { height: 320px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .readout,
+  .barFill,
+  .col { transition: none; }
 }

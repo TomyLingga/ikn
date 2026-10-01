@@ -5,9 +5,9 @@
   place-items: center;
   padding: clamp(20px, 5vw, 56px);
   background:
-    radial-gradient(circle at 15% 15%, rgba(31, 81, 52, 0.06), transparent 34%),
-    radial-gradient(circle at 85% 85%, rgba(214, 143, 78, 0.06), transparent 30%),
-    #d5d0c8;
+    radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 34%),
+    radial-gradient(circle at 85% 85%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 30%),
+    var(--paper-2);
 }
 
 :global([data-theme='dark']) .page {
@@ -239,7 +239,7 @@
   background: transparent;
   border-color: var(--green);
   color: var(--green);
-  box-shadow: 0 2px 12px rgba(31, 81, 52, 0.15);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
 .primaryButton:active:not(:disabled) {

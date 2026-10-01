@@ -2,10 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasCustomerAudience;
 use App\Support\Money;
 
 class Voucher extends Model
 {
+    use HasCustomerAudience;
+
+    public const AUDIENCE_ALL = 'all';
+    public const AUDIENCE_CUSTOMERS = 'customers';
+    public const AUDIENCES = [self::AUDIENCE_ALL, self::AUDIENCE_CUSTOMERS];
+    public const AUDIENCE_PIVOT = 'voucher_customers';
+    public const AUDIENCE_KEY = 'voucher_id';
+
     public const TYPE_PERCENT = 'percent';
     public const TYPE_FIXED = 'fixed';
     public const TYPES = [self::TYPE_PERCENT, self::TYPE_FIXED];
@@ -16,7 +25,7 @@ class Voucher extends Model
 
     protected $fillable = [
         'code', 'type', 'value', 'min_subtotal', 'max_discount', 'quota', 'used_count',
-        'per_user_limit', 'scope', 'starts_at', 'ends_at', 'is_active',
+        'per_user_limit', 'scope', 'starts_at', 'ends_at', 'is_active', 'audience',
     ];
 
     protected $casts = [

@@ -24,6 +24,14 @@ class CommerceSettingsRequest extends FormRequest
             'priceIncludesTax' => ['sometimes', 'required', 'boolean'],
             'autoCompleteDays' => ['sometimes', 'required', 'integer', 'min:0', 'max:90'],
             'reminderHoursBeforeDue' => ['sometimes', 'required', 'integer', 'min:0', 'max:168'],
+            'invoicePrefix' => ['sometimes', 'required', 'string', 'max:40', 'regex:/^[A-Za-z0-9.\-\/ ]+$/'],
+            'invoiceSignerName' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'invoiceSignerTitle' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'invoiceCc' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'shippingOriginLabel' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'shippingOriginLat' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
+            'shippingOriginLng' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
+            'shippingRoadFactor' => ['sometimes', 'required', 'numeric', 'min:1', 'max:3'],
         ];
     }
 }

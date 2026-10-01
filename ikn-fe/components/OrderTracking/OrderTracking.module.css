@@ -1,14 +1,81 @@
-.track { display: flex; flex-direction: column; }
+.track { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .step { position: relative; padding: 0 0 24px 30px; }
 .step:last-child { padding-bottom: 0; }
 .step::before { content: ''; position: absolute; top: 18px; bottom: 0; left: 7px; width: 2px; background: var(--line); }
 .step:last-child::before { display: none; }
-.done::before { background: var(--green); }
+.done::before { background: var(--primary); }
 .dot { position: absolute; top: 2px; left: 0; width: 16px; height: 16px; border: 2px solid var(--line-strong); border-radius: 50%; background: var(--surface); }
-.done .dot { border-color: var(--green); background: var(--green); }
-.current .dot { border-color: var(--green); box-shadow: 0 0 0 4px var(--green-tint); }
+.done .dot { border-color: var(--primary); background: var(--primary); }
+.current .dot { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-tint); }
 .body { padding-bottom: 0; }
 .label { font-weight: 500; }
+.current .label { font-weight: 700; }
 .step:not(.done) .label { color: var(--ink-soft); }
 .at { display: block; margin-top: 2px; color: var(--ink-soft); font-family: var(--font-mono); font-size: 0.76rem; }
-.cancelled { padding: 10px 14px; border-radius: 0; background: rgba(178, 60, 50, 0.12); color: #b23c32; font-family: var(--font-mono); font-size: 0.78rem; }
+.note { display: block; margin-top: 2px; color: var(--ink-soft); font-size: 0.84rem; line-height: 1.45; }
+
+/* Catatan perjalanan dari admin: sub-langkah kecil di bawah "Dikirim". */
+.updates {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 12px 12px 12px 14px;
+  list-style: none;
+  border-left: 2px solid var(--primary);
+  border-radius: 0 10px 10px 0;
+  background: var(--primary-tint);
+}
+
+.update {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.updateDot {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 45%, var(--surface));
+}
+
+.updateLatest .updateDot {
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.updateBody { min-width: 0; }
+
+.updateNote {
+  display: block;
+  color: var(--ink);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.updateLatest .updateNote { font-weight: 600; }
+
+.updateRemove {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.updateRemove:hover:not(:disabled) { background: var(--red-tint); color: var(--red); }
+.updateRemove:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.updateRemove:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cancelled { margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: var(--red-tint); color: var(--red); font-family: var(--font-mono); font-size: 0.78rem; }

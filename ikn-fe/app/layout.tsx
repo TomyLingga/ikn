@@ -6,18 +6,24 @@ import { CartProvider } from '@/components/CartProvider';
 import { AuthProvider } from '@/components/AuthProvider';
 import Script from 'next/script';
 import { fetchSite } from '@/lib/server-data';
+import { themeStyle } from '@/lib/theme';
+import NavProgress from '@/components/NavProgress';
+import ConfirmHost from '@/components/ConfirmDialog';
 
 // Pasangan huruf industrial: Archivo (grotesque) untuk teks & display,
 // IBM Plex Mono untuk label teknis — identitas "lembar data pabrik".
+// Satu-satunya sumber font: next/font (di-host sendiri, di-preload). globals.css memakai variabelnya lewat
+// --font-sans / --font-mono; jangan menambah <link>/@import Google Fonts lagi (unduhan ganda + memblokir render).
 const archivo = Archivo({
   subsets: ['latin'],
+  style: ['normal', 'italic'],
   display: 'swap',
   variable: '--font-archivo',
 });
 
 const plexMono = IBM_Plex_Mono({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
   variable: '--font-plex-mono',
 });
@@ -40,17 +46,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { settings } = await fetchSite();
   const gaId = settings.analytics?.ga_measurement_id?.trim() || '';
   const gscToken = settings.analytics?.gsc_verification?.trim() || '';
+  // Warna tema dari Pengaturan Situs; hanya hex valid yang disuntik (lib/theme.ts), kosong = bawaan globals.css.
+  const themeCss = themeStyle(settings.theme);
 
   return (
     <html lang="id" className={`${archivo.variable} ${plexMono.variable}`}>
       <head>
         {gscToken && <meta name="google-site-verification" content={gscToken} />}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
+        {themeCss && <style id="site-theme" dangerouslySetInnerHTML={{ __html: themeCss }} />}
         {/* Anti-flash: pasang tema tersimpan sebelum paint pertama */}
         <script
           dangerouslySetInnerHTML={{
@@ -67,6 +70,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </Script>
           </>
         )}
+        <NavProgress />
+        <ConfirmHost />
         <LanguageProvider>
           <AuthProvider>
             <CartProvider>{children}</CartProvider>

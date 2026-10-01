@@ -296,7 +296,7 @@ paths:
                 type: object
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/AdminCustomerSummary' } }
-                  meta: { $ref: '#/components/schemas/PageMeta' }
+                  meta: { allOf: [{ $ref: '#/components/schemas/PageMeta' }, { $ref: '#/components/schemas/StatusCountsMeta' }] }
         '403': { $ref: '#/components/responses/Forbidden' }
   /admin/customers/{customer}:
     get:

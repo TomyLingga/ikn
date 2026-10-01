@@ -49,7 +49,8 @@ class AdminCustomerTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.email', 'pending@contoh.co.id')
             ->assertJsonPath('data.0.company', 'PT Contoh')
-            ->assertJsonPath('data.0.addressesCount', 0);
+            ->assertJsonPath('data.0.addressesCount', 0)
+            ->assertJsonPath('meta.counts.pending', 1); // angka tab sepanjang waktu
 
         $this->actingAs($admin)->getJson('/api/v1/admin/customers?q=COATING')
             ->assertOk()

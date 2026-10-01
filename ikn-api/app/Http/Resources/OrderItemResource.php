@@ -5,7 +5,7 @@ namespace App\Http\Resources;
 use App\Models\OrderItem;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-// Item order dari snapshot (harga beku). `reviewed` diisi bila order memuat relasi reviews.
+// Item order dari snapshot (harga beku). `reviewed` dan `review` diisi bila order memuat relasi reviews.
 class OrderItemResource extends JsonResource
 {
     public function toArray($request): array
@@ -17,6 +17,8 @@ class OrderItemResource extends JsonResource
         $reviewed = $order && $order->relationLoaded('reviews')
             ? in_array((int) $item->product_id, $order->reviewedProductIds(), true)
             : null;
+
+        $review = $reviewed ? $order->reviews->firstWhere('product_id', $item->product_id) : null;
 
         return [
             'id' => $item->id,
@@ -34,6 +36,12 @@ class OrderItemResource extends JsonResource
             'lineTotal' => $item->lineTotalInt(),
             'weightGram' => $item->weight_gram,
             'reviewed' => $reviewed,
+            // Ulasan customer untuk produk ini pada order ini (null bila belum diulas).
+            'review' => $review ? [
+                'rating' => (int) $review->rating,
+                'body' => $review->body,
+                'date' => optional($review->created_at)->toApiString(),
+            ] : null,
         ];
     }
 }

@@ -24,6 +24,8 @@ class VoucherResource extends JsonResource
             'startsAt' => optional($this->starts_at)->toApiString(),
             'endsAt' => optional($this->ends_at)->toApiString(),
             'isActive' => $this->is_active,
+            'audience' => $this->audience ?: \App\Models\Voucher::AUDIENCE_ALL,
+            'customers' => $this->audienceCustomers(),
             'createdAt' => optional($this->created_at)->toApiString(),
             'updatedAt' => optional($this->updated_at)->toApiString(),
         ];

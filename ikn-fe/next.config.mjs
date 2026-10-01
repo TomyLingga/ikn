@@ -14,6 +14,17 @@ const nextConfig = {
   },
   // Tidak ada rewrite ke API: browser memanggil NEXT_PUBLIC_API_URL langsung (Sanctum cookie SPA, CORS + credentials),
   // server component memakai API_INTERNAL_URL. Lihat plan/01-architecture.md bagian 2.
+  async redirects() {
+    // Satu halaman per menu utama (2026-09-29): alamat lama tetap bekerja lewat pengalihan permanen.
+    return [
+      { source: '/produk', destination: '/bisnis', permanent: true },
+      { source: '/unduhan', destination: '/bisnis#unduhan', permanent: true },
+      { source: '/keberlanjutan/sertifikat', destination: '/keberlanjutan#sertifikat', permanent: true },
+      { source: '/keberlanjutan/pelanggan', destination: '/keberlanjutan#pelanggan', permanent: true },
+      { source: '/keberlanjutan/reach', destination: '/keberlanjutan#reach', permanent: true },
+      { source: '/keberlanjutan/whistleblowing', destination: '/keberlanjutan#whistleblowing', permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

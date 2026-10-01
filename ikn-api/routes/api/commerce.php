@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Customer\DashboardController;
 use App\Http\Controllers\Api\V1\Customer\OrderController;
 use App\Http\Controllers\Api\V1\Customer\OrderPaymentController;
+use App\Http\Controllers\Api\V1\Customer\VoucherController;
 use App\Http\Controllers\Api\V1\PaymentWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('customer')->middleware(['auth:sanctum', 'role:customer'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'show']);
+    Route::get('vouchers', [VoucherController::class, 'index']); // voucher khusus customer ini (ASUMSI A-67)
 
     Route::get('orders', [OrderController::class, 'index']);
     Route::post('orders', [OrderController::class, 'store'])->middleware('customer.active');

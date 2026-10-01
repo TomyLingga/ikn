@@ -10,13 +10,14 @@ import SessionLoader from '@/components/SessionLoader';
 import AdminModal from '@/components/admin/AdminModal';
 import { AdminCard } from '@/components/admin/AdminPage';
 import { useLang } from '@/components/LanguageProvider';
-import { orderLabel, paymentLabel } from '@/lib/commerce';
-import { api, ApiError, errorMessage } from '@/lib/api';
+import { orderLabel, paymentLabel, shipmentMetricsText, shippingBreakdownText } from '@/lib/commerce';
+import { api, apiUpload, ApiError, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { adminCancellableStatuses, dueEditableStatuses, fromDateTimeLocal, paymentMethodSummary } from '@/lib/admin';
+import { adminCancellableStatuses, dueEditableStatuses, fromDateTimeLocal, paymentMethodSummary, refreshAdminBadges } from '@/lib/admin';
 import { formatDateTime, formatIDR } from '@/lib/format';
-import type { Order, Payment } from '@/lib/types';
+import type { Order, OrderAttachment, Payment, TrackingUpdate } from '@/lib/types';
 import styles from './page.module.css';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 type Modal = { type: 'cancel' } | { type: 'ship' } | { type: 'due' } | { type: 'reject'; payment: Payment } | { type: 'note'; status: 'processing' | 'delivered' | 'completed' } | null;
 
@@ -53,6 +54,11 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
   const [courier, setCourier] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
   const [note, setNote] = useState('');
+  const [trackNote, setTrackNote] = useState('');
+  // Lampiran (faktur pajak, surat jalan): dipilih di modal "Tandai dikirim" atau diunggah dari kartu Lampiran.
+  const [shipFiles, setShipFiles] = useState<File[]>([]);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachLabel, setAttachLabel] = useState('');
   const [dueMode, setDueMode] = useState<'hours' | 'date'>('hours');
   const [extendHours, setExtendHours] = useState('24');
   const [dueAt, setDueAt] = useState('');
@@ -94,6 +100,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     setActionOk('');
     try {
       await action();
+      refreshAdminBadges(); // terima/tolak pembayaran atau batal order mengubah antrean verifikasi di sidebar
       await refresh();
       setActionOk(okMessage);
       setModal(null);
@@ -120,9 +127,95 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     void run(() => api(`${orderPath}/cancel`, { method: 'POST', body: { reason: reason.trim() } }), t('Order dibatalkan.', 'Order cancelled.'));
   }
 
-  function submitShip(event: FormEvent<HTMLFormElement>) {
+  // Unggah satu lampiran (multipart) ke POST /admin/orders/{number}/attachments.
+  async function uploadAttachment(file: File, label = ''): Promise<void> {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (label.trim()) fd.append('label', label.trim());
+    await apiUpload(`${orderPath}/attachments`, fd);
+  }
+
+  async function submitShip(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    changeStatus('shipped', { courier: courier.trim(), trackingNumber: trackingNumber.trim(), note: note.trim() || null });
+    if (busy) return;
+    const files = shipFiles;
+    setBusy(true);
+    setActionError('');
+    setActionOk('');
+    try {
+      await api(`${orderPath}/status`, { method: 'POST', body: { status: 'shipped', courier: courier.trim(), trackingNumber: trackingNumber.trim(), note: note.trim() || null } });
+    } catch (err) {
+      setActionError(actionErrorText(err, lang));
+      setBusy(false);
+      return;
+    }
+    // Status sudah berubah; lampiran menyusul satu per satu. Gagal unggah tidak membatalkan status: modal ditutup,
+    // berkas yang gagal dilaporkan dan bisa diunggah ulang dari kartu "Lampiran untuk customer".
+    const failed: string[] = [];
+    for (const file of files) {
+      try {
+        await uploadAttachment(file);
+      } catch (err) {
+        failed.push(`${file.name} (${actionErrorText(err, lang)})`);
+      }
+    }
+    setShipFiles([]);
+    await refresh();
+    setModal(null);
+    setBusy(false);
+    const uploaded = files.length - failed.length;
+    if (failed.length > 0) {
+      setActionError(
+        t(
+          `Order ditandai dikirim, tetapi ${failed.length} lampiran gagal diunggah: ${failed.join('; ')}. Unggah ulang lewat kartu Lampiran.`,
+          `Order marked as shipped, but ${failed.length} attachment(s) failed: ${failed.join('; ')}. Re-upload from the Attachments card.`,
+        ),
+      );
+    }
+    setActionOk(
+      uploaded > 0
+        ? t(`Order ditandai dikirim; ${uploaded} lampiran diunggah dan customer diberi tahu.`, `Order marked as shipped; ${uploaded} attachment(s) uploaded and the customer notified.`)
+        : t('Order ditandai dikirim.', 'Order marked as shipped.'),
+    );
+  }
+
+  function submitAttachment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!attachFile) return;
+    const file = attachFile;
+    const label = attachLabel;
+    void run(
+      async () => {
+        await uploadAttachment(file, label);
+        setAttachFile(null);
+        setAttachLabel('');
+      },
+      t('Lampiran diunggah; customer mendapat notifikasi.', 'Attachment uploaded; the customer has been notified.'),
+    );
+  }
+
+  async function removeAttachment(attachment: OrderAttachment) {
+    if (!(await confirmDialog(t(`Hapus lampiran "${attachment.label || attachment.file?.originalName}"?`, `Delete attachment "${attachment.label || attachment.file?.originalName}"?`)))) return;
+    void run(() => api(`${orderPath}/attachments/${attachment.id}`, { method: 'DELETE' }), t('Lampiran dihapus.', 'Attachment deleted.'));
+  }
+
+  // Catatan perjalanan kiriman (ASUMSI A-70): hanya selama order berstatus dikirim; customer mendapat notifikasi.
+  function submitTracking(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = trackNote.trim();
+    if (value.length < 3) {
+      setActionError(t('Catatan perjalanan minimal 3 karakter.', 'The shipping note needs at least 3 characters.'));
+      return;
+    }
+    void run(
+      () => api(`${orderPath}/tracking`, { method: 'POST', body: { note: value } }).then(() => setTrackNote('')),
+      t('Catatan perjalanan ditambahkan; customer menerima notifikasi.', 'Shipping note added; the customer has been notified.'),
+    );
+  }
+
+  async function removeTracking(update: TrackingUpdate) {
+    if (!await confirmDialog(t(`Hapus catatan "${update.note}"?`, `Delete the note "${update.note}"?`))) return;
+    void run(() => api(`${orderPath}/tracking/${update.id}`, { method: 'DELETE' }), t('Catatan perjalanan dihapus.', 'Shipping note deleted.'));
   }
 
   function submitNote(event: FormEvent<HTMLFormElement>) {
@@ -152,8 +245,8 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     void run(() => api(`${orderPath}/due`, { method: 'PUT', body }), t('Batas waktu pembayaran diperbarui.', 'Payment deadline updated.'));
   }
 
-  function acceptPayment(payment: Payment) {
-    if (!window.confirm(t(`Terima pembayaran #${payment.id} sebesar ${formatIDR(payment.amount)}?`, `Accept payment #${payment.id} of ${formatIDR(payment.amount)}?`))) return;
+  async function acceptPayment(payment: Payment) {
+    if (!await confirmDialog(t(`Terima pembayaran #${payment.id} sebesar ${formatIDR(payment.amount)}?`, `Accept payment #${payment.id} of ${formatIDR(payment.amount)}?`))) return;
     void run(() => api(`/admin/payments/${payment.id}/accept`, { method: 'POST', body: {} }), t('Pembayaran diterima; order berstatus dibayar.', 'Payment accepted; order is now paid.'));
   }
 
@@ -239,6 +332,9 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         <div className={styles.badges}>
           <StatusBadge label={status[lang]} tone={status.tone} />
           <StatusBadge label={payStatus[lang]} tone={payStatus.tone} />
+          <a href={`/print/invoice/${encodeURIComponent(order.number)}`} target="_blank" rel="noopener" className="btn btn-line btn-sm">
+            <Icon name="arrowDown" size={15} /> {t('Cetak invoice', 'Print invoice')}
+          </a>
         </div>
       </div>
 
@@ -307,7 +403,10 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                   {' '}
                   · {tr(order.shippingMethod.label, lang)}
                   {order.shippingMethod.eta ? ` (${tr(order.shippingMethod.eta, lang)})` : ''}
-                  {order.shippingMethod.weightGram ? ` · ${(order.shippingMethod.weightGram / 1000).toFixed(2)} kg` : ''}
+                  {shipmentMetricsText(order.shippingMethod) ? ` · ${shipmentMetricsText(order.shippingMethod)}` : ''}
+                  {order.shippingMethod.breakdown && order.shippingMethod.type !== 'flat' && !order.shippingMethod.breakdown.free && (
+                    <span className="admin-cell-sub">{shippingBreakdownText(order.shippingMethod.breakdown, lang)}</span>
+                  )}
                 </small>
               )}
             </span>
@@ -375,6 +474,10 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
             <br />
             <Link href={`/admin/customers?q=${encodeURIComponent(order.customer.email)}`} className="link">
               {t('Lihat profil customer', 'View customer profile')}
+            </Link>
+            {' · '}
+            <Link href={`/admin/chat?customer=${order.customer.id}`} className="link">
+              {t('Chat customer', 'Chat with customer')}
             </Link>
           </p>
           <hr className={styles.divider} />
@@ -459,7 +562,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                     {payment.proof && (
                       <span>
                         {t('Bukti', 'Proof')}:{' '}
-                        <a href={payment.proof.url || `/api/v1/files/${payment.proof.mediaId}`} target="_blank" rel="noopener noreferrer" className="link">
+                        <a href={payment.proof.url || `/api/v1/files/${payment.proof.mediaId}`} target="_blank" rel="noopener" className="link">
                           {payment.proof.originalName}
                         </a>{' '}
                         · {formatDateTime(payment.proof.uploadedAt, lang)}
@@ -509,7 +612,33 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         </AdminCard>
 
         <AdminCard title={t('Lacak & aksi order', 'Tracking & order actions')}>
-          <OrderTracking order={order} />
+          <OrderTracking order={order} onRemoveUpdate={order.canAddTracking ? removeTracking : undefined} removeDisabled={busy} />
+
+          {order.canAddTracking && (
+            <form className={styles.trackForm} onSubmit={submitTracking}>
+              <label htmlFor="track-note" className="field-label">
+                {t('Tambah catatan perjalanan', 'Add a shipping note')}
+              </label>
+              <div className={styles.trackRow}>
+                <input
+                  id="track-note"
+                  value={trackNote}
+                  maxLength={200}
+                  onChange={(e) => setTrackNote(e.target.value)}
+                  placeholder={t('mis. Pesanan tiba di Provinsi Riau', 'e.g. The parcel has arrived in Riau Province')}
+                />
+                <button type="submit" className="btn btn-line btn-sm" disabled={busy || trackNote.trim().length < 3}>
+                  <Icon name="plus" size={14} /> {t('Tambah', 'Add')}
+                </button>
+              </div>
+              <p className="admin-field-hint">
+                {t(
+                  'Tampil berurutan di bawah "Dikirim" pada halaman pesanan customer, dan customer mendapat notifikasi. Bisa ditambah berkali-kali sampai pesanan diterima.',
+                  'Shown in order under "Shipped" on the customer order page, and the customer gets a notification. Add as many as needed until the order is delivered.',
+                )}
+              </p>
+            </form>
+          )}
 
           <div className={styles.actionGroup}>
             {order.status === 'paid' && (
@@ -585,6 +714,53 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         </AdminCard>
       </div>
 
+      {(order.canAttach || (order.attachments || []).length > 0) && (
+        <div style={{ marginTop: 20 }}>
+          <AdminCard
+            title={t('Lampiran untuk customer', 'Attachments for the customer')}
+            desc={t('Faktur pajak, surat jalan, atau dokumen lain. Berkas privat: hanya admin dan customer pemilik order yang bisa membukanya.', 'Tax invoice, delivery note, or other documents. Private files: only admins and the order owner can open them.')}
+          >
+            {(order.attachments || []).length === 0 ? (
+              <p className="admin-field-hint">{t('Belum ada lampiran.', 'No attachments yet.')}</p>
+            ) : (
+              <ul className={styles.fileList}>
+                {(order.attachments || []).map((file) => (
+                  <li key={file.id} className={styles.fileRow}>
+                    <span className={styles.fileIcon}>
+                      <Icon name="orders" size={18} />
+                    </span>
+                    <span className={styles.fileBody}>
+                      <a href={file.file?.url} target="_blank" rel="noopener" className="link">
+                        {file.label || file.file?.originalName}
+                      </a>
+                      <small className="admin-cell-sub">
+                        {file.file?.originalName}
+                        {file.file ? ` · ${Math.max(1, Math.round(file.file.size / 1024))} KB` : ''} · {formatDateTime(file.at, lang)}
+                        {file.actor ? ` · ${file.actor.name}` : ''}
+                      </small>
+                    </span>
+                    {order.canAttach && (
+                      <button type="button" className="btn btn-line btn-sm" disabled={busy} onClick={() => void removeAttachment(file)}>
+                        {t('Hapus', 'Delete')}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {order.canAttach && (
+              <form className={styles.attachForm} onSubmit={submitAttachment}>
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.doc,.csv,.txt,.zip" onChange={(e) => setAttachFile(e.target.files?.[0] || null)} />
+                <input value={attachLabel} maxLength={120} onChange={(e) => setAttachLabel(e.target.value)} placeholder={t('Keterangan, mis. Faktur Pajak 010.000-26.00000001', 'Label, e.g. Tax Invoice 010.000-26.00000001')} />
+                <button type="submit" className="btn btn-solid btn-sm" disabled={busy || !attachFile}>
+                  <Icon name="plus" size={14} /> {t('Unggah lampiran', 'Upload attachment')}
+                </button>
+              </form>
+            )}
+          </AdminCard>
+        </div>
+      )}
+
       {modal?.type === 'cancel' && (
         <AdminModal title={t('Batalkan order', 'Cancel order')} onClose={() => setModal(null)} small>
           <form className="admin-form" onSubmit={submitCancel}>
@@ -613,7 +789,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
 
       {modal?.type === 'ship' && (
         <AdminModal title={t('Tandai dikirim', 'Mark as shipped')} onClose={() => setModal(null)} small>
-          <form className="admin-form" onSubmit={submitShip}>
+          <form className="admin-form" onSubmit={(e) => void submitShip(e)}>
             <label>
               <span className="field-label">{t('Kurir / ekspedisi', 'Courier')} *</span>
               <input value={courier} onChange={(e) => setCourier(e.target.value)} placeholder={t('Contoh: JNE Trucking', 'e.g. JNE Trucking')} required />
@@ -625,6 +801,23 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
             <label>
               <span className="field-label">{t('Catatan (opsional)', 'Note (optional)')}</span>
               <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+            </label>
+            <label>
+              <span className="field-label">{t('Lampiran untuk customer (opsional)', 'Attachments for the customer (optional)')}</span>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.doc,.csv,.txt,.zip"
+                onChange={(e) => setShipFiles(Array.from(e.target.files || []))}
+              />
+              <small className="admin-field-hint">
+                {t('Faktur pajak, surat jalan, atau dokumen lain (PDF/gambar/Office, maks. 10 MB per berkas). Customer dapat mengunduhnya dari detail pesanan dan mendapat notifikasi.', 'Tax invoice, delivery note, or other documents (PDF/image/Office, max. 10 MB each). The customer can download them from the order details and gets a notification.')}
+              </small>
+              {shipFiles.length > 0 && (
+                <small className="admin-field-hint">
+                  {shipFiles.map((f) => f.name).join(', ')}
+                </small>
+              )}
             </label>
             {actionError && <p className="admin-form-error">{actionError}</p>}
             <div className="admin-modal-actions">

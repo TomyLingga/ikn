@@ -2,19 +2,30 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Fee;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class FeeResource extends JsonResource
 {
-    public function toArray($request): array
+    /** Bentuk publik (GET /commerce/config): tanpa daftar customer sasaran. */
+    public static function publicArray(Fee $fee): array
     {
         return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'type' => $this->type,
-            'amount' => $this->amountInt(),
-            'isActive' => $this->is_active,
-            'sortOrder' => $this->sort_order,
+            'id' => $fee->id,
+            'name' => $fee->name,
+            'type' => $fee->type,
+            'amount' => $fee->amountInt(),
+            'isActive' => $fee->is_active,
+            'sortOrder' => $fee->sort_order,
+        ];
+    }
+
+    /** Bentuk admin: + audience dan customers[] (butuh with('customers.profile')). */
+    public function toArray($request): array
+    {
+        return self::publicArray($this->resource) + [
+            'audience' => $this->audience ?: Fee::AUDIENCE_ALL,
+            'customers' => $this->audienceCustomers(),
             'createdAt' => optional($this->created_at)->toApiString(),
             'updatedAt' => optional($this->updated_at)->toApiString(),
         ];

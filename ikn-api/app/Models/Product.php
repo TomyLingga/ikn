@@ -25,7 +25,7 @@ class Product extends Model
     protected $fillable = [
         'slug', 'code', 'category_id', 'name', 'kind', 'summary', 'highlights', 'specs', 'applications',
         'solubility', 'aliases', 'price_mode', 'price', 'promo_price', 'promo_starts_at', 'promo_ends_at',
-        'unit', 'moq', 'weight_gram', 'stock_status', 'is_taxable', 'is_published', 'rating_avg', 'review_count',
+        'unit', 'moq', 'weight_gram', 'length_cm', 'width_cm', 'height_cm', 'stock_status', 'is_taxable', 'is_published', 'rating_avg', 'review_count',
     ];
 
     protected $translatable = ['name', 'summary'];
@@ -37,6 +37,9 @@ class Product extends Model
         'aliases' => 'array',
         'moq' => 'integer',
         'weight_gram' => 'integer',
+        'length_cm' => 'float',
+        'width_cm' => 'float',
+        'height_cm' => 'float',
         'stock_qty' => 'integer',
         'reserved_qty' => 'integer',
         'review_count' => 'integer',
@@ -155,6 +158,27 @@ class Product extends Model
         return $this->price_mode === self::PRICE_MODE_FIXED;
     }
 
+    /** Volume kemasan per satuan jual (cm³) untuk ongkir; 0 bila dimensi belum lengkap (ASUMSI A-76). */
+    public function volumeCm3(): int
+    {
+        if (! $this->length_cm || ! $this->width_cm || ! $this->height_cm) {
+            return 0;
+        }
+
+        return (int) round((float) $this->length_cm * (float) $this->width_cm * (float) $this->height_cm);
+    }
+
+    /** @return array{lengthCm: float|null, widthCm: float|null, heightCm: float|null, volumeCm3: int} */
+    public function dimensions(): array
+    {
+        return [
+            'lengthCm' => $this->length_cm === null ? null : (float) $this->length_cm,
+            'widthCm' => $this->width_cm === null ? null : (float) $this->width_cm,
+            'heightCm' => $this->height_cm === null ? null : (float) $this->height_cm,
+            'volumeCm3' => $this->volumeCm3(),
+        ];
+    }
+
     public function priceInt(): ?int
     {
         return $this->price === null ? null : Money::toInt($this->price);
@@ -186,12 +210,24 @@ class Product extends Model
         return $this->promoActive() ? Money::toInt($this->promo_price) : $this->priceInt();
     }
 
-    /** URL gambar pertama (untuk kartu produk) atau null. */
+    /**
+     * Foto thumbnail (kartu produk, keranjang, snapshot order): foto yang ditandai admin, atau foto pertama
+     * menurut urutan. Video tidak pernah menjadi thumbnail (ASUMSI A-72).
+     */
+    public function thumbnailImage(): ?ProductImage
+    {
+        $images = $this->relationLoaded('images') ? $this->images : $this->images()->with('media')->get();
+        $photos = $images->filter(fn (ProductImage $image) => $image->media && $image->media->isImage());
+
+        return $photos->firstWhere('is_thumbnail', true) ?? $photos->first();
+    }
+
+    /** URL foto thumbnail atau null. */
     public function primaryImageUrl(): ?string
     {
-        $first = $this->relationLoaded('images') ? $this->images->first() : $this->images()->with('media')->first();
+        $thumbnail = $this->thumbnailImage();
 
-        return $first && $first->media ? $first->media->url() : null;
+        return $thumbnail ? $thumbnail->media->url() : null;
     }
 
     /** Hitung ulang rating_avg dan review_count dari ulasan tayang. */

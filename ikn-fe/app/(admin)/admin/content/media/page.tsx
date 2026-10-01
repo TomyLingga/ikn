@@ -7,6 +7,7 @@ import { MediaGrid, Pager } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, apiPaged, ApiError, errorMessage, uploadMedia } from '@/lib/api';
 import type { MediaItem, PagedMeta } from '@/lib/cms';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 type MediaFilter = '' | 'image' | 'document';
 
@@ -67,7 +68,7 @@ export default function AdminMediaLibrary() {
   }
 
   async function remove(item: MediaItem) {
-    if (!window.confirm(t(`Hapus berkas "${item.originalName}"?`, `Delete file "${item.originalName}"?`))) return;
+    if (!await confirmDialog(t(`Hapus berkas "${item.originalName}"?`, `Delete file "${item.originalName}"?`))) return;
     setError('');
     try {
       await api(`/admin/media/${item.id}`, { method: 'DELETE' });

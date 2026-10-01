@@ -17,8 +17,11 @@ class MediaController extends ApiController
         $query = Media::query()
             ->where('disk', Media::DISK_PUBLIC)
             ->when($request->query('collection'), fn ($q, $c) => $q->where('collection', $c))
+            // type: image | video | visual (gambar + video) | document (selain gambar & video)
             ->when($request->query('type') === 'image', fn ($q) => $q->where('mime', 'like', 'image/%'))
-            ->when($request->query('type') === 'document', fn ($q) => $q->where('mime', 'not like', 'image/%'))
+            ->when($request->query('type') === 'video', fn ($q) => $q->where('mime', 'like', 'video/%'))
+            ->when($request->query('type') === 'visual', fn ($q) => $q->where(fn ($w) => $w->where('mime', 'like', 'image/%')->orWhere('mime', 'like', 'video/%')))
+            ->when($request->query('type') === 'document', fn ($q) => $q->where('mime', 'not like', 'image/%')->where('mime', 'not like', 'video/%'))
             ->when($request->query('q'), fn ($q, $s) => $q->where('original_name', 'ilike', '%'.$s.'%'))
             ->orderByDesc('id');
 

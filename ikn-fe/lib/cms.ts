@@ -98,16 +98,35 @@ export interface DocLinkData {
   updatedAt?: string | null;
 }
 
+export interface GeoPoint {
+  lat: number | null;
+  lng: number | null;
+}
+
 export interface ContactLocation {
   name: I18n;
   address: string;
   phones: { number: string }[];
+  geo?: GeoPoint | null; // pin peta Leaflet/OSM (halaman Kontak, footer); kosong = tanpa pin
+}
+
+export interface SocialLink {
+  label: string; // nama platform, mis. Instagram
+  handle: string;
+  url: string;
+  icon?: MediaSummary | null; // ikon unggahan admin; kosong = ikon bawaan menurut platform (components/SocialIcon)
 }
 
 export interface ContactInfo {
   locations: ContactLocation[];
   emails: { address: string }[];
-  social: { label: string; handle: string; url: string }[];
+  social: SocialLink[];
+  background?: MediaSummary | null; // foto latar blok kontak; kosong = gradien warna tema
+}
+
+export interface WhatsAppContact {
+  label: string;
+  number: string;
 }
 
 export interface SiteSettings {
@@ -131,12 +150,20 @@ export interface SiteSettings {
   };
   // Kanal chat & analitik (opsional agar fallback lama tetap valid).
   contact?: {
-    whatsapp: string; // nomor internasional tanpa +, mis. 6281234567890; kosong = tombol tidak tampil
+    whatsapp: string; // nomor utama, internasional tanpa +, mis. 6281234567890; kosong = tombol tidak tampil
     whatsapp_message: I18n;
+    /** Nomor marketing tambahan (label = nama tim/orang). Bersama nomor utama menjadi daftar pilihan. */
+    whatsapp_contacts?: WhatsAppContact[];
   };
   analytics?: {
     ga_measurement_id: string; // G-XXXXXXX; kosong = tanpa GA
     gsc_verification: string; // token meta google-site-verification
+  };
+  // Tema warna (hex #rrggbb; kosong = bawaan CSS). Disuntik ke --theme-* oleh app/layout.tsx, lihat lib/theme.ts.
+  theme?: {
+    primary: string;
+    primary_deep: string;
+    accent: string;
   };
 }
 
@@ -147,12 +174,21 @@ export interface SiteData {
   docLinks: DocLinkData[];
 }
 
+// Kategori berita (post_categories); postCount: publik = berita terbit, admin = semua.
+export interface PostCategory {
+  id: number;
+  slug: string;
+  name: I18n;
+  sortOrder?: number;
+  postCount?: number | null;
+}
+
 export interface PostSummary {
   id: number;
   slug: string;
   title: I18n;
   excerpt: I18n;
-  tag: string | null;
+  category: PostCategory | null;
   author: string | null;
   /** Estimated reading time in minutes, computed server-side from the ID body. */
   readingMinutes: number;
@@ -262,6 +298,7 @@ export type FieldType =
   | 'textarea'
   | 'number'
   | 'boolean'
+  | 'geo'
   | 'url'
   | 'icon'
   | 'select'
@@ -279,7 +316,7 @@ export interface FieldDef {
   max?: number;
   options?: Record<string, string>;
   default?: string;
-  accept?: 'image' | 'document';
+  accept?: 'image' | 'document' | 'video' | 'visual'; // visual = gambar + video
   fields?: Record<string, FieldDef>;
   max_items?: number;
 }
@@ -287,12 +324,14 @@ export interface FieldDef {
 export interface SectionTypeDef {
   name: I18n;
   description: I18n;
-  pages: string[];
+  pages: string[]; // petunjuk halaman bawaan (bukan pembatas)
+  group?: string; // kunci kelompok di SectionTypesResponse.groups
   fields: Record<string, FieldDef>;
 }
 
 export interface SectionTypesResponse {
   types: Record<string, SectionTypeDef>;
+  groups?: Record<string, I18n>; // kelompok tipe, urutan = urutan tampil di pemilih
   icons: string[];
 }
 

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import '@/app/styles/admin.css';
 
 export const metadata = {
-  title: { default: 'Admin · PT IKN', template: '%s · Admin PT IKN' },
+  title: { default: 'Admin', template: '%s · Admin PT IKN' },
   robots: { index: false, follow: false },
 };
 

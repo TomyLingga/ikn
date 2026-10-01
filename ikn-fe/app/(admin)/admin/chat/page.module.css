@@ -1,0 +1,313 @@
+.inbox {
+  height: min(720px, calc(100dvh - 210px));
+  min-height: 460px;
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+/* ---- Daftar percakapan ---- */
+.list {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+}
+
+.listTools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.search {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink-soft);
+}
+
+.search:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.unreadToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.unreadToggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.listEmpty {
+  margin: 0;
+  padding: 28px 18px;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+
+.row:hover { background: var(--paper); }
+.row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.rowOn,
+.rowOn:hover {
+  background: var(--primary-tint);
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.rowOn .avatar {
+  background: var(--primary);
+  color: #fff;
+}
+
+:global([data-theme='dark']) .rowOn .avatar { color: #06121f; }
+
+.rowBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rowTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rowTop strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Penanda percakapan tamu (belum login) */
+.guestTag {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--warn-tint);
+  color: var(--warn);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rowTop small {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+}
+
+.rowPreview {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowUnread .rowTop strong { font-weight: 700; }
+.rowUnread .rowPreview { color: var(--ink); font-weight: 600; }
+
+.rowBadge {
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* ---- Utas ---- */
+.thread {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.placeholder p {
+  max-width: 34ch;
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.threadHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.backBtn {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: none;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.threadWho {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.threadWho strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  font-size: 0.98rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadWho small {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadLinks {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+
+.threadError {
+  margin: 0;
+  padding: 8px 16px;
+  background: var(--red-tint);
+  color: var(--red);
+  font-size: 0.82rem;
+}
+
+/* Kotak tulis memakai gaya modul chat, bukan gaya input formulir admin. */
+.thread :global(textarea) {
+  min-height: 40px;
+}
+
+@media (max-width: 860px) {
+  .inbox {
+    grid-template-columns: 1fr;
+    height: calc(100dvh - 190px);
+  }
+
+  .hasActive .list { display: none; }
+  .inbox:not(.hasActive) .thread { display: none; }
+  .backBtn { display: grid; }
+  .threadLinks { display: none; }
+}

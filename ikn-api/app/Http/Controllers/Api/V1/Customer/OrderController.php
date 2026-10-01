@@ -15,22 +15,64 @@ use App\Models\Review;
 use App\Services\Commerce\CheckoutService;
 use App\Services\Commerce\OrderStateMachine;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
-// Order customer (kontrak bagian 9): daftar, checkout, detail, cancel, konfirmasi diterima/selesai, ulasan.
+// Order customer (kontrak bagian 9): daftar (status/group/q/from/to + meta.groups), checkout, detail, cancel,
+// konfirmasi diterima/selesai, ulasan.
 class OrderController extends ApiController
 {
     public function index(Request $request)
     {
-        $request->validate(['status' => ['nullable', 'string', Rule::in(Order::STATUSES)]]);
+        $request->validate([
+            'status' => ['nullable', 'string', Rule::in(Order::STATUSES)],
+            'group' => ['nullable', 'string', Rule::in(array_merge(array_keys(Order::GROUPS), [Order::GROUP_TO_REVIEW]))],
+            'q' => ['nullable', 'string', 'max:120'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
+        $tz = config('app.timezone');
+        $user = $request->user();
 
-        $query = Order::ownedBy($request->user())->with(OrderSummaryResource::eager())
+        $query = Order::ownedBy($user)->with(OrderSummaryResource::eager())
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
+            ->when($request->query('group'), fn ($q, $group) => $q->inGroup($group))
+            ->when($request->query('from'), fn ($q, $from) => $q->where('created_at', '>=', Carbon::parse($from, $tz)->startOfDay()))
+            ->when($request->query('to'), fn ($q, $to) => $q->where('created_at', '<=', Carbon::parse($to, $tz)->endOfDay()))
+            ->when(trim((string) $request->query('q')), function ($q, $term) {
+                $like = '%'.addcslashes($term, '%_\\').'%';
+                $q->where(function ($w) use ($like) {
+                    $w->where('number', 'ILIKE', $like)
+                        ->orWhere('invoice_number', 'ILIKE', $like)
+                        ->orWhereHas('items', fn ($i) => $i->whereRaw("product_snapshot->'name'->>'id' ILIKE ?", [$like])
+                            ->orWhereRaw("product_snapshot->'name'->>'en' ILIKE ?", [$like])
+                            ->orWhereRaw("product_snapshot->>'code' ILIKE ?", [$like]));
+                });
+            })
             ->orderByDesc('created_at')->orderByDesc('id');
 
-        return $this->paginated($query->paginate($this->perPage()), OrderSummaryResource::class);
+        $paginator = $query->paginate($this->perPage());
+
+        // Jumlah per kelompok (sepanjang waktu) untuk angka di tab "Pesanan saya".
+        $byStatus = Order::ownedBy($user)->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status');
+        $groups = [];
+        foreach (Order::GROUPS as $group => $statuses) {
+            $groups[$group] = (int) collect($statuses)->sum(fn ($status) => (int) ($byStatus[$status] ?? 0));
+        }
+        $groups[Order::GROUP_TO_REVIEW] = Order::ownedBy($user)->awaitingReview()->count();
+
+        return response()->json([
+            'data' => OrderSummaryResource::collection(collect($paginator->items())),
+            'meta' => [
+                'page' => $paginator->currentPage(),
+                'perPage' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'lastPage' => $paginator->lastPage(),
+                'groups' => $groups,
+            ],
+        ]);
     }
 
     /** Checkout: 201 order baru, atau 200 order yang sama bila Idempotency-Key sudah dipakai (24 jam). */
@@ -132,7 +174,7 @@ class OrderController extends ApiController
 
         return $this->created([
             'reviews' => ReviewResource::collection(collect($created)->map->load(['product', 'user']))->resolve(),
-            'order' => ['number' => $order->number, 'canReview' => $order->canReview()],
+            'order' => ['number' => $order->number, 'canReview' => $order->canReview(), 'reviewedProductIds' => $order->reviewedProductIds()],
         ]);
     }
 

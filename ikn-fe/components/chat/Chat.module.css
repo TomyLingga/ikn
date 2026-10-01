@@ -1,0 +1,226 @@
+/* Bagian bersama live chat: daftar gelembung + kotak tulis (widget customer dan kotak masuk admin). */
+.thread {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--paper);
+  scrollbar-width: thin;
+}
+
+.threadEmpty {
+  margin: auto;
+  max-width: 28ch;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.older {
+  align-self: center;
+  margin-bottom: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.older:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.day {
+  align-self: center;
+  margin: 8px 0 4px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.bubbleRow {
+  display: flex;
+}
+
+.mine { justify-content: flex-end; }
+.theirs { justify-content: flex-start; }
+
+.bubble {
+  max-width: min(82%, 460px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px 12px 7px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.bubble p {
+  margin: 0;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bubble time {
+  align-self: flex-end;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  opacity: 0.7;
+}
+
+.theirs .bubble {
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.mine .bubble {
+  border-bottom-right-radius: 4px;
+  background: var(--primary);
+  color: #fff;
+}
+
+:global([data-theme='dark']) .mine .bubble {
+  color: #06121f;
+}
+
+.sender {
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* Kartu rujukan produk/pesanan */
+.context {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.theirs .context {
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.context:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+
+.contextThumb {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+}
+
+.contextThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.contextBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.contextBody small {
+  color: var(--ink-soft);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.contextBody strong {
+  overflow: hidden;
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contextBody span {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+/* Kotak tulis */
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 120px;
+  padding: 9px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  resize: none;
+}
+
+.composer textarea:focus {
+  outline: 0;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.send {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), transform 0.12s var(--ease);
+}
+
+:global([data-theme='dark']) .send { color: #06121f; }
+
+.send:hover:not(:disabled) { background: var(--primary-deep); }
+.send:active:not(:disabled) { transform: scale(0.95); }
+.send:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.send:disabled { background: var(--line-strong); cursor: not-allowed; }

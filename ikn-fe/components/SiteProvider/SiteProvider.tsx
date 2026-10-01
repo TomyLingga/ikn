@@ -25,7 +25,7 @@ export const emptySite: SiteData = {
       subsidiary_note: { id: '', en: '' },
     },
     seo: { default_title: { id: '', en: '' }, default_description: { id: '', en: '' } },
-    contact: { whatsapp: '', whatsapp_message: { id: '', en: '' } },
+    contact: { whatsapp: '', whatsapp_message: { id: '', en: '' }, whatsapp_contacts: [] },
     analytics: { ga_measurement_id: '', gsc_verification: '' },
   },
   menus: {

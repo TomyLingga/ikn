@@ -15,7 +15,8 @@ class PageController extends ApiController
 {
     public function index()
     {
-        $pages = Page::withCount('sections')->orderBy('slug')->get()->map(fn (Page $p) => [
+        // Urut judul (bahasa Indonesia, tanpa memandang huruf besar/kecil) agar daftar admin mudah dipindai.
+        $pages = Page::withCount('sections')->orderByRaw("lower(title->>'id')")->orderBy('slug')->get()->map(fn (Page $p) => [
             'id' => $p->id,
             'slug' => $p->slug,
             'title' => $p->title,

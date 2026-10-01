@@ -35,6 +35,7 @@ Route::prefix('content')->group(function () {
     Route::get('pages/{slug}', [PublicSite\PageController::class, 'show']);
     Route::get('blocks/{key}', [PublicSite\PageController::class, 'block']);
     Route::get('news', [PublicSite\ContentController::class, 'news']);
+    Route::get('news-categories', [PublicSite\ContentController::class, 'newsCategories']);
     Route::get('news/{slug}', [PublicSite\ContentController::class, 'newsDetail']);
     Route::get('gallery', [PublicSite\ContentController::class, 'gallery']);
     Route::get('certificates', [PublicSite\ContentController::class, 'certificates']);
@@ -48,13 +49,16 @@ Route::get('wbs/{code}', [PublicSite\WbsController::class, 'show']);
 Route::post('contact', [PublicSite\ContactController::class, 'store'])->middleware('throttle:public-form');
 
 // ---- Berkas privat ----
-Route::get('files/{media}', [FileController::class, 'show'])->middleware('auth:sanctum');
+// session.downloads: berkas bisa dibuka langsung di tab browser oleh pengguna yang sudah login (tanpa Origin/Referer FE).
+Route::get('files/{media}', [FileController::class, 'show'])->middleware(['session.downloads', 'auth:sanctum']);
 
 // ---- Admin ----
 Route::prefix('admin')
     ->middleware(['auth:sanctum', 'role:admin,super_admin', 'audit'])
     ->group(function () {
         Route::get('permissions/self', [Admin\PermissionController::class, 'self']);
+        // Pemilih customer untuk sasaran voucher/biaya tambahan (modul customers|vouchers|fees, dicek di controller).
+        Route::get('customer-options', [Admin\CustomerOptionController::class, 'index']);
 
         Route::middleware('role:super_admin')->group(function () {
             Route::get('users', [Admin\UserController::class, 'index']);
@@ -106,6 +110,7 @@ Route::prefix('admin')
         });
 
         Route::middleware('module:news')->group(function () {
+            Route::apiResource('news-categories', Admin\PostCategoryController::class)->except('show')->parameters(['news-categories' => 'newsCategory']);
             Route::apiResource('news', Admin\PostController::class)->parameters(['news' => 'post']);
         });
 

@@ -10,6 +10,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n, type PageData, type PageListItem } from '@/lib/cms';
 import { formatDateTime } from '@/lib/format';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 type PageStatus = PageListItem['status'];
 
@@ -71,7 +72,7 @@ export default function AdminPages() {
 
   async function remove(row: PageListItem) {
     const name = tr(row.title, lang);
-    if (!window.confirm(t(`Hapus halaman "${name}" beserta semua section-nya?`, `Delete page "${name}" and all its sections?`))) return;
+    if (!await confirmDialog(t(`Hapus halaman "${name}" beserta semua section-nya?`, `Delete page "${name}" and all its sections?`))) return;
     setError('');
     try {
       await api(`/admin/pages/${row.id}`, { method: 'DELETE' });

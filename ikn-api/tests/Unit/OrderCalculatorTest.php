@@ -193,6 +193,41 @@ class OrderCalculatorTest extends TestCase
         $this->assertSame(15000, $this->quote([['productSlug' => $product->slug, 'qty' => 2]], $address, $flat->id)->shippingTotal);
     }
 
+    public function test_calculated_rate_combines_distance_weight_and_volume(): void
+    {
+        // 40×30×25 cm = 30.000 cm³ per satuan; 2 satuan = 60.000 cm³ → 0,06 m³; 2 × 1.250 g → 3 kg.
+        $product = $this->makeProduct(['price' => 10000, 'weight_gram' => 1250, 'length_cm' => 40, 'width_cm' => 30, 'height_cm' => 25], 100);
+        $zone = $this->makeZone([['12', 'province']]);
+        $rate = $this->makeRate($zone, ['base_amount' => 20000, 'per_km_amount' => 1000, 'per_kg_amount' => 2000, 'per_m3_amount' => 500000]);
+        // Titik asal = alamat yang sama digeser 0,1° bujur di khatulistiwa ≈ 11,12 km garis lurus × 1,3 = 14,46 → 15 km.
+        $this->commerceSettings(['shippingOriginLat' => 0, 'shippingOriginLng' => 100, 'shippingRoadFactor' => 1.3]);
+        $address = ['province_code' => '12', 'lat' => 0, 'lng' => 100.1];
+
+        $quote = $this->quote([['productSlug' => $product->slug, 'qty' => 2]], $address, $rate->id);
+
+        $this->assertSame(60000, $quote->volumeCm3);
+        $this->assertSame(15, $quote->shipping['distanceKm']);
+        $this->assertSame(['base' => 20000, 'distance' => 15000, 'weight' => 6000, 'volume' => 30000, 'minimumApplied' => false, 'free' => false], $quote->shipping['breakdown']);
+        $this->assertSame(71000, $quote->shippingTotal);
+        $this->assertSame(60000, $quote->shipping['volumeCm3']);
+    }
+
+    public function test_distance_rate_is_withheld_until_address_has_map_point(): void
+    {
+        $product = $this->makeProduct(['price' => 10000], 100);
+        $zone = $this->makeZone([['12', 'province']]);
+        $byDistance = $this->makeRate($zone, ['per_km_amount' => 1000]);
+        $flat = $this->makeRate($zone, ['type' => ShippingRate::TYPE_FLAT, 'base_amount' => 15000]);
+        $this->commerceSettings(['shippingOriginLat' => 3.3495, 'shippingOriginLng' => 99.0862]);
+
+        $quote = $this->quote([['productSlug' => $product->slug, 'qty' => 1]], ['province_code' => '12']);
+        $this->assertSame([$flat->id], array_column($quote->availableShippingRates, 'rateId'));
+        $this->assertContains('distance_unavailable', $quote->warnings);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->quote([['productSlug' => $product->slug, 'qty' => 1]], ['province_code' => '12'], $byDistance->id);
+    }
+
     public function test_most_specific_zone_wins_and_default_zone_is_fallback(): void
     {
         $product = $this->makeProduct(['price' => 10000], 100);

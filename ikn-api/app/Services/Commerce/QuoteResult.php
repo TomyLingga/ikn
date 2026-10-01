@@ -9,8 +9,8 @@ use App\Models\Voucher;
 /**
  * Hasil OrderCalculator::quote() (kontrak internal BE-2 → BE-3). Semua uang integer rupiah.
  *
- * items[]: { product: Product, qty, unitPrice, basePrice, promoApplied, lineTotal, discountAmount, taxAmount, weightGram }
- * shipping: { rateId, zoneId, label{id,en}, eta{id,en}|null, amount, weightGram, type } | null
+ * items[]: { product: Product, qty, unitPrice, basePrice, promoApplied, lineTotal, discountAmount, taxAmount, weightGram, volumeCm3 }
+ * shipping: { rateId, zoneId, label{id,en}, eta{id,en}|null, amount, type, available, distanceKm, weightGram, volumeCm3, breakdown } | null
  */
 final class QuoteResult
 {
@@ -53,6 +53,9 @@ final class QuoteResult
     public int $grandTotal = 0;
 
     public int $weightGram = 0;
+
+    /** Total volume kemasan (cm³) dari dimensi produk × qty; 0 bila dimensi belum diisi (ASUMSI A-76). */
+    public int $volumeCm3 = 0;
 
     /** @var string[] */
     public array $warnings = [];
@@ -100,6 +103,7 @@ final class QuoteResult
             'uniqueCode' => $this->uniqueCode,
             'grandTotal' => $this->grandTotal,
             'weightGram' => $this->weightGram,
+            'volumeCm3' => $this->volumeCm3,
             'warnings' => $this->warnings,
         ];
     }

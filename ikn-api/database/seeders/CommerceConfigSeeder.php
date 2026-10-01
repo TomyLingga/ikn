@@ -9,6 +9,7 @@ use App\Models\Media;
 use App\Models\PaymentMethod;
 use App\Models\ShippingRate;
 use App\Models\ShippingZone;
+use App\Models\User;
 use App\Models\Voucher;
 use App\Services\Commerce\CommerceSettings;
 use App\Services\Media\MediaService;
@@ -56,23 +57,23 @@ class CommerceConfigSeeder extends Seeder
                 'name' => ['id' => 'Sumatera Utara', 'en' => 'North Sumatra'], 'priority' => 10, 'is_default' => false,
                 'regions' => [['12', 'province']],
                 'rates' => [
-                    ['name' => ['id' => 'Reguler', 'en' => 'Regular'], 'type' => 'per_kg', 'base_amount' => 25000, 'per_kg_amount' => 2000, 'min_amount' => 0, 'free_above' => 25000000, 'eta' => ['id' => '2–4 hari', 'en' => '2–4 days']],
-                    ['name' => ['id' => 'Ekspres', 'en' => 'Express'], 'type' => 'per_kg', 'base_amount' => 60000, 'per_kg_amount' => 4000, 'min_amount' => 0, 'free_above' => null, 'eta' => ['id' => '1–2 hari', 'en' => '1–2 days']],
+                    ['name' => ['id' => 'Reguler', 'en' => 'Regular'], 'type' => 'calculated', 'base_amount' => 20000, 'per_km_amount' => 500, 'per_kg_amount' => 1500, 'per_m3_amount' => 100000, 'min_amount' => 0, 'free_above' => 25000000, 'eta' => ['id' => '2–4 hari', 'en' => '2–4 days']],
+                    ['name' => ['id' => 'Ekspres', 'en' => 'Express'], 'type' => 'calculated', 'base_amount' => 50000, 'per_km_amount' => 1000, 'per_kg_amount' => 3000, 'per_m3_amount' => 150000, 'min_amount' => 0, 'free_above' => null, 'eta' => ['id' => '1–2 hari', 'en' => '1–2 days']],
                 ],
             ],
             [
                 'name' => ['id' => 'Jawa', 'en' => 'Java'], 'priority' => 10, 'is_default' => false,
                 'regions' => [['31', 'province'], ['32', 'province'], ['33', 'province'], ['34', 'province'], ['35', 'province'], ['36', 'province']],
                 'rates' => [
-                    ['name' => ['id' => 'Reguler', 'en' => 'Regular'], 'type' => 'per_kg', 'base_amount' => 50000, 'per_kg_amount' => 3500, 'min_amount' => 60000, 'free_above' => null, 'eta' => ['id' => '4–7 hari', 'en' => '4–7 days']],
-                    ['name' => ['id' => 'Ekspres', 'en' => 'Express'], 'type' => 'per_kg', 'base_amount' => 120000, 'per_kg_amount' => 6000, 'min_amount' => 150000, 'free_above' => null, 'eta' => ['id' => '2–3 hari', 'en' => '2–3 days']],
+                    ['name' => ['id' => 'Reguler', 'en' => 'Regular'], 'type' => 'calculated', 'base_amount' => 50000, 'per_km_amount' => 50, 'per_kg_amount' => 3000, 'per_m3_amount' => 250000, 'min_amount' => 60000, 'free_above' => null, 'eta' => ['id' => '4–7 hari', 'en' => '4–7 days']],
+                    ['name' => ['id' => 'Ekspres', 'en' => 'Express'], 'type' => 'calculated', 'base_amount' => 120000, 'per_km_amount' => 100, 'per_kg_amount' => 5000, 'per_m3_amount' => 400000, 'min_amount' => 150000, 'free_above' => null, 'eta' => ['id' => '2–3 hari', 'en' => '2–3 days']],
                 ],
             ],
             [
                 'name' => ['id' => 'Indonesia lainnya', 'en' => 'Rest of Indonesia'], 'priority' => 0, 'is_default' => true,
                 'regions' => [],
                 'rates' => [
-                    ['name' => ['id' => 'Kargo reguler', 'en' => 'Regular cargo'], 'type' => 'per_kg', 'base_amount' => 100000, 'per_kg_amount' => 5000, 'min_amount' => 150000, 'free_above' => null, 'eta' => ['id' => '5–10 hari', 'en' => '5–10 days']],
+                    ['name' => ['id' => 'Kargo reguler', 'en' => 'Regular cargo'], 'type' => 'calculated', 'base_amount' => 100000, 'per_km_amount' => 40, 'per_kg_amount' => 4000, 'per_m3_amount' => 300000, 'min_amount' => 150000, 'free_above' => null, 'eta' => ['id' => '5–10 hari', 'en' => '5–10 days']],
                 ],
             ],
         ];
@@ -108,6 +109,21 @@ class CommerceConfigSeeder extends Seeder
             'scope' => $resiprene ? ['type' => Voucher::SCOPE_CATEGORY, 'categoryIds' => [$resiprene->id]] : ['type' => Voucher::SCOPE_ALL],
             'starts_at' => now()->startOfDay(), 'ends_at' => now()->addYear()->endOfDay(), 'is_active' => true,
         ]);
+
+        // Contoh voucher untuk customer tertentu (ASUMSI A-67): hanya customer demo aktif yang bisa memakainya,
+        // dan kodenya tampil di halaman checkout customer tersebut.
+        $buyer = User::where('email', 'buyer@coatingsolutions.co.id')->first();
+        if ($buyer) {
+            $partner = Voucher::firstOrCreate(['code' => 'MITRA250'], [
+                'type' => Voucher::TYPE_FIXED, 'value' => 250000, 'min_subtotal' => 2500000, 'max_discount' => null,
+                'quota' => null, 'used_count' => 0, 'per_user_limit' => 3, 'scope' => ['type' => Voucher::SCOPE_ALL],
+                'starts_at' => now()->startOfDay(), 'ends_at' => now()->addYear()->endOfDay(), 'is_active' => true,
+                'audience' => Voucher::AUDIENCE_CUSTOMERS,
+            ]);
+            if ($partner->wasRecentlyCreated) {
+                $partner->customers()->syncWithoutDetaching([$buyer->id]);
+            }
+        }
     }
 
     private function paymentMethods(MediaService $media): void

@@ -9,6 +9,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n, type MediaSummary } from '@/lib/cms';
 import type { Category } from '@/lib/types';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 interface CategoryForm {
   name: I18n;
@@ -125,7 +126,7 @@ export default function AdminProductCategories() {
   }
 
   async function remove(row: Category) {
-    if (!window.confirm(t(`Hapus kategori "${tr(row.name, lang)}"?`, `Delete category "${tr(row.name, lang)}"?`))) return;
+    if (!await confirmDialog(t(`Hapus kategori "${tr(row.name, lang)}"?`, `Delete category "${tr(row.name, lang)}"?`))) return;
     setError('');
     try {
       await api(`/admin/categories/${row.id}`, { method: 'DELETE' });

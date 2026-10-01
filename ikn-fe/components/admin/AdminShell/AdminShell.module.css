@@ -74,7 +74,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 18px;
+  gap: 2px;
   overflow-y: auto;
   scrollbar-width: none;
   overscroll-behavior: contain;
@@ -84,76 +84,116 @@
   display: none;
 }
 
-.navGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.groupHead {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  border: 0;
-  background: transparent;
-  color: var(--ink-soft);
-  cursor: pointer;
-  opacity: 0.8;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-weight: 600;
-  transition: opacity 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.groupHead:hover {
-  opacity: 1;
-  color: var(--ink);
-}
-
-.groupTitle {
-  display: block;
-}
-
-.groupChevron {
-  opacity: 0.6;
-  transition: transform 0.25s var(--ease);
-}
-
-.chevronOpen {
-  transform: rotate(90deg);
-}
-
-.groupItems {
+.navSection {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  overflow: hidden;
-  transition: max-height 0.3s var(--ease), opacity 0.25s var(--ease);
+  margin-top: 14px;
 }
 
-.itemsOpen {
-  max-height: 1000px;
-  opacity: 1;
+.sectionTitle {
+  padding: 0 12px 6px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.75;
 }
 
-.itemsClosed {
-  max-height: 0;
-  opacity: 0;
-}
-
-.navLink {
+/* Kepala menu (tombol akordeon) dan tautan Dashboard berbagi tampilan yang sama. */
+.menuHead {
+  width: 100%;
   min-height: 40px;
   display: flex;
   align-items: center;
   gap: 11px;
   padding: 8px 12px;
+  border: 0;
   border-radius: 8px;
+  background: transparent;
   color: var(--ink-soft);
+  cursor: pointer;
+  font-family: inherit;
   font-size: 0.88rem;
+  text-align: left;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.menuHead:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.menuHead svg {
+  flex-shrink: 0;
+}
+
+.menuLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menuHasActive {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.menuHasActive svg:first-child {
+  color: var(--green);
+}
+
+.menuChevron {
+  opacity: 0.55;
+  transition: transform 0.25s var(--ease);
+}
+
+.menuOpen .menuChevron {
+  transform: rotate(90deg);
+}
+
+/* Buka-tutup lewat grid-template-rows (0fr -> 1fr): tinggi mengikuti isi tanpa max-height tebakan. */
+.menuPanel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s var(--ease);
+}
+
+.menuOpen .menuPanel {
+  grid-template-rows: 1fr;
+}
+
+.menuItems {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: 20px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0.28s;
+}
+
+.menuOpen .menuItems {
+  visibility: visible;
+  margin-block: 2px 6px;
+}
+
+.navLink {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
   transition: background 0.2s var(--ease), color 0.2s var(--ease);
 }
 
@@ -162,14 +202,28 @@
   color: var(--ink);
 }
 
-.active {
+/* Badge jumlah (mis. pembayaran menunggu verifikasi) */
+.badge {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #d9480f;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.active,
+.active:hover {
   background: var(--green-tint);
   color: var(--green);
   font-weight: 600;
-}
-
-.navLink svg {
-  flex-shrink: 0;
 }
 
 .logout {
@@ -201,15 +255,31 @@
   transform: rotate(180deg);
 }
 
-/* Collapse State */
+/* Collapse State: hanya ikon menu; klik ikon melebarkan sidebar dan membuka menunya. */
 .collapsed .sidebar {
   padding-inline: 12px;
 }
 
+/* Sidebar ciut: badge menumpang di pojok ikon. */
+.collapsed .menuHead {
+  position: relative;
+}
+
+.collapsed .menuBadge {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  font-size: 0.6rem;
+}
+
 .collapsed .brandMeta,
-.collapsed .groupTitle,
-.collapsed .groupChevron,
-.collapsed .navLink span,
+.collapsed .sectionTitle,
+.collapsed .menuLabel,
+.collapsed .menuChevron,
+.collapsed .menuPanel,
 .collapsed .logout span {
   display: none;
 }
@@ -218,29 +288,20 @@
   justify-content: center;
 }
 
-.collapsed .groupHead {
-  justify-content: center;
-  padding: 8px 0;
-}
-
-.collapsed .groupItems {
-  max-height: 1000px;
-  opacity: 1;
-}
-
 .collapsed .brand,
-.collapsed .navLink,
+.collapsed .menuHead,
 .collapsed .logout {
   justify-content: center;
   padding-inline: 0;
 }
 
-.collapsed .nav {
-  gap: 10px;
+.collapsed .menuHasActive {
+  background: var(--green-tint);
 }
 
-.collapsed .navGroup + .navGroup {
-  padding-top: 10px;
+.collapsed .navSection {
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--line);
 }
 
@@ -352,28 +413,38 @@
   }
 
   .collapsed .brandMeta,
-  .collapsed .groupTitle,
-  .collapsed .navLink span,
+  .collapsed .sectionTitle,
+  .collapsed .menuLabel,
+  .collapsed .menuChevron,
   .collapsed .logout span {
     display: block;
   }
 
-  .collapsed .groupHead {
-    justify-content: space-between;
+  .collapsed .menuPanel {
+    display: grid;
   }
 
   .collapsed .brand,
-  .collapsed .navLink,
+  .collapsed .menuHead,
   .collapsed .logout {
-    padding-inline: 10px;
+    padding-inline: 12px;
     justify-content: flex-start;
   }
 
-  .collapsed .nav {
-    gap: 18px;
+  .collapsed .menuHasActive {
+    background: transparent;
   }
 
-  .collapsed .navGroup + .navGroup {
+  .collapsed .menuBadge {
+    position: static;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    font-size: 0.68rem;
+  }
+
+  .collapsed .navSection {
+    margin-top: 14px;
     padding-top: 0;
     border-top: 0;
   }

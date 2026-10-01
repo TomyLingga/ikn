@@ -25,6 +25,7 @@ return [
         'categories' => ['id' => 'Kategori Produk', 'en' => 'Product Categories'],
         'stock' => ['id' => 'Stok', 'en' => 'Stock'],
         'customers' => ['id' => 'Customer', 'en' => 'Customers'],
+        'chat' => ['id' => 'Live Chat', 'en' => 'Live Chat'],
         'shipping' => ['id' => 'Ongkir', 'en' => 'Shipping'],
         'vouchers' => ['id' => 'Voucher', 'en' => 'Vouchers'],
         'fees' => ['id' => 'Biaya Tambahan', 'en' => 'Fees'],
@@ -36,10 +37,9 @@ return [
 
     'cms' => [
         // Halaman bawaan yang dirujuk route FE: slug tidak boleh diubah/dihapus dari admin.
-        'protected_pages' => [
-            'home', 'tentang', 'kontak', 'keberlanjutan', 'sertifikat', 'pelanggan', 'reach',
-            'whistleblowing', 'galeri', 'berita', 'unduhan', 'produk',
-        ],
+        // Halaman bawaan (punya rute statis di FE): sertifikat/pelanggan/reach/whistleblowing kini section di
+        // keberlanjutan, unduhan section di bisnis (2026-09-29).
+        'protected_pages' => ['home', 'tentang', 'bisnis', 'media', 'berita', 'galeri', 'keberlanjutan', 'kontak'],
     ],
 
     'media' => [
@@ -48,7 +48,10 @@ return [
         'document_max_kb' => 20480,
         'image_mimes' => ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'],
         'document_mimes' => ['application/pdf'],
-        'collections' => ['general', 'hero', 'gallery', 'news', 'certificates', 'brochures', 'logos', 'documents', 'wbs', 'help-guide', 'products', 'categories', 'qris', 'payment-proofs'],
+        // Video pendek untuk kepala halaman (slideshow); disajikan langsung dari disk public.
+        'video_max_kb' => 51200,
+        'video_mimes' => ['video/mp4', 'video/webm'],
+        'collections' => ['general', 'hero', 'gallery', 'news', 'certificates', 'brochures', 'logos', 'documents', 'wbs', 'help-guide', 'products', 'categories', 'qris', 'payment-proofs', 'order-attachments'],
     ],
 
     // ---- Commerce (phase e-commerce) ----
@@ -56,6 +59,16 @@ return [
         // Bukti bayar (disk private): jpg/png/pdf ≤ 5 MB (kontrak bagian 9).
         'proof_max_kb' => 5120,
         'proof_mimes' => ['image/jpeg', 'image/png', 'application/pdf'],
+        // Lampiran order dari admin (faktur pajak, surat jalan): pdf/gambar/office ≤ 10 MB, disk private (ASUMSI A-74).
+        'attachment_max_kb' => 10240,
+        'attachment_mimes' => [
+            'application/pdf', 'image/jpeg', 'image/png', 'image/webp',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword',
+            'text/csv', 'text/plain', 'application/zip',
+        ],
+        // Sisa waktu minimum (jam) setelah bukti ditolak agar customer sempat unggah ulang (ASUMSI A-77).
+        'reupload_grace_hours' => 12,
         // Default settings commerce (tabel settings, grup "commerce"); admin mengubah lewat /admin/settings.
         'defaults' => [
             'payment_due_hours' => 24,
@@ -64,9 +77,19 @@ return [
             'price_includes_tax' => true,
             'auto_complete_days' => 7,
             'reminder_hours_before_due' => 2,
+            // Invoice: {prefix}/{urut per bulan}/{bulan Romawi}/{tahun}, mis. PMS/X/INV/RA/77/IV/2026 (format klien).
+            'invoice_prefix' => 'PMS/X/INV/RA',
+            'invoice_signer_name' => 'Amalia Nasution',
+            'invoice_signer_title' => 'SEVP Operation',
+            'invoice_cc' => 'ATU, File',
+            // Titik asal pengiriman (ASUMSI A-76): bawaan = pabrik Resiprene (CmsPageSeeder::GEO_RESIPRENE_PLANT).
+            'shipping_origin_label' => 'Pabrik Resiprene',
+            'shipping_origin_lat' => 3.3495,
+            'shipping_origin_lng' => 99.0862,
+            // Jarak jalan ≈ jarak garis lurus × faktor ini (tanpa layanan rute eksternal).
+            'shipping_road_factor' => 1.3,
         ],
         'order_number_prefix' => 'IKN',
-        'invoice_number_prefix' => 'INV',
     ],
 
     // Kerangka payment gateway (ASUMSI A-15: Xendit). Nilai rahasia hanya dari .env; kosong = non-aktif.

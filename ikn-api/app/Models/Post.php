@@ -8,7 +8,7 @@ class Post extends Model
 {
     use HasTranslations;
 
-    protected $fillable = ['slug', 'title', 'excerpt', 'body', 'tag', 'author', 'cover_media_id', 'is_published', 'published_at'];
+    protected $fillable = ['slug', 'title', 'excerpt', 'body', 'category_id', 'author', 'cover_media_id', 'is_published', 'published_at'];
 
     protected $translatable = ['title', 'excerpt', 'body'];
 
@@ -23,6 +23,11 @@ class Post extends Model
     public function cover()
     {
         return $this->belongsTo(Media::class, 'cover_media_id');
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(PostCategory::class, 'category_id');
     }
 
     public function scopePublished($query)

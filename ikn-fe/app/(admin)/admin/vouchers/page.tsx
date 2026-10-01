@@ -4,23 +4,29 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
+import CustomerPicker from '@/components/admin/CustomerPicker';
 import { Pager, firstError, type FieldErrors } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, apiPaged, ApiError, errorMessage } from '@/lib/api';
 import { tr, type PagedMeta } from '@/lib/cms';
 import {
+  audienceLabels,
+  audienceSummary,
   fromDateTimeLocal,
   numberOrNull,
   queryString,
   toDateTimeLocal,
   voucherScopeLabels,
   voucherTypeLabels,
+  type Audience,
+  type CustomerOption,
   type VoucherRow,
   type VoucherScope,
   type VoucherType,
 } from '@/lib/admin';
 import { formatDateTime, formatIDR } from '@/lib/format';
 import type { Category } from '@/lib/types';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 interface VoucherForm {
   code: string;
@@ -35,11 +41,13 @@ interface VoucherForm {
   startsAt: string;
   endsAt: string;
   isActive: boolean;
+  audience: Audience;
+  customers: CustomerOption[];
 }
 
 const PER_PAGE = 20;
 
-const emptyForm = (): VoucherForm => ({ code: '', type: 'percent', value: '', minSubtotal: '0', maxDiscount: '', quota: '', perUserLimit: '', scope: 'all', categoryIds: [], startsAt: '', endsAt: '', isActive: true });
+const emptyForm = (): VoucherForm => ({ code: '', type: 'percent', value: '', minSubtotal: '0', maxDiscount: '', quota: '', perUserLimit: '', scope: 'all', categoryIds: [], startsAt: '', endsAt: '', isActive: true, audience: 'all', customers: [] });
 
 const formFrom = (v: VoucherRow): VoucherForm => ({
   code: v.code,
@@ -54,6 +62,8 @@ const formFrom = (v: VoucherRow): VoucherForm => ({
   startsAt: toDateTimeLocal(v.startsAt),
   endsAt: toDateTimeLocal(v.endsAt),
   isActive: v.isActive,
+  audience: v.audience || 'all',
+  customers: [...(v.customers || [])],
 });
 
 function toPayload(form: VoucherForm) {
@@ -70,6 +80,8 @@ function toPayload(form: VoucherForm) {
     startsAt: fromDateTimeLocal(form.startsAt),
     endsAt: fromDateTimeLocal(form.endsAt),
     isActive: form.isActive,
+    audience: form.audience,
+    customerIds: form.audience === 'customers' ? form.customers.map((c) => c.id) : [],
   };
 }
 
@@ -81,7 +93,8 @@ function voucherState(v: VoucherRow, now: number): 'inactive' | 'scheduled' | 'e
   return 'active';
 }
 
-// Voucher diskon: GET/POST /admin/vouchers, PUT/DELETE /admin/vouchers/{id}; scope all|category (categoryIds[]).
+// Voucher diskon: GET/POST /admin/vouchers, PUT/DELETE /admin/vouchers/{id}; scope all|category (categoryIds[]);
+// sasaran semua customer atau customer tertentu (audience + customerIds[]).
 export default function AdminVouchers() {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
@@ -94,6 +107,7 @@ export default function AdminVouchers() {
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [active, setActive] = useState('');
+  const [audience, setAudience] = useState('');
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<VoucherRow | null>(null);
@@ -106,7 +120,7 @@ export default function AdminVouchers() {
     setLoading(true);
     setError('');
     try {
-      const result = await apiPaged<VoucherRow>(`/admin/vouchers${queryString({ q, active, page, perPage: PER_PAGE })}`);
+      const result = await apiPaged<VoucherRow>(`/admin/vouchers${queryString({ q, active, audience, page, perPage: PER_PAGE })}`);
       setRows(result.items);
       setMeta(result.meta);
     } catch (err) {
@@ -114,7 +128,7 @@ export default function AdminVouchers() {
     } finally {
       setLoading(false);
     }
-  }, [q, active, page]);
+  }, [q, active, audience, page]);
 
   useEffect(() => {
     void refresh();
@@ -145,6 +159,10 @@ export default function AdminVouchers() {
     if (saving) return;
     if (form.scope === 'category' && form.categoryIds.length === 0) {
       setFormError(t('Pilih minimal satu kategori untuk cakupan kategori.', 'Pick at least one category for the category scope.'));
+      return;
+    }
+    if (form.audience === 'customers' && form.customers.length === 0) {
+      setFormError(t('Pilih minimal satu customer, atau ubah sasaran menjadi semua customer.', 'Pick at least one customer, or switch the audience to all customers.'));
       return;
     }
     setSaving(true);
@@ -182,7 +200,7 @@ export default function AdminVouchers() {
   }
 
   async function remove(row: VoucherRow) {
-    if (!window.confirm(t(`Hapus voucher ${row.code}? Order yang sudah memakainya tetap tersimpan.`, `Delete voucher ${row.code}? Orders that used it are kept.`))) return;
+    if (!await confirmDialog(t(`Hapus voucher ${row.code}? Order yang sudah memakainya tetap tersimpan.`, `Delete voucher ${row.code}? Orders that used it are kept.`))) return;
     setError('');
     try {
       await api(`/admin/vouchers/${row.id}`, { method: 'DELETE' });
@@ -219,6 +237,19 @@ export default function AdminVouchers() {
           </small>
         </span>
       ),
+    },
+    {
+      key: 'audience',
+      label: t('Berlaku untuk', 'Applies to'),
+      render: (v) =>
+        v.audience === 'customers' ? (
+          <span title={v.customers.map((c) => c.company || c.name).join(', ')}>
+            <StatusBadge label={t('Khusus', 'Targeted')} tone="info" small />
+            <small className="admin-cell-sub">{audienceSummary(v, lang)}</small>
+          </span>
+        ) : (
+          audienceLabels.all[lang]
+        ),
     },
     {
       key: 'discount',
@@ -319,6 +350,20 @@ export default function AdminVouchers() {
             <option value="">{t('Semua', 'All')}</option>
             <option value="1">{t('Aktif', 'Active')}</option>
             <option value="0">{t('Nonaktif', 'Inactive')}</option>
+          </select>
+        </label>
+        <label className="admin-filter">
+          <span>{t('Sasaran', 'Audience')}</span>
+          <select
+            value={audience}
+            onChange={(e) => {
+              setAudience(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">{t('Semua', 'All')}</option>
+            <option value="all">{audienceLabels.all[lang]}</option>
+            <option value="customers">{audienceLabels.customers[lang]}</option>
           </select>
         </label>
         <span className="admin-result-count">
@@ -424,6 +469,29 @@ export default function AdminVouchers() {
                 {t('Cakupan kategori: minimum subtotal dibandingkan dengan seluruh keranjang, diskon hanya dihitung dari item kategori terpilih.', 'Category scope: minimum subtotal is checked against the whole cart; the discount applies only to items in the selected categories.')}
               </small>
               {firstError(formErrors, 'categoryIds') && <small className="cms-field-error">{firstError(formErrors, 'categoryIds')}</small>}
+            </div>
+            <div className="cms-field">
+              <span className="field-label">{t('Berlaku untuk', 'Applies to')}</span>
+              <div className="admin-form-row">
+                {(Object.keys(audienceLabels) as Audience[]).map((key) => (
+                  <label key={key} className="cms-check">
+                    <input type="radio" name="audience" checked={form.audience === key} onChange={() => setForm({ ...form, audience: key })} />
+                    <span>{audienceLabels[key][lang]}</span>
+                  </label>
+                ))}
+              </div>
+              {form.audience === 'customers' && (
+                <CustomerPicker
+                  value={form.customers}
+                  onChange={(customers) => setForm({ ...form, customers })}
+                  error={firstError(formErrors, 'customerIds', 'customerIds.0')}
+                />
+              )}
+              <small className="admin-field-hint">
+                {form.audience === 'customers'
+                  ? t('Hanya customer terpilih yang bisa memakai kode ini; voucher juga tampil di halaman checkout mereka.', 'Only the selected customers can use this code; it also appears on their checkout page.')
+                  : t('Semua customer yang mengetahui kodenya bisa memakai voucher ini.', 'Any customer who knows the code can use this voucher.')}
+              </small>
             </div>
             <label className="cms-check">
               <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />

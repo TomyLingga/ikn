@@ -19,6 +19,7 @@ import {
 } from '@/lib/cms';
 import { formatDateTime } from '@/lib/format';
 import type { Lang } from '@/lib/types';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 type PageStatus = PageData['status'];
 
@@ -75,6 +76,7 @@ export default function AdminPageEditor({ params }: { params: { id: string } }) 
   const [editing, setEditing] = useState<PageSection | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
+  const [typeQuery, setTypeQuery] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -178,7 +180,7 @@ export default function AdminPageEditor({ params }: { params: { id: string } }) 
   async function removeSection(section: PageSection) {
     const def = types?.types[section.type];
     const name = def ? tr(def.name, lang) : section.type;
-    if (!window.confirm(t(`Hapus section "${name}"? Isinya tidak bisa dikembalikan.`, `Delete section "${name}"? Its content cannot be restored.`))) return;
+    if (!await confirmDialog(t(`Hapus section "${name}"? Isinya tidak bisa dikembalikan.`, `Delete section "${name}"? Its content cannot be restored.`))) return;
     setBusy(section.id);
     setError('');
     try {
@@ -192,12 +194,26 @@ export default function AdminPageEditor({ params }: { params: { id: string } }) 
     }
   }
 
-  // Types whose `pages` hint includes this slug first, generic types next, the rest last.
-  const typeList = useMemo<Array<[string, SectionTypeDef]>>(() => {
+  // Pemilih tipe: dikelompokkan menurut `groups` dari API (urutan API), disaring kata kunci;
+  // di dalam kelompok, tipe yang disarankan untuk halaman ini (petunjuk `pages`) tampil lebih dulu.
+  const typeGroups = useMemo(() => {
     if (!types || !page) return [];
-    const rank = (def: SectionTypeDef) => (def.pages.includes(page.slug) ? 0 : def.pages.length === 0 ? 1 : 2);
-    return Object.entries(types.types).sort((a, b) => rank(a[1]) - rank(b[1]));
-  }, [types, page]);
+    const groups = types.groups ?? {};
+    const query = typeQuery.trim().toLowerCase();
+    const buckets = new Map<string, Array<[string, SectionTypeDef]>>();
+    for (const [type, def] of Object.entries(types.types)) {
+      if (query && !`${tr(def.name, lang)} ${tr(def.description, lang)} ${type}`.toLowerCase().includes(query)) continue;
+      const key = def.group && groups[def.group] ? def.group : 'other';
+      buckets.set(key, [...(buckets.get(key) ?? []), [type, def]]);
+    }
+    const rank = (def: SectionTypeDef) => (def.pages.includes(page.slug) ? 0 : 1);
+    return [...Object.keys(groups), 'other'].flatMap((key) => {
+      const items = buckets.get(key);
+      if (!items) return [];
+      const group = groups[key];
+      return [{ key, label: group ? tr(group, lang) : lang === 'en' ? 'Other' : 'Lainnya', items: items.slice().sort((a, b) => rank(a[1]) - rank(b[1])) }];
+    });
+  }, [types, page, typeQuery, lang]);
 
   if (loading) {
     return <div className="admin-empty">{t('Memuat halaman...', 'Loading page...')}</div>;
@@ -215,9 +231,7 @@ export default function AdminPageEditor({ params }: { params: { id: string } }) 
     );
   }
 
-  // Halaman bawaan di bawah /keberlanjutan punya rute publik bersarang.
-  const NESTED: Record<string, string> = { sertifikat: '/keberlanjutan/sertifikat', pelanggan: '/keberlanjutan/pelanggan', reach: '/keberlanjutan/reach', whistleblowing: '/keberlanjutan/whistleblowing' };
-  const publicHref = page.slug === 'home' ? '/' : NESTED[page.slug] ?? `/${page.slug}`;
+  const publicHref = page.slug === 'home' ? '/' : `/${page.slug}`;
   const editingDef = editing && types ? types.types[editing.type] : undefined;
   const creatingDef = creating && types ? types.types[creating] : undefined;
 
@@ -461,36 +475,46 @@ export default function AdminPageEditor({ params }: { params: { id: string } }) 
       )}
 
       {pickerOpen && (
-        <AdminModal title={t('Pilih tipe section', 'Choose a section type')} onClose={() => setPickerOpen(false)} width={920}>
-          <div className="cms-type-grid">
-            {typeList.map(([type, def]) => {
-              const suggested = def.pages.includes(page.slug);
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  className={`cms-type-card${suggested ? ' is-suggested' : ''}`}
-                  onClick={() => {
-                    setPickerOpen(false);
-                    setCreating(type);
-                  }}
-                >
-                  <strong>{tr(def.name, lang)}</strong>
-                  <p>{tr(def.description, lang)}</p>
-                  <div className="cms-type-pages">
-                    {def.pages.length === 0 ? (
-                      <span>{t('semua halaman', 'any page')}</span>
-                    ) : (
-                      def.pages.map((slug) => (
-                        <span key={slug} className={slug === page.slug ? 'is-match' : ''}>
-                          {slug}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+        <AdminModal title={t('Pilih tipe section', 'Choose a section type')} onClose={() => setPickerOpen(false)} width={980}>
+          <div className="cms-type-picker">
+            <input
+              type="search"
+              className="cms-type-search"
+              value={typeQuery}
+              onChange={(e) => setTypeQuery(e.target.value)}
+              placeholder={t('Cari tipe section (mis. foto, FAQ, berita)...', 'Search section types (e.g. photo, FAQ, news)...')}
+              aria-label={t('Cari tipe section', 'Search section types')}
+              autoFocus
+            />
+            {typeGroups.length === 0 && <p className="admin-note">{t('Tidak ada tipe yang cocok.', 'No matching type.')}</p>}
+            {typeGroups.map((group) => (
+              <section key={group.key} className="cms-type-group">
+                <h3>
+                  {group.label} <span>{group.items.length}</span>
+                </h3>
+                <div className="cms-type-grid">
+                  {group.items.map(([type, def]) => {
+                    const suggested = def.pages.includes(page.slug);
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        className={`cms-type-card${suggested ? ' is-suggested' : ''}`}
+                        onClick={() => {
+                          setPickerOpen(false);
+                          setTypeQuery('');
+                          setCreating(type);
+                        }}
+                      >
+                        <strong>{tr(def.name, lang)}</strong>
+                        <p>{tr(def.description, lang)}</p>
+                        {suggested && <span className="cms-type-tag">{t('Disarankan untuk halaman ini', 'Suggested for this page')}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         </AdminModal>
       )}

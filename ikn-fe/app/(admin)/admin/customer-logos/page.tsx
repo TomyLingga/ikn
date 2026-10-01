@@ -8,6 +8,7 @@ import { MediaPicker, firstError, type FieldErrors } from '@/components/admin/cm
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import type { CustomerLogoData, MediaSummary } from '@/lib/cms';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
 interface LogoForm {
   name: string;
@@ -115,7 +116,7 @@ export default function AdminCustomerLogos() {
   }
 
   async function remove(row: CustomerLogoData) {
-    if (!window.confirm(t(`Hapus logo "${row.name}"?`, `Delete logo "${row.name}"?`))) return;
+    if (!await confirmDialog(t(`Hapus logo "${row.name}"?`, `Delete logo "${row.name}"?`))) return;
     setError('');
     try {
       await api(`/admin/customer-logos/${row.id}`, { method: 'DELETE' });

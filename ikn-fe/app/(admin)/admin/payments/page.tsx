@@ -6,19 +6,34 @@ import Icon from '@/components/Icon';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
+import AdminTabs, { type AdminTab, type AdminTabGroup } from '@/components/admin/AdminTabs';
 import { Pager } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { paymentLabel, paymentStatus } from '@/lib/commerce';
 import { api, apiPaged, ApiError, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { paymentMethodSummary, queryString, type AdminPayment, type PaymentMethodRow } from '@/lib/admin';
+import { defaultDateRange, paymentMethodSummary, queryString, refreshAdminBadges, type AdminPayment, type CountsMeta, type PaymentMethodRow } from '@/lib/admin';
 import { formatDateTime, formatIDR } from '@/lib/format';
-import type { PagedMeta } from '@/lib/cms';
-import type { PaymentStatusKey } from '@/lib/types';
+import type { IconName, PaymentStatusKey } from '@/lib/types';
+import { confirmDialog } from '@/components/ConfirmDialog';
 
-type StatusTab = PaymentStatusKey | 'all';
+type StatusFilter = PaymentStatusKey | 'all';
 
-const TABS: StatusTab[] = ['awaiting_verification', 'pending', 'paid', 'rejected', 'expired', 'failed', 'cancelled', 'all'];
+// Antrean (tanpa filter tanggal) vs riwayat (rentang tanggal bawaan awal bulan s.d. hari ini).
+const QUEUE_STATUSES: StatusFilter[] = ['awaiting_verification', 'pending', 'paid'];
+const HISTORY_STATUSES: StatusFilter[] = ['all', 'rejected', 'expired', 'failed', 'cancelled'];
+// Tab bawaan: antrean verifikasi (lencana merah). Rentang tanggal bawaan awal bulan s.d. hari ini di semua tab.
+const DEFAULT_STATUS: StatusFilter = 'awaiting_verification';
+const TAB_ICONS: Record<StatusFilter, IconName> = {
+  all: 'wallet',
+  awaiting_verification: 'paymentCheck',
+  pending: 'clock',
+  paid: 'checkCircle',
+  rejected: 'cancelCircle',
+  expired: 'close',
+  failed: 'close',
+  cancelled: 'cancelCircle',
+};
 const PER_PAGE = 20;
 
 function actionErrorText(err: unknown): string {
@@ -28,19 +43,21 @@ function actionErrorText(err: unknown): string {
   return errorMessage(err);
 }
 
-// Verifikasi pembayaran: GET /admin/payments?status&q&method (per percobaan bayar), detail + accept/reject by id.
+// Verifikasi pembayaran: GET /admin/payments?status&q&method&from&to (per percobaan bayar), detail + accept/reject by id.
 export default function AdminPayments() {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
-  const [tab, setTab] = useState<StatusTab>('awaiting_verification');
+  const [status, setStatus] = useState<StatusFilter>(DEFAULT_STATUS);
+  const dated = HISTORY_STATUSES.includes(status);
+  const [range, setRange] = useState(() => defaultDateRange());
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [method, setMethod] = useState('');
   const [methods, setMethods] = useState<PaymentMethodRow[]>([]);
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<AdminPayment[]>([]);
-  const [meta, setMeta] = useState<PagedMeta>({ page: 1, perPage: PER_PAGE, total: 0, lastPage: 1 });
+  const [meta, setMeta] = useState<CountsMeta>({ page: 1, perPage: PER_PAGE, total: 0, lastPage: 1 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -56,15 +73,17 @@ export default function AdminPayments() {
     setLoading(true);
     setError('');
     try {
-      const result = await apiPaged<AdminPayment>(`/admin/payments${queryString({ status: tab, q, method, page, perPage: PER_PAGE })}`);
+      const result = await apiPaged<AdminPayment>(
+        `/admin/payments${queryString({ status, q, method, from: dated ? range.from : '', to: dated ? range.to : '', page, perPage: PER_PAGE })}`,
+      );
       setRows(result.items);
-      setMeta(result.meta);
+      setMeta(result.meta as CountsMeta);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [tab, q, method, page]);
+  }, [status, q, method, dated, range.from, range.to, page]);
 
   useEffect(() => {
     void refresh();
@@ -99,13 +118,14 @@ export default function AdminPayments() {
 
   async function accept(payment: AdminPayment) {
     if (busy) return;
-    if (!window.confirm(t(`Terima pembayaran ${payment.order?.number ?? `#${payment.id}`} sebesar ${formatIDR(payment.amount)}?`, `Accept payment ${payment.order?.number ?? `#${payment.id}`} of ${formatIDR(payment.amount)}?`))) return;
+    if (!await confirmDialog(t(`Terima pembayaran ${payment.order?.number ?? `#${payment.id}`} sebesar ${formatIDR(payment.amount)}?`, `Accept payment ${payment.order?.number ?? `#${payment.id}`} of ${formatIDR(payment.amount)}?`))) return;
     setBusy(true);
     setActionError('');
     try {
       await api(`/admin/payments/${payment.id}/accept`, { method: 'POST', body: {} });
       setNotice(t(`Pembayaran ${payment.order?.number ?? ''} diterima; order berstatus dibayar.`, `Payment ${payment.order?.number ?? ''} accepted; order is now paid.`));
       setDetail(null);
+      refreshAdminBadges();
       await refresh();
     } catch (err) {
       const text = actionErrorText(err);
@@ -138,6 +158,7 @@ export default function AdminPayments() {
       await api(`/admin/payments/${detail.id}/reject`, { method: 'POST', body: { reason: reason.trim() } });
       setNotice(t('Bukti pembayaran ditolak; customer dapat mengunggah ulang.', 'Payment proof rejected; the customer can upload again.'));
       setDetail(null);
+      refreshAdminBadges();
       await refresh();
     } catch (err) {
       setActionError(actionErrorText(err));
@@ -152,7 +173,33 @@ export default function AdminPayments() {
     setQ(search.trim());
   }
 
-  const tabLabel = (key: StatusTab) => (key === 'all' ? t('Semua', 'All') : paymentStatus[key][lang]);
+  function resetFilters() {
+    setStatus(DEFAULT_STATUS);
+    setRange(defaultDateRange());
+    setMethod('');
+    setSearch('');
+    setQ('');
+    setPage(1);
+  }
+
+  const statusLabel = (key: StatusFilter) => (key === 'all' ? t('Semua', 'All') : paymentStatus[key][lang]);
+  const defaults = defaultDateRange();
+  const filtersChanged = status !== DEFAULT_STATUS || !!q || !!method || (dated && (range.from !== defaults.from || range.to !== defaults.to));
+  const counts = meta.counts || {};
+  const allCount = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  const tabFor = (key: StatusFilter): AdminTab<StatusFilter> => ({
+    key,
+    label: statusLabel(key),
+    icon: TAB_ICONS[key],
+    count: key === 'all' ? allCount : counts[key] || 0,
+    badge: key === 'awaiting_verification',
+  });
+  const groups: AdminTabGroup<StatusFilter>[] = [
+    { key: 'queue', label: t('Perlu diproses', 'In progress'), note: t('semua tanggal', 'all dates'), tabs: QUEUE_STATUSES.map(tabFor) },
+    { key: 'history', label: t('Riwayat', 'History'), note: t('filter tanggal', 'date filter'), tabs: HISTORY_STATUSES.map(tabFor) },
+  ];
+  const tabTotal = status === 'all' ? allCount : counts[status] || 0;
+  const outsideRange = dated && !q && !method && (range.from || range.to) ? Math.max(0, tabTotal - meta.total) : 0;
 
   const columns: Column<AdminPayment>[] = [
     {
@@ -250,23 +297,15 @@ export default function AdminPayments() {
       )}
       {error && <p className="form-error">{error}</p>}
 
-      <div className="admin-tabs" role="tablist">
-        {TABS.map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            className={`admin-tab ${tab === key ? 'is-active' : ''}`}
-            onClick={() => {
-              setTab(key);
-              setPage(1);
-            }}
-          >
-            {tabLabel(key)}
-          </button>
-        ))}
-      </div>
+      <AdminTabs
+        groups={groups}
+        value={status}
+        label={t('Status pembayaran', 'Payment status')}
+        onChange={(key) => {
+          setStatus(key);
+          setPage(1);
+        }}
+      />
 
       <form className="admin-toolbar" onSubmit={submitSearch}>
         <label className="admin-search">
@@ -276,6 +315,36 @@ export default function AdminPayments() {
         <button type="submit" className="btn btn-line btn-sm">
           {t('Cari', 'Search')}
         </button>
+        {dated && (
+          <>
+            <label className="admin-filter">
+              <span>{t('Dari', 'From')}</span>
+              <input
+                type="date"
+                className="admin-filter-input"
+                value={range.from}
+                max={range.to || undefined}
+                onChange={(e) => {
+                  setRange({ ...range, from: e.target.value });
+                  setPage(1);
+                }}
+              />
+            </label>
+            <label className="admin-filter">
+              <span>{t('Sampai', 'To')}</span>
+              <input
+                type="date"
+                className="admin-filter-input"
+                value={range.to}
+                min={range.from || undefined}
+                onChange={(e) => {
+                  setRange({ ...range, to: e.target.value });
+                  setPage(1);
+                }}
+              />
+            </label>
+          </>
+        )}
         <label className="admin-filter">
           <span>{t('Metode', 'Method')}</span>
           <select
@@ -293,10 +362,31 @@ export default function AdminPayments() {
             ))}
           </select>
         </label>
+        {filtersChanged && (
+          <button type="button" className="row-act" onClick={resetFilters}>
+            Reset
+          </button>
+        )}
         <span className="admin-result-count">
           {meta.total} {t('pembayaran', 'payments')}
         </span>
       </form>
+      <p className="admin-field-hint admin-filter-note">
+        {!dated
+          ? t('Antrean ini menampilkan semua pembayaran pada status tersebut tanpa batas tanggal.', 'This queue shows every payment in this status, with no date limit.')
+          : range.from || range.to
+          ? t('Tanggal = bukti diunggah (atau percobaan bayar dibuat bila belum ada bukti).', 'Date = proof uploaded (or payment attempt created when no proof yet).')
+          : t('Semua tanggal.', 'All dates.')}
+        {outsideRange > 0 && (
+          <>
+            {' '}
+            {t(`${outsideRange} pembayaran lain berada di luar rentang tanggal.`, `${outsideRange} more payment(s) fall outside the date range.`)}
+            <button type="button" onClick={() => { setRange({ from: '', to: '' }); setPage(1); }}>
+              {t('Tampilkan semua tanggal', 'Show all dates')}
+            </button>
+          </>
+        )}
+      </p>
 
       <DataTable
         columns={columns}
@@ -326,7 +416,7 @@ export default function AdminPayments() {
                       </div>
                     )}
                     <p className="admin-field-hint">
-                      <a href={proofUrl} target="_blank" rel="noopener noreferrer" className="link">
+                      <a href={proofUrl} target="_blank" rel="noopener" className="link">
                         {t('Buka berkas di tab baru', 'Open file in a new tab')} <Icon name="arrow" size={13} />
                       </a>{' '}
                       · {detail.proof.originalName} · {Math.round(detail.proof.size / 1024)} KB · {t('diunggah', 'uploaded')} {formatDateTime(detail.proof.uploadedAt, lang)}

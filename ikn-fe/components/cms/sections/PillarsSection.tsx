@@ -5,16 +5,21 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
+import SecHead from './SecHead';
 import { asList, asText, iconName, pad2, type I18nItem, type PillarsContent } from '../utils';
 
-// Sustainability pillars (environment, social, governance). `key` becomes the anchor id.
+// Sustainability pillars (environment, social, governance). Section id = key (mis. #esg); tiap pilar juga ber-id `key`.
 export default function PillarsSection({ section }: { section: PageSection }) {
   const { lang } = useLang();
-  const items = asList<PillarsContent['items'][number]>((section.content as PillarsContent).items);
+  const c = section.content as PillarsContent;
+  const items = asList<PillarsContent['items'][number]>(c.items);
+  const label = tr(c.label, lang);
+  const heading = tr(c.heading, lang);
 
   return (
-    <section className="section-tight">
+    <section className="section-tight" id={section.key || undefined}>
       <div className="container">
+        {(label || heading) && <SecHead label={label} heading={heading} />}
         <div className="sustain-grid">
           {items.map((s, i) => {
             const points = asList<I18nItem>(s.points);

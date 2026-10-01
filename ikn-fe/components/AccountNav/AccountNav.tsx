@@ -22,13 +22,13 @@ export default function AccountNav({ collapsed = false }: { collapsed?: boolean 
 
   const mainLinks: { href: string; label: string; icon: IconName; exact?: boolean }[] = [
     { href: '/dashboard', label: n.dashboard, icon: 'target', exact: true },
-    { href: '/dashboard/katalog', label: n.shop, icon: 'flask', exact: true },
-    { href: '/dashboard/pesanan', label: n.orders, icon: 'drop' },
+    { href: '/dashboard/katalog', label: n.shop, icon: 'store' },
+    { href: '/dashboard/pesanan', label: n.orders, icon: 'orders' },
   ];
   
   const settingLinks: { href: string; label: string; icon: IconName }[] = [
-    { href: '/dashboard/profil', label: n.profile, icon: 'handshake' },
-    { href: '/dashboard/perusahaan', label: n.company, icon: 'gear' },
+    { href: '/dashboard/profil', label: n.profile, icon: 'users' },
+    { href: '/dashboard/perusahaan', label: n.company, icon: 'store' },
     { href: '/dashboard/alamat', label: n.address, icon: 'pin' },
   ];
 

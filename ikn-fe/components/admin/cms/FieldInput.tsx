@@ -4,9 +4,10 @@ import type { ReactNode } from 'react';
 import Icon from '@/components/Icon';
 import type { FieldDef } from '@/lib/cms';
 import type { IconName } from '@/lib/types';
+import ColorInput from './ColorInput';
+import GeoPicker, { type GeoValue } from './GeoPicker';
 
-// Scalar inputs for schema fields: text, textarea, number, boolean, url, select, icon, color.
-const HEX = /^#[0-9a-f]{6}$/i;
+// Scalar inputs for schema fields: text, textarea, number, boolean, url, select, icon, color, geo.
 interface FieldInputProps {
   label: string;
   def: FieldDef;
@@ -27,6 +28,20 @@ export default function FieldInput({ label, def, value, onChange, icons = [], er
         <span>{label}</span>
         {error && <small className="cms-field-error">{error}</small>}
       </label>
+    );
+  }
+
+  if (def.type === 'geo') {
+    // Bukan <label>: peta dan tombol di dalamnya tidak boleh memicu fokus input pertama.
+    return (
+      <div className="cms-field">
+        <span className="field-label">
+          {label}
+          {required}
+        </span>
+        <GeoPicker value={(value as GeoValue | null | undefined) ?? null} onChange={onChange} />
+        {error && <small className="cms-field-error">{error}</small>}
+      </div>
     );
   }
 
@@ -74,27 +89,7 @@ export default function FieldInput({ label, def, value, onChange, icons = [], er
       );
       break;
     case 'color':
-      control = (
-        <div className="cms-color-row">
-          <input
-            type="color"
-            value={HEX.test(text) ? text : '#ffffff'}
-            onChange={(e) => onChange(e.target.value.toLowerCase())}
-            aria-label={label}
-          />
-          <input
-            type="text"
-            value={text}
-            maxLength={7}
-            placeholder="kosong = warna bawaan"
-            onChange={(e) => onChange(e.target.value.trim())}
-            className="mono"
-          />
-          <button type="button" className="row-act" onClick={() => onChange('')} disabled={text === ''}>
-            Bawaan
-          </button>
-        </div>
-      );
+      control = <ColorInput value={text} onChange={onChange} label={label} />;
       break;
     case 'url':
       control = (

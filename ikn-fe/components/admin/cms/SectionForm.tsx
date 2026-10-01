@@ -71,7 +71,7 @@ export function FieldRenderer({ fieldKey, def, value, onChange, path, errors, ic
           value={toMediaRef(value)}
           onChange={onChange}
           accept={def.accept ?? 'image'}
-          collection={def.accept === 'document' ? 'documents' : 'general'}
+          collection={def.accept === 'document' ? 'documents' : def.accept === 'visual' || def.accept === 'video' ? 'hero' : 'general'}
           required={def.required}
           error={firstError(errors, path)}
         />
