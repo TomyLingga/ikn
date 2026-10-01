@@ -13,6 +13,7 @@ import { openChat } from '@/lib/shop';
 import type { PagedMeta } from '@/lib/cms';
 import type { Category, Product } from '@/lib/types';
 import type { CatalogQuery, CatalogSort } from './query';
+import Select from '@/components/Select';
 
 export type { CatalogQuery, CatalogSort } from './query';
 
@@ -60,12 +61,12 @@ export default function CatalogBrowser({ products, meta, categories, query, base
   const allActive = !query.category || query.category === 'all';
 
   const sortSelect = (
-    <select className="cat-sort" value={query.sort} onChange={(e) => go({ sort: e.target.value as CatalogSort })} aria-label={t('Urutkan', 'Sort by')}>
+    <Select className="cat-sort" value={query.sort} onChange={(e) => go({ sort: e.target.value as CatalogSort })} aria-label={t('Urutkan', 'Sort by')}>
       <option value="">{t('Unggulan', 'Featured')}</option>
       <option value="name">{t('Nama A–Z', 'Name A–Z')}</option>
       <option value="price">{t('Harga terendah', 'Lowest price')}</option>
       <option value="newest">{t('Terbaru', 'Newest')}</option>
-    </select>
+    </Select>
   );
 
   const results =

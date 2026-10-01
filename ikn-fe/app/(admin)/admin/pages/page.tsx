@@ -11,6 +11,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n, type PageData, type PageListItem } from '@/lib/cms';
 import { formatDateTime } from '@/lib/format';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 type PageStatus = PageListItem['status'];
 
@@ -234,10 +235,10 @@ export default function AdminPages() {
             </label>
             <label>
               <span className="field-label">Status</span>
-              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as PageStatus })}>
+              <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as PageStatus })}>
                 <option value="draft">{t('Draf', 'Draft')}</option>
                 <option value="published">{t('Terbit', 'Published')}</option>
-              </select>
+              </Select>
             </label>
             <div className="admin-modal-actions">
               <button type="button" className="btn btn-line btn-sm" onClick={() => setFormOpen(false)}>

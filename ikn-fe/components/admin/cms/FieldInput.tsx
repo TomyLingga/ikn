@@ -6,6 +6,7 @@ import type { FieldDef } from '@/lib/cms';
 import type { IconName } from '@/lib/types';
 import ColorInput from './ColorInput';
 import GeoPicker, { type GeoValue } from './GeoPicker';
+import Select from '@/components/Select';
 
 // Scalar inputs for schema fields: text, textarea, number, boolean, url, select, icon, color, geo.
 interface FieldInputProps {
@@ -62,14 +63,14 @@ export default function FieldInput({ label, def, value, onChange, icons = [], er
     case 'select':
       control = (
         // Nilai kosong = bawaan; bila definisi punya default, tampilkan default itu (bukan "—").
-        <select value={text || (typeof def.default === 'string' ? def.default : '')} onChange={(e) => onChange(e.target.value)}>
+        <Select value={text || (typeof def.default === 'string' ? def.default : '')} onChange={(e) => onChange(e.target.value)}>
           {!def.required && typeof def.default !== 'string' && <option value="">—</option>}
           {Object.entries(def.options ?? {}).map(([key, name]) => (
             <option key={key} value={key}>
               {name}
             </option>
           ))}
-        </select>
+        </Select>
       );
       break;
     case 'icon':
@@ -78,14 +79,14 @@ export default function FieldInput({ label, def, value, onChange, icons = [], er
           <span className="cms-icon-preview" aria-hidden="true">
             {text !== '' && icons.includes(text) ? <Icon name={text as IconName} size={18} /> : null}
           </span>
-          <select value={text} onChange={(e) => onChange(e.target.value)}>
+          <Select value={text} onChange={(e) => onChange(e.target.value)}>
             <option value="">— pilih ikon —</option>
             {icons.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       );
       break;

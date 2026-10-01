@@ -11,6 +11,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { tr, type PostCategory, type PostDetail } from '@/lib/cms';
 import { formatDateTime } from '@/lib/format';
 import { emptyForm, formFromPost, toLocalInput, toPayload, type NewsForm } from '../newsForm';
+import Select from '@/components/Select';
 
 // Full-page news editor (WordPress style). `new` creates via POST /admin/news;
 // a numeric id loads and saves through GET/PUT /admin/news/{id}.
@@ -243,10 +244,10 @@ export default function AdminNewsEditor({ params }: { params: { id: string } }) 
               <div className="cms-fields">
                 <label>
                   <span className="field-label">Status</span>
-                  <select value={form.isPublished ? '1' : '0'} onChange={(e) => setForm({ ...form, isPublished: e.target.value === '1' })}>
+                  <Select value={form.isPublished ? '1' : '0'} onChange={(e) => setForm({ ...form, isPublished: e.target.value === '1' })}>
                     <option value="0">{t('Draf', 'Draft')}</option>
                     <option value="1">{t('Terbit', 'Published')}</option>
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   <span className="field-label">{t('Tanggal terbit', 'Publish date')}</span>
@@ -275,14 +276,14 @@ export default function AdminNewsEditor({ params }: { params: { id: string } }) 
               <div className="cms-fields">
                 <label>
                   <span className="field-label">{t('Kategori', 'Category')}</span>
-                  <select value={form.categoryId ?? ''} onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : null })}>
+                  <Select value={form.categoryId ?? ''} onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : null })}>
                     <option value="">{t('— Tanpa kategori —', '— No category —')}</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {tr(cat.name, lang)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <small className="admin-field-hint">
                     {t('Kategori tampil sebagai filter di halaman Berita. ', 'Categories appear as filters on the News page. ')}
                     <Link href="/admin/news-categories" className="cms-link">

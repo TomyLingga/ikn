@@ -26,6 +26,7 @@ import type { CommerceConfig, Order, Payment, ReviewInput } from '@/lib/types';
 import styles from './CustomerOrderDetail.module.css';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import OrderProgress, { orderNextStep } from '@/components/customer/OrderProgress';
+import Select from '@/components/Select';
 
 const paths = shopPaths(true);
 const RATING_LABELS_ID: [string, string, string, string, string] = ['Buruk', 'Kurang', 'Cukup', 'Baik', 'Sangat baik'];
@@ -559,14 +560,14 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                             </label>
                           ))}
                           {selectedMethod?.type === 'manual_transfer' && (config?.bankAccounts || []).length > 0 && (
-                            <select className="cat-sort" value={newBank} onChange={(e) => setNewBank(e.target.value ? Number(e.target.value) : '')}>
+                            <Select className="cat-sort" value={newBank} onChange={(e) => setNewBank(e.target.value ? Number(e.target.value) : '')}>
                               <option value="">{t('Pilih rekening tujuan', 'Choose bank account')}</option>
                               {(config?.bankAccounts || []).map((b) => (
                                 <option key={b.id} value={b.id}>
                                   {b.bankName} · {b.accountNumber}
                                 </option>
                               ))}
-                            </select>
+                            </Select>
                           )}
                           <div className={styles.inlineActions}>
                             <button

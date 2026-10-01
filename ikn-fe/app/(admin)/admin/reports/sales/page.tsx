@@ -13,6 +13,7 @@ import { tr } from '@/lib/cms';
 import { defaultDateRange, queryString, type SalesReport, type SalesReportProduct } from '@/lib/admin';
 import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
 import type { OrderSummary } from '@/lib/types';
+import Select from '@/components/Select';
 
 type FilterMode = 'year' | 'month' | 'range';
 
@@ -161,25 +162,25 @@ export default function AdminSalesReport() {
         {mode !== 'range' && (
           <label className="admin-filter">
             <span>{t('Tahun', 'Year')}</span>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            <Select value={year} onChange={(e) => setYear(Number(e.target.value))}>
               {YEAR_OPTIONS.map((y) => (
                 <option key={y} value={y}>
                   {y}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         )}
         {mode === 'month' && (
           <label className="admin-filter">
             <span>{t('Bulan', 'Month')}</span>
-            <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            <Select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
               {months.map((name, idx) => (
                 <option key={idx + 1} value={idx + 1}>
                   {name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         )}
         {mode === 'range' && (

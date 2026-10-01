@@ -16,6 +16,7 @@ import { defaultDateRange, paymentMethodSummary, queryString, refreshAdminBadges
 import { formatDateTime, formatIDR } from '@/lib/format';
 import type { IconName, PaymentStatusKey } from '@/lib/types';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 type StatusFilter = PaymentStatusKey | 'all';
 
@@ -347,7 +348,7 @@ export default function AdminPayments() {
         )}
         <label className="admin-filter">
           <span>{t('Metode', 'Method')}</span>
-          <select
+          <Select
             value={method}
             onChange={(e) => {
               setMethod(e.target.value);
@@ -360,7 +361,7 @@ export default function AdminPayments() {
                 {tr(m.name, lang)}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         {filtersChanged && (
           <button type="button" className="row-act" onClick={resetFilters}>

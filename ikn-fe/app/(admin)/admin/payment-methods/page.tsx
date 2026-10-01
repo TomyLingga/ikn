@@ -11,6 +11,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n } from '@/lib/cms';
 import { numberOrNull, paymentMethodConfig, paymentMethodTypeLabels, type PaymentDriver, type PaymentMethodRow } from '@/lib/admin';
 import type { PaymentMethodType } from '@/lib/types';
+import Select from '@/components/Select';
 
 interface MethodForm {
   code: string;
@@ -264,21 +265,21 @@ export default function AdminPaymentMethods() {
               </label>
               <label>
                 <span className="field-label">{t('Jenis', 'Type')} *</span>
-                <select value={form.type} onChange={(e) => update('type', e.target.value as PaymentMethodType)}>
+                <Select value={form.type} onChange={(e) => update('type', e.target.value as PaymentMethodType)}>
                   {TYPES.map((key) => (
                     <option key={key} value={key}>
                       {paymentMethodTypeLabels[key][lang]}
                     </option>
                   ))}
-                </select>
+                </Select>
                 {firstError(formErrors, 'type') && <small className="cms-field-error">{firstError(formErrors, 'type')}</small>}
               </label>
               <label>
                 <span className="field-label">Driver</span>
-                <select value={form.driver} onChange={(e) => update('driver', e.target.value as PaymentDriver)}>
+                <Select value={form.driver} onChange={(e) => update('driver', e.target.value as PaymentDriver)}>
                   <option value="manual">manual ({t('verifikasi admin', 'admin verification')})</option>
                   <option value="xendit">xendit ({t('gateway otomatis', 'automatic gateway')})</option>
-                </select>
+                </Select>
                 {firstError(formErrors, 'driver') && <small className="cms-field-error">{firstError(formErrors, 'driver')}</small>}
               </label>
             </div>

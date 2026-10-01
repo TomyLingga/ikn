@@ -13,6 +13,7 @@ import { emptyI18n, tr, type I18n } from '@/lib/cms';
 import { audienceLabels, audienceSummary, feeTypeLabels, type Audience, type CustomerOption, type FeeRow, type FeeType } from '@/lib/admin';
 import { formatIDR } from '@/lib/format';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 interface FeeForm {
   name: I18n;
@@ -221,11 +222,11 @@ export default function AdminAdditionalFees() {
       <div className="admin-toolbar">
         <label className="admin-filter">
           <span>{t('Sasaran', 'Audience')}</span>
-          <select value={audience} onChange={(e) => setAudience(e.target.value as '' | Audience)}>
+          <Select value={audience} onChange={(e) => setAudience(e.target.value as '' | Audience)}>
             <option value="">{t('Semua', 'All')}</option>
             <option value="all">{audienceLabels.all[lang]}</option>
             <option value="customers">{audienceLabels.customers[lang]}</option>
-          </select>
+          </Select>
         </label>
         <span className="admin-result-count">
           {visible.length} {t('biaya', 'fees')}
@@ -258,13 +259,13 @@ export default function AdminAdditionalFees() {
             <div className="admin-form-row admin-form-row-3">
               <label>
                 <span className="field-label">{t('Jenis', 'Type')}</span>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as FeeType })}>
+                <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as FeeType })}>
                   {(Object.keys(feeTypeLabels) as FeeType[]).map((key) => (
                     <option key={key} value={key}>
                       {feeTypeLabels[key][lang]}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label>
                 <span className="field-label">{t('Nominal (Rp)', 'Amount (Rp)')} *</span>

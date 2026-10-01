@@ -15,6 +15,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { tr, type AdminUserData, type ModuleOption } from '@/lib/cms';
 import { formatDateTime } from '@/lib/format';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 type AdminRole = AdminUserData['role'];
 
@@ -377,10 +378,10 @@ export default function AdminUsers() {
               </label>
               <label>
                 <span className="field-label">Role</span>
-                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as AdminRole })}>
+                <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as AdminRole })}>
                   <option value="admin">{t('Admin (akses per modul)', 'Admin (per-module access)')}</option>
                   <option value="super_admin">{t('Super Admin (akses penuh)', 'Super Admin (full access)')}</option>
-                </select>
+                </Select>
               </label>
             </div>
             {form.role === 'admin' && (

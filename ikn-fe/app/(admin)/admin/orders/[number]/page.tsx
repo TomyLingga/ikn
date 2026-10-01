@@ -18,6 +18,7 @@ import { formatDateTime, formatIDR } from '@/lib/format';
 import type { Order, OrderAttachment, Payment, TrackingUpdate } from '@/lib/types';
 import styles from './page.module.css';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 type Modal = { type: 'cancel' } | { type: 'ship' } | { type: 'due' } | { type: 'reject'; payment: Payment } | { type: 'note'; status: 'processing' | 'delivered' | 'completed' } | null;
 
@@ -876,14 +877,14 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
             {dueMode === 'hours' ? (
               <label>
                 <span className="field-label">{t('Perpanjang selama', 'Extend by')}</span>
-                <select value={extendHours} onChange={(e) => setExtendHours(e.target.value)}>
+                <Select value={extendHours} onChange={(e) => setExtendHours(e.target.value)}>
                   {EXTEND_OPTIONS.map((h) => (
                     <option key={h} value={h}>
                       {h} {t('jam', 'hours')}
                       {h >= 24 ? ` (${h / 24} ${t('hari', 'days')})` : ''}
                     </option>
                   ))}
-                </select>
+                </Select>
                 <small className="admin-field-hint">
                   {t('Dihitung dari batas saat ini (atau dari sekarang bila sudah lewat).', 'Counted from the current deadline (or from now if it has passed).')}
                 </small>

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import type { IconName } from '@/lib/types';
+import Select from '@/components/Select';
 
 // Header standar tiap halaman admin: judul, deskripsi, dan tombol aksi opsional.
 interface AdminPageHeadProps {
@@ -169,7 +170,7 @@ export function DataTable<T extends object>({
             </span>
             <label className="admin-filter" style={{ padding: '4px 8px', fontSize: '0.74rem', marginBottom: 0 }}>
               <span>{lang === 'en' ? 'Per page:' : 'Per hal:'}</span>
-              <select
+              <Select
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value));
@@ -179,7 +180,7 @@ export function DataTable<T extends object>({
                 {pageSizeOptions.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
-              </select>
+              </Select>
             </label>
           </div>
 

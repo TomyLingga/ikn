@@ -11,6 +11,7 @@ import { api, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type DocLinkData, type I18n, type WbsReportData } from '@/lib/cms';
 import { formatDateTime } from '@/lib/format';
 import type { Tone } from '@/lib/types';
+import Select from '@/components/Select';
 
 type WbsStatus = WbsReportData['status'];
 
@@ -270,13 +271,13 @@ export default function AdminWhistleblowing() {
             <div className="admin-form-row">
               <label>
                 <span className="field-label">Status</span>
-                <select value={detailStatus} onChange={(e) => setDetailStatus(e.target.value as WbsStatus)}>
+                <Select value={detailStatus} onChange={(e) => setDetailStatus(e.target.value as WbsStatus)}>
                   {STATUSES.map((status) => (
                     <option key={status} value={status}>
                       {statusLabel(status)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             </div>
             <label>

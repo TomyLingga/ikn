@@ -1,3 +1,18 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "JSXOpeningElement[name.name='select']",
+        "message": "Use <Select> from '@/components/Select' (searchable dropdown) instead of a raw <select>."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["components/Select/Select.tsx"],
+      "rules": { "no-restricted-syntax": "off" }
+    }
+  ]
 }

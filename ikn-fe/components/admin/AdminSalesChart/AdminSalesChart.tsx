@@ -6,6 +6,7 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { formatIDR } from '@/lib/format';
 import styles from './AdminSalesChart.module.css';
+import Select from '@/components/Select';
 
 // Titik data penjualan bulanan dari API (dashboard `salesChart[]`, laporan `byMonth[]`): total rupiah penuh.
 export interface SalesChartPoint {
@@ -183,24 +184,24 @@ export default function AdminSalesChart({
         <div className={styles.filters}>
           <label>
             <span>{t('Tahun', 'Year')}</span>
-            <select value={year} disabled={loading} onChange={(event) => changeYear(Number(event.target.value))}>
+            <Select value={year} disabled={loading} onChange={(event) => changeYear(Number(event.target.value))}>
               {(years.includes(year) ? years : [year, ...years]).map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             <span>{t('Bulan', 'Month')}</span>
-            <select value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)}>
+            <Select value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)}>
               <option value="all">{t('Semua bulan', 'All months')}</option>
               {yearData.map((point) => (
                 <option key={point.monthIndex} value={point.monthIndex}>
                   {point.month}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         </div>
       </div>

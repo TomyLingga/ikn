@@ -12,6 +12,7 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import type { CustomerAddress, CustomerAddressInput, GeoResult, Region, RegionLevel } from '@/lib/types';
+import Select from '@/components/Select';
 
 const AddressMap = dynamic(() => import('@/components/customer/AddressMap'), {
   ssr: false,
@@ -218,12 +219,12 @@ export default function AddressForm({ initial, onSaved, onCancel, defaults, subm
   ) => (
     <label>
       <span className="label">{label}</span>
-      <select value={value} onChange={(e) => pickRegion(level, e.target.value)} disabled={disabled} required className="addr-select">
+      <Select value={value} onChange={(e) => pickRegion(level, e.target.value)} disabled={disabled} required className="addr-select">
         <option value="">{disabled ? '—' : t('Pilih…', 'Select…')}</option>
         {options.map((r) => (
           <option key={r.code} value={r.code}>{r.name}</option>
         ))}
-      </select>
+      </Select>
       {fieldError(`${level}Code`)}
     </label>
   );

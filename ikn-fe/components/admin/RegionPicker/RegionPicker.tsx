@@ -6,6 +6,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage } from '@/lib/api';
 import { regionLevelLabels, type ZoneRegionRef } from '@/lib/admin';
 import type { Region, RegionLevel } from '@/lib/types';
+import Select from '@/components/Select';
 
 // Cache nama wilayah lintas komponen (kode → nama). API tidak punya GET /regions/{code}, jadi nama
 // diselesaikan lewat daftar anak induknya (GET /regions?parent=) atau daftar provinsi.
@@ -217,36 +218,36 @@ export default function RegionPicker({ value, onChange, error }: RegionPickerPro
           <div className="admin-form-row admin-form-row-3">
             <label>
               <span className="field-label">{t('Provinsi', 'Province')}</span>
-              <select value={province} onChange={(e) => setProvince(e.target.value)}>
+              <Select value={province} onChange={(e) => setProvince(e.target.value)}>
                 <option value="">{t('— pilih —', '— select —')}</option>
                 {provinces.map((p) => (
                   <option key={p.code} value={p.code}>
                     {p.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               <span className="field-label">{t('Kabupaten/Kota', 'Regency/City')}</span>
-              <select value={regency} onChange={(e) => setRegency(e.target.value)} disabled={!province}>
+              <Select value={regency} onChange={(e) => setRegency(e.target.value)} disabled={!province}>
                 <option value="">{province ? t('— semua / pilih —', '— all / select —') : '—'}</option>
                 {regencies.map((r) => (
                   <option key={r.code} value={r.code}>
                     {r.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               <span className="field-label">{t('Kecamatan', 'District')}</span>
-              <select value={district} onChange={(e) => setDistrict(e.target.value)} disabled={!regency}>
+              <Select value={district} onChange={(e) => setDistrict(e.target.value)} disabled={!regency}>
                 <option value="">{regency ? t('— semua / pilih —', '— all / select —') : '—'}</option>
                 {districts.map((d) => (
                   <option key={d.code} value={d.code}>
                     {d.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           </div>
           <div className="row-actions">

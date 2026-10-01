@@ -9,6 +9,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type GalleryItemData, type I18n, type MediaSummary } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 type GalleryType = GalleryItemData['type'];
 
@@ -228,10 +229,10 @@ export default function AdminGallery() {
             <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Tipe', 'Type')}</span>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as GalleryType })}>
+                <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as GalleryType })}>
                   <option value="image">{t('Gambar', 'Image')}</option>
                   <option value="video">Video (YouTube)</option>
-                </select>
+                </Select>
               </label>
               <label>
                 <span className="field-label">{t('Urutan', 'Sort order')}</span>

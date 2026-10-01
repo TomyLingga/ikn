@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider';
 import styles from './PhoneInput.module.css';
+import Select from '@/components/Select';
 
 export interface CountryCode {
   iso: string;
@@ -114,7 +115,7 @@ export default function PhoneInput({ value, onChange, onBlur, name, required, in
         <span className={styles.codeText} aria-hidden="true">
           {country.iso} +{country.dial}
         </span>
-        <select
+        <Select
           className={styles.codeSelect}
           value={iso}
           aria-label={lang === 'en' ? 'Country code' : 'Kode negara'}
@@ -128,7 +129,7 @@ export default function PhoneInput({ value, onChange, onBlur, name, required, in
               {lang === 'en' ? c.en : c.id} (+{c.dial})
             </option>
           ))}
-        </select>
+        </Select>
       </span>
       <input
         id={id}

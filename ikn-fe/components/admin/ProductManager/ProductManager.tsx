@@ -15,6 +15,7 @@ import { formatIDR } from '@/lib/format';
 import type { Category } from '@/lib/types';
 import ProductForm from './ProductForm';
 import StockPanel from './StockPanel';
+import Select from '@/components/Select';
 
 type ModalState =
   | { type: 'form'; product: AdminProduct | null }
@@ -232,7 +233,7 @@ export default function ProductManager() {
         </button>
         <label className="admin-filter">
           <span>{t('Kategori', 'Category')}</span>
-          <select
+          <Select
             value={category}
             onChange={(e) => {
               setCategory(e.target.value);
@@ -245,11 +246,11 @@ export default function ProductManager() {
                 {tr(c.name, lang)}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="admin-filter">
           <span>Status</span>
-          <select
+          <Select
             value={published}
             onChange={(e) => {
               setPublished(e.target.value);
@@ -259,7 +260,7 @@ export default function ProductManager() {
             <option value="">{t('Semua', 'All')}</option>
             <option value="1">{t('Tayang', 'Published')}</option>
             <option value="0">{t('Draf', 'Draft')}</option>
-          </select>
+          </Select>
         </label>
         <label className="cms-check admin-filter">
           <input

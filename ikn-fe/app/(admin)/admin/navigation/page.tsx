@@ -10,6 +10,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type DocLinkData, type I18n, type MediaSummary, type MenuData, type MenuNode } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 type MenuLocation = 'header' | 'footer';
 
@@ -365,14 +366,14 @@ export default function AdminNavigation() {
             <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Kategori (menu induk)', 'Category (parent menu)')}</span>
-                <select value={docForm.category} onChange={(e) => setDocForm({ ...docForm, category: e.target.value })}>
+                <Select value={docForm.category} onChange={(e) => setDocForm({ ...docForm, category: e.target.value })}>
                   {!categories.includes(docForm.category) && <option value={docForm.category}>{docForm.category}</option>}
                   {categories.map((category) => (
                     <option key={category} value={category}>
                       {category}
                     </option>
                   ))}
-                </select>
+                </Select>
                 {firstError(docErrors, 'category') && <small className="cms-field-error">{firstError(docErrors, 'category')}</small>}
               </label>
               <label>

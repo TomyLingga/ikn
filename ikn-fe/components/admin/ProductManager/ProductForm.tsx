@@ -17,6 +17,7 @@ import {
   type ProductPayload,
 } from '@/lib/admin';
 import type { Category, PriceMode } from '@/lib/types';
+import Select from '@/components/Select';
 
 interface ProductFormState {
   code: string;
@@ -243,7 +244,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
           </label>
           <label>
             <span className="field-label">{t('Kategori', 'Category')} *</span>
-            <select value={form.categoryId} onChange={(e) => update('categoryId', e.target.value)} required>
+            <Select value={form.categoryId} onChange={(e) => update('categoryId', e.target.value)} required>
               {categories.length === 0 && <option value="">{t('— Belum ada kategori —', '— No categories yet —')}</option>}
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
@@ -251,7 +252,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
                   {!category.isActive ? ` (${t('nonaktif', 'inactive')})` : ''}
                 </option>
               ))}
-            </select>
+            </Select>
             {firstError(errors, 'categoryId') && <small className="cms-field-error">{firstError(errors, 'categoryId')}</small>}
           </label>
         </div>
@@ -305,10 +306,10 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
         <div className="admin-form-row admin-form-row-3">
           <label>
             <span className="field-label">{t('Mode harga', 'Pricing mode')}</span>
-            <select value={form.priceMode} onChange={(e) => update('priceMode', e.target.value as PriceMode)}>
+            <Select value={form.priceMode} onChange={(e) => update('priceMode', e.target.value as PriceMode)}>
               <option value="fixed">{t('Harga tetap', 'Fixed price')}</option>
               <option value="quote">{t('Penawaran (hubungi marketing)', 'Quote (contact sales)')}</option>
-            </select>
+            </Select>
           </label>
           <label>
             <span className="field-label">{t('Harga (Rp, sebelum promo)', 'Price (Rp, before promo)')}</span>
@@ -381,10 +382,10 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
           </label>
           <label>
             <span className="field-label">{t('Status stok', 'Stock status')}</span>
-            <select value={form.stockStatus} onChange={(e) => update('stockStatus', e.target.value as '' | 'made_to_order')}>
+            <Select value={form.stockStatus} onChange={(e) => update('stockStatus', e.target.value as '' | 'made_to_order')}>
               <option value="">{t('Otomatis dari stok tersedia', 'Automatic from available stock')}</option>
               <option value="made_to_order">{t('Pre-order / made to order (manual)', 'Made to order (manual)')}</option>
-            </select>
+            </Select>
             <small className="admin-field-hint">{t('Jumlah stok diubah lewat tombol "Stok" pada daftar produk.', 'Stock quantity is changed via the "Stock" button on the product list.')}</small>
           </label>
         </div>

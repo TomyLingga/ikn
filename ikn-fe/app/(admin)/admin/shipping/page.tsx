@@ -24,6 +24,7 @@ import {
 } from '@/lib/admin';
 import { formatIDR } from '@/lib/format';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 interface ZoneForm {
   name: I18n;
@@ -573,13 +574,13 @@ export default function AdminShipping() {
             <div className="admin-form-row admin-form-row-3">
               <label>
                 <span className="field-label">{t('Jenis tarif', 'Rate type')}</span>
-                <select value={rateForm.type} onChange={(e) => setRateForm({ ...rateForm, type: e.target.value as ShippingRateType })}>
+                <Select value={rateForm.type} onChange={(e) => setRateForm({ ...rateForm, type: e.target.value as ShippingRateType })}>
                   {(Object.keys(shippingRateTypeLabels) as ShippingRateType[]).map((key) => (
                     <option key={key} value={key}>
                       {shippingRateTypeLabels[key][lang]}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label>
                 <span className="field-label">{rateForm.type === 'flat' ? t('Tarif tetap (Rp)', 'Flat rate (Rp)') : t('Tarif dasar (Rp)', 'Base amount (Rp)')}</span>

@@ -11,6 +11,7 @@ import { tr, type PagedMeta } from '@/lib/cms';
 import { queryString } from '@/lib/admin';
 import { formatDateTime } from '@/lib/format';
 import type { ProductReview } from '@/lib/types';
+import Select from '@/components/Select';
 
 const PER_PAGE = 20;
 
@@ -135,7 +136,7 @@ export default function AdminReviews() {
         </button>
         <label className="admin-filter">
           <span>Status</span>
-          <select
+          <Select
             value={published}
             onChange={(e) => {
               setPublished(e.target.value);
@@ -145,7 +146,7 @@ export default function AdminReviews() {
             <option value="">{t('Semua', 'All')}</option>
             <option value="1">{t('Tampil', 'Visible')}</option>
             <option value="0">{t('Disembunyikan', 'Hidden')}</option>
-          </select>
+          </Select>
         </label>
         <span className="admin-result-count">
           {meta.total} {t('ulasan', 'reviews')}

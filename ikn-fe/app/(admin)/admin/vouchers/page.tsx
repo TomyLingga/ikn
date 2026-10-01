@@ -27,6 +27,7 @@ import {
 import { formatDateTime, formatIDR } from '@/lib/format';
 import type { Category } from '@/lib/types';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 interface VoucherForm {
   code: string;
@@ -340,7 +341,7 @@ export default function AdminVouchers() {
         </button>
         <label className="admin-filter">
           <span>Status</span>
-          <select
+          <Select
             value={active}
             onChange={(e) => {
               setActive(e.target.value);
@@ -350,11 +351,11 @@ export default function AdminVouchers() {
             <option value="">{t('Semua', 'All')}</option>
             <option value="1">{t('Aktif', 'Active')}</option>
             <option value="0">{t('Nonaktif', 'Inactive')}</option>
-          </select>
+          </Select>
         </label>
         <label className="admin-filter">
           <span>{t('Sasaran', 'Audience')}</span>
-          <select
+          <Select
             value={audience}
             onChange={(e) => {
               setAudience(e.target.value);
@@ -364,7 +365,7 @@ export default function AdminVouchers() {
             <option value="">{t('Semua', 'All')}</option>
             <option value="all">{audienceLabels.all[lang]}</option>
             <option value="customers">{audienceLabels.customers[lang]}</option>
-          </select>
+          </Select>
         </label>
         <span className="admin-result-count">
           {meta.total} {t('voucher', 'vouchers')}
@@ -391,13 +392,13 @@ export default function AdminVouchers() {
               </label>
               <label>
                 <span className="field-label">{t('Jenis diskon', 'Discount type')}</span>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as VoucherType })}>
+                <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as VoucherType })}>
                   {(Object.keys(voucherTypeLabels) as VoucherType[]).map((key) => (
                     <option key={key} value={key}>
                       {voucherTypeLabels[key][lang]}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <label>
                 <span className="field-label">{form.type === 'percent' ? t('Persentase (%)', 'Percentage (%)') : t('Nominal (Rp)', 'Amount (Rp)')} *</span>

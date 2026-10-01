@@ -11,6 +11,7 @@ import { tr, type PagedMeta } from '@/lib/cms';
 import { stockLabels } from '@/lib/commerce';
 import { stockMovementLabels, type AdminProduct, type StockSummary } from '@/lib/admin';
 import { formatDateTime } from '@/lib/format';
+import Select from '@/components/Select';
 
 interface StockPanelProps {
   product: AdminProduct;
@@ -117,10 +118,10 @@ export default function StockPanel({ product, onClose, onChanged }: StockPanelPr
           <div className="admin-form-row admin-form-row-3">
             <label>
               <span className="field-label">{t('Jenis mutasi', 'Movement type')}</span>
-              <select value={type} onChange={(e) => setType(e.target.value as 'in' | 'adjust')}>
+              <Select value={type} onChange={(e) => setType(e.target.value as 'in' | 'adjust')}>
                 <option value="in">{t('Stok masuk (produksi / pembelian)', 'Stock in (production / purchase)')}</option>
                 <option value="adjust">{t('Penyesuaian (+/−, stock opname)', 'Adjustment (+/−, stock count)')}</option>
-              </select>
+              </Select>
             </label>
             <label>
               <span className="field-label">{t('Jumlah', 'Quantity')} ({product.unit})</span>

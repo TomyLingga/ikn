@@ -20,6 +20,7 @@ import {
 import { formatDateTime } from '@/lib/format';
 import type { Lang } from '@/lib/types';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
 
 type PageStatus = PageData['status'];
 
@@ -414,10 +415,10 @@ export default function AdminPageEditor({ params }: { params: { id: string } }) 
               </label>
               <label>
                 <span className="field-label">Status</span>
-                <select value={meta.status} onChange={(e) => setMeta({ ...meta, status: e.target.value as PageStatus })}>
+                <Select value={meta.status} onChange={(e) => setMeta({ ...meta, status: e.target.value as PageStatus })}>
                   <option value="draft">{t('Draf', 'Draft')}</option>
                   <option value="published">{t('Terbit', 'Published')}</option>
-                </select>
+                </Select>
               </label>
               <I18nInput
                 label={t('SEO: judul', 'SEO title')}
