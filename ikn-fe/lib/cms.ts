@@ -129,6 +129,11 @@ export interface WhatsAppContact {
   number: string;
 }
 
+export interface AuthSlide {
+  media: MediaSummary;
+  caption: I18n;
+}
+
 export interface SiteSettings {
   company: {
     name: string;
@@ -154,6 +159,10 @@ export interface SiteSettings {
     whatsapp_message: I18n;
     /** Nomor marketing tambahan (label = nama tim/orang). Bersama nomor utama menjadi daftar pilihan. */
     whatsapp_contacts?: WhatsAppContact[];
+  };
+  /** Panel foto/video halaman login/daftar/lupa password (kosong = foto bawaan). */
+  auth?: {
+    slides?: AuthSlide[];
   };
   analytics?: {
     ga_measurement_id: string; // G-XXXXXXX; kosong = tanpa GA

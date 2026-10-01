@@ -8,6 +8,7 @@ import { api, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import type { FormContent } from '../utils';
+import { emailError, isEmail } from '@/lib/validation';
 
 const ui = {
   id: {
@@ -74,6 +75,10 @@ export default function ContactFormSection({ section }: { section: PageSection }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!isEmail(email)) {
+      setError(emailError(email, lang === 'en' ? 'en' : 'id'));
+      return;
+    }
     setSending(true);
     setError(null);
     try {
@@ -124,7 +129,9 @@ export default function ContactFormSection({ section }: { section: PageSection }
               placeholder="nama@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              aria-invalid={!!emailError(email, lang === 'en' ? 'en' : 'id')}
             />
+            {emailError(email, lang === 'en' ? 'en' : 'id') && <small className="form-error" role="alert">{emailError(email, lang === 'en' ? 'en' : 'id')}</small>}
           </label>
           <label>
             <span className="label">{s.subject}</span>

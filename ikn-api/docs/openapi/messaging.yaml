@@ -127,7 +127,7 @@ paths:
               properties:
                 name: { type: string, minLength: 2, maxLength: 120 }
                 email: { type: string, format: email, maxLength: 160 }
-                phone: { type: string, maxLength: 40, nullable: true, description: 'angka, +, spasi, tanda kurung, titik, strip' }
+                phone: { type: string, maxLength: 40, nullable: true, description: 'E.164 dengan kode negara, mis. +6281234567890 atau +60123456789 (8-15 digit; spasi/strip/titik/kurung boleh); tanpa + hanya nomor Indonesia 0.../62...; rule PhoneNumber (A-78)' }
                 body: { type: string, maxLength: 2000 }
       responses:
         '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { token: { type: string }, conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }

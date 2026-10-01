@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { emailError } from '@/lib/validation';
 import type { FormEvent } from 'react';
 import Icon from '@/components/Icon';
 import { useAuth } from '@/components/AuthProvider';
@@ -104,7 +105,8 @@ export default function CustomerCompanyForm() {
           </label>
           <label>
             <span className="label">{t('Email perusahaan', 'Company email')}</span>
-            <input name="companyEmail" type="email" value={companyEmail} onChange={(e) => setCompanyEmail(e.target.value)} />
+            <input name="companyEmail" type="email" value={companyEmail} onChange={(e) => setCompanyEmail(e.target.value)} aria-invalid={!!emailError(companyEmail, lang)} />
+            {emailError(companyEmail, lang) && <small className="form-error" role="alert">{emailError(companyEmail, lang)}</small>}
             {fieldError('companyEmail')}
           </label>
           <label>

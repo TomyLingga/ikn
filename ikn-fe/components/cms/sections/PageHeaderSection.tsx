@@ -23,7 +23,7 @@ interface Slide {
 }
 
 // Page header: eyebrow label, display title, lead. Dengan media (foto/video dari admin) menjadi tata letak
-// "split" (teks kiri, panggung media kanan) atau "cover" (media memenuhi latar); lebih dari satu media = slideshow fade.
+// "split" (teks kiri, panggung media kanan), "split_reverse" (media kiri, teks kanan) atau "cover" (media memenuhi latar); lebih dari satu media = slideshow fade.
 // Tanpa media: tata letak teks lama; breadcrumb=true memakai varian ringkas "commerce-head".
 export default function PageHeaderSection({ section, pageTitle }: Props) {
   const { lang } = useLang();
@@ -39,7 +39,8 @@ export default function PageHeaderSection({ section, pageTitle }: Props) {
   const crumbs = c.breadcrumb ? breadcrumbItems(pathname || '/', site.menus.header.items, lang, pageTitle) : null;
 
   if (slides.length > 0) {
-    const layout = asText(c.layout) === 'cover' ? 'cover' : 'split';
+    const rawLayout = asText(c.layout);
+    const layout = rawLayout === 'cover' ? 'cover' : rawLayout === 'split_reverse' ? 'split ph-reverse' : 'split';
     const interval = Number(c.interval) > 0 ? Number(c.interval) : 6;
     return (
       <section className={`pagehead ph ph-${layout}`}>

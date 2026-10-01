@@ -19,7 +19,7 @@ class RegisterRequest extends AccountFormRequest
             'email' => ['required', 'string', 'email', 'max:190', 'unique:users,email'],
             'password' => $this->passwordRules(),
             'passwordConfirmation' => ['required', 'string'],
-            'phone' => ['nullable', 'string', 'max:40'],
+            'phone' => ['nullable', 'string', 'max:40', new \App\Rules\PhoneNumber()],
             'company' => ['nullable', 'string', 'max:160'],
             'position' => ['nullable', 'string', 'max:120'],
             'taxId' => ['nullable', 'string', 'max:40'],

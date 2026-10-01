@@ -6,12 +6,14 @@ import Link from 'next/link';
 import Icon from '@/components/Icon';
 import AuthPage, { authStyles as styles } from '@/components/auth';
 import { useLang } from '@/components/LanguageProvider';
+import { emailError } from '@/lib/validation';
 import { api, errorMessage } from '@/lib/api';
 
 // Lupa password: POST /auth/password/forgot (selalu 200; tautan reset dikirim lewat email).
 export default function ForgotPasswordPage() {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
+  const [emailTouched, setEmailTouched] = useState(false);
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -62,7 +64,8 @@ export default function ForgotPasswordPage() {
           {error && <p className={styles.error} role="alert"><Icon name="close" size={16} /> {error}</p>}
           <label className={styles.field}>
             <span>Email</span>
-            <input name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@perusahaan.com" />
+            <input name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmailTouched(true)} placeholder="nama@perusahaan.com" aria-invalid={emailTouched && !!emailError(email, lang)} className={emailTouched && emailError(email, lang) ? styles.invalid : undefined} />
+            {emailTouched && emailError(email, lang) && <small className={styles.fieldError} role="alert">{emailError(email, lang)}</small>}
           </label>
           <button type="submit" className={styles.primaryButton} disabled={busy}>
             {busy ? t('Mengirim…', 'Sending…') : t('Kirim tautan reset', 'Send reset link')} <Icon name="arrow" size={18} />

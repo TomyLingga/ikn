@@ -16,6 +16,8 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email', 'max:190'],
             'password' => ['required', 'string', 'max:200'],
+            // "Ingat saya": cookie remember (web guard) agar tetap login setelah sesi/peramban ditutup.
+            'remember' => ['sometimes', 'boolean'],
         ];
     }
 }

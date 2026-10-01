@@ -9,6 +9,9 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { accountStatusLabels } from '@/lib/commerce';
 import { formatDateTime } from '@/lib/format';
+import PasswordChecklist from '@/components/PasswordChecklist';
+import { confirmError, isPhone, isStrongPassword, phoneError, validationText } from '@/lib/validation';
+import PhoneInput from '@/components/PhoneInput';
 import type { CustomerProfile } from '@/lib/types';
 
 export default function CustomerProfileForm() {
@@ -60,6 +63,10 @@ export default function CustomerProfileForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (phone.trim() && !isPhone(phone)) {
+      setErrors({ phone: validationText.phone[lang] });
+      return;
+    }
     setSaving(true);
     setSaved(false);
     setSaveError(null);
@@ -88,6 +95,10 @@ export default function CustomerProfileForm() {
     setPasswordSaved(false);
     setPasswordError(null);
     setPasswordErrors({});
+    if (!isStrongPassword(newPassword)) {
+      setPasswordError(validationText.password[lang]);
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setPasswordError(t('Konfirmasi password baru tidak sama.', 'New password confirmation does not match.'));
       return;
@@ -141,8 +152,8 @@ export default function CustomerProfileForm() {
           </label>
           <label>
             <span className="label">{t('Telepon', 'Phone')}</span>
-            <input name="phone" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} inputMode="tel" />
-            {errors.phone && <small className="form-error">{errors.phone}</small>}
+            <PhoneInput value={phone} onChange={setPhone} invalid={!!phoneError(phone, lang)} />
+            {phoneError(phone, lang) ? <small className="form-error" role="alert">{phoneError(phone, lang)}</small> : errors.phone && <small className="form-error">{errors.phone}</small>}
           </label>
           <label className="co-full">
             <span className="label">Email</span>
@@ -159,7 +170,7 @@ export default function CustomerProfileForm() {
       <div className="acct-section-head" style={{ marginTop: 34 }}>
         <div>
           <h2 className="h3">{t('Ganti password', 'Change password')}</h2>
-          <p className="form-note">{t('Minimal 8 karakter, mengandung huruf dan angka.', 'At least 8 characters with letters and numbers.')}</p>
+          <p className="form-note">{t('Minimal 8 karakter dengan huruf besar, huruf kecil, dan angka.', 'At least 8 characters with uppercase, lowercase and a number.')}</p>
         </div>
       </div>
       <form className="form acct-form" onSubmit={handlePasswordSubmit}>
@@ -172,11 +183,17 @@ export default function CustomerProfileForm() {
           <label>
             <span className="label">{t('Password baru', 'New password')}</span>
             <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+            {newPassword && <PasswordChecklist value={newPassword} />}
             {passwordErrors.password && <small className="form-error">{passwordErrors.password}</small>}
           </label>
           <label>
             <span className="label">{t('Konfirmasi password baru', 'Confirm new password')}</span>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} autoComplete="new-password" aria-invalid={!!confirmError(newPassword, confirmPassword, lang)} />
+            {confirmError(newPassword, confirmPassword, lang) ? (
+              <small className="form-error" role="alert">{confirmError(newPassword, confirmPassword, lang)}</small>
+            ) : (
+              confirmPassword && <small className="form-note" style={{ color: 'var(--ok, var(--primary))' }}>✓ {validationText.confirmOk[lang]}</small>
+            )}
           </label>
         </div>
         {passwordError && <p className="form-error" role="alert">{passwordError}</p>}

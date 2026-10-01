@@ -9,17 +9,13 @@ export const metadata = {
 type SearchParams = Record<string, string | string[] | undefined>;
 
 // Katalog di dalam portal customer: kartu produk dan detailnya tetap di /dashboard/katalog (lib/shop.ts).
+// The hero strip (title + search) is rendered by CatalogBrowser layout="top" so it follows the UI language.
 export default async function CustomerCatalogPage({ searchParams }: { searchParams: SearchParams }) {
   const query = parseCatalogQuery(searchParams);
   const [products, categories] = await Promise.all([fetchProducts(query), fetchCategories()]);
 
   return (
     <div className="shop-page">
-      <header className="portal-head">
-        <h1>Belanja produk</h1>
-        <p>Harga khusus customer dan stok terbaru. Tambahkan ke keranjang, lalu checkout tanpa meninggalkan portal.</p>
-      </header>
-
       <CatalogBrowser products={products.items} meta={products.meta} categories={categories} query={query} basePath="/dashboard/katalog" layout="top" />
     </div>
   );

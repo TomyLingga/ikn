@@ -1,0 +1,95 @@
+/* Input telepon = satu kotak: kode negara (select transparan di atas label "ID +62") + nomor nasional. */
+.wrap {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.wrap:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.filled {
+  min-height: 50px;
+  border-color: transparent;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ink) 6%, var(--surface));
+}
+
+.filled:focus-within {
+  background: var(--surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.invalid,
+.invalid:focus-within {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 14%, transparent);
+}
+
+.code {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 26px 0 12px;
+  border-right: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.code::after {
+  content: '';
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--ink-soft);
+  border-bottom: 1.5px solid var(--ink-soft);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.codeText {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Select asli menutupi label: daftar negara bawaan peramban (ramah ponsel), tampilan tertutup tetap ringkas. */
+.codeSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  appearance: auto;
+  font: inherit;
+}
+
+.number {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: none;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ink);
+  font: inherit;
+}
+
+.codeSelect:focus-visible + .number,
+.code:focus-within {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}

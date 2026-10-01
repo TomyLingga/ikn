@@ -192,6 +192,9 @@ const CONTENT: Record<string, HelpText> = {
   'Catatan anak perusahaan': h('Keterangan induk usaha di footer, mis. "Anak perusahaan PTPN III (Persero)".', 'Parent company note in the footer.'),
   'Judul bawaan': h('Judul Google untuk halaman yang tidak mengatur SEO sendiri.', 'Google title for pages without their own SEO.'),
   'Deskripsi bawaan': h('Deskripsi Google untuk halaman yang tidak mengatur SEO sendiri.', 'Google description for pages without their own SEO.'),
+  'Foto / video halaman login': h('Slide panel samping halaman login, daftar, dan lupa password (maks. 6). Kosong = foto bawaan.', 'Side-panel slides on the login, register and forgot-password pages (max 6). Empty = default photos.'),
+  'Foto atau video': h('Pilih gambar (JPG/PNG/WebP) atau video MP4/WebM dari Media Library. Video diputar tanpa suara.', 'Pick an image or an MP4/WebM video from the Media Library. Videos play muted.'),
+  'Teks di atas foto (opsional)': h('Kalimat pendek yang tampil di bagian bawah foto, mis. "Mutu teruji sejak 1965." Kosong = tanpa teks.', 'Short line shown at the bottom of the photo. Empty = no text.'),
   'Judul petunjuk': h('Nama dokumen/tautan petunjuk penggunaan yang tampil di panel admin.', 'Name of the admin guide document/link.'),
   'Tipe sumber': h('Tautan URL = arahkan ke alamat web. Unggah dokumen = berkas PDF.', 'URL = web address. Upload = PDF file.'),
   'Berkas petunjuk': h('Berkas PDF petunjuk penggunaan admin.', 'Admin guide PDF.'),
@@ -215,12 +218,13 @@ const CONTENT: Record<string, HelpText> = {
 // Field section CMS (SectionDefinitions)
 // ---------------------------------------------------------------------------------------------
 const CMS: Record<string, HelpText> = {
+  'Tampilan blok': h('Gaya pembungkus section: Polos = seperti biasa; Kartu timbul = dibungkus kartu bersudut bulat dengan bayangan halus; Pita berwarna = latar warna lembut selebar layar. Pakai kartu/pita secukupnya agar tetap menonjol, mis. selang-seling.', 'Section wrapper: Plain = as usual; Raised card = rounded card with a soft shadow; Tinted band = soft full-width colour. Use sparingly so it stands out.'),
   'Label kecil': h('Teks kecil berhuruf kapital di atas judul bagian, mis. "Tentang Kami". Opsional.', 'Small uppercase text above the section heading. Optional.'),
   'Judul bagian': h('Judul besar section ini. Opsional; kosong = section tampil tanpa judul.', 'Large heading of this section. Optional.'),
   'Teks': h('Teks yang tampil apa adanya.', 'Text shown as typed.'),
   'Paragraf pembuka': h('Kalimat pembuka di bawah judul halaman.', 'Intro paragraph under the page title.'),
   'Tampilkan breadcrumb': h('Tampilkan jejak navigasi (Beranda / Halaman) di atas judul.', 'Show the breadcrumb trail above the title.'),
-  'Tata letak media': h('Teks kiri, media kanan = foto/video di samping teks. Media memenuhi latar = foto/video menjadi latar penuh.', 'Split = media beside the text. Cover = media fills the background.'),
+  'Tata letak media': h('Teks kiri, media kanan atau Media kiri, teks kanan = foto/video di samping teks (di ponsel teks tetap di atas). Media memenuhi latar = foto/video menjadi latar penuh.', 'Split / reversed split = media beside the text (text stays on top on phones). Cover = media fills the background.'),
   'Berkas (gambar atau video MP4/WebM)': h('Gambar atau video pendek dari Media Library. Video diputar tanpa suara dan berulang.', 'Image or short video from the Media Library. Videos play muted.'),
   'Keterangan (opsional)': h('Keterangan singkat di bawah/atas gambar.', 'Short caption for the image.'),
   'Detik per foto (video mengikuti durasinya)': h('Lama tiap foto tampil sebelum berganti (slideshow). Video berganti saat selesai diputar.', 'How long each photo shows before switching. Videos switch when they end.'),
@@ -433,7 +437,7 @@ const EN_PAIRS: [string, string][] = [
   ['Words', 'Kata'], ['Figures', 'Angka'], ['Items', 'Keunggulan'], ['Videos', 'Video'], ['Milestones', 'Tonggak'], ['Mission points', 'Butir misi'],
   ['Nodes (positions)', 'Simpul (jabatan)'], ['Locations', 'Lokasi'], ['Phones', 'Telepon'], ['Social media', 'Media sosial'], ['Cards', 'Kartu'],
   ['Pillars', 'Pilar'], ['Points', 'Poin'], ['Blocks', 'Blok'], ['Steps', 'Langkah'], ['Features', 'Fitur'], ['Rows', 'Baris'], ['People', 'Orang'],
-  ['Testimonials', 'Testimoni'], ['Technical specifications', 'Spesifikasi teknis'], ['Solubility', 'Kelarutan (solubility)'],
+  ['Testimonials', 'Testimoni'], ['Block style', 'Tampilan blok'], ['Login page photos / videos', 'Foto / video halaman login'], ['Photo or video', 'Foto atau video'], ['Caption on the photo (optional)', 'Teks di atas foto (opsional)'], ['Technical specifications', 'Spesifikasi teknis'], ['Solubility', 'Kelarutan (solubility)'],
   ['Simulation', 'Simulasi'], ['Percentage (%)', 'Persentase (%)'], ['Payment deadline', 'Batas waktu pembayaran'],
   ['Reminder before deadline', 'Pengingat sebelum batas bayar'], ['VAT rate', 'Tarif PPN'], ['Auto-complete after delivery', 'Selesai otomatis setelah diterima'],
   ['Company name', 'Nama perusahaan'], ['Short name', 'Nama singkat'], ['Parent company', 'Induk perusahaan'], ['Established', 'Berdiri sejak'],

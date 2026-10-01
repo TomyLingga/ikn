@@ -18,7 +18,7 @@ class UserManagementTest extends TestCase
         $response = $this->actingAs($super)->postJson('/api/v1/admin/users', [
             'name' => 'Admin Konten',
             'email' => 'Konten@PTIKN.com',
-            'password' => 'rahasia123',
+            'password' => 'Rahasia123',
             'role' => 'admin',
             'permissions' => ['news', 'gallery'],
             'active' => true,
@@ -55,7 +55,7 @@ class UserManagementTest extends TestCase
         $admin = $this->adminWith(['news']);
 
         $this->actingAs($super)->putJson('/api/v1/admin/users/'.$admin->id, [
-            'permissions' => ['cms'], 'password' => 'barubaru123', 'active' => false,
+            'permissions' => ['cms'], 'password' => 'BaruBaru123', 'active' => false,
         ])->assertOk()->assertJsonPath('data.permissions', ['cms'])->assertJsonPath('data.active', false);
 
         $this->assertSame(User::STATUS_INACTIVE, $admin->fresh()->status);

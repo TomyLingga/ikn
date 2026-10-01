@@ -1,0 +1,82 @@
+/* Mini stepper: dots joined by a line; done = brand color, current = ring, upcoming = muted. */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* Connector to the previous step. */
+.steps li + li::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  right: calc(50% + 15px);
+  left: calc(-50% + 15px);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.steps li.done::before,
+.steps li.now::before { background: var(--primary); }
+
+.dot {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.done .dot {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+:global([data-theme='dark']) .done .dot { color: #06121f; }
+
+.now .dot {
+  border-color: var(--primary);
+  background: var(--primary-tint);
+  color: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.done .label { color: var(--ink); }
+.now .label { color: var(--primary); font-weight: 700; }
+
+.compact .dot { width: 22px; height: 22px; }
+.compact li + li::before { top: 10px; right: calc(50% + 12px); left: calc(-50% + 12px); }
+.compact .label { font-size: 0.7rem; }
+
+@media (max-width: 420px) {
+  .label { font-size: 0.66rem; }
+  .compact .label { font-size: 0.64rem; }
+}

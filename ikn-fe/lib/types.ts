@@ -12,6 +12,8 @@ export type Tone = 'ok' | 'warn' | 'bad' | 'info';
 
 // Nama ikon yang tersedia di komponen Icon.
 export type IconName =
+  | 'eye'
+  | 'eyeOff'
   | 'microscope'
   | 'diamond'
   | 'award'

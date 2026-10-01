@@ -61,8 +61,9 @@ export default function FieldInput({ label, def, value, onChange, icons = [], er
       break;
     case 'select':
       control = (
-        <select value={text} onChange={(e) => onChange(e.target.value)}>
-          {!def.required && <option value="">—</option>}
+        // Nilai kosong = bawaan; bila definisi punya default, tampilkan default itu (bukan "—").
+        <select value={text || (typeof def.default === 'string' ? def.default : '')} onChange={(e) => onChange(e.target.value)}>
+          {!def.required && typeof def.default !== 'string' && <option value="">—</option>}
           {Object.entries(def.options ?? {}).map(([key, name]) => (
             <option key={key} value={key}>
               {name}

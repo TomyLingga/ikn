@@ -4,6 +4,8 @@
 // dengan pencarian Nominatim lewat proxy backend (GET /geo/search, GET /geo/reverse).
 // Dipakai di dashboard alamat dan inline saat checkout.
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { isPhone, phoneError, validationText } from '@/lib/validation';
+import PhoneInput from '@/components/PhoneInput';
 import type { FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import Icon from '@/components/Icon';
@@ -181,6 +183,10 @@ export default function AddressForm({ initial, onSaved, onCancel, defaults, subm
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
+    if (!isPhone(form.phone)) {
+      setErrors({ phone: validationText.phone[lang] });
+      return;
+    }
     setBusy(true);
     setError('');
     setErrors({});
@@ -239,8 +245,8 @@ export default function AddressForm({ initial, onSaved, onCancel, defaults, subm
         </label>
         <label>
           <span className="label">{t('Telepon', 'Phone')}</span>
-          <input value={form.phone} onChange={(e) => set('phone', e.target.value)} required maxLength={40} inputMode="tel" />
-          {fieldError('phone')}
+          <PhoneInput value={form.phone} onChange={(phone) => set('phone', phone)} required invalid={!!phoneError(form.phone, lang)} />
+          {phoneError(form.phone, lang) ? <small className="form-error" role="alert">{phoneError(form.phone, lang)}</small> : fieldError('phone')}
         </label>
         <label>
           <span className="label">{t('Kode pos', 'Postal code')}</span>

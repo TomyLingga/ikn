@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from 'react';
 import type { FormEvent } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Icon from '@/components/Icon';
@@ -10,6 +9,10 @@ import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage, fieldErrors } from '@/lib/api';
 import ThemeToggle from '@/components/ThemeToggle';
+import AuthVisual from '@/components/auth/AuthVisual';
+import PasswordChecklist from '@/components/PasswordChecklist';
+import { confirmError, emailError, isEmail, isPhone, isStrongPassword, passwordError, phoneError, validationText } from '@/lib/validation';
+import PhoneInput from '@/components/PhoneInput';
 import styles from './page.module.css';
 
 type AuthMode = 'login' | 'registration';
@@ -30,6 +33,12 @@ function AuthCard() {
 
   const [mode, setMode] = useState<AuthMode>(searchParams.get('mode') === 'register' ? 'registration' : 'login');
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
+  // Nilai terkontrol untuk validasi langsung (format email, nomor HP, kekuatan & konfirmasi kata sandi).
+  const [values, setValues] = useState({ loginEmail: '', email: '', phone: '', password: '', confirm: '' });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const setValue = (key: keyof typeof values) => (event: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: event.target.value }));
+  const touch = (key: string) => () => setTouched((t) => ({ ...t, [key]: true }));
   const [error, setError] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -47,6 +56,11 @@ function AuthCard() {
     setMode(nextMode);
     setError('');
     setErrors({});
+    // Simpan mode di URL tanpa navigasi agar muat ulang/bagikan tautan tetap di form yang sama.
+    const url = new URL(window.location.href);
+    if (nextMode === 'registration') url.searchParams.set('mode', 'register');
+    else url.searchParams.delete('mode');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}`);
   }
 
   function safePath(path: string | null): string | null {
@@ -100,11 +114,16 @@ function AuthCard() {
     const form = new FormData(event.currentTarget);
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
+    if (!isEmail(email)) {
+      setTouched((t) => ({ ...t, loginEmail: true }));
+      setBusy(false);
+      return;
+    }
 
     try {
       // Coba sebagai customer dulu; bila kredensial bukan customer (422), coba admin.
       try {
-        await loginCustomer(email, password);
+        await loginCustomer(email, password, remember);
         router.replace(redirectParam && !redirectParam.startsWith('/admin') ? redirectParam : '/dashboard');
         return;
       } catch (customerError) {
@@ -115,7 +134,7 @@ function AuthCard() {
           return;
         }
         if (!(customerError instanceof ApiError) || customerError.status !== 422) throw customerError;
-        await loginAdmin(email, password);
+        await loginAdmin(email, password, remember);
         router.replace(redirectParam?.startsWith('/admin') ? redirectParam : '/admin');
       }
     } catch (err) {
@@ -134,13 +153,22 @@ function AuthCard() {
     const form = new FormData(event.currentTarget);
     const value = (key: string) => String(form.get(key) || '').trim();
     const email = value('email');
+    const phone = values.phone.trim(); // dari PhoneInput: E.164, mis. +6281234567890
+    const password = String(form.get('password') || '');
+    const confirm = String(form.get('passwordConfirmation') || '');
+    if (!isEmail(email) || (phone && !isPhone(phone)) || !isStrongPassword(password) || password !== confirm) {
+      setTouched({ email: true, phone: true, password: true, confirm: true });
+      setError(t('Periksa kembali isian yang ditandai merah.', 'Please check the fields marked in red.'));
+      setBusy(false);
+      return;
+    }
     try {
       await registerCustomer({
         name: value('name'),
         email,
         password: String(form.get('password') || ''),
         passwordConfirmation: String(form.get('passwordConfirmation') || ''),
-        phone: value('phone') || undefined,
+        phone: phone || undefined,
         company: value('company') || undefined,
         position: value('position') || undefined,
         taxId: value('taxId') || undefined,
@@ -155,19 +183,28 @@ function AuthCard() {
   }
 
   const fieldError = (key: string) => (errors[key] ? <small className={styles.fieldError}>{errors[key]}</small> : null);
+  // Error klien (setelah field disentuh) didahulukan; error server tampil bila tidak ada error klien.
+  const liveError = (key: string, message: string) =>
+    touched[key] && message ? (
+      <small className={styles.fieldError} role="alert">
+        {message}
+      </small>
+    ) : null;
+  const loginEmailError = emailError(values.loginEmail, lang);
+  const regEmailError = emailError(values.email, lang);
+  const regPhoneError = phoneError(values.phone, lang);
+  const regPasswordError = passwordError(values.password, lang);
+  const regConfirmError = confirmError(values.password, values.confirm, lang);
+
+  const showRegister = mode === 'registration' && !registered && !(customer || admin);
 
   return (
-    <section className={styles.card} aria-labelledby="auth-title">
-      <div className={styles.brand}>
-        <Link href="/" aria-label="Kembali ke beranda PT IKN">
-          <Image src="/img/rubin-logo.png" alt="PT IKN" width={48} height={48} priority />
-        </Link>
-        <div>
-          <strong>PT Industri Karet Nusantara</strong>
-          <span>{t('Selamat datang', 'Welcome')}</span>
+    <section className={`${styles.card} ${showRegister ? styles.isRegister : ''}`} aria-labelledby="auth-title">
+      <div className={styles.formPane}>
+        <div className={styles.themeCorner}>
+          <ThemeToggle />
         </div>
-      </div>
-
+        <div className={styles.formInner} key={registered ? 'done' : mode}>
       {(customer || admin) ? (
         <div className={styles.loggedIn}>
           <p>{t('Anda sudah login sebagai', 'You are logged in as')} <strong>{customer?.name || admin?.name}</strong></p>
@@ -205,14 +242,21 @@ function AuthCard() {
       ) : (
         <>
           <div className={styles.heading}>
-            <span className={styles.eyebrow}>{mode === 'login' ? t('Masuk ke akun', 'Sign in') : t('Buat akun baru', 'Create an account')}</span>
-            <h1 id="auth-title">{mode === 'login' ? 'Login' : t('Buat akun', 'Register')}</h1>
+            <span className={styles.eyebrow}>{mode === 'login' ? t('Portal customer', 'Customer portal') : t('Akun perusahaan baru', 'New company account')}</span>
+            <h1 id="auth-title">{mode === 'login' ? t('Selamat datang kembali', 'Welcome back') : t('Buat akun', 'Create an account')}</h1>
             <p>
               {mode === 'login'
-                ? t('Masukkan email dan kata sandi untuk melanjutkan.', 'Enter your email and password to continue.')
+                ? t('Masuk untuk memesan, membayar, dan melacak pesanan Anda.', 'Sign in to order, pay, and track your orders.')
                 : t('Daftarkan perusahaan Anda untuk mulai memesan produk PT IKN secara online.', 'Register your company to start ordering PT IKN products online.')}
             </p>
           </div>
+
+          <p className={styles.modeSwitch}>
+            {mode === 'login' ? t('Belum punya akun?', "Don't have an account?") : t('Sudah punya akun?', 'Already have an account?')}{' '}
+            <button type="button" onClick={() => changeMode(mode === 'login' ? 'registration' : 'login')}>
+              {mode === 'login' ? t('Daftar sekarang', 'Register now') : t('Masuk', 'Log in')}
+            </button>
+          </p>
 
           {notice && (
             <div className={`${styles.notice} ${styles[`notice_${notice.tone}`]}`} role="status">
@@ -248,7 +292,19 @@ function AuthCard() {
 
               <label className={styles.field}>
                 <span>Email</span>
-                <input name="email" type="email" autoComplete="email" required placeholder="nama@perusahaan.com" />
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="nama@perusahaan.com"
+                  value={values.loginEmail}
+                  onChange={setValue('loginEmail')}
+                  onBlur={touch('loginEmail')}
+                  aria-invalid={touched.loginEmail && !!loginEmailError}
+                  className={touched.loginEmail && loginEmailError ? styles.invalid : undefined}
+                />
+                {liveError('loginEmail', loginEmailError)}
               </label>
 
               <label className={styles.field}>
@@ -261,18 +317,28 @@ function AuthCard() {
                     required
                     placeholder={t('Masukkan kata sandi', 'Enter your password')}
                   />
-                  <button type="button" onClick={() => setShowPassword((visible) => !visible)}>
-                    {showPassword ? t('Sembunyikan', 'Hide') : t('Lihat', 'Show')}
+                  <button
+                    type="button"
+                    className={styles.eyeButton}
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? t('Sembunyikan kata sandi', 'Hide password') : t('Lihat kata sandi', 'Show password')}
+                    aria-pressed={showPassword}
+                  >
+                    <Icon name={showPassword ? 'eyeOff' : 'eye'} size={20} />
                   </button>
                 </span>
               </label>
 
-              <div className={styles.formRow}>
+              <div className={styles.formRowBetween}>
+                <label className={styles.remember}>
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                  <span>{t('Ingat saya', 'Remember me')}</span>
+                </label>
                 <Link href="/forgot-password" className={styles.subtleLink}>{t('Lupa password?', 'Forgot password?')}</Link>
               </div>
 
               <button type="submit" className={styles.primaryButton} disabled={busy}>
-                {busy ? t('Memproses…', 'Processing…') : 'Login'} <Icon name="arrow" size={18} />
+                {busy ? t('Memproses…', 'Processing…') : t('Masuk', 'Log in')} <Icon name="arrow" size={18} />
               </button>
             </form>
           ) : (
@@ -286,8 +352,19 @@ function AuthCard() {
               </label>
               <label className={styles.field}>
                 <span>Email</span>
-                <input name="email" type="email" autoComplete="email" required placeholder="nama@perusahaan.com" />
-                {fieldError('email')}
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="nama@perusahaan.com"
+                  value={values.email}
+                  onChange={setValue('email')}
+                  onBlur={touch('email')}
+                  aria-invalid={touched.email && !!regEmailError}
+                  className={touched.email && regEmailError ? styles.invalid : undefined}
+                />
+                {liveError('email', regEmailError) || fieldError('email')}
               </label>
               <div className={styles.twoCol}>
                 <label className={styles.field}>
@@ -304,8 +381,15 @@ function AuthCard() {
               <div className={styles.twoCol}>
                 <label className={styles.field}>
                   <span>{t('Nomor telepon', 'Phone number')}</span>
-                  <input name="phone" type="tel" autoComplete="tel" maxLength={40} placeholder="08…" />
-                  {fieldError('phone')}
+                  <PhoneInput
+                    name="phoneNational"
+                    variant="filled"
+                    value={values.phone}
+                    onChange={(phone) => setValues((v) => ({ ...v, phone }))}
+                    onBlur={touch('phone')}
+                    invalid={touched.phone && !!regPhoneError}
+                  />
+                  {liveError('phone', regPhoneError) || fieldError('phone')}
                 </label>
                 <label className={styles.field}>
                   <span>NPWP</span>
@@ -315,13 +399,56 @@ function AuthCard() {
               </div>
               <label className={styles.field}>
                 <span>{t('Kata sandi', 'Password')}</span>
-                <input name="password" type="password" autoComplete="new-password" required minLength={8} placeholder={t('Min. 8 karakter, huruf dan angka', 'Min. 8 characters, letters and numbers')} />
+                <span className={styles.passwordField}>
+                  <input
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    placeholder={t('Min. 8 karakter: huruf besar, kecil, dan angka', 'Min. 8 characters: upper, lower and a number')}
+                    value={values.password}
+                    onChange={setValue('password')}
+                    onBlur={touch('password')}
+                    aria-invalid={touched.password && !!regPasswordError}
+                    className={touched.password && regPasswordError ? styles.invalid : undefined}
+                  />
+                  <button
+                    type="button"
+                    className={styles.eyeButton}
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? t('Sembunyikan kata sandi', 'Hide password') : t('Lihat kata sandi', 'Show password')}
+                    aria-pressed={showPassword}
+                  >
+                    <Icon name={showPassword ? 'eyeOff' : 'eye'} size={20} />
+                  </button>
+                </span>
+                {values.password && <PasswordChecklist value={values.password} />}
                 {fieldError('password')}
               </label>
               <label className={styles.field}>
                 <span>{t('Ulangi kata sandi', 'Confirm password')}</span>
-                <input name="passwordConfirmation" type="password" autoComplete="new-password" required minLength={8} placeholder={t('Ketik ulang kata sandi', 'Re-type your password')} />
-                {fieldError('passwordConfirmation')}
+                <input
+                  name="passwordConfirmation"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  placeholder={t('Ketik ulang kata sandi', 'Re-type your password')}
+                  value={values.confirm}
+                  onChange={setValue('confirm')}
+                  aria-invalid={!!regConfirmError}
+                  className={regConfirmError ? styles.invalid : values.confirm && !regConfirmError ? styles.valid : undefined}
+                />
+                {regConfirmError ? (
+                  <small className={styles.fieldError} role="alert">
+                    {regConfirmError}
+                  </small>
+                ) : values.confirm ? (
+                  <small className={styles.fieldOk}>✓ {validationText.confirmOk[lang]}</small>
+                ) : (
+                  fieldError('passwordConfirmation')
+                )}
               </label>
 
               <p className={styles.hint}>
@@ -332,19 +459,16 @@ function AuthCard() {
               </p>
 
               <button type="submit" className={styles.primaryButton} disabled={busy}>
-                {busy ? t('Mendaftarkan…', 'Registering…') : t('Daftar', 'Register')} <Icon name="arrow" size={18} />
+                {busy ? t('Mendaftarkan…', 'Registering…') : t('Buat akun', 'Create account')} <Icon name="arrow" size={18} />
               </button>
             </form>
           )}
 
-          <p className={styles.modeSwitch}>
-            {mode === 'login' ? t('Belum punya akun?', "Don't have an account?") : t('Sudah punya akun?', 'Already have an account?')}{' '}
-            <button type="button" onClick={() => changeMode(mode === 'login' ? 'registration' : 'login')}>
-              {mode === 'login' ? t('Daftar', 'Register') : t('Kembali ke Login', 'Back to login')}
-            </button>
-          </p>
         </>
       )}
+        </div>
+      </div>
+      <AuthVisual />
     </section>
   );
 }
@@ -352,12 +476,6 @@ function AuthCard() {
 export default function LoginPage() {
   return (
     <main className={styles.page}>
-      <Link href="/" className={styles.backLink}>
-        <Icon name="arrow" size={16} /> Kembali ke situs
-      </Link>
-      <div className={styles.themeCorner}>
-        <ThemeToggle />
-      </div>
       <Suspense fallback={<p className={styles.loading}>Memuat…</p>}>
         <AuthCard />
       </Suspense>

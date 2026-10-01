@@ -1,12 +1,9 @@
 'use client';
 
-// Kerangka halaman auth (login, lupa/reset password): kartu neumorphic yang sama dengan /login.
+// Kerangka halaman auth lupa/reset password: kartu dua panel yang sama dengan /login (form kiri, foto kanan).
 import type { ReactNode } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import Icon from '@/components/Icon';
 import ThemeToggle from '@/components/ThemeToggle';
-import { useLang } from '@/components/LanguageProvider';
+import AuthVisual from '@/components/auth/AuthVisual';
 import styles from '@/app/(auth)/login/page.module.css';
 
 export { styles as authStyles };
@@ -21,34 +18,24 @@ interface AuthPageProps {
 }
 
 export default function AuthPage({ eyebrow, title, lead, children, footer }: AuthPageProps) {
-  const { lang } = useLang();
-  const t = (id: string, en: string) => (lang === 'en' ? en : id);
-
   return (
     <main className={styles.page}>
-      <Link href="/" className={styles.backLink}>
-        <Icon name="arrow" size={16} /> {t('Kembali ke situs', 'Back to site')}
-      </Link>
-      <div className={styles.themeCorner}>
-        <ThemeToggle />
-      </div>
       <section className={styles.card} aria-labelledby="auth-title">
-        <div className={styles.brand}>
-          <Link href="/" aria-label="PT IKN">
-            <Image src="/img/rubin-logo.png" alt="PT IKN" width={48} height={48} priority />
-          </Link>
-          <div>
-            <strong>PT Industri Karet Nusantara</strong>
-            <span>{t('Portal customer', 'Customer portal')}</span>
+        <div className={styles.formPane}>
+          <div className={styles.themeCorner}>
+            <ThemeToggle />
+          </div>
+          <div className={styles.formInner}>
+            <div className={styles.heading}>
+              <span className={styles.eyebrow}>{eyebrow}</span>
+              <h1 id="auth-title">{title}</h1>
+              {lead && <p>{lead}</p>}
+            </div>
+            {children}
+            {footer && <p className={`${styles.modeSwitch} ${styles.footerSwitch}`}>{footer}</p>}
           </div>
         </div>
-        <div className={styles.heading}>
-          <span className={styles.eyebrow}>{eyebrow}</span>
-          <h1 id="auth-title">{title}</h1>
-          {lead && <p>{lead}</p>}
-        </div>
-        {children}
-        {footer && <p className={styles.modeSwitch}>{footer}</p>}
+        <AuthVisual />
       </section>
     </main>
   );

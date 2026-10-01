@@ -4,6 +4,8 @@ import FloatingContacts from '@/components/FloatingContacts';
 import PageTransition from '@/components/PageTransition';
 import { SiteProvider } from '@/components/SiteProvider';
 import { fetchSite } from '@/lib/server-data';
+import JsonLd from '@/components/JsonLd';
+import { organizationJsonLd, websiteJsonLd } from '@/lib/seo';
 import '@/app/pages.css';
 import '@/app/styles/commerce.css';
 
@@ -14,6 +16,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
 
   return (
     <SiteProvider site={site}>
+      <JsonLd data={[organizationJsonLd(site), websiteJsonLd()]} />
       <Navbar />
       <main className="site-main">
         <PageTransition>{children}</PageTransition>

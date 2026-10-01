@@ -3,6 +3,7 @@
 namespace Tests\Feature\Commerce;
 
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\Commerce\OrderStateMachine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,6 +90,85 @@ class AdminDashboardReportTest extends TestCase
 
         $this->app['auth']->forgetGuards();
         $this->actingAs($this->adminWith(['orders']))->getJson('/api/v1/admin/dashboard')->assertStatus(403);
+    }
+
+    public function test_dashboard_kpis_work_queue_top_products_low_stock_and_payment_due(): void
+    {
+        $this->setUpCommerce();
+        $orders = $this->seedScenario(); // "now" frozen at the 15th 12:00 of the current month
+        $now = now();
+        $product = Product::where('slug', 'resiprene-35')->firstOrFail();
+        $admin = $this->superAdmin();
+
+        // Previous period (same elapsed span last month): one paid order on day 4.
+        Carbon::setTestNow($now->copy()->startOfMonth()->subMonthNoOverflow()->addDays(3)->setTime(10, 0));
+        $previous = $this->payOrder($this->placeOrder($product, 3), $admin);
+
+        // Unpaid orders: one past its due time (expiry job not run yet), one due within 24 hours.
+        Carbon::setTestNow($now->copy()->subDays(2));
+        $overdue = $this->placeOrder($product, 1);
+        Carbon::setTestNow($now->copy()->subHours(1));
+        $dueSoon = $this->placeOrder($product, 1);
+        Carbon::setTestNow($now);
+
+        // Customers: buyer registered last month, two registered this month.
+        $this->buyer->forceFill(['created_at' => $now->copy()->startOfMonth()->subMonthNoOverflow()->addDay()])->save();
+        $this->customer(['email' => 'new1@x.id', 'created_at' => $now->copy()->subDays(3)]);
+        $this->customer(['email' => 'new2@x.id', 'created_at' => $now->copy()->subDays(1)]);
+
+        // Low stock: below max(moq x 10, 50); made-to-order and quote products never count.
+        $low = $this->makeProduct(['slug' => 'low-moq', 'moq' => 10], 40);
+        $this->makeProduct(['slug' => 'low-min'], 20);
+        $this->makeProduct(['slug' => 'made-to-order', 'stock_status' => Product::STOCK_MADE_TO_ORDER]);
+        $this->makeProduct(['slug' => 'quote-only', 'price_mode' => Product::PRICE_MODE_QUOTE, 'price' => null]);
+
+        $response = $this->actingAs($admin)->getJson('/api/v1/admin/dashboard')->assertOk();
+        $paid = $orders['paid']->grandTotalInt();
+        $prev = $previous->grandTotalInt();
+
+        $response->assertJsonPath('data.kpis.revenue.current', $paid)
+            ->assertJsonPath('data.kpis.revenue.previous', $prev)
+            ->assertJsonPath('data.kpis.revenue.changePct', round(($paid - $prev) / $prev * 100, 1))
+            ->assertJsonPath('data.kpis.paidOrders.current', 1)
+            ->assertJsonPath('data.kpis.paidOrders.previous', 1)
+            ->assertJsonPath('data.kpis.avgOrderValue.current', $paid)
+            ->assertJsonPath('data.kpis.newCustomers.current', 2)
+            ->assertJsonPath('data.kpis.newCustomers.previous', 1)
+            ->assertJsonPath('data.period.from', $now->copy()->startOfMonth()->toApiString())
+            ->assertJsonPath('data.workQueue.paymentsToVerify', 1)
+            ->assertJsonPath('data.workQueue.ordersToProcess', 2) // this month's paid + last month's paid
+            ->assertJsonPath('data.workQueue.ordersToShip', 0)
+            ->assertJsonPath('data.workQueue.ordersInTransit', 0)
+            ->assertJsonPath('data.workQueue.paymentsOverdue', 1)
+            ->assertJsonPath('data.workQueue.customersToApprove', 0)
+            ->assertJsonPath('data.workQueue.unreadChats', 0)
+            ->assertJsonCount(1, 'data.topProducts')
+            ->assertJsonPath('data.topProducts.0.productSlug', 'resiprene-35')
+            ->assertJsonPath('data.topProducts.0.qty', 5)
+            ->assertJsonPath('data.topProducts.0.orders', 1)
+            ->assertJsonPath('data.topProducts.0.revenue', 500000)
+            ->assertJsonPath('data.lowStock.total', 2)
+            ->assertJsonPath('data.lowStock.items.0.slug', 'low-min')
+            ->assertJsonPath('data.lowStock.items.0.available', 20)
+            ->assertJsonPath('data.lowStock.items.0.threshold', 50)
+            ->assertJsonPath('data.lowStock.items.1.id', $low->id)
+            ->assertJsonPath('data.lowStock.items.1.threshold', 100)
+            ->assertJsonPath('data.paymentDue.overdue', 1)
+            ->assertJsonPath('data.paymentDue.dueSoon', 1)
+            ->assertJsonPath('data.paymentDue.items.0.number', $overdue->number)
+            ->assertJsonPath('data.paymentDue.items.1.number', $dueSoon->number);
+
+        // Stock is never written by the dashboard.
+        $this->assertSame(40, $low->fresh()->stock_qty);
+
+        // Work queue respects module access (null = module not granted), like /admin/badges.
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->adminWith(['dashboard', 'payments']))->getJson('/api/v1/admin/dashboard')->assertOk()
+            ->assertJsonPath('data.workQueue.paymentsToVerify', 1)
+            ->assertJsonPath('data.workQueue.ordersToProcess', null)
+            ->assertJsonPath('data.workQueue.paymentsOverdue', null)
+            ->assertJsonPath('data.workQueue.customersToApprove', null)
+            ->assertJsonPath('data.workQueue.unreadChats', null);
     }
 
     public function test_sales_report_json_and_csv_exclude_cancelled_and_expired(): void

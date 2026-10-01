@@ -77,7 +77,7 @@ class AuthController extends ApiController
             throw new ApiException(400, 'BAD_REQUEST', 'Stateful session required: send requests from an allowed frontend origin.');
         }
 
-        Auth::guard('web')->login($user);
+        Auth::guard('web')->login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
         $user->forceFill(['last_login_at' => now()])->save();

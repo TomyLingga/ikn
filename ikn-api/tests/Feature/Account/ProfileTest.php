@@ -33,10 +33,10 @@ class ProfileTest extends TestCase
             ->assertJsonPath('data.addresses.0.isDefault', true)
             ->assertJsonPath('data.addresses.0.region.village', 'Cakung Barat');
 
-        $this->actingAs($user)->putJson('/api/v1/customer/profile', ['name' => 'Budi S.', 'phone' => '0899', 'position' => 'Manager'])
+        $this->actingAs($user)->putJson('/api/v1/customer/profile', ['name' => 'Budi S.', 'phone' => '089912345678', 'position' => 'Manager'])
             ->assertOk()
             ->assertJsonPath('data.name', 'Budi S.')
-            ->assertJsonPath('data.phone', '0899')
+            ->assertJsonPath('data.phone', '089912345678')
             ->assertJsonPath('data.position', 'Manager')
             ->assertJsonPath('data.company', 'Coating Solutions Co.')
             ->assertJsonStructure(['message']);
@@ -50,7 +50,7 @@ class ProfileTest extends TestCase
             ->assertJsonPath('data.taxId', '99.999');
 
         $this->assertDatabaseHas('users', ['id' => $user->id, 'name' => 'Budi S.']);
-        $this->assertDatabaseHas('customer_profiles', ['user_id' => $user->id, 'company' => 'Coating Solutions Indonesia', 'company_email' => 'sales@example.com', 'phone' => '0899']);
+        $this->assertDatabaseHas('customer_profiles', ['user_id' => $user->id, 'company' => 'Coating Solutions Indonesia', 'company_email' => 'sales@example.com', 'phone' => '089912345678']);
 
         $this->actingAs($user)->putJson('/api/v1/customer/profile/company', ['companyEmail' => 'bukan-email'])
             ->assertStatus(422)

@@ -25,6 +25,7 @@ import { openChat, shopPaths } from '@/lib/shop';
 import type { CommerceConfig, Order, Payment, ReviewInput } from '@/lib/types';
 import styles from './CustomerOrderDetail.module.css';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import OrderProgress, { orderNextStep } from '@/components/customer/OrderProgress';
 
 const paths = shopPaths(true);
 const RATING_LABELS_ID: [string, string, string, string, string] = ['Buruk', 'Kurang', 'Cukup', 'Baik', 'Sangat baik'];
@@ -178,6 +179,16 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
   const justPlaced = params.get('placed') === '1' && order.status === 'pending_payment';
   const ratingLabels = lang === 'en' ? RATING_LABELS_EN : RATING_LABELS_ID;
   const showReviews = order.status === 'completed' && (reviewable.length > 0 || reviewed.length > 0);
+  const next = orderNextStep(order, lang);
+  // Jump link to the section where the customer acts next (payment, tracking actions, review form).
+  const nextAction =
+    order.status === 'pending_payment' && order.canUploadProof
+      ? { href: '#payment', label: t('Bayar sekarang', 'Pay now') }
+      : canConfirmReceived(order) || canComplete(order)
+        ? { href: '#tracking', label: canConfirmReceived(order) ? t('Konfirmasi diterima', 'Confirm receipt') : t('Selesaikan pesanan', 'Complete order') }
+        : showReviews && reviewable.length > 0 && canReview(order)
+          ? { href: '#review', label: t('Beri ulasan', 'Write a review') }
+          : null;
 
   return (
     <div className={styles.page}>
@@ -218,6 +229,26 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
             </p>
           </div>
         </div>
+      )}
+
+      {!justPlaced && (
+        <section className={`${styles.nextCard} ${styles[`next_${next.tone}`]} no-print`} aria-label={t('Langkah berikutnya', 'Next step')}>
+          <div className={styles.nextText}>
+            <span className={styles.nextIcon}>
+              <Icon name={next.icon} size={20} />
+            </span>
+            <div>
+              <strong>{next.title}</strong>
+              <p>{next.body}</p>
+            </div>
+            {nextAction && (
+              <a href={nextAction.href} className={styles.primaryBtn}>
+                {nextAction.label} <Icon name="arrowDown" size={16} />
+              </a>
+            )}
+          </div>
+          <OrderProgress status={order.status} lang={lang} />
+        </section>
       )}
 
       {actionError && (

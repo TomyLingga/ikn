@@ -28,7 +28,7 @@ class StartGuestChatRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'min:2', 'max:120'],
             'email' => ['required', 'email', 'max:160'],
-            'phone' => ['nullable', 'string', 'max:40', 'regex:/^[0-9+() .-]+$/'],
+            'phone' => ['nullable', 'string', 'max:40', new \App\Rules\PhoneNumber()],
             'body' => ['required', 'string', 'max:'.ChatMessage::BODY_MAX],
         ];
     }

@@ -28,6 +28,23 @@ class AdminLoginTest extends TestCase
         $this->assertNotNull($admin->fresh()->last_login_at);
     }
 
+    public function test_remember_me_sets_remember_cookie(): void
+    {
+        $admin = $this->superAdmin();
+        $admin->forceFill(['remember_token' => null])->save();
+
+        $remembered = $this->fromFrontend()->postJson('/api/v1/auth/admin/login', ['email' => $admin->email, 'password' => 'password', 'remember' => true])->assertOk();
+        $this->assertNotNull($admin->fresh()->remember_token);
+        $this->assertTrue(collect($remembered->headers->getCookies())->contains(fn ($cookie) => str_starts_with($cookie->getName(), 'remember_web_')));
+
+        // Tanpa remember: remember token tidak diganti (factory sudah mengisi token awal).
+        $other = $this->adminWith(['cms']);
+        $before = $other->remember_token;
+        $this->app['auth']->forgetGuards();
+        $this->fromFrontend()->postJson('/api/v1/auth/admin/login', ['email' => $other->email, 'password' => 'password'])->assertOk();
+        $this->assertSame($before, $other->fresh()->remember_token);
+    }
+
     public function test_wrong_password_returns_validation_error(): void
     {
         $this->superAdmin(['email' => 'super@ptikn.com']);

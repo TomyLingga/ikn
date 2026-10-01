@@ -11,6 +11,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 ARG NEXT_PUBLIC_API_URL=https://api.example.com/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_SITE_URL=https://ikn.co.id
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

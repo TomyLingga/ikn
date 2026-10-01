@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import PasswordChecklist from '@/components/PasswordChecklist';
+import { emailError } from '@/lib/validation';
 import Icon from '@/components/Icon';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
@@ -351,7 +353,8 @@ export default function AdminUsers() {
               </label>
               <label>
                 <span className="field-label">Email</span>
-                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required maxLength={190} />
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required maxLength={190} aria-invalid={!!emailError(form.email, lang)} />
+                {emailError(form.email, lang) && <small className="cms-field-error" role="alert">{emailError(form.email, lang)}</small>}
                 {firstError(formErrors, 'email') && <small className="cms-field-error">{firstError(formErrors, 'email')}</small>}
               </label>
             </div>
@@ -369,6 +372,7 @@ export default function AdminUsers() {
                   minLength={8}
                   autoComplete="new-password"
                 />
+                {form.password && <PasswordChecklist value={form.password} />}
                 {firstError(formErrors, 'password') && <small className="cms-field-error">{firstError(formErrors, 'password')}</small>}
               </label>
               <label>

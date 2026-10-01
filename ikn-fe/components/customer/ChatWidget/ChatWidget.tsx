@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { emailError, isEmail, isPhone, phoneError, validationText } from '@/lib/validation';
+import PhoneInput from '@/components/PhoneInput';
 import Image from 'next/image';
 import Icon from '@/components/Icon';
 import { ChatComposer, ChatThread } from '@/components/chat';
@@ -271,11 +273,19 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
   async function startGuest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sending) return;
+    const phone = form.phone.trim(); // dari PhoneInput: E.164, kosong bila tidak diisi
+    const clientErrors: Record<string, string> = {};
+    if (!isEmail(form.email)) clientErrors.email = validationText.email[lang];
+    if (phone && !isPhone(phone)) clientErrors.phone = validationText.phone[lang];
+    if (Object.keys(clientErrors).length) {
+      setFormErrors(clientErrors);
+      return;
+    }
     setSending(true);
     setFormErrors({});
     setError('');
     try {
-      const res = await api<{ token: string; message: ChatMessage }>('/chat/guest', { method: 'POST', body: form });
+      const res = await api<{ token: string; message: ChatMessage }>('/chat/guest', { method: 'POST', body: { ...form, phone } });
       writeGuestToken(res.token);
       setGuestToken(res.token);
       reset();
@@ -359,16 +369,20 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
               <label>
                 <span className="sr-only">Email</span>
                 <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder={t('Email Anda', 'Your email')} autoComplete="email" required />
-                {formErrors.email && <small>{formErrors.email}</small>}
+                {(formErrors.email || emailError(form.email, lang)) && <small>{formErrors.email || emailError(form.email, lang)}</small>}
               </label>
-              <label className={styles.phoneField}>
+              <div className={styles.phoneField}>
                 <span className="sr-only">{t('Telepon', 'Phone')}</span>
-                <span className={styles.phonePrefix} aria-hidden="true">
-                  <Icon name="phone" size={16} /> +62
-                </span>
-                <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder={t('Telepon Anda (opsional)', 'Your phone (optional)')} autoComplete="tel" />
-                {formErrors.phone && <small>{formErrors.phone}</small>}
-              </label>
+                <PhoneInput
+                  value={form.phone}
+                  onChange={(phone) => setForm((f) => ({ ...f, phone }))}
+                  placeholder={t('Telepon (opsional)', 'Phone (optional)')}
+                  invalid={!!formErrors.phone || (form.phone.replace(/\D/g, '').length > 5 && !!phoneError(form.phone, lang))}
+                />
+                {(formErrors.phone || (form.phone.replace(/\D/g, '').length > 5 && phoneError(form.phone, lang))) && (
+                  <small>{formErrors.phone || validationText.phone[lang]}</small>
+                )}
+              </div>
               <label>
                 <span className={styles.fieldLabel}>{t('Pesan', 'Message')}</span>
                 <textarea rows={5} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder={t('Tulis pesan Anda', 'Write your message')} required maxLength={2000} />

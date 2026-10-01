@@ -14,6 +14,6 @@ class DashboardController extends ApiController
         $request->validate(['year' => ['nullable', 'integer', 'min:2000', 'max:2100']]);
         $year = (int) ($request->query('year') ?: now()->setTimezone(config('app.timezone'))->year);
 
-        return $this->data($dashboard->build($year));
+        return $this->data($dashboard->build($year, $request->user()));
     }
 }

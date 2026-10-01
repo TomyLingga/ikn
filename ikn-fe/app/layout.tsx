@@ -9,6 +9,8 @@ import { fetchSite } from '@/lib/server-data';
 import { themeStyle } from '@/lib/theme';
 import NavProgress from '@/components/NavProgress';
 import ConfirmHost from '@/components/ConfirmDialog';
+import type { Metadata, Viewport } from 'next';
+import { DEFAULT_OG_IMAGE, SITE_URL } from '@/lib/seo';
 
 // Pasangan huruf industrial: Archivo (grotesque) untuk teks & display,
 // IBM Plex Mono untuk label teknis — identitas "lembar data pabrik".
@@ -30,16 +32,49 @@ const plexMono = IBM_Plex_Mono({
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = {
-  metadataBase: new URL('https://ikn.co.id'),
-  title: {
-    default: 'PT Industri Karet Nusantara — Hilir Karet Berkualitas',
-    template: '%s · PT IKN',
-  },
-  description:
-    'PT Industri Karet Nusantara (PT IKN) adalah perusahaan hilir karet berpengalaman sejak 1965, memproduksi Resiprene 35 dan aneka barang karet dari Medan, Sumatera Utara.',
-  keywords: ['karet', 'rubber', 'Resiprene', 'PT IKN', 'Medan', 'hilir karet'],
+const FALLBACK_TITLE = 'PT Industri Karet Nusantara — Hilir Karet Berkualitas';
+const FALLBACK_DESCRIPTION =
+  'PT Industri Karet Nusantara (PT IKN) adalah perusahaan hilir karet berpengalaman sejak 1965, memproduksi Resiprene 35 dan aneka barang karet dari Medan, Sumatera Utara.';
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b1220' },
+  ],
 };
+
+// Metadata bawaan seluruh situs: judul & deskripsi dari Pengaturan Situs → SEO bawaan, OpenGraph/Twitter untuk
+// pratinjau tautan (WhatsApp, LinkedIn, Facebook), dan metadataBase dari NEXT_PUBLIC_SITE_URL (lib/seo.ts).
+export async function generateMetadata(): Promise<Metadata> {
+  const { settings } = await fetchSite();
+  const title = settings.seo?.default_title?.id?.trim() || FALLBACK_TITLE;
+  const description = settings.seo?.default_description?.id?.trim() || FALLBACK_DESCRIPTION;
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: { default: title, template: '%s · PT IKN' },
+    description,
+    applicationName: 'PT Industri Karet Nusantara',
+    keywords: [
+      'karet', 'pabrik karet Medan', 'barang karet industri', 'rubber products Indonesia', 'Resiprene 35', 'cyclised natural rubber',
+      'karet siklis', 'sarung egrek', 'sepatu boots karet', 'rubber membrane', 'PT IKN', 'PT Industri Karet Nusantara', 'PTPN III', 'hilir karet',
+    ],
+    authors: [{ name: 'PT Industri Karet Nusantara' }],
+    creator: 'PT Industri Karet Nusantara',
+    publisher: 'PT Industri Karet Nusantara',
+    formatDetection: { telephone: true, email: true, address: true },
+    openGraph: {
+      type: 'website',
+      siteName: 'PT Industri Karet Nusantara',
+      locale: 'id_ID',
+      alternateLocale: ['en_US'],
+      title,
+      description,
+      images: [{ url: DEFAULT_OG_IMAGE, width: 1200, height: 630, alt: 'PT Industri Karet Nusantara' }],
+    },
+    twitter: { card: 'summary_large_image', title, description, images: [DEFAULT_OG_IMAGE] },
+    robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 } },
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Analitik dari Pengaturan Situs (kosong = tidak dipasang). fetchSite di-cache per request (React cache).

@@ -34,6 +34,29 @@ class SettingsAndSiteTest extends TestCase
         $this->assertDatabaseMissing('settings', ['key' => 'hacker.key']);
     }
 
+    public function test_auth_slides_accept_images_and_videos_and_protect_media(): void
+    {
+        $admin = $this->adminWith(['settings']);
+        $photo = \App\Models\Media::create(['disk' => 'public', 'path' => 'x/pabrik.jpg', 'original_name' => 'pabrik.jpg', 'mime' => 'image/jpeg', 'size' => 10]);
+        $video = \App\Models\Media::create(['disk' => 'public', 'path' => 'x/produksi.mp4', 'original_name' => 'produksi.mp4', 'mime' => 'video/mp4', 'size' => 10]);
+        $pdf = \App\Models\Media::create(['disk' => 'public', 'path' => 'x/brosur.pdf', 'original_name' => 'brosur.pdf', 'mime' => 'application/pdf', 'size' => 10]);
+
+        $this->actingAs($admin)->putJson('/api/v1/admin/site-settings', ['auth' => ['slides' => [
+            ['mediaId' => $photo->id, 'caption' => ['id' => 'Pabrik kami']],
+            ['mediaId' => null],
+            ['mediaId' => $video->id],
+        ]]])->assertOk()
+            ->assertJsonPath('data.auth.slides.0.media.id', $photo->id)
+            ->assertJsonPath('data.auth.slides.0.caption.en', 'Pabrik kami')
+            ->assertJsonPath('data.auth.slides.1.media.mime', 'video/mp4');
+        $this->getJson('/api/v1/content/settings')->assertOk()->assertJsonCount(2, 'data.auth.slides');
+
+        // Media yang dipakai slide tidak bisa dihapus; PDF ditolak sebagai slide.
+        $this->actingAs($this->adminWith(['media']))->deleteJson('/api/v1/admin/media/'.$photo->id)->assertStatus(409);
+        $this->actingAs($admin)->putJson('/api/v1/admin/site-settings', ['auth' => ['slides' => [['mediaId' => $pdf->id]]]])
+            ->assertStatus(422)->assertJsonStructure(['errors' => ['auth.slides']]);
+    }
+
     public function test_whatsapp_contacts_are_normalised_and_validated(): void
     {
         $admin = $this->adminWith(['settings']);

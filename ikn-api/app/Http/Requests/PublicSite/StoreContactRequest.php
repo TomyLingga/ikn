@@ -18,7 +18,7 @@ class StoreContactRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'string', 'email', 'max:190'],
-            'phone' => ['nullable', 'string', 'max:40'],
+            'phone' => ['nullable', 'string', 'max:40', new \App\Rules\PhoneNumber()],
             'subject' => ['nullable', 'string', 'max:200'],
             'message' => ['required', 'string', 'max:5000'],
             'type' => ['nullable', Rule::in(ContactMessage::TYPES)],

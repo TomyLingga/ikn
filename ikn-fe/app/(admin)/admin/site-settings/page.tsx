@@ -5,7 +5,7 @@ import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
 import { ColorInput, I18nInput, ListField, MediaPicker, firstError, type FieldErrors } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
-import type { SiteSettings, WhatsAppContact } from '@/lib/cms';
+import type { SiteSettings, WhatsAppContact, AuthSlide } from '@/lib/cms';
 import { THEME_DEFAULTS, THEME_VARIABLES, themeColor, type ThemeSettings } from '@/lib/theme';
 
 type CompanyPatch = Partial<SiteSettings['company']>;
@@ -93,6 +93,7 @@ export default function AdminSiteSettings() {
           contact: settings.contact ?? emptyContact,
           analytics: settings.analytics ?? emptyAnalytics,
           theme: settings.theme ?? emptyTheme,
+          auth: { slides: (settings.auth?.slides ?? []).filter((s) => s.media?.id).map((s) => ({ mediaId: s.media.id, caption: s.caption })) },
         },
       });
       setSettings(saved);
@@ -318,6 +319,44 @@ export default function AdminSiteSettings() {
               />
               {firstError(errors, 'analytics.gsc_verification') && <small className="cms-field-error">{firstError(errors, 'analytics.gsc_verification')}</small>}
             </label>
+          </div>
+        </AdminCard>
+
+        <AdminCard title={t('Halaman login', 'Login page')}>
+          <div className="admin-form">
+            <p className="admin-field-hint">
+              {t(
+                'Foto atau video di panel samping halaman login, daftar, dan lupa password (maks. 6). Foto berganti tiap 5,5 detik; video diputar tanpa suara sampai selesai lalu pindah ke slide berikutnya. Kosongkan untuk memakai foto bawaan.',
+                'Photos or videos in the side panel of the login, register and forgot-password pages (max 6). Photos rotate every 5.5 s; videos play muted to the end, then move on. Leave empty to use the default photos.',
+              )}
+            </p>
+            <ListField<AuthSlide>
+              label={t('Foto / video halaman login', 'Login page photos / videos')}
+              items={settings.auth?.slides ?? []}
+              onChange={(slides) => setSettings((current) => (current ? { ...current, auth: { ...(current.auth ?? {}), slides } } : current))}
+              createItem={() => ({ media: null as unknown as AuthSlide['media'], caption: { id: '', en: '' } })}
+              maxItems={6}
+              addLabel={t('Tambah slide', 'Add slide')}
+              error={firstError(errors, 'auth.slides')}
+              renderItem={(item, _index, set) => (
+                <div className="admin-form">
+                  <MediaPicker
+                    label={t('Foto atau video', 'Photo or video')}
+                    value={item.media ?? null}
+                    onChange={(media) => set({ ...item, media: media as AuthSlide['media'] })}
+                    accept="visual"
+                    required
+                    hint={t('Lanskap/potret tinggi tampil paling baik (mis. 1200×1500). Video MP4/WebM pendek, tanpa suara.', 'Tall images work best (e.g. 1200×1500). Short MP4/WebM videos, muted.')}
+                  />
+                  <I18nInput
+                    label={t('Teks di atas foto (opsional)', 'Caption on the photo (optional)')}
+                    value={item.caption ?? { id: '', en: '' }}
+                    onChange={(caption) => set({ ...item, caption })}
+                    maxLength={120}
+                  />
+                </div>
+              )}
+            />
           </div>
         </AdminCard>
 

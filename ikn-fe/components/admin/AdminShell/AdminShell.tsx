@@ -10,6 +10,7 @@ import LangToggle from '@/components/LangToggle';
 import SidebarToggle from '@/components/SidebarToggle';
 import SessionLoader from '@/components/SessionLoader';
 import AdminFieldHelp from '@/components/admin/AdminFieldHelp';
+import AdminChatDock from '@/components/admin/AdminChatDock';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api } from '@/lib/api';
@@ -423,6 +424,10 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       }`}
     >
       <AdminFieldHelp />
+      {/* Messaging dock: admins with the chat module, hidden on the full inbox page itself. */}
+      {(admin.role === 'super_admin' || (allowed ?? []).includes('chat')) && !isActivePath(pathname, '/admin/chat') && (
+        <AdminChatDock unread={badges['/admin/chat'] || 0} adminName={admin.name} />
+      )}
       {/* ASIDE / SIDEBAR */}
       <aside className={styles.sidebar}>
         <div className={styles.brand}>

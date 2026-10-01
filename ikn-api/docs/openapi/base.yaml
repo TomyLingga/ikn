@@ -822,6 +822,7 @@ components:
             properties:
               email: { type: string, format: email }
               password: { type: string }
+              remember: { type: boolean, default: false, description: 'Ingat saya: cookie remember_web_* agar tetap login setelah peramban ditutup' }
     Post:
       required: true
       content:
@@ -1077,6 +1078,14 @@ components:
               maxItems: 10
               description: 'nomor marketing tambahan; bersama nomor utama menjadi daftar pilihan di tombol melayang/footer/Kontak; nomor dinormalkan ke 62…, ganda ditolak'
               items: { type: object, properties: { label: { type: string, maxLength: 60, example: Marketing Resiprene }, number: { type: string, example: '628116480083' } } }
+        auth:
+          type: object
+          properties:
+            slides:
+              type: array
+              maxItems: 6
+              description: 'Panel foto/video halaman login/daftar/lupa password (A-79). PUT menerima [{mediaId, caption}] (media gambar atau video); respons [{media, caption}]. Kosong = foto bawaan FE.'
+              items: { type: object, properties: { media: { $ref: '#/components/schemas/MediaSummary' }, mediaId: { type: integer, writeOnly: true }, caption: { $ref: '#/components/schemas/I18n' } } }
         analytics:
           type: object
           properties:

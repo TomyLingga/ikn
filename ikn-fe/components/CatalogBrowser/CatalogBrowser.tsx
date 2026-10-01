@@ -9,6 +9,7 @@ import ProductCard from '@/components/ProductCard';
 import EmptyState from '@/components/EmptyState';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
+import { openChat } from '@/lib/shop';
 import type { PagedMeta } from '@/lib/cms';
 import type { Category, Product } from '@/lib/types';
 import type { CatalogQuery, CatalogSort } from './query';
@@ -117,22 +118,79 @@ export default function CatalogBrowser({ products, meta, categories, query, base
       </>
     );
 
-  // Portal customer: satu bilah pencarian besar, chip kategori yang bisa digeser, lalu kisi produk.
+  // Portal customer: hero strip with the search bar, scrollable category chips + sort, then the product grid.
   if (layout === 'top') {
+    const totalProducts = categories.reduce((sum, c) => sum + (c.productCount || 0), 0);
+    const activeCategory = categories.find((c) => c.slug === query.category);
     return (
       <div className="shop">
-        <div className="shop-toolbar">
-          <form className="shop-search" onSubmit={submitSearch} role="search">
-            <Icon name="search" size={19} />
-            <input
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t('Cari nama atau kode produk', 'Search product name or code')}
-              aria-label={t('Cari produk', 'Search products')}
-            />
-            <button type="submit">{t('Cari', 'Search')}</button>
-          </form>
+        <section className="shop-hero">
+          <div className="shop-hero-text">
+            <span className="shop-eyebrow">
+              <Icon name="store" size={15} /> {t('Belanja B2B PT IKN', 'PT IKN B2B store')}
+            </span>
+            <h1>{t('Belanja produk', 'Shop products')}</h1>
+            <p>
+              {t(
+                'Harga khusus customer dan stok terbaru. Tambahkan ke keranjang, lalu checkout tanpa meninggalkan portal.',
+                'Customer pricing and live stock. Add to cart and check out without leaving the portal.',
+              )}
+            </p>
+            <form className="shop-search" onSubmit={submitSearch} role="search">
+              <Icon name="search" size={19} />
+              <input
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t('Cari nama atau kode produk', 'Search product name or code')}
+                aria-label={t('Cari produk', 'Search products')}
+              />
+              <button type="submit">{t('Cari', 'Search')}</button>
+            </form>
+          </div>
+          <ul className="shop-perks">
+            <li>
+              <span><Icon name="tag" size={17} /></span>
+              <div>
+                <strong>{t('Harga khusus customer', 'Customer pricing')}</strong>
+                <small>{t('Termasuk harga promo yang sedang berlaku', 'Including active promo prices')}</small>
+              </div>
+            </li>
+            <li>
+              <span><Icon name="package" size={17} /></span>
+              <div>
+                <strong>{t('Stok real-time', 'Live stock')}</strong>
+                <small>{t('Jumlah tersedia dan minimum order per produk', 'Available quantity and minimum order')}</small>
+              </div>
+            </li>
+            <li>
+              <span><Icon name="chat" size={17} /></span>
+              <div>
+                <strong>{t('Butuh spesifikasi khusus?', 'Need a custom spec?')}</strong>
+                <small>{t('Minta penawaran lewat live chat', 'Request a quote via live chat')}</small>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <div className="shop-bar">
+          <nav className="shop-chips" aria-label={t('Kategori produk', 'Product categories')}>
+            <Link href={buildHref(basePath, { ...query, category: 'all', page: 1 }, false)} className={`shop-chip ${allActive ? 'is-active' : ''}`} aria-current={allActive ? 'true' : undefined}>
+              {t('Semua produk', 'All products')}
+              {totalProducts > 0 && <small>{totalProducts}</small>}
+            </Link>
+            {categories.map((c) => (
+              <Link
+                key={c.slug}
+                href={buildHref(basePath, { ...query, category: c.slug, page: 1 }, false)}
+                className={`shop-chip ${query.category === c.slug ? 'is-active' : ''}`}
+                aria-current={query.category === c.slug ? 'true' : undefined}
+              >
+                {tr(c.name, lang)}
+                {typeof c.productCount === 'number' && <small>{c.productCount}</small>}
+              </Link>
+            ))}
+          </nav>
           <label className="shop-sort">
             <Icon name="sort" size={17} />
             <span className="sr-only">{t('Urutkan', 'Sort by')}</span>
@@ -140,37 +198,60 @@ export default function CatalogBrowser({ products, meta, categories, query, base
           </label>
         </div>
 
-        <nav className="shop-chips" aria-label={t('Kategori produk', 'Product categories')}>
-          <Link href={buildHref(basePath, { ...query, category: 'all', page: 1 }, false)} className={`shop-chip ${allActive ? 'is-active' : ''}`} aria-current={allActive ? 'true' : undefined}>
-            {t('Semua produk', 'All products')}
-          </Link>
-          {categories.map((c) => (
-            <Link
-              key={c.slug}
-              href={buildHref(basePath, { ...query, category: c.slug, page: 1 }, false)}
-              className={`shop-chip ${query.category === c.slug ? 'is-active' : ''}`}
-              aria-current={query.category === c.slug ? 'true' : undefined}
-            >
-              {tr(c.name, lang)}
-              {typeof c.productCount === 'number' && <small>{c.productCount}</small>}
-            </Link>
-          ))}
-        </nav>
-
         <p className="shop-meta">
-          <strong>{meta.total}</strong> {t('produk', 'products')}
-          {query.q && (
-            <>
-              {' '}
-              {t('untuk', 'for')} “{query.q}”{' '}
-              <button type="button" className="cat-clear" onClick={() => { setQ(''); go({ q: '' }); }}>
-                {t('hapus pencarian', 'clear search')}
-              </button>
-            </>
+          <span>
+            {t('Menampilkan', 'Showing')} <strong>{meta.total}</strong> {t('produk', 'products')}
+            {activeCategory && (
+              <>
+                {' '}
+                {t('di', 'in')} <strong>{tr(activeCategory.name, lang)}</strong>
+              </>
+            )}
+            {query.q && (
+              <>
+                {' '}
+                {t('untuk', 'for')} “{query.q}”
+              </>
+            )}
+          </span>
+          {(query.q || activeCategory) && (
+            <button
+              type="button"
+              className="cat-clear"
+              onClick={() => {
+                setQ('');
+                go({ q: '', category: 'all' });
+              }}
+            >
+              <Icon name="close" size={14} /> {t('Hapus filter', 'Clear filters')}
+            </button>
           )}
         </p>
 
-        {results}
+        {products.length === 0 ? (
+          <div className="shop-empty">
+            <span className="shop-empty-icon">
+              <Icon name="search" size={28} strokeWidth={1.4} />
+            </span>
+            <h2>{t('Produk tidak ditemukan', 'No products found')}</h2>
+            <p>
+              {t(
+                'Coba kata kunci lain atau lihat semua kategori. Butuh produk dengan spesifikasi khusus? Tanyakan lewat live chat.',
+                'Try another keyword or browse all categories. Need a product to a custom spec? Ask us via live chat.',
+              )}
+            </p>
+            <div className="shop-empty-actions">
+              <Link href={basePath} className="btn btn-solid btn-sm" onClick={() => setQ('')}>
+                {t('Lihat semua produk', 'View all products')}
+              </Link>
+              <button type="button" className="btn btn-line btn-sm" onClick={() => openChat()}>
+                <Icon name="chat" /> {t('Tanya tim marketing', 'Ask our marketing team')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          results
+        )}
       </div>
     );
   }

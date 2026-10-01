@@ -75,11 +75,20 @@ final class SectionDefinitions
         return self::list($id, $en, ['text' => self::f('i18n_text', 'Teks', 'Text', ['required' => true])]);
     }
 
+    /** Pilihan "Tampilan blok" yang ditambahkan ke setiap tipe section (kosong = plain). */
+    public const SURFACES = ['plain' => 'Polos', 'card' => 'Kartu timbul', 'band' => 'Pita berwarna'];
+
+    /** Tipe yang selebar layar atau punya latar sendiri: tidak mendapat pilihan tampilan blok. */
+    public const NO_SURFACE = ['page_header', 'hero', 'marquee', 'cta', 'contact_info'];
+
     public static function all(): array
     {
         $types = self::definitions();
         foreach ($types as $key => $definition) {
             $types[$key]['group'] = self::GROUP_OF[$key] ?? 'content';
+            if (! in_array($key, self::NO_SURFACE, true)) {
+                $types[$key]['fields']['surface'] = self::f('select', 'Tampilan blok', 'Block style', ['options' => self::SURFACES, 'default' => 'plain']);
+            }
         }
 
         return $types;
@@ -96,7 +105,7 @@ final class SectionDefinitions
                     'lead' => self::f('i18n_textarea', 'Paragraf pembuka', 'Lead paragraph'),
                     'breadcrumb' => self::f('boolean', 'Tampilkan breadcrumb', 'Show breadcrumb'),
                     // Tanpa media = tata letak teks saja (lama). Media: gambar (jpg/png/webp) atau video MP4/WebM dari media library.
-                    'layout' => self::f('select', 'Tata letak media', 'Media layout', ['options' => ['split' => 'Teks kiri, media kanan', 'cover' => 'Media memenuhi latar'], 'default' => 'split']),
+                    'layout' => self::f('select', 'Tata letak media', 'Media layout', ['options' => ['split' => 'Teks kiri, media kanan', 'split_reverse' => 'Media kiri, teks kanan', 'cover' => 'Media memenuhi latar'], 'default' => 'split']),
                     'media' => self::list('Foto / video', 'Photos / videos', [
                         'file' => self::f('media', 'Berkas (gambar atau video MP4/WebM)', 'File (image or MP4/WebM video)', ['required' => true, 'accept' => 'visual']),
                         'caption' => self::f('i18n_text', 'Keterangan (opsional)', 'Caption (optional)', ['max' => 120]),

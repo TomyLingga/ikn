@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import type { BreadcrumbItem } from '@/components/Breadcrumb';
 import type { I18n, MediaSummary, MenuNode, PageData } from '@/lib/cms';
 import { tr } from '@/lib/cms';
+import { buildMetadata } from '@/lib/seo';
 import type { IconName, Lang } from '@/lib/types';
 
 // ---------------------------------------------------------------- Section content shapes
@@ -382,7 +383,20 @@ export function breadcrumbItems(
 /** Page metadata from the CMS SEO block (Indonesian text; an RSC cannot know the visitor's language). */
 export function pageMetadata(page: PageData | null, fallbackTitle: string): Metadata {
   if (!page) return { title: fallbackTitle };
-  const title = page.seo?.title?.id || page.title?.id || fallbackTitle;
-  const description = page.seo?.description?.id || '';
-  return description ? { title, description } : { title };
+  // Beranda tanpa judul SEO memakai judul kaya kata kunci (bukan "Beranda") — judul ini yang tampil di Google.
+  const title =
+    page.seo?.title?.id ||
+    (page.slug === 'home' ? 'PT Industri Karet Nusantara — Pabrik Karet Industri & Resiprene 35 di Medan' : page.title?.id || fallbackTitle);
+  // Deskripsi: SEO halaman, else paragraf pembuka kepala halaman (agar tiap halaman punya deskripsi unik di Google).
+  const header = page.sections?.find((s) => s.type === 'page_header' || s.type === 'hero');
+  const headerContent = (header?.content ?? {}) as Record<string, unknown>;
+  const lead = headerContent.lead ?? headerContent.subtitle;
+  const description = page.seo?.description?.id || tr(lead as I18n | undefined, 'id') || '';
+  // Gambar OG: foto pertama kepala halaman/hero (bukan video), else gambar bawaan.
+  const media = (headerContent.media as { file?: { url?: string; mime?: string } }[] | undefined)?.find((m) => m.file?.url && !(m.file.mime || '').startsWith('video/'))?.file?.url;
+  const slide = (headerContent.slides as { image?: { url?: string } }[] | undefined)?.[0]?.image?.url;
+  const path = page.slug === 'home' ? '/' : `/${page.slug}`;
+  // Judul yang sudah memuat nama perusahaan tidak diberi akhiran template " · PT IKN" lagi.
+  const hasBrand = /PT IKN|Industri Karet Nusantara/i.test(title);
+  return buildMetadata({ title, absoluteTitle: page.slug === 'home' || hasBrand, description, path, image: media || slide || null });
 }

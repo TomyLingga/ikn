@@ -17,13 +17,61 @@ class CmsPageSeeder extends Seeder
         return ['id' => $id, 'en' => $en];
     }
 
+    /**
+     * Judul & deskripsi SEO halaman bawaan (kata kunci yang dicari pembeli: pabrik karet, barang karet industri,
+     * Resiprene 35, Medan). Judul ±50–60 karakter, deskripsi ±140–160 karakter. Juga dipakai migrasi
+     * 2026_10_02_000020_improve_default_page_seo untuk DB yang sudah terisi.
+     *
+     * @return array<string, array{title: array, description: array}>
+     */
+    public static function seoDefaults(): array
+    {
+        $t = fn (string $id, string $en) => self::t($id, $en);
+
+        return [
+            'home' => [
+                'title' => $t('PT Industri Karet Nusantara — Pabrik Karet Industri & Resiprene 35 di Medan', 'PT Industri Karet Nusantara — Industrial Rubber Manufacturer & Resiprene 35, Medan'),
+                'description' => $t('Produsen barang karet industri sejak 1965 di Medan: Resiprene 35 (cyclised rubber), sarung egrek, sepatu boots, rubber membrane. Pesan online langsung dari pabrik.', 'Industrial rubber manufacturer since 1965 in Medan, Indonesia: Resiprene 35 (cyclised rubber), harvesting sickle sheaths, boots, rubber membranes. Order online direct from the factory.'),
+            ],
+            'tentang' => [
+                'title' => $t('Tentang PT IKN — Sejarah, Visi Misi & Struktur Organisasi', 'About PT IKN — History, Vision, Mission & Organisation'),
+                'description' => $t('Profil PT Industri Karet Nusantara, anak perusahaan PTPN III: sejarah sejak 1965, visi misi, nilai AKHLAK, dan struktur organisasi pabrik karet di Medan.', 'Profile of PT Industri Karet Nusantara, a PTPN III subsidiary: history since 1965, vision, mission, AKHLAK values and organisation of the Medan rubber plant.'),
+            ],
+            'bisnis' => [
+                'title' => $t('Produk Karet Industri — Resiprene 35 & Aneka Barang Karet', 'Industrial Rubber Products — Resiprene 35 & Rubber Goods'),
+                'description' => $t('Lini bisnis PT IKN: Resiprene 35 untuk cat, tinta, dan coating, serta barang karet industri untuk perkebunan dan pabrik. Lihat spesifikasi, harga, dan pesan online.', 'PT IKN business lines: Resiprene 35 for paints, inks and coatings, and industrial rubber goods for plantations and factories. See specifications, prices and order online.'),
+            ],
+            'keberlanjutan' => [
+                'title' => $t('Keberlanjutan, Sertifikasi & Pelanggan PT IKN', 'Sustainability, Certifications & Customers of PT IKN'),
+                'description' => $t('Komitmen ESG PT Industri Karet Nusantara: sertifikasi ISO dan REACH, pelanggan industri dalam dan luar negeri, serta saluran Whistle Blowing System.', 'ESG commitment of PT Industri Karet Nusantara: ISO and REACH certifications, domestic and international industrial customers, and the Whistle Blowing System.'),
+            ],
+            'media' => [
+                'title' => $t('Media PT IKN — Berita, Galeri & Unduhan Brosur', 'PT IKN Media — News, Gallery & Brochure Downloads'),
+                'description' => $t('Kabar terbaru, galeri foto dan video produksi, serta brosur produk karet PT Industri Karet Nusantara yang dapat diunduh.', 'Latest news, production photo and video gallery, and downloadable rubber product brochures from PT Industri Karet Nusantara.'),
+            ],
+            'berita' => [
+                'title' => $t('Berita & Artikel Industri Karet — PT IKN', 'Rubber Industry News & Articles — PT IKN'),
+                'description' => $t('Berita perusahaan, kegiatan, dan artikel seputar industri karet hilir dari PT Industri Karet Nusantara, Medan.', 'Company news, activities and downstream rubber industry articles from PT Industri Karet Nusantara, Medan.'),
+            ],
+            'galeri' => [
+                'title' => $t('Galeri Foto & Video Pabrik Karet PT IKN', 'PT IKN Rubber Plant Photo & Video Gallery'),
+                'description' => $t('Dokumentasi foto dan video pabrik, proses produksi, dan kegiatan PT Industri Karet Nusantara.', 'Photos and videos of the plant, production process and activities of PT Industri Karet Nusantara.'),
+            ],
+            'kontak' => [
+                'title' => $t('Kontak PT IKN — Alamat Pabrik, WhatsApp & Penawaran Harga', 'Contact PT IKN — Plant Address, WhatsApp & Price Quotes'),
+                'description' => $t('Hubungi PT Industri Karet Nusantara di Jl. Medan–Tanjung Morawa Km 9,5 Medan: telepon, email, WhatsApp marketing, dan formulir permintaan penawaran.', 'Contact PT Industri Karet Nusantara at Jl. Medan–Tanjung Morawa Km 9.5, Medan: phone, email, marketing WhatsApp and quote request form.'),
+            ],
+        ];
+    }
+
     public function run()
     {
+        $seo = self::seoDefaults();
         foreach ($this->pages() as $slug => $page) {
             $model = Page::firstOrCreate(['slug' => $slug], [
                 'title' => $page['title'],
                 'status' => Page::STATUS_PUBLISHED,
-                'seo' => ['title' => $page['title'], 'description' => $page['description'] ?? ['id' => '', 'en' => '']],
+                'seo' => $seo[$slug] ?? ['title' => $page['title'], 'description' => $page['description'] ?? ['id' => '', 'en' => '']],
                 'template' => 'default',
             ]);
 

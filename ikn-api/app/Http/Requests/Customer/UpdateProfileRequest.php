@@ -11,7 +11,7 @@ class UpdateProfileRequest extends AccountFormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:120'],
-            'phone' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:40', new \App\Rules\PhoneNumber()],
             'position' => ['sometimes', 'nullable', 'string', 'max:120'],
         ];
     }

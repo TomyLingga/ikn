@@ -604,7 +604,9 @@
 .road-nav-btn:hover:not(:disabled) { background: var(--primary); border-color: var(--primary); color: #fff; }
 .road-nav-btn:disabled { opacity: 0.35; cursor: default; }
 
-.road-track { overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; padding-bottom: 8px; scrollbar-width: thin; }
+.road-track { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scroll-snap-type: x proximity; padding: 4px 0 12px; scrollbar-width: none; -ms-overflow-style: none; }
+/* Scrollbar disembunyikan: geser lewat tombol panah, trackpad, atau sentuhan. */
+.road-track::-webkit-scrollbar { display: none; }
 .road {
   --stop-w: clamp(250px, 24vw, 300px);
   --pin-top: 96px;
@@ -1542,6 +1544,11 @@
 .ph { padding: calc(var(--nav-h) + clamp(32px, 6vw, 64px)) 0 clamp(40px, 6vw, 72px); border-bottom: 1px solid var(--line); overflow: hidden; }
 .ph-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 64px); align-items: center; }
 .ph-text { min-width: 0; }
+/* Media kiri, teks kanan: kolom dibalik (lebar ikut ditukar); di ponsel tetap teks di atas. */
+.ph-reverse .ph-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); }
+.ph-reverse .ph-text { order: 2; }
+.ph-reverse .ph-stage { order: 1; }
+@media (max-width: 860px) { .ph-reverse .ph-grid { grid-template-columns: 1fr; } .ph-reverse .ph-text { order: 0; } .ph-reverse .ph-stage { order: 0; } }
 .ph-text .pagehead-title { margin-top: 20px; max-width: none; font-size: clamp(2.2rem, 4.2vw, 4rem); overflow-wrap: break-word; hyphens: auto; }
 .ph-text .lead { margin-top: 22px; }
 .ph-stage { position: relative; aspect-ratio: 4 / 3; border-radius: var(--leaf); overflow: hidden; background: var(--paper-2); box-shadow: var(--shadow-lg); }
@@ -1698,3 +1705,44 @@
 @media (max-width: 900px) { .ifeat-grid { grid-template-columns: repeat(min(var(--ifeat-cols, 4), 2), minmax(0, 1fr)); } }
 @media (max-width: 520px) { .ifeat-grid { grid-template-columns: minmax(0, 1fr); } .ifeat-icon { width: 64px; height: 64px; } }
 @media (prefers-reduced-motion: reduce) { .ifeat-icon { transition: none; } .ifeat-item:hover .ifeat-icon { transform: none; } }
+
+/* ---- Tampilan blok section (field `surface`, dibungkus SectionRenderer) ----
+   card = kartu timbul selebar konten; band = pita berwarna lembut selebar layar. Kartu di dalam kartu timbul
+   memakai latar sedikit lebih gelap (token --surface diturunkan) agar tidak menyatu dan tidak bertumpuk bayangan. */
+.sec-surface-card {
+  --surface-card: var(--surface);
+  padding: clamp(10px, 1.6vw, 20px) var(--gutter);
+}
+.sec-surface-card > * {
+  max-width: var(--maxw);
+  margin-inline: auto;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface-card);
+  box-shadow: 0 2px 6px rgba(15, 27, 45, 0.04), 0 28px 60px -34px rgba(15, 27, 45, 0.38);
+}
+.sec-surface-card > section,
+.sec-surface-card > .section,
+.sec-surface-card > .section-tight { padding-block: clamp(36px, 5vw, 68px); }
+.sec-surface-card > * > * { --surface: color-mix(in srgb, var(--ink) 4%, var(--surface-card)); }
+:root[data-theme='dark'] .sec-surface-card > * { box-shadow: 0 28px 60px -30px rgba(0, 0, 0, 0.7); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .sec-surface-card > * { box-shadow: 0 28px 60px -30px rgba(0, 0, 0, 0.7); }
+}
+
+.sec-surface-band {
+  background: color-mix(in srgb, var(--primary) 7%, var(--paper));
+  border-block: 1px solid color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.sec-surface-band + .sec-surface-band { border-top: 0; }
+.sec-surface-band > * { --surface: color-mix(in srgb, #fff 55%, var(--paper)); }
+:root[data-theme='dark'] .sec-surface-band > * { --surface: color-mix(in srgb, var(--ink) 6%, var(--paper)); }
+
+@media (max-width: 640px) {
+  .sec-surface-card { padding: 8px 10px; }
+  .sec-surface-card > * { border-radius: 18px; }
+  .sec-surface-card .container { padding-inline: 16px; }
+  .sec-surface-card > section,
+  .sec-surface-card > .section,
+  .sec-surface-card > .section-tight { padding-block: 32px; }
+}

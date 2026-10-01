@@ -2,13 +2,20 @@ import Breadcrumb from '@/components/Breadcrumb';
 import CatalogBrowser, { parseCatalogQuery } from '@/components/CatalogBrowser';
 import EmptyState from '@/components/EmptyState';
 import { fetchCategories, fetchProducts } from '@/lib/server-data';
+import { buildMetadata } from '@/lib/seo';
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const categories = await fetchCategories();
   const c = categories.find((item) => item.slug === params.slug);
-  return c ? { title: `${c.name.id} — Katalog`, description: c.description?.id || '' } : { title: 'Kategori' };
+  return c
+    ? buildMetadata({
+        title: `${c.name.id} — Katalog Produk Karet`,
+        description: c.description?.id || `Katalog ${c.name.id} PT Industri Karet Nusantara: harga, minimum order, dan stok. Pesan online untuk kebutuhan industri.`,
+        path: `/catalog/kategori/${c.slug}`,
+      })
+    : { title: 'Kategori', robots: { index: false, follow: true } };
 }
 
 export default async function CategoryPage({ params, searchParams }: { params: { slug: string }; searchParams: SearchParams }) {

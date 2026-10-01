@@ -9,6 +9,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { openCartDrawer, openChat, useShopPaths } from '@/lib/shop';
 import { tr } from '@/lib/cms';
+import { formatIDR } from '@/lib/format';
 import type { Product } from '@/lib/types';
 
 // Kontrol qty + tombol tambah keranjang di halaman detail produk.
@@ -135,6 +136,11 @@ export default function AddToCart({ product }: { product: Product }) {
 
       {shop.portal ? (
         <>
+          {/* Live subtotal for the chosen quantity (before shipping, fees and tax). */}
+          <p className="pd-subtotal">
+            <span>{t('Subtotal', 'Subtotal')} ({clamp(qty).toLocaleString('id-ID')} {product.unit})</span>
+            <strong>{formatIDR((product.effectivePrice ?? product.price ?? 0) * clamp(qty))}</strong>
+          </p>
           <div className="pd-buy-actions pd-buy-row">
             <button type="button" className="btn btn-line btn-block" onClick={handleAdd}>
               {added ? <>{t('Ditambahkan', 'Added')} <Icon name="check" /></> : <><Icon name="bag" /> {t('Tambah ke keranjang', 'Add to cart')}</>}

@@ -25,11 +25,16 @@ class StoreUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'string', 'email', 'max:190', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'max:200'],
+            'password' => ['required', 'string', 'min:8', 'max:200', 'regex:'.\App\Http\Requests\Account\AccountFormRequest::PASSWORD_PATTERN],
             'role' => ['required', Rule::in(User::ADMIN_ROLES)],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::in(array_keys(config('ikn.modules', [])))],
             'active' => ['nullable', 'boolean'],
         ];
+    }
+
+    public function messages(): array
+    {
+        return ['password.regex' => __('account.password_policy'), 'password.min' => __('account.password_policy')];
     }
 }

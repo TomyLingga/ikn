@@ -25,6 +25,11 @@ return [
         ['settings', 'value', 'mediaId'],
     ],
 
+    // [tabel, kolom jsonb, kunci] berupa ARRAY objek yang memuat id media, mis. settings auth.slides [{mediaId}].
+    'json_array_id_columns' => [
+        ['settings', 'value', 'mediaId'],
+    ],
+
     // [tabel, kolom jsonb/teks] yang mungkin memuat URL/path media (gambar inline editor, config).
     'text_columns' => [
         ['posts', 'body'],

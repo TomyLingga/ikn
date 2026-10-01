@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import NewsArticle from '@/components/cms/NewsArticle';
 import PageFallback from '@/components/cms/PageFallback';
 import { fetchNewsDetail } from '@/lib/server-data';
+import JsonLd from '@/components/JsonLd';
+import { articleJsonLd, breadcrumbJsonLd, buildMetadata } from '@/lib/seo';
 
 interface Params {
   params: { slug: string };
@@ -10,25 +12,33 @@ interface Params {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const post = await fetchNewsDetail(params.slug);
   if (!post) return { title: 'Berita' };
-  const title = post.title.id;
-  const description = post.excerpt?.id || undefined;
-  return {
-    title,
-    description,
-    openGraph: {
-      type: 'article',
-      title,
-      description,
-      publishedTime: post.publishedAt ?? undefined,
-      authors: post.author ? [post.author] : undefined,
-      images: post.cover ? [{ url: post.cover.url }] : undefined,
-    },
-  };
+  return buildMetadata({
+    title: post.title.id,
+    description: post.excerpt?.id,
+    path: `/berita/${post.slug}`,
+    image: post.cover?.url,
+    type: 'article',
+    publishedTime: post.publishedAt,
+  });
 }
 
 export default async function NewsDetail({ params }: Params) {
   const post = await fetchNewsDetail(params.slug);
   if (!post) return <PageFallback variant="news" />;
 
-  return <NewsArticle post={post} />;
+  return (
+    <>
+      <JsonLd
+        data={[
+          articleJsonLd(post),
+          breadcrumbJsonLd([
+            { name: 'Beranda', path: '/' },
+            { name: 'Berita', path: '/berita' },
+            { name: post.title.id, path: `/berita/${post.slug}` },
+          ]),
+        ]}
+      />
+      <NewsArticle post={post} />
+    </>
+  );
 }

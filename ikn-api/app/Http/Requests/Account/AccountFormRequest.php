@@ -5,10 +5,10 @@ namespace App\Http\Requests\Account;
 use Illuminate\Foundation\Http\FormRequest;
 
 // Dasar Form Request area akun: input camelCase, nama atribut dari resources/lang/*/account.php (kunci attributes),
-// kebijakan password bersama (ASUMSI A-25: min 8 karakter, huruf dan angka).
+// kebijakan password bersama (ASUMSI A-25, diperketat A-78: min 8 karakter, huruf besar, huruf kecil, dan angka).
 abstract class AccountFormRequest extends FormRequest
 {
-    public const PASSWORD_PATTERN = '/^(?=.*[A-Za-z])(?=.*\d).+$/';
+    public const PASSWORD_PATTERN = '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/';
 
     public function authorize(): bool
     {

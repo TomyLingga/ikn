@@ -65,12 +65,71 @@ export interface SalesChartPoint {
   orders: number;
 }
 
+/** KPI value for the current period vs the same elapsed span last month; changePct null when previous = 0. */
+export interface DashboardMetric {
+  current: number;
+  previous: number;
+  changePct: number | null;
+}
+
+/** Work queue counters; null = the admin lacks that module (same rule as GET /admin/badges). */
+export interface DashboardWorkQueue {
+  paymentsToVerify: number | null;
+  ordersToProcess: number | null;
+  ordersToShip: number | null;
+  ordersInTransit: number | null;
+  ordersDelivered: number | null;
+  paymentsOverdue: number | null;
+  customersToApprove: number | null;
+  unreadChats: number | null;
+}
+
+export interface DashboardTopProduct {
+  productId: number;
+  productSlug: string | null;
+  code: string | null;
+  name: I18n;
+  image: string | null;
+  unit: string | null;
+  qty: number;
+  orders: number;
+  revenue: number;
+}
+
+export interface DashboardLowStockItem {
+  id: number;
+  slug: string;
+  code: string | null;
+  name: I18n;
+  image: string | null;
+  unit: string | null;
+  moq: number;
+  stock: number;
+  reserved: number;
+  available: number;
+  threshold: number;
+  stockStatus: 'in_stock' | 'made_to_order' | 'out_of_stock';
+  isPublished: boolean;
+}
+
 export interface DashboardData {
   stats: DashboardStats;
   recentOrders: OrderSummary[];
   needsAction: OrderSummary[];
   salesChart: SalesChartPoint[];
   year: number;
+  // Dashboard v2 (additive keys).
+  period: { from: string; to: string; previousFrom: string; previousTo: string };
+  kpis: {
+    revenue: DashboardMetric;
+    paidOrders: DashboardMetric;
+    avgOrderValue: DashboardMetric;
+    newCustomers: DashboardMetric;
+  };
+  workQueue: DashboardWorkQueue;
+  topProducts: DashboardTopProduct[];
+  lowStock: { total: number; rule: { min: number; moqFactor: number }; items: DashboardLowStockItem[] };
+  paymentDue: { overdue: number; dueSoon: number; windowHours: number; items: OrderSummary[] };
 }
 
 // ---- Laporan penjualan (GET /admin/reports/sales) ----

@@ -25,8 +25,8 @@ interface AuthContextValue {
   customer: CustomerAccount | null;
   admin: AdminAccount | null;
   ready: boolean;
-  loginCustomer: (email: string, password: string) => Promise<CustomerAccount>;
-  loginAdmin: (email: string, password: string) => Promise<AdminAccount>;
+  loginCustomer: (email: string, password: string, remember?: boolean) => Promise<CustomerAccount>;
+  loginAdmin: (email: string, password: string, remember?: boolean) => Promise<AdminAccount>;
   /** POST /auth/register — tidak login otomatis; customer harus verifikasi email dulu. */
   registerCustomer: (payload: RegisterPayload) => Promise<RegisterResult>;
   /** POST /auth/logout — satu sesi, menghapus customer maupun admin. */
@@ -70,19 +70,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().finally(() => setReady(true));
   }, [refresh]);
 
-  const loginCustomer = useCallback(async (email: string, password: string): Promise<CustomerAccount> => {
+  const loginCustomer = useCallback(async (email: string, password: string, remember = false): Promise<CustomerAccount> => {
     const result = await api<{ user: AuthUser }>('/auth/login', {
       method: 'POST',
-      body: { email, password },
+      body: { email, password, remember },
     });
     setUser(result.user);
     return toCustomerAccount(result.user);
   }, []);
 
-  const loginAdmin = useCallback(async (email: string, password: string): Promise<AdminAccount> => {
+  const loginAdmin = useCallback(async (email: string, password: string, remember = false): Promise<AdminAccount> => {
     const result = await api<{ account: AdminAccount }>('/auth/admin/login', {
       method: 'POST',
-      body: { email, password },
+      body: { email, password, remember },
     });
     // Ambil user lengkap agar `user` konsisten dengan /auth/me.
     await refresh();

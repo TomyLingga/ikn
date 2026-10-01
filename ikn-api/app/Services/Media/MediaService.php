@@ -143,6 +143,13 @@ class MediaService
             }
         }
 
+        foreach (config('media_references.json_array_id_columns', []) as [$table, $column, $key]) {
+            if ($this->tableExists($table)
+                && DB::table($table)->whereRaw("jsonb_typeof($column) = 'array' AND $column @> ?::jsonb", [json_encode([[$key => (int) $media->id]])])->exists()) {
+                return true;
+            }
+        }
+
         // Gambar yang disisipkan di HTML/JSON (isi berita, section, config metode bayar) dirujuk lewat path-nya.
         $needle = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $media->path).'%';
         foreach (config('media_references.text_columns', []) as [$table, $column]) {

@@ -241,25 +241,8 @@
   font-size: 0.78rem;
 }
 
-.phoneField input { padding-left: 86px; }
-
-.phonePrefix {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 48px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  border: 1px solid var(--line-strong);
-  border-right: 0;
-  border-radius: 10px 0 0 10px;
-  background: var(--paper-2);
-  color: var(--ink-soft);
-  font-size: 0.9rem;
-  font-weight: 600;
-}
+.phoneField { display: grid; gap: 4px; }
+.phoneField small { color: var(--red); font-size: 0.78rem; }
 
 .submit {
   min-height: 50px;

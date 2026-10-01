@@ -314,6 +314,26 @@ class PageTest extends TestCase
         $this->assertContains('microscope', $types['icons']);
     }
 
+    public function test_every_section_type_except_full_bleed_has_block_style_option(): void
+    {
+        $admin = $this->adminWith(['cms']);
+        $types = $this->actingAs($admin)->getJson('/api/v1/admin/cms/section-types')->assertOk()->json('data.types');
+        foreach ($types as $type => $definition) {
+            $hasSurface = isset($definition['fields']['surface']);
+            $this->assertSame(! in_array($type, \App\Services\Cms\SectionDefinitions::NO_SURFACE, true), $hasSurface, "type {$type}");
+        }
+        $this->assertSame(['plain', 'card', 'band'], array_keys($types['timeline']['fields']['surface']['options']));
+
+        $page = \App\Models\Page::create(['slug' => 'blok', 'title' => ['id' => 'Blok'], 'status' => 'published']);
+        $url = "/api/v1/admin/pages/{$page->id}/sections";
+        $this->actingAs($admin)->postJson($url, ['type' => 'faq', 'content' => [
+            'surface' => 'card', 'items' => [['question' => ['id' => 'Q?'], 'answer' => ['id' => 'A.']]],
+        ]])->assertStatus(201)->assertJsonPath('data.content.surface', 'card');
+        $this->actingAs($admin)->postJson($url, ['type' => 'faq', 'content' => [
+            'surface' => 'glass', 'items' => [['question' => ['id' => 'Q?'], 'answer' => ['id' => 'A.']]],
+        ]])->assertStatus(422)->assertJsonValidationErrors(['content.surface']);
+    }
+
     public function test_text_visual_photo_side_and_cta_extras_are_validated(): void
     {
         $admin = $this->adminWith(['cms']);

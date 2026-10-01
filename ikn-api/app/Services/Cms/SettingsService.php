@@ -40,6 +40,9 @@ class SettingsService
         'theme.primary' => ['type' => 'color', 'public' => true, 'default' => '#0b6fb8'],
         'theme.primary_deep' => ['type' => 'color', 'public' => true, 'default' => '#0a3f6b'],
         'theme.accent' => ['type' => 'color', 'public' => true, 'default' => '#1785cc'],
+        // Panel foto/video halaman login, daftar, dan lupa password (ASUMSI A-79): [{mediaId, caption {id,en}}], maks. 6.
+        // Kosong = foto bawaan di FE (components/auth/AuthVisual).
+        'auth.slides' => ['type' => 'media_slides', 'public' => true, 'default' => []],
         'admin.help_guide' => ['type' => 'json', 'public' => false, 'default' => ['title' => 'Panduan Admin', 'type' => 'url', 'url' => '', 'mediaId' => null]],
     ];
 
@@ -140,9 +143,40 @@ class SettingsService
                 return [is_array($value) ? $value : null, null];
             case 'whatsapp_contacts':
                 return $this->cleanWhatsAppContacts($value, $key);
+            case 'media_slides':
+                return $this->cleanMediaSlides($value, $key);
         }
 
         return [$value, null];
+    }
+
+    /** Daftar slide {mediaId, caption}: media harus gambar atau video yang ada; maks. 6; baris tanpa media dibuang. */
+    private function cleanMediaSlides($value, string $key): array
+    {
+        if ($value === null || $value === '') {
+            return [[], null];
+        }
+        if (! is_array($value)) {
+            return [null, __('validation.array', ['attribute' => $key])];
+        }
+
+        $out = [];
+        foreach (array_values($value) as $i => $row) {
+            $id = is_array($row) ? ($row['mediaId'] ?? ($row['media']['id'] ?? null)) : null;
+            if ($id === null || $id === '') {
+                continue;
+            }
+            $media = is_numeric($id) ? Media::find((int) $id) : null;
+            if (! $media || ! (str_starts_with((string) $media->mime, 'image/') || str_starts_with((string) $media->mime, 'video/'))) {
+                return [null, __('validation.exists', ['attribute' => "{$key}.{$i}.mediaId"])];
+            }
+            $out[] = ['mediaId' => (int) $media->id, 'caption' => I18n::normalize($row['caption'] ?? null)];
+            if (count($out) > 6) {
+                return [null, __('validation.max.array', ['attribute' => $key, 'max' => 6])];
+            }
+        }
+
+        return [$out, null];
     }
 
     /** Daftar {label, number}: nomor dinormalkan ke 62…, baris kosong dibuang, nomor ganda ditolak. */
@@ -193,6 +227,16 @@ class SettingsService
             $media = $value ? Media::find((int) $value) : null;
 
             return $media ? $media->toSummary() : null;
+        }
+        if ($type === 'media_slides') {
+            if (! is_array($value)) {
+                return [];
+            }
+            $media = Media::whereIn('id', array_filter(array_column($value, 'mediaId')))->get()->keyBy('id');
+
+            return array_values(array_filter(array_map(fn ($row) => isset($media[$row['mediaId'] ?? 0])
+                ? ['media' => $media[$row['mediaId']]->toSummary(), 'caption' => I18n::normalize($row['caption'] ?? null)]
+                : null, $value)));
         }
         if ($type === 'whatsapp_contacts') {
             return is_array($value) ? array_values(array_map(fn ($row) => ['label' => (string) ($row['label'] ?? ''), 'number' => (string) ($row['number'] ?? '')], $value)) : [];

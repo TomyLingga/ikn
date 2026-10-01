@@ -171,6 +171,20 @@ function renderSection(section: PageSection, extra: SectionExtra, page: PageMeta
 // Renders a page's CMS sections in order, reproducing the original page markup.
 // Adjacent hero+marquee and info+form pairs are merged into one block, as in the
 // hand-written pages they replace.
+// "Tampilan blok" per section (field `surface`): polos (bawaan), kartu timbul, atau pita berwarna selebar layar.
+// Tipe selebar layar / berlatar sendiri tidak dibungkus (sama dengan SectionDefinitions::NO_SURFACE di API).
+const NO_SURFACE = new Set(['page_header', 'hero', 'marquee', 'cta', 'contact_info']);
+
+function withSurface(section: PageSection, node: ReactNode): ReactNode {
+  const surface = (section.content as { surface?: unknown } | null)?.surface;
+  if (NO_SURFACE.has(section.type) || (surface !== 'card' && surface !== 'band')) return node;
+  return (
+    <div className={`sec-surface sec-surface-${surface}`} data-section-type={section.type}>
+      {node}
+    </div>
+  );
+}
+
 export default function SectionRenderer({ sections, extra = {}, page = null }: SectionRendererProps) {
   const visible = sections
     .filter((s) => s.isVisible !== false)
@@ -213,7 +227,7 @@ export default function SectionRenderer({ sections, extra = {}, page = null }: S
     }
 
     const node = renderSection(section, extra, page);
-    if (node) nodes.push(<Fragment key={section.id}>{node}</Fragment>);
+    if (node) nodes.push(<Fragment key={section.id}>{withSurface(section, node)}</Fragment>);
   }
 
   return <>{nodes}</>;

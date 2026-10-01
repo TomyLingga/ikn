@@ -171,7 +171,7 @@ paths:
               type: object
               properties:
                 name: { type: string, maxLength: 120 }
-                phone: { type: string, nullable: true, maxLength: 40 }
+                phone: { type: string, nullable: true, maxLength: 40, description: 'E.164 dengan kode negara, mis. +6281234567890 atau +60123456789 (8-15 digit; spasi/strip/titik/kurung boleh); tanpa + hanya nomor Indonesia 0.../62...; rule PhoneNumber (A-78)' }
                 position: { type: string, nullable: true, maxLength: 120 }
       responses:
         '200': { $ref: '#/components/responses/CustomerProfile' }
@@ -209,7 +209,7 @@ paths:
               required: [currentPassword, password, passwordConfirmation]
               properties:
                 currentPassword: { type: string }
-                password: { type: string, minLength: 8 }
+                password: { type: string, minLength: 8, description: 'min. 8 dengan huruf besar, huruf kecil, dan angka (ASUMSI A-25/A-78)' }
                 passwordConfirmation: { type: string }
       responses:
         '200': { $ref: '#/components/responses/OkWithMessage' }
@@ -387,9 +387,9 @@ components:
       properties:
         name: { type: string, maxLength: 120 }
         email: { type: string, format: email, description: disimpan lowercase }
-        password: { type: string, minLength: 8, description: 'huruf dan angka (ASUMSI A-25)' }
+        password: { type: string, minLength: 8, description: 'min. 8 dengan huruf besar, huruf kecil, dan angka (ASUMSI A-25/A-78)' }
         passwordConfirmation: { type: string }
-        phone: { type: string, nullable: true, maxLength: 40 }
+        phone: { type: string, nullable: true, maxLength: 40, description: 'E.164 dengan kode negara, mis. +6281234567890 atau +60123456789 (8-15 digit; spasi/strip/titik/kurung boleh); tanpa + hanya nomor Indonesia 0.../62...; rule PhoneNumber (A-78)' }
         company: { type: string, nullable: true, maxLength: 160 }
         position: { type: string, nullable: true, maxLength: 120 }
         taxId: { type: string, nullable: true, maxLength: 40 }
@@ -406,7 +406,7 @@ components:
       properties:
         token: { type: string }
         email: { type: string, format: email }
-        password: { type: string, minLength: 8 }
+        password: { type: string, minLength: 8, description: 'min. 8 dengan huruf besar, huruf kecil, dan angka (ASUMSI A-25/A-78)' }
         passwordConfirmation: { type: string }
     UserProfile:
       type: object
@@ -460,7 +460,7 @@ components:
       properties:
         label: { type: string, maxLength: 80 }
         recipientName: { type: string, maxLength: 120 }
-        phone: { type: string, maxLength: 40 }
+        phone: { type: string, maxLength: 40, description: 'E.164 dengan kode negara, mis. +6281234567890 atau +60123456789 (8-15 digit; spasi/strip/titik/kurung boleh); tanpa + hanya nomor Indonesia 0.../62...; rule PhoneNumber (A-78)' }
         addressLine: { type: string, maxLength: 1000 }
         provinceCode: { type: string, example: '31' }
         regencyCode: { type: string, example: '31.75' }

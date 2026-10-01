@@ -27,11 +27,16 @@ class UpdateUserRequest extends FormRequest
         return [
             'name' => ['sometimes', 'required', 'string', 'max:120'],
             'email' => ['sometimes', 'required', 'string', 'email', 'max:190', Rule::unique('users', 'email')->ignore($user?->id)],
-            'password' => ['nullable', 'string', 'min:8', 'max:200'],
+            'password' => ['nullable', 'string', 'min:8', 'max:200', 'regex:'.\App\Http\Requests\Account\AccountFormRequest::PASSWORD_PATTERN],
             'role' => ['sometimes', 'required', Rule::in(User::ADMIN_ROLES)],
             'permissions' => ['sometimes', 'nullable', 'array'],
             'permissions.*' => ['string', Rule::in(array_keys(config('ikn.modules', [])))],
             'active' => ['sometimes', 'boolean'],
         ];
+    }
+
+    public function messages(): array
+    {
+        return ['password.regex' => __('account.password_policy'), 'password.min' => __('account.password_policy')];
     }
 }

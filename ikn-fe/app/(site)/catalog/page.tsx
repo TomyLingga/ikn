@@ -1,12 +1,14 @@
 import Breadcrumb from '@/components/Breadcrumb';
 import CatalogBrowser, { parseCatalogQuery } from '@/components/CatalogBrowser';
 import { fetchCategories, fetchProducts } from '@/lib/server-data';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Katalog Produk',
+export const metadata = buildMetadata({
+  title: 'Katalog Produk Karet Industri — Resiprene 35 & Barang Karet',
   description:
-    'Katalog produk hilir karet PT Industri Karet Nusantara — Resiprene 35 dan aneka barang karet industri.',
-};
+    'Beli produk karet industri langsung dari pabrik PT Industri Karet Nusantara (Medan): Resiprene 35 (cyclised natural rubber), sarung egrek, sepatu boots, rubber membrane, dan aneka barang karet. Harga transparan, minimum order jelas, pesan online.',
+  path: '/catalog',
+});
 
 type SearchParams = Record<string, string | string[] | undefined>;
 

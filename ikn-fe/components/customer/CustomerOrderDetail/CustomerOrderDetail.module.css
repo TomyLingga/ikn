@@ -566,3 +566,49 @@
   .cardBody { padding: 16px 14px; }
 }
 
+
+/* ---- Langkah berikutnya + progres (di bawah kepala halaman) ---- */
+.nextCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr);
+  align-items: center;
+  gap: 16px 28px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--info);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.nextText {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+}
+
+.nextText > div { flex: 1 1 200px; min-width: 0; }
+.nextText strong { font-size: 1rem; }
+.nextText p { margin: 2px 0 0; color: var(--ink-soft); font-size: 0.86rem; line-height: 1.45; }
+
+.nextIcon {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--info-tint);
+  color: var(--info);
+}
+
+.next_warn { border-left-color: var(--warn); }
+.next_warn .nextIcon { background: var(--warn-tint); color: var(--warn); }
+.next_ok { border-left-color: var(--ok); }
+.next_ok .nextIcon { background: var(--ok-tint); color: var(--ok); }
+.next_bad { grid-template-columns: 1fr; border-left-color: var(--red); }
+.next_bad .nextIcon { background: var(--red-tint); color: var(--red); }
+
+@media (max-width: 860px) {
+  .nextCard { grid-template-columns: 1fr; padding: 14px; }
+}

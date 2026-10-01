@@ -15,7 +15,7 @@ class AddressRequest extends AccountFormRequest
         return [
             'label' => ['required', 'string', 'max:80'],
             'recipientName' => ['required', 'string', 'max:120'],
-            'phone' => ['required', 'string', 'max:40'],
+            'phone' => ['required', 'string', 'max:40', new \App\Rules\PhoneNumber()],
             'addressLine' => ['required', 'string', 'max:1000'],
             'provinceCode' => $code,
             'regencyCode' => $code,
