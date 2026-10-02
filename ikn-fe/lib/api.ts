@@ -6,13 +6,14 @@
 // - apiPaged<T>(path, options) → { items, meta } untuk daftar berpaginasi
 // - apiUpload<T>(path, form)   → multipart (bukti bayar, media); semua request multipart dikirim lewat XHR agar
 //                                dialog unggah (components/UploadProgress) menampilkan persentase, dan ukuran berkas
-//                                dicek dulu di browser (lib/upload-progress.ts UPLOAD_LIMITS)
+//                                dicek dulu di browser terhadap GET /upload-limits (batas config yang sudah dibatasi
+//                                batas PHP server), jadi berkas terlalu besar ditolak sebelum dikirim
 // - uploadMedia(file)          → POST /admin/media
 // - ApiError                   → status, code, errors (422), meta (409 INSUFFICIENT_STOCK, VOUCHER_INVALID, 403 ACCOUNT_NOT_APPROVED)
 
 import type { PagedMeta } from '@/lib/cms';
 import type { AuthUser } from '@/lib/types';
-import { oversizeMessage, trackUpload, uploadName, type UploadTracker } from '@/lib/upload-progress';
+import { DEFAULT_UPLOAD_LIMITS, oversizeMessage, trackUpload, uploadName, type UploadLimits, type UploadTracker } from '@/lib/upload-progress';
 
 export class ApiError extends Error {
   status: number;
@@ -112,6 +113,22 @@ function parsePayload(text: string): Envelope {
   }
 }
 
+let uploadLimits: Promise<UploadLimits> | null = null;
+
+/** Batas unggahan efektif dari server (sekali per muatan halaman); gagal = batas bawaan config. */
+function loadUploadLimits(): Promise<UploadLimits> {
+  if (!uploadLimits) {
+    uploadLimits = fetch(`${API_URL}/upload-limits`, { headers: { Accept: 'application/json' } })
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then((json: { data?: UploadLimits }) => ({ ...DEFAULT_UPLOAD_LIMITS, ...(json.data || {}) }))
+      .catch(() => {
+        uploadLimits = null; // coba lagi pada unggahan berikutnya
+        return DEFAULT_UPLOAD_LIMITS;
+      });
+  }
+  return uploadLimits;
+}
+
 interface RawResponse {
   status: number;
   ok: boolean;
@@ -144,7 +161,8 @@ async function request(path: string, options: ApiOptions, retried = false, track
   if (options.formData && !tracker) {
     const { name, size } = uploadName(options.formData);
     if (name) {
-      const tooLarge = oversizeMessage(path, options.formData, currentLang() === 'en' ? 'en' : 'id');
+      const limits = await loadUploadLimits();
+      const tooLarge = oversizeMessage(path, options.formData, currentLang() === 'en' ? 'en' : 'id', limits);
       const upload = trackUpload(name, size);
       if (tooLarge) {
         upload.fail(tooLarge);

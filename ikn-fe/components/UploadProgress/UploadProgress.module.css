@@ -172,3 +172,31 @@
     transition: none;
   }
 }
+
+/* Tombol tutup sendiri (bukan .btn situs yang huruf kapital/mono) agar sama di admin, portal, dan situs. */
+.closeBtn {
+  min-height: 38px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  background: color-mix(in srgb, var(--primary) 85%, #000);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Tema gelap: --primary lebih terang, teks gelap agar kontras. */
+:global([data-theme='dark']) .closeBtn {
+  color: #0b1220;
+}

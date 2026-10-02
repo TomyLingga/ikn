@@ -69,14 +69,26 @@ export function trackUpload(name: string, total: number): UploadTracker {
 
 const MB = 1024 * 1024;
 
-/** Batas per berkas, sama dengan ikn-api config/ikn.php (media, commerce, wbs). */
-export const UPLOAD_LIMITS = {
-  imageMb: 5,
-  documentMb: 10,
-  videoMb: 100,
-  proofMb: 5,
-  attachmentMb: 10,
-  wbsMb: 10,
+/** Batas per berkas dalam KB, bentuk respons GET /upload-limits (config ikn-api dibatasi batas PHP server). */
+export interface UploadLimits {
+  imageKb: number;
+  documentKb: number;
+  videoKb: number;
+  proofKb: number;
+  attachmentKb: number;
+  wbsKb: number;
+  serverKb: number;
+}
+
+/** Cadangan bila /upload-limits gagal dimuat: sama dengan ikn-api config/ikn.php. */
+export const DEFAULT_UPLOAD_LIMITS: UploadLimits = {
+  imageKb: 5 * 1024,
+  documentKb: 10 * 1024,
+  videoKb: 100 * 1024,
+  proofKb: 5 * 1024,
+  attachmentKb: 10 * 1024,
+  wbsKb: 10 * 1024,
+  serverKb: 0,
 };
 
 function kindOf(file: File): 'image' | 'video' | 'document' {
@@ -85,14 +97,18 @@ function kindOf(file: File): 'image' | 'video' | 'document' {
   return 'document';
 }
 
-/** Batas (MB) untuk berkas ini pada endpoint ini. */
-export function uploadLimitMb(path: string, file: File): number {
+/** Batas (KB) untuk berkas ini pada endpoint ini. */
+export function uploadLimitKb(path: string, file: File, limits: UploadLimits): number {
   const p = path.split('?')[0] || '';
-  if (/\/proof$/.test(p)) return UPLOAD_LIMITS.proofMb;
-  if (/\/attachments$/.test(p)) return UPLOAD_LIMITS.attachmentMb;
-  if (/^\/(admin\/)?wbs/.test(p) || p.startsWith('/admin/help-guide')) return UPLOAD_LIMITS.wbsMb;
+  if (/\/proof$/.test(p)) return limits.proofKb;
+  if (/\/attachments$/.test(p)) return limits.attachmentKb;
+  if (/^\/(admin\/)?wbs/.test(p) || p.startsWith('/admin/help-guide')) return limits.wbsKb;
   const kind = kindOf(file);
-  return kind === 'video' ? UPLOAD_LIMITS.videoMb : kind === 'image' ? UPLOAD_LIMITS.imageMb : UPLOAD_LIMITS.documentMb;
+  return kind === 'video' ? limits.videoKb : kind === 'image' ? limits.imageKb : limits.documentKb;
+}
+
+function formatLimit(kb: number): string {
+  return kb >= 1024 ? `${Math.floor(kb / 1024)} MB` : `${kb} KB`;
 }
 
 export function formatMb(bytes: number): string {
@@ -100,16 +116,17 @@ export function formatMb(bytes: number): string {
 }
 
 /** Pesan bila ada berkas yang melebihi batas, atau null bila semua aman. */
-export function oversizeMessage(path: string, form: FormData, lang: 'id' | 'en'): string | null {
+export function oversizeMessage(path: string, form: FormData, lang: 'id' | 'en', limits: UploadLimits = DEFAULT_UPLOAD_LIMITS): string | null {
   for (const value of Array.from(form.values())) {
     if (!(value instanceof File) || !value.size) continue;
-    const limit = uploadLimitMb(path, value);
-    if (value.size > limit * MB) {
+    const limitKb = uploadLimitKb(path, value, limits);
+    if (value.size > limitKb * 1024) {
       const kind = kindOf(value);
       const what = lang === 'en' ? { video: 'videos', image: 'images', document: 'documents' }[kind] : { video: 'video', image: 'gambar', document: 'dokumen' }[kind];
+      const limit = formatLimit(limitKb);
       return lang === 'en'
-        ? `"${value.name}" is ${formatMb(value.size)}, over the ${limit} MB limit for ${what}. Compress it or pick a smaller file.`
-        : `Berkas "${value.name}" berukuran ${formatMb(value.size)}, melebihi batas ${limit} MB untuk ${what}. Kompres atau pilih berkas yang lebih kecil.`;
+        ? `"${value.name}" is ${formatMb(value.size)}, over the ${limit} limit for ${what}. Compress it or pick a smaller file.`
+        : `Berkas "${value.name}" berukuran ${formatMb(value.size)}, melebihi batas ${limit} untuk ${what}. Kompres atau pilih berkas yang lebih kecil.`;
     }
   }
   return null;

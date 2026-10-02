@@ -154,6 +154,38 @@ paths:
           $ref: '#/components/responses/UserSession'
         '401':
           $ref: '#/components/responses/Unauthenticated'
+  /upload-limits:
+    get:
+      tags:
+      - content
+      summary: Batas ukuran unggahan efektif (KB) = config ikn dibatasi upload_max_filesize/post_max_size PHP; FE menolak berkas terlalu besar
+        sebelum mengirim
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      imageKb:
+                        type: integer
+                      documentKb:
+                        type: integer
+                      videoKb:
+                        type: integer
+                      proofKb:
+                        type: integer
+                      attachmentKb:
+                        type: integer
+                      wbsKb:
+                        type: integer
+                      serverKb:
+                        type: integer
+                        description: batas PHP server (0 = tidak terbatas)
   /content/site:
     get:
       tags:

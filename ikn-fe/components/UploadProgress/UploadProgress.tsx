@@ -89,7 +89,7 @@ export default function UploadProgressHost() {
 
               {error && (
                 <div className={styles.actions}>
-                  <button ref={index === items.findIndex((i) => i.status === 'error') ? closeRef : undefined} type="button" className="btn btn-solid btn-sm" onClick={() => dismissUpload(item.id)}>
+                  <button ref={index === items.findIndex((i) => i.status === 'error') ? closeRef : undefined} type="button" className={styles.closeBtn} onClick={() => dismissUpload(item.id)}>
                     {t('Tutup', 'Close')}
                   </button>
                 </div>

@@ -43,6 +43,9 @@ Route::prefix('content')->group(function () {
     Route::get('customer-logos', [PublicSite\ContentController::class, 'customerLogos']);
 });
 
+// ---- Batas unggahan efektif (config dibatasi batas PHP); FE mengecek ukuran berkas sebelum mengirim ----
+Route::get('upload-limits', [PublicSite\UploadLimitsController::class, 'show']);
+
 // ---- Formulir publik ----
 Route::post('wbs', [PublicSite\WbsController::class, 'store'])->middleware('throttle:public-form');
 Route::get('wbs/{code}', [PublicSite\WbsController::class, 'show']);

@@ -424,7 +424,7 @@ function WorkQueue({ queue, t }: { queue: DashboardWorkQueue; t: T }) {
         <span className={styles.queueSub}>
           {open > 0
             ? t(`${open} item menunggu tindakan`, `${open} item${open === 1 ? '' : 's'} waiting`)
-            : t('Semua beres. Tidak ada yang menunggu.', 'All clear. Nothing waiting.')}
+            : t('Semua selesai. Tidak ada yang menunggu.', 'All clear. Nothing waiting.')}
         </span>
       </div>
       <div className={styles.queueGrid}>
@@ -438,7 +438,7 @@ function WorkQueue({ queue, t }: { queue: DashboardWorkQueue; t: T }) {
               </span>
               <span className={styles.qText}>
                 <span className={styles.qLabel}>{item.label}</span>
-                <small>{count === 0 ? t('Beres', 'Clear') : item.hint}</small>
+                <small>{count === 0 ? t('Selesai', 'Clear') : item.hint}</small>
               </span>
               <strong className={styles.qCount}>{count}</strong>
             </Link>
