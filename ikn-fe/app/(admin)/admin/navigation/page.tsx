@@ -11,6 +11,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type DocLinkData, type I18n, type MediaSummary, type MenuData, type MenuNode } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
+import { FileLink } from '@/components/FileViewer';
 
 type MenuLocation = 'header' | 'footer';
 
@@ -232,9 +233,15 @@ export default function AdminNavigation() {
       label: t('Target', 'Target'),
       render: (d) =>
         d.targetUrl ? (
-          <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" className="cms-link mono">
-            {d.file ? d.file.originalName : d.targetUrl}
-          </a>
+          d.file ? (
+            <FileLink file={{ url: d.file.url, name: d.file.originalName, mime: d.file.mime }} className="cms-link mono">
+              {d.file.originalName}
+            </FileLink>
+          ) : (
+            <a href={d.targetUrl} target="_blank" rel="noopener noreferrer" className="cms-link mono">
+              {d.targetUrl}
+            </a>
+          )
         ) : (
           '—'
         ),

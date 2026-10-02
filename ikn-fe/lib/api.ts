@@ -4,12 +4,15 @@
 //
 // - api<T>(path, options)      → isi envelope `data` (atau envelope utuh bila `raw: true`)
 // - apiPaged<T>(path, options) → { items, meta } untuk daftar berpaginasi
-// - apiUpload<T>(path, form)   → multipart (bukti bayar, media)
+// - apiUpload<T>(path, form)   → multipart (bukti bayar, media); semua request multipart dikirim lewat XHR agar
+//                                dialog unggah (components/UploadProgress) menampilkan persentase, dan ukuran berkas
+//                                dicek dulu di browser (lib/upload-progress.ts UPLOAD_LIMITS)
 // - uploadMedia(file)          → POST /admin/media
 // - ApiError                   → status, code, errors (422), meta (409 INSUFFICIENT_STOCK, VOUCHER_INVALID, 403 ACCOUNT_NOT_APPROVED)
 
 import type { PagedMeta } from '@/lib/cms';
 import type { AuthUser } from '@/lib/types';
+import { oversizeMessage, trackUpload, uploadName, type UploadTracker } from '@/lib/upload-progress';
 
 export class ApiError extends Error {
   status: number;
@@ -80,8 +83,88 @@ export interface Envelope<T = unknown> {
   errors?: Record<string, string[]>;
 }
 
-async function request(path: string, options: ApiOptions, retried = false): Promise<Envelope> {
+/** Pesan bila server tidak mengirim JSON yang bisa dibaca (mis. peringatan PHP sebelum JSON, halaman error proxy). */
+function statusMessage(status: number): string {
+  const en = currentLang() === 'en';
+  if (status === 413) return en ? 'The file is larger than the server allows. Pick a smaller file.' : 'Ukuran berkas melebihi batas yang diizinkan server. Pilih berkas yang lebih kecil.';
+  if (status === 415) return en ? 'This file type is not allowed.' : 'Jenis berkas ini tidak diizinkan.';
+  if (status === 401) return en ? 'Your session has ended. Please log in again.' : 'Sesi Anda sudah berakhir. Silakan login kembali.';
+  if (status === 403) return en ? 'You do not have access to this action.' : 'Anda tidak memiliki akses untuk aksi ini.';
+  if (status >= 500) return en ? 'The server had a problem. Try again in a moment.' : 'Server sedang bermasalah. Coba lagi sebentar lagi.';
+  return en ? `Request failed (${status}).` : `Permintaan gagal (${status}).`;
+}
+
+/** JSON dari teks respons; toleran terhadap teks lain di depan JSON (peringatan PHP dev dengan display_errors). */
+function parsePayload(text: string): Envelope {
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Envelope;
+  } catch {
+    const start = text.indexOf('{"');
+    if (start > 0) {
+      try {
+        return JSON.parse(text.slice(start)) as Envelope;
+      } catch {
+        /* abaikan */
+      }
+    }
+    return {};
+  }
+}
+
+interface RawResponse {
+  status: number;
+  ok: boolean;
+  payload: Envelope;
+}
+
+/** Multipart lewat XHR: progres unggah ke dialog, bisa dibatalkan. */
+function sendMultipart(url: string, method: string, headers: Record<string, string>, form: FormData, tracker: UploadTracker | null): Promise<RawResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url, true);
+    xhr.withCredentials = true;
+    Object.entries(headers).forEach(([key, value]) => xhr.setRequestHeader(key, value));
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) tracker?.progress(event.loaded, event.total);
+    };
+    xhr.upload.onload = () => tracker?.processing();
+    xhr.onload = () => resolve({ status: xhr.status, ok: xhr.status >= 200 && xhr.status < 300, payload: xhr.status === 204 ? {} : parsePayload(xhr.responseText) });
+    xhr.onerror = () => reject(new ApiError(0, currentLang() === 'en' ? 'Could not reach the API server. Check your connection.' : 'Tidak dapat terhubung ke server API. Periksa koneksi Anda.', {}, 'NETWORK_ERROR'));
+    xhr.onabort = () => reject(new ApiError(0, currentLang() === 'en' ? 'Upload cancelled.' : 'Unggahan dibatalkan.', {}, 'UPLOAD_ABORTED'));
+    tracker?.setCancel(() => xhr.abort());
+    xhr.send(form);
+  });
+}
+
+async function request(path: string, options: ApiOptions, retried = false, tracker: UploadTracker | null = null): Promise<Envelope> {
   const method = options.method || 'GET';
+
+  // Unggahan: cek batas ukuran di browser dulu, lalu tampilkan dialog progres.
+  if (options.formData && !tracker) {
+    const { name, size } = uploadName(options.formData);
+    if (name) {
+      const tooLarge = oversizeMessage(path, options.formData, currentLang() === 'en' ? 'en' : 'id');
+      const upload = trackUpload(name, size);
+      if (tooLarge) {
+        upload.fail(tooLarge);
+        throw new ApiError(413, tooLarge, {}, 'FILE_TOO_LARGE');
+      }
+      try {
+        const payload = await request(path, options, retried, upload);
+        upload.done();
+        return payload;
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'UPLOAD_ABORTED') {
+          upload.fail(error.message);
+        } else {
+          upload.fail(errorMessage(error));
+        }
+        throw error;
+      }
+    }
+  }
+
   if (method !== 'GET') await ensureCsrf();
 
   const headers: Record<string, string> = {
@@ -94,28 +177,34 @@ async function request(path: string, options: ApiOptions, retried = false): Prom
   const xsrf = readCookie('XSRF-TOKEN');
   if (xsrf) headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrf);
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}${path}`, {
-      method,
-      headers,
-      credentials: 'include',
-      body: options.formData ?? (options.body !== undefined ? JSON.stringify(options.body) : undefined),
-    });
-  } catch {
-    throw new ApiError(0, 'Tidak dapat terhubung ke server API.', {}, 'NETWORK_ERROR');
+  let res: RawResponse;
+  if (options.formData) {
+    res = await sendMultipart(`${API_URL}${path}`, method, headers, options.formData, tracker);
+  } else {
+    let response: Response;
+    try {
+      response = await fetch(`${API_URL}${path}`, {
+        method,
+        headers,
+        credentials: 'include',
+        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      });
+    } catch {
+      throw new ApiError(0, 'Tidak dapat terhubung ke server API.', {}, 'NETWORK_ERROR');
+    }
+    res = { status: response.status, ok: response.ok, payload: response.status === 204 ? {} : parsePayload(await response.text().catch(() => '')) };
   }
 
-  const payload = (res.status === 204 ? {} : await res.json().catch(() => ({}))) as Envelope;
+  const payload = res.payload;
 
   if (!res.ok) {
     if (res.status === 419 && !retried) {
       csrfReady = false;
-      return request(path, options, true);
+      return request(path, options, true, tracker);
     }
     throw new ApiError(
       res.status,
-      payload.message || `Permintaan gagal (${res.status}).`,
+      payload.message || statusMessage(res.status),
       payload.errors || {},
       payload.code || `HTTP_${res.status}`,
       (payload as { meta?: Record<string, unknown> }).meta ?? null,

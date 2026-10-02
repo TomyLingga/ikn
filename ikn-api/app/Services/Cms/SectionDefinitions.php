@@ -348,6 +348,7 @@ final class SectionDefinitions
             'certificates' => self::type('Daftar sertifikat', 'Certificate list',
                 'Label/judul opsional; daftar sertifikat dari menu Sertifikat.',
                 'Optional label/heading; certificates from the Certificates menu.', self::labelHeading() + [
+                    'layout' => self::f('select', 'Tata letak', 'Layout', ['options' => ['list' => 'Daftar baris (logo kiri)', 'grid' => 'Kartu lencana (logo besar)'], 'default' => 'list']),
                     'empty_text' => self::f('i18n_text', 'Teks bila kosong', 'Empty text'),
                 ], ['keberlanjutan']),
 

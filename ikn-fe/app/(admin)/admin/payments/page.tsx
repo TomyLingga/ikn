@@ -17,6 +17,7 @@ import { formatDateTime, formatIDR } from '@/lib/format';
 import type { IconName, PaymentStatusKey } from '@/lib/types';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
+import { FileLink } from '@/components/FileViewer';
 
 type StatusFilter = PaymentStatusKey | 'all';
 
@@ -417,9 +418,9 @@ export default function AdminPayments() {
                       </div>
                     )}
                     <p className="admin-field-hint">
-                      <a href={proofUrl} target="_blank" rel="noopener" className="link">
-                        {t('Buka berkas di tab baru', 'Open file in a new tab')} <Icon name="arrow" size={13} />
-                      </a>{' '}
+                      <FileLink file={proofUrl ? { url: proofUrl, name: detail.proof.originalName, mime: detail.proof.mime } : null} className="link">
+                        {t('Lihat berkas', 'View file')} <Icon name="arrow" size={13} />
+                      </FileLink>{' '}
                       · {detail.proof.originalName} · {Math.round(detail.proof.size / 1024)} KB · {t('diunggah', 'uploaded')} {formatDateTime(detail.proof.uploadedAt, lang)}
                     </p>
                   </div>

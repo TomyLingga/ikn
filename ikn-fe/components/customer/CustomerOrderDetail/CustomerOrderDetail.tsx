@@ -27,6 +27,7 @@ import styles from './CustomerOrderDetail.module.css';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import OrderProgress, { orderNextStep } from '@/components/customer/OrderProgress';
 import Select from '@/components/Select';
+import { FileLink } from '@/components/FileViewer';
 
 const paths = shopPaths(true);
 const RATING_LABELS_ID: [string, string, string, string, string] = ['Buruk', 'Kurang', 'Cukup', 'Baik', 'Sangat baik'];
@@ -495,7 +496,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                 <ul className={styles.files}>
                   {(order.attachments || []).map((file) => (
                     <li key={file.id}>
-                      <a href={file.file?.url} target="_blank" rel="noopener" className={styles.fileLink}>
+                      <FileLink file={file.file ? { url: file.file.url, name: file.file.originalName, mime: file.file.mime } : null} className={styles.fileLink}>
                         <span className={styles.fileIcon}>
                           <Icon name="orders" size={18} />
                         </span>
@@ -506,8 +507,8 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                             {file.file ? ` · ${Math.max(1, Math.round(file.file.size / 1024))} KB` : ''} · {formatDateTime(file.at, lang)}
                           </small>
                         </span>
-                        <Icon name="arrowDown" size={16} />
-                      </a>
+                        <Icon name="eye" size={16} />
+                      </FileLink>
                     </li>
                   ))}
                 </ul>

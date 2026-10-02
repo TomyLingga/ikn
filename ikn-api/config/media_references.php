@@ -8,6 +8,7 @@ return [
         ['posts', 'cover_media_id'],
         ['gallery_items', 'media_id'],
         ['certificates', 'media_id'],
+        ['certificates', 'logo_media_id'],
         ['brochures', 'media_id'],
         ['customer_logos', 'media_id'],
         ['doc_links', 'media_id'],

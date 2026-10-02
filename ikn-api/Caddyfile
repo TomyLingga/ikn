@@ -26,7 +26,7 @@ www.{$SITE_DOMAIN} {
 {$API_DOMAIN} {
     import security
     request_body {
-        max_size 25MB
+        max_size 105MB
     }
     reverse_proxy nginx:80 {
         header_up X-Forwarded-Proto https

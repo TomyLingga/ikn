@@ -1,34 +1,449 @@
-.footer { padding: clamp(56px, 8vw, 100px) 0 36px; background: var(--green-deep); color: rgba(255, 255, 255, 0.78); }
-.top { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; padding-bottom: 56px; border-bottom: 1px solid rgba(255, 255, 255, 0.14); }
-.headline { margin: 18px 0 28px; color: #fff; font-family: var(--font-sans); font-size: clamp(1.7rem, 3.2vw, 2.6rem); font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; }
-.columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
-.column :global(.label) { display: block; margin-bottom: 18px; color: var(--primary-soft); }
-.column ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
-.column a { color: rgba(255, 255, 255, 0.78); font-size: 0.95rem; transition: color 0.2s var(--ease); }
-.column a:hover { color: var(--amber); }
-.handle { margin-left: 4px; color: var(--primary-soft); font-family: var(--font-mono); font-size: 0.72rem; }
-.base { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-top: 28px; }
-.wordmark { color: rgba(255, 255, 255, 0.08); font-family: var(--font-mono); font-size: clamp(3rem, 12vw, 8rem); font-weight: 500; letter-spacing: -0.04em; line-height: 0.8; }
-.fine { display: flex; flex-direction: column; gap: 5px; color: var(--primary-soft); font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.06em; text-align: right; }
-
-@media (max-width: 800px) { .top { grid-template-columns: 1fr; gap: 40px; } }
-@media (max-width: 520px) {
-  .columns { grid-template-columns: 1fr 1fr; }
-  .base { flex-direction: column; align-items: flex-start; }
-  .fine { text-align: left; }
+/* Footer: latar biru tua bergradasi + panel membulat (Terhubung · Hubungi kami · Lokasi), pil "Bagikan" di tepi atas panel. */
+.footer {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(72px, 9vw, 112px) 0 28px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--primary-deep) 92%, #000) 0%, var(--primary-deep) 55%, color-mix(in srgb, var(--primary-deep) 80%, var(--primary)) 100%);
+  color: rgba(255, 255, 255, 0.82);
 }
 
-@media (prefers-reduced-motion: reduce) { .footer { scroll-snap-align: none; } }
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(42rem 26rem at 8% 92%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%),
+    radial-gradient(36rem 24rem at 96% 70%, color-mix(in srgb, var(--primary) 45%, transparent), transparent 70%);
+  opacity: 0.55;
+}
 
-/* Tautan WhatsApp di kolom kontak: ikon kecil + nomor, langsung membuka percakapan. */
-.whatsapp {
+.inner {
+  position: relative;
+}
+
+/* ---------- Panel ---------- */
+.panel {
+  position: relative;
+  padding: 44px clamp(22px, 4vw, 52px) 40px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--primary) 62%, var(--primary-deep));
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.55);
+}
+
+.share {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 24px);
+  padding: 6px 10px 6px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-deep) 88%, #000);
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+.shareLabel {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  margin-right: 6px;
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 
-.whatsapp :global(.social-icon) {
+.shareIcon,
+.shareIcon svg {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+}
+
+.shareBtn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #fff;
+  transition: background 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.shareBtn svg {
+  width: 19px;
+  height: 19px;
+}
+
+.shareBtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.panelGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr minmax(260px, 0.95fr);
+}
+
+.block {
+  min-width: 0;
+  padding: 8px clamp(18px, 3vw, 40px);
+}
+
+.block:first-child {
+  padding-left: 0;
+}
+
+.block:last-child {
+  padding-right: 0;
+}
+
+.block + .block {
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.blockTitle {
+  margin: 0 0 14px;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: clamp(1.5rem, 2.6vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+.blockText {
+  margin: 0 0 24px;
+  max-width: 44ch;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* Ikon sosial besar tanpa label */
+.socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.socialBtn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.socialBtn :global(.social-icon) {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  color: #fff;
+  font-size: 24px;
+}
+
+.socialBtn :global(.social-icon) svg {
+  width: 24px;
+  height: 24px;
+}
+
+.socialBtn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Tombol kontak */
+.ctaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.ctaPrimary,
+.ctaGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: transform 0.2s var(--ease), background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.ctaPrimary {
+  background: #fff;
+  color: var(--primary-deep);
+}
+
+.ctaPrimary:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, #fff 88%, var(--accent));
+}
+
+.ctaGhost {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+
+.ctaGhost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ctaGhost :global(.social-icon) {
   width: 22px;
   height: 22px;
+  border-radius: 50%;
+  background: #25d366;
+  color: #fff;
   font-size: 13px;
+}
+
+.contactList {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contactList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.contactList a {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.93rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactList a:hover {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Lokasi: peta pin (komponen ContactMap compact) */
+.address {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.address :global(svg) {
+  flex: none;
+  margin-top: 3px;
+}
+
+.mapCard :global(.footer-map) {
+  max-width: none;
+  height: 200px;
+  margin-top: 0;
+  border-radius: 14px;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* ---------- Tautan menu footer ---------- */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 26px;
+  padding: 34px 4px 26px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.links a {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.95rem;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  text-underline-offset: 4px;
+  transition: color 0.2s var(--ease);
+}
+
+.links a:hover {
+  color: #fff;
+  text-decoration-color: #fff;
+}
+
+/* ---------- Identitas ---------- */
+.base {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 24px;
+  /* Ruang untuk tombol melayang (Chat WhatsApp / Live Chat) di kanan bawah layar. */
+  padding-right: 236px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.logo {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.tagline {
+  margin: 0 0 4px;
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.fine {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.84rem;
+}
+
+.toTop {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s var(--ease);
+}
+
+.toTop:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.shareBtn:focus-visible,
+.socialBtn:focus-visible,
+.ctaPrimary:focus-visible,
+.ctaGhost:focus-visible,
+.toTop:focus-visible,
+.links a:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* ---------- Responsif ---------- */
+@media (max-width: 1080px) {
+  .panelGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mapBlock {
+    grid-column: 1 / -1;
+    margin-top: 28px;
+    padding: 28px 0 0 !important;
+    border-left: 0 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .block:nth-child(2) {
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .panel {
+    padding: 52px 20px 28px;
+    border-radius: 18px;
+  }
+
+  .panelGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .block {
+    padding: 0 !important;
+  }
+
+  .block + .block {
+    margin-top: 26px;
+    padding-top: 26px !important;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .mapBlock {
+    margin-top: 26px;
+  }
+
+  .shareLabel span:last-child,
+  .shareLabel {
+    font-size: 0;
+    margin-right: 0;
+    gap: 0;
+  }
+
+  .shareLabel .shareIcon {
+    margin-right: 4px;
+  }
+
+  .share {
+    padding: 4px 8px;
+  }
+
+  .shareBtn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .base {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .base {
+    padding-right: 76px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer *,
+  .footer *::before {
+    transition: none !important;
+  }
+}
+
+/* Tema gelap: --primary lebih terang, jadi panel dicampur lebih banyak warna dasar agar teks putih tetap kontras. */
+:global([data-theme='dark']) .panel {
+  background: color-mix(in srgb, var(--primary) 30%, var(--primary-deep));
 }

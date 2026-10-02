@@ -19,6 +19,7 @@ import type { Order, OrderAttachment, Payment, TrackingUpdate } from '@/lib/type
 import styles from './page.module.css';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
+import { FileLink } from '@/components/FileViewer';
 
 type Modal = { type: 'cancel' } | { type: 'ship' } | { type: 'due' } | { type: 'reject'; payment: Payment } | { type: 'note'; status: 'processing' | 'delivered' | 'completed' } | null;
 
@@ -563,9 +564,9 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                     {payment.proof && (
                       <span>
                         {t('Bukti', 'Proof')}:{' '}
-                        <a href={payment.proof.url || `/api/v1/files/${payment.proof.mediaId}`} target="_blank" rel="noopener" className="link">
+                        <FileLink file={{ url: payment.proof.url || `/api/v1/files/${payment.proof.mediaId}`, name: payment.proof.originalName, mime: payment.proof.mime }} className="link">
                           {payment.proof.originalName}
-                        </a>{' '}
+                        </FileLink>{' '}
                         · {formatDateTime(payment.proof.uploadedAt, lang)}
                       </span>
                     )}
@@ -731,9 +732,9 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                       <Icon name="orders" size={18} />
                     </span>
                     <span className={styles.fileBody}>
-                      <a href={file.file?.url} target="_blank" rel="noopener" className="link">
+                      <FileLink file={file.file ? { url: file.file.url, name: file.file.originalName, mime: file.file.mime } : null} className="link">
                         {file.label || file.file?.originalName}
-                      </a>
+                      </FileLink>
                       <small className="admin-cell-sub">
                         {file.file?.originalName}
                         {file.file ? ` · ${Math.max(1, Math.round(file.file.size / 1024))} KB` : ''} · {formatDateTime(file.at, lang)}
@@ -751,7 +752,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
             )}
             {order.canAttach && (
               <form className={styles.attachForm} onSubmit={submitAttachment}>
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.doc,.csv,.txt,.zip" onChange={(e) => setAttachFile(e.target.files?.[0] || null)} />
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" onChange={(e) => setAttachFile(e.target.files?.[0] || null)} />
                 <input value={attachLabel} maxLength={120} onChange={(e) => setAttachLabel(e.target.value)} placeholder={t('Keterangan, mis. Faktur Pajak 010.000-26.00000001', 'Label, e.g. Tax Invoice 010.000-26.00000001')} />
                 <button type="submit" className="btn btn-solid btn-sm" disabled={busy || !attachFile}>
                   <Icon name="plus" size={14} /> {t('Unggah lampiran', 'Upload attachment')}
@@ -808,11 +809,11 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
               <input
                 type="file"
                 multiple
-                accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.doc,.csv,.txt,.zip"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
                 onChange={(e) => setShipFiles(Array.from(e.target.files || []))}
               />
               <small className="admin-field-hint">
-                {t('Faktur pajak, surat jalan, atau dokumen lain (PDF/gambar/Office, maks. 10 MB per berkas). Customer dapat mengunduhnya dari detail pesanan dan mendapat notifikasi.', 'Tax invoice, delivery note, or other documents (PDF/image/Office, max. 10 MB each). The customer can download them from the order details and gets a notification.')}
+                {t('Faktur pajak, surat jalan, atau dokumen lain (dokumen PDF atau gambar JPG/PNG/WebP, maks. 10 MB per berkas). Customer dapat mengunduhnya dari detail pesanan dan mendapat notifikasi.', 'Tax invoice, delivery note, or other documents (PDF documents or JPG/PNG/WebP images, max. 10 MB each). The customer can download them from the order details and gets a notification.')}
               </small>
               {shipFiles.length > 0 && (
                 <small className="admin-field-hint">

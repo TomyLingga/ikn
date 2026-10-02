@@ -1,0 +1,289 @@
+/* Penampil berkas dalam situs (PDF/gambar/video). Selalu gelap agar dokumen dan foto menonjol, di tema apa pun. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(6, 10, 18, 0.92);
+  color: #fff;
+  animation: fade 0.16s ease;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  min-height: 60px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 16, 28, 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.kind {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pages {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.zoom button {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.zoom button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.zoom button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.zoomValue {
+  min-width: 56px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.action,
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.action {
+  padding: 0 14px;
+}
+
+.close {
+  width: 38px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.action:hover:not(:disabled),
+.close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.action:disabled {
+  opacity: 0.6;
+}
+
+.action:focus-visible,
+.close:focus-visible,
+.zoom button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* PDF */
+.pdfScroll {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* halaman diperbesar tetap bisa digulir ke kiri; dipusatkan lewat margin auto */
+  gap: 16px;
+  padding: 20px 16px 40px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.pdfPage {
+  flex: none;
+  margin-inline: auto;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.pdfPage canvas {
+  display: block;
+}
+
+/* Gambar */
+.imageWrap {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  overflow: auto;
+}
+
+.imageWrap img {
+  max-width: 100%;
+  max-height: calc(100dvh - 100px);
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  cursor: zoom-in;
+}
+
+.imageZoomed {
+  place-items: start center;
+}
+
+.imageZoomed img {
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+}
+
+/* Video */
+.videoWrap {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.videoWrap video {
+  max-width: min(100%, 1280px);
+  max-height: calc(100dvh - 110px);
+  border-radius: 8px;
+  background: #000;
+}
+
+.other,
+.message {
+  margin: auto;
+  max-width: 360px;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.82);
+  text-align: center;
+}
+
+.other {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  margin: auto;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .bar {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .kind,
+  .pages {
+    display: none;
+  }
+
+  .action span {
+    display: none;
+  }
+
+  .action {
+    width: 38px;
+    padding: 0;
+  }
+
+  .zoom button {
+    min-width: 32px;
+    padding: 0 4px;
+  }
+
+  .zoomValue {
+    min-width: 44px !important;
+  }
+
+  .pdfScroll {
+    padding: 12px 8px 30px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .spinner {
+    animation: none;
+  }
+}

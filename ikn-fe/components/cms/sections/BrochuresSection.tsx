@@ -7,6 +7,7 @@ import { tr } from '@/lib/cms';
 import type { BrochureData, PageSection } from '@/lib/cms';
 import SecHead from './SecHead';
 import { fileKind, formatBytes, type EmptyTextContent } from '../utils';
+import { FileLink } from '@/components/FileViewer';
 
 interface Props {
   section: PageSection;
@@ -50,9 +51,9 @@ export default function BrochuresSection({ section, items }: Props) {
                     )}
                   </div>
                   {b.file?.url ? (
-                    <a href={b.file.url} className="btn btn-line btn-sm download-cta" target="_blank" rel="noreferrer">
-                      {lang === 'en' ? 'Download' : 'Unduh'} <Icon name="arrowDown" />
-                    </a>
+                    <FileLink file={{ url: b.file.url, name: b.file.originalName, mime: b.file.mime }} className="btn btn-line btn-sm download-cta">
+                      {lang === 'en' ? 'View' : 'Lihat'} <Icon name="eye" />
+                    </FileLink>
                   ) : (
                     <p className="download-note">{archiveNote}</p>
                   )}

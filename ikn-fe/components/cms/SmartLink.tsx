@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { isExternal, isProtocolLink } from './utils';
+import { FileLink, isSiteFile } from '@/components/FileViewer';
 
 interface SmartLinkProps {
   href: string;
@@ -27,6 +28,14 @@ export default function SmartLink({ href, className, style, children, newTab = f
       <a href={href} className={className} style={style}>
         {children}
       </a>
+    );
+  }
+  // Berkas media situs (PDF/gambar/video) dibuka di penampil dalam situs, bukan tab baru.
+  if (isSiteFile(href)) {
+    return (
+      <FileLink file={{ url: href }} className={className} style={style}>
+        {children}
+      </FileLink>
     );
   }
   if (newTab || isExternal(href)) {

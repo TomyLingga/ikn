@@ -1244,11 +1244,27 @@
 .article-related-item:hover h3 { color: var(--green); }
 .article-aside-all { align-self: flex-start; }
 
-/* Certificate list */
+/* Certificate list (baris: logo kiri) dan kartu lencana (logo besar) */
 .cert-list { display: flex; flex-direction: column; }
-.cert-row { display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: center; padding: 26px 0; border-bottom: 1px solid var(--line); }
+.cert-row { display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; padding: 24px 0; border-bottom: 1px solid var(--line); }
 .cert-material { font-family: var(--font-mono); font-size: 0.78rem; color: var(--amber); display: block; margin: 4px 0 8px; }
-.cert-body p { color: var(--ink-soft); max-width: 52ch; }
+.cert-body p, .cert-card-body p { color: var(--ink-soft); max-width: 60ch; margin: 0; }
+.cert-badge { position: relative; display: grid; place-items: center; width: 92px; height: 92px; flex: none; padding: 12px; border-radius: 16px; background: #fff; border: 1px solid var(--line); box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--ink) 40%, transparent); overflow: hidden; }
+.cert-badge img { width: 100%; height: 100%; object-fit: contain; }
+.cert-badge-empty { gap: 2px; align-content: center; background: color-mix(in srgb, var(--primary) 8%, var(--surface)); color: var(--primary); border-color: color-mix(in srgb, var(--primary) 22%, var(--line)); box-shadow: none; }
+.cert-badge-index { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; }
+.cert-badge-lg { width: 100%; height: 100%; border-radius: 12px; padding: 18px; box-shadow: none; }
+.cert-view { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink); font-size: 0.88rem; font-weight: 600; white-space: nowrap; transition: border-color 0.2s var(--ease), background 0.2s var(--ease), color 0.2s var(--ease); }
+.cert-view:hover { border-color: var(--primary); background: var(--primary); color: #fff; }
+.cert-verified { display: inline-flex; align-items: center; gap: 6px; color: var(--ok, var(--primary)); font-size: 0.86rem; font-weight: 600; white-space: nowrap; }
+.cert-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+.cert-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), border-color 0.25s var(--ease); }
+.cert-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--primary) 35%, var(--line)); box-shadow: 0 18px 36px -22px color-mix(in srgb, var(--ink) 55%, transparent); }
+.cert-card-media { display: block; aspect-ratio: 16 / 10; padding: 14px; background: color-mix(in srgb, var(--ink) 4%, var(--surface)); border-bottom: 1px solid var(--line); }
+a.cert-card-media { cursor: zoom-in; }
+.cert-card-body { flex: 1; padding: 18px 20px 6px; }
+.cert-card-body .h3 { font-size: 1.12rem; }
+.cert-card-foot { padding: 14px 20px 20px; }
 
 /* Customer logos */
 .logo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
@@ -1272,7 +1288,9 @@
   .article-aside { position: static; border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 24px; gap: 26px; }
   .article-related-item { grid-template-columns: 80px 1fr; }
   .article-body { max-width: none; }
-  .cert-row { grid-template-columns: 1fr; gap: 12px; }
+  .cert-row { grid-template-columns: auto 1fr; gap: 14px 18px; align-items: start; }
+  .cert-row > .cert-view, .cert-row > .cert-verified { grid-column: 2; justify-self: start; }
+  .cert-row .cert-badge { width: 68px; height: 68px; padding: 8px; border-radius: 12px; }
 }
 
 /* ---------- Auth: error, reveal, demo box ---------- */

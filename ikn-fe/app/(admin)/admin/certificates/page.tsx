@@ -9,12 +9,14 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type CertificateData, type I18n, type MediaSummary } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import { FileLink } from '@/components/FileViewer';
 
 interface CertificateForm {
   name: I18n;
   material: I18n;
   description: I18n;
   file: MediaSummary | null;
+  logo: MediaSummary | null;
   isPublished: boolean;
   sortOrder: number;
 }
@@ -24,6 +26,7 @@ const emptyForm = (): CertificateForm => ({
   material: emptyI18n(),
   description: emptyI18n(),
   file: null,
+  logo: null,
   isPublished: true,
   sortOrder: 0,
 });
@@ -34,6 +37,7 @@ function formFromRow(row: CertificateData): CertificateForm {
     material: row.material ?? emptyI18n(),
     description: row.description ?? emptyI18n(),
     file: row.file,
+    logo: row.logo ?? null,
     isPublished: row.isPublished,
     sortOrder: row.sortOrder,
   };
@@ -46,6 +50,7 @@ function toPayload(form: CertificateForm) {
     material: form.material,
     description: form.description,
     mediaId: form.file?.id ?? null,
+    logoMediaId: form.logo?.id ?? null,
     isPublished: form.isPublished,
     sortOrder: form.sortOrder,
   };
@@ -143,16 +148,28 @@ export default function AdminCertificates() {
   }
 
   const columns: Column<CertificateData>[] = [
-    { key: 'name', label: t('Sertifikat', 'Certificate'), render: (c) => <strong>{tr(c.name, lang)}</strong> },
+    {
+      key: 'name',
+      label: t('Sertifikat', 'Certificate'),
+      render: (c) => (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          {c.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={c.logo.url} alt="" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8, background: '#fff', border: '1px solid var(--line)', padding: 4 }} />
+          ) : null}
+          <strong>{tr(c.name, lang)}</strong>
+        </span>
+      ),
+    },
     { key: 'material', label: t('Materi / standar', 'Scope / standard'), render: (c) => tr(c.material, lang) || '—' },
     {
       key: 'file',
       label: t('Berkas', 'File'),
       render: (c) =>
         c.file ? (
-          <a href={c.file.url} target="_blank" rel="noopener noreferrer" className="cms-link mono">
+          <FileLink file={{ url: c.file.url, name: c.file.originalName, mime: c.file.mime }} className="cms-link mono">
             {c.file.originalName}
-          </a>
+          </FileLink>
         ) : (
           '—'
         ),
@@ -237,6 +254,15 @@ export default function AdminCertificates() {
               accept="document"
               collection="certificates"
               error={firstError(formErrors, 'mediaId')}
+            />
+            <MediaPicker
+              label={t('Logo sertifikat', 'Certificate logo')}
+              value={form.logo}
+              onChange={(logo) => setForm({ ...form, logo })}
+              accept="image"
+              collection="certificates"
+              hint={t('PNG/SVG berlatar transparan atau putih, mis. lencana ISO atau logo lembaga sertifikasi.', 'PNG/SVG with a transparent or white background, e.g. the ISO badge or the certifying body logo.')}
+              error={firstError(formErrors, 'logoMediaId')}
             />
             <div className="admin-form-row">
               <label>

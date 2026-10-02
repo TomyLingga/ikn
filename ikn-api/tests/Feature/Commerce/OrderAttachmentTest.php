@@ -33,6 +33,8 @@ class OrderAttachmentTest extends TestCase
 
         // Jenis berkas di luar daftar → 415; sukses → 201 dengan attachments[] + notifikasi customer.
         $this->actingAs($admin)->post($url($paid), ['file' => UploadedFile::fake()->create('virus.exe', 10, 'application/x-msdownload')])->assertStatus(415);
+        // Dokumen hanya PDF (2026-10-03): berkas Office ditolak.
+        $this->actingAs($admin)->post($url($paid), ['file' => UploadedFile::fake()->create('rekap.xlsx', 10, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')])->assertStatus(415);
         $this->actingAs($admin)->post($url($paid), ['file' => UploadedFile::fake()->create('faktur-pajak.pdf', 50, 'application/pdf'), 'label' => 'Faktur Pajak 010.000-26.00000001'])
             ->assertStatus(201)
             ->assertJsonCount(1, 'data.attachments')

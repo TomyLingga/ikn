@@ -12,6 +12,7 @@ import { emptyI18n, tr, type DocLinkData, type I18n, type WbsReportData } from '
 import { formatDateTime } from '@/lib/format';
 import type { Tone } from '@/lib/types';
 import Select from '@/components/Select';
+import { FileLink } from '@/components/FileViewer';
 
 type WbsStatus = WbsReportData['status'];
 
@@ -177,9 +178,9 @@ export default function AdminWhistleblowing() {
           {wbsDoc?.file ? (
             <p className="admin-field-hint">
               {t('Dokumen aktif:', 'Current document:')}{' '}
-              <a href={wbsDoc.file.url} target="_blank" rel="noopener noreferrer" className="cms-link">
+              <FileLink file={{ url: wbsDoc.file.url, name: wbsDoc.file.originalName, mime: wbsDoc.file.mime }} className="cms-link">
                 {wbsDoc.file.originalName}
-              </a>{' '}
+              </FileLink>{' '}
               · {tr(wbsDoc.label, lang)}
             </p>
           ) : (
@@ -191,7 +192,7 @@ export default function AdminWhistleblowing() {
             accept=".pdf,application/pdf"
             selectedFile={docFile}
             onFileSelect={setDocFile}
-            helperText={t('Format PDF, maks 20MB.', 'PDF format, max 20MB.')}
+            helperText={t('Format PDF, maks. 10 MB.', 'PDF format, max. 10 MB.')}
           />
           <div>
             <button type="submit" className="btn btn-solid btn-sm" disabled={docUploading}>
@@ -249,9 +250,9 @@ export default function AdminWhistleblowing() {
                 <dt>{t('Lampiran', 'Attachment')}</dt>
                 <dd>
                   {detail.attachment ? (
-                    <a href={detail.attachment.url} target="_blank" rel="noopener noreferrer" className="cms-link">
+                    <FileLink file={{ url: detail.attachment.url, name: detail.attachment.originalName, mime: detail.attachment.mime }} className="cms-link">
                       {detail.attachment.originalName}
-                    </a>
+                    </FileLink>
                   ) : (
                     '—'
                   )}

@@ -343,7 +343,7 @@ paths:
     post:
       tags: [admin-media]
       security: [{ cookieAuth: [] }]
-      summary: Unggah ke disk public (gambar ≤ 5 MB, PDF ≤ 20 MB; mime dideteksi finfo)
+      summary: Unggah ke disk public (gambar ≤ 5 MB, dokumen hanya PDF ≤ 10 MB, video mp4/webm ≤ 100 MB; mime dideteksi finfo)
       requestBody:
         content:
           multipart/form-data:
@@ -881,7 +881,8 @@ components:
               name: { $ref: '#/components/schemas/I18n' }
               material: { $ref: '#/components/schemas/I18n' }
               description: { $ref: '#/components/schemas/I18n' }
-              mediaId: { type: integer, nullable: true }
+              mediaId: { type: integer, nullable: true, description: 'berkas sertifikat; hanya media PDF (422 bila bukan PDF)' }
+              logoMediaId: { type: integer, nullable: true, description: 'logo/lencana sertifikat; hanya media gambar (422 bila bukan gambar)' }
               isPublished: { type: boolean }
               sortOrder: { type: integer }
     Brochure:
@@ -1062,6 +1063,8 @@ components:
           properties:
             footer_headline: { $ref: '#/components/schemas/I18n' }
             footer_cta_label: { $ref: '#/components/schemas/I18n' }
+            footer_connect_text: { $ref: '#/components/schemas/I18n' }
+            footer_contact_text: { $ref: '#/components/schemas/I18n' }
             subsidiary_note: { $ref: '#/components/schemas/I18n' }
         seo:
           type: object
@@ -1247,6 +1250,7 @@ components:
         material: { $ref: '#/components/schemas/I18n' }
         description: { $ref: '#/components/schemas/I18n' }
         file: { $ref: '#/components/schemas/MediaSummary' }
+        logo: { $ref: '#/components/schemas/MediaSummary' }
         isPublished: { type: boolean }
         sortOrder: { type: integer }
     Brochure:

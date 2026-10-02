@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -89,7 +90,10 @@ class Handler extends ExceptionHandler
         }
 
         if ($e instanceof PostTooLargeException) {
-            return $this->envelope(413, 'FILE_TOO_LARGE', __('api.file_too_large'));
+            // Batas body PHP (post_max_size) terlampaui sebelum validasi berjalan: sebutkan batas server.
+            $maxMb = (int) floor(UploadedFile::getMaxFilesize() / 1048576);
+
+            return $this->envelope(413, 'FILE_TOO_LARGE', $maxMb > 0 ? __('api.file_too_large_max', ['max' => $maxMb.' MB']) : __('api.file_too_large'));
         }
 
         if ($e instanceof HttpExceptionInterface) {

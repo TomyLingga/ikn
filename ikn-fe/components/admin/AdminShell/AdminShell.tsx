@@ -17,6 +17,7 @@ import { api } from '@/lib/api';
 import { ADMIN_BADGES_EVENT } from '@/lib/admin';
 import type { IconName } from '@/lib/types';
 import styles from './AdminShell.module.css';
+import { openFile } from '@/components/FileViewer';
 
 const roleLabels: Record<'super_admin' | 'admin', Record<'id' | 'en', string>> = {
   super_admin: { id: 'Super Admin', en: 'Super Admin' },
@@ -367,7 +368,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       if (data.type === 'url' && data.url) {
         window.open(data.url, '_blank', 'noopener');
       } else if (data.type === 'file' && data.file?.url) {
-        window.open(data.file.url, '_blank', 'noopener');
+        openFile({ url: data.file.url, name: data.file.originalName });
       } else {
         setHelpGuideData(data);
         setHelpModalOpen(true);

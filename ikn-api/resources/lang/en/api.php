@@ -10,6 +10,7 @@ return [
     'csrf_mismatch' => 'Invalid session, please reload the page.',
     'too_many_requests' => 'Too many requests. Please try again later.',
     'file_too_large' => 'The file exceeds the size limit.',
+    'file_too_large_max' => 'The file exceeds the :max limit.',
     'unsupported_media' => 'This file type is not allowed.',
     'server_error' => 'An unexpected server error occurred.',
     'login_failed' => 'Email or password is incorrect.',

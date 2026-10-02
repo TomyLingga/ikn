@@ -265,7 +265,7 @@ paths:
               type: object
               required: [file]
               properties:
-                file: { type: string, format: binary, description: 'pdf/jpg/png/webp/xlsx/xls/docx/doc/csv/txt/zip ≤ 10 MB (ikn.commerce.attachment_*)' }
+                file: { type: string, format: binary, description: 'dokumen PDF atau gambar jpg/png/webp ≤ 10 MB (ikn.commerce.attachment_*); berkas Office/zip → 415' }
                 label: { type: string, maxLength: 120 }
       responses:
         '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }

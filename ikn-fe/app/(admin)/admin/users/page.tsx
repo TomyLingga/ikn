@@ -326,7 +326,7 @@ export default function AdminUsers() {
                 onFileSelect={setGuideFile}
                 activeFilePath={guide.file?.url}
                 activeFileName={guide.file?.originalName}
-                helperText={t('Format PDF, maks 20MB.', 'PDF format, max 20MB.')}
+                helperText={t('Format PDF, maks. 10 MB.', 'PDF format, max. 10 MB.')}
               />
             )}
             <div>

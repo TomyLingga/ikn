@@ -14,6 +14,7 @@ class CertificateResource extends JsonResource
             'material' => $this->material,
             'description' => $this->description,
             'file' => $this->media ? $this->media->toSummary() : null,
+            'logo' => $this->logo ? $this->logo->toSummary() : null,
             'isPublished' => $this->is_published,
             'sortOrder' => $this->sort_order,
             'updatedAt' => optional($this->updated_at)->toApiString(),

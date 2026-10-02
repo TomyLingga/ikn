@@ -147,6 +147,9 @@ export interface SiteSettings {
   site: {
     footer_headline: I18n;
     footer_cta_label: I18n;
+    /** Teks kolom "Terhubung" dan "Hubungi kami" di footer (opsional: data lama/fallback). */
+    footer_connect_text?: I18n;
+    footer_contact_text?: I18n;
     subsidiary_note: I18n;
   };
   seo: {
@@ -231,6 +234,8 @@ export interface CertificateData {
   material: I18n;
   description: I18n;
   file: MediaSummary | null;
+  /** Logo/lencana sertifikat (gambar), opsional. */
+  logo?: MediaSummary | null;
   isPublished: boolean;
   sortOrder: number;
   updatedAt?: string | null;

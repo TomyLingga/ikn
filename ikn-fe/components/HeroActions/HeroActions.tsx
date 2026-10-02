@@ -3,6 +3,7 @@
 import Icon from '@/components/Icon';
 import SmartLink from '@/components/cms/SmartLink';
 import { useSite } from '@/components/SiteProvider';
+import { FileLink } from '@/components/FileViewer';
 
 export interface HeroButton {
   label: string;
@@ -31,6 +32,14 @@ export default function HeroActions({ buttons }: HeroActionsProps) {
         const useProfile = b.profileDocument && !!profileUrl;
         const href = useProfile ? profileUrl : b.url;
         const outline = b.style === 'outline';
+        if (useProfile) {
+          const doc = settings.company.profile_document!;
+          return (
+            <FileLink key={i} file={{ url: doc.url, name: doc.originalName, mime: doc.mime }} className={outline ? 'btn btn-line' : 'btn btn-solid'}>
+              {b.label} <Icon name="eye" size={16} />
+            </FileLink>
+          );
+        }
         return (
           <SmartLink key={i} href={href} className={outline ? 'btn btn-line' : 'btn btn-solid'} newTab={useProfile || b.newTab}>
             {b.label}{' '}

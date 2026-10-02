@@ -61,7 +61,7 @@ class ContentController extends ApiController
     public function certificates()
     {
         return $this->data(CertificateResource::collection(
-            Certificate::published()->with('media')->orderBy('sort_order')->orderBy('id')->get()
+            Certificate::published()->with('media', 'logo')->orderBy('sort_order')->orderBy('id')->get()
         ));
     }
 

@@ -8,6 +8,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, apiPaged, ApiError, errorMessage, uploadMedia } from '@/lib/api';
 import type { MediaItem, PagedMeta } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import { FileLink } from '@/components/FileViewer';
 
 type MediaFilter = '' | 'image' | 'document';
 
@@ -183,9 +184,9 @@ export default function AdminMediaLibrary() {
               <button type="button" className="row-act" onClick={() => void copyUrl(item)}>
                 {t('Salin URL', 'Copy URL')}
               </button>
-              <a href={item.url} target="_blank" rel="noopener noreferrer" className="row-act">
+              <FileLink file={{ url: item.url, name: item.originalName, mime: item.mime }} className="row-act">
                 {t('Buka', 'Open')}
-              </a>
+              </FileLink>
               <button type="button" className="row-act row-act-danger" onClick={() => void remove(item)}>
                 {t('Hapus', 'Delete')}
               </button>

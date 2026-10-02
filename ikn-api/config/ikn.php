@@ -45,11 +45,12 @@ return [
     'media' => [
         // Batas ukuran (KB) dan mime yang diizinkan per jenis unggahan.
         'image_max_kb' => 5120,
-        'document_max_kb' => 20480,
+        // Dokumen hanya PDF, maks. 10 MB (permintaan pemilik 2026-10-03).
+        'document_max_kb' => 10240,
         'image_mimes' => ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'],
         'document_mimes' => ['application/pdf'],
         // Video pendek untuk kepala halaman (slideshow); disajikan langsung dari disk public.
-        'video_max_kb' => 51200,
+        'video_max_kb' => 102400, // 100 MB (permintaan pemilik 2026-10-03)
         'video_mimes' => ['video/mp4', 'video/webm'],
         'collections' => ['general', 'hero', 'gallery', 'news', 'certificates', 'brochures', 'logos', 'documents', 'wbs', 'help-guide', 'products', 'categories', 'qris', 'payment-proofs', 'order-attachments'],
     ],
@@ -59,14 +60,9 @@ return [
         // Bukti bayar (disk private): jpg/png/pdf ≤ 5 MB (kontrak bagian 9).
         'proof_max_kb' => 5120,
         'proof_mimes' => ['image/jpeg', 'image/png', 'application/pdf'],
-        // Lampiran order dari admin (faktur pajak, surat jalan): pdf/gambar/office ≤ 10 MB, disk private (ASUMSI A-74).
+        // Lampiran order dari admin (faktur pajak, surat jalan): dokumen PDF atau gambar ≤ 10 MB, disk private (ASUMSI A-74).
         'attachment_max_kb' => 10240,
-        'attachment_mimes' => [
-            'application/pdf', 'image/jpeg', 'image/png', 'image/webp',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword',
-            'text/csv', 'text/plain', 'application/zip',
-        ],
+        'attachment_mimes' => ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
         // Sisa waktu minimum (jam) setelah bukti ditolak agar customer sempat unggah ulang (ASUMSI A-77).
         'reupload_grace_hours' => 12,
         // Default settings commerce (tabel settings, grup "commerce"); admin mengubah lewat /admin/settings.

@@ -3,6 +3,7 @@
 import { useRef, useState, type DragEvent } from 'react';
 import Icon from '@/components/Icon';
 import styles from './FileUploadDropzone.module.css';
+import { FileLink } from '@/components/FileViewer';
 
 interface FileUploadDropzoneProps {
   label?: string;
@@ -17,13 +18,13 @@ interface FileUploadDropzoneProps {
 
 export default function FileUploadDropzone({
   label = 'Unggah Dokumen',
-  accept = '.pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png',
+  accept = '.pdf,application/pdf',
   maxSizeMB = 20,
   selectedFile,
   onFileSelect,
   activeFilePath,
   activeFileName,
-  helperText = 'Format didukung: PDF, DOCX, PPT, PPTX (Maks 20MB)',
+  helperText = 'Format PDF, maks. 10 MB',
 }: FileUploadDropzoneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -119,16 +120,14 @@ export default function FileUploadDropzone({
         <div className={styles.activeBadge}>
           <Icon name="checkCircle" size={15} style={{ color: 'var(--green)' }} />
           <span>File Aktif:</span>
-          <a
-            href={activeFilePath}
-            target="_blank"
-            rel="noopener noreferrer"
+          <FileLink
+            file={{ url: activeFilePath, name: activeFileName || null }}
             className="link"
             style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}
           >
             <span>{activeFileName || activeFilePath}</span>
             <Icon name="arrow" size={13} style={{ transform: 'rotate(-45deg)' }} />
-          </a>
+          </FileLink>
         </div>
       )}
     </div>

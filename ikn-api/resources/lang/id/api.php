@@ -10,6 +10,7 @@ return [
     'csrf_mismatch' => 'Sesi tidak valid, muat ulang halaman.',
     'too_many_requests' => 'Terlalu banyak permintaan. Coba lagi nanti.',
     'file_too_large' => 'Ukuran berkas melebihi batas.',
+    'file_too_large_max' => 'Ukuran berkas melebihi batas :max.',
     'unsupported_media' => 'Jenis berkas tidak diizinkan.',
     'server_error' => 'Terjadi kesalahan pada server.',
     'login_failed' => 'Email atau kata sandi salah.',

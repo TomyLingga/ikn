@@ -9,6 +9,8 @@ import { fetchSite } from '@/lib/server-data';
 import { themeStyle } from '@/lib/theme';
 import NavProgress from '@/components/NavProgress';
 import ConfirmHost from '@/components/ConfirmDialog';
+import FileViewerHost from '@/components/FileViewer';
+import UploadProgressHost from '@/components/UploadProgress';
 import type { Metadata, Viewport } from 'next';
 import { DEFAULT_OG_IMAGE, SITE_URL } from '@/lib/seo';
 
@@ -107,6 +109,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         )}
         <NavProgress />
         <ConfirmHost />
+        <FileViewerHost />
+        <UploadProgressHost />
         <LanguageProvider>
           <AuthProvider>
             <CartProvider>{children}</CartProvider>

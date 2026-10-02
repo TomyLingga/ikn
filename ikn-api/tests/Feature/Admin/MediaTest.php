@@ -53,7 +53,8 @@ class MediaTest extends TestCase
 
         $this->actingAs($this->adminWith(['media']))->post('/api/v1/admin/media', [
             'file' => UploadedFile::fake()->image('big.png', 2000, 2000),
-        ])->assertStatus(413)->assertJsonPath('code', 'FILE_TOO_LARGE');
+        ])->assertStatus(413)->assertJsonPath('code', 'FILE_TOO_LARGE')
+            ->assertJsonPath('message', __('api.file_too_large_max', ['max' => '1 KB']));
     }
 
     public function test_referenced_media_cannot_be_deleted(): void

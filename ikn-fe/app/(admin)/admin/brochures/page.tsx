@@ -9,6 +9,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type BrochureData, type I18n, type MediaSummary } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import { FileLink } from '@/components/FileViewer';
 
 interface BrochureForm {
   title: I18n;
@@ -145,9 +146,9 @@ export default function AdminBrochures() {
       label: t('Berkas', 'File'),
       render: (b) =>
         b.file ? (
-          <a href={b.file.url} target="_blank" rel="noopener noreferrer" className="cms-link mono">
+          <FileLink file={{ url: b.file.url, name: b.file.originalName, mime: b.file.mime }} className="cms-link mono">
             {b.file.originalName}
-          </a>
+          </FileLink>
         ) : (
           '—'
         ),

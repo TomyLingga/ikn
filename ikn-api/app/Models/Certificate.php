@@ -8,7 +8,7 @@ class Certificate extends Model
 {
     use HasTranslations;
 
-    protected $fillable = ['name', 'material', 'description', 'media_id', 'is_published', 'sort_order'];
+    protected $fillable = ['name', 'material', 'description', 'media_id', 'logo_media_id', 'is_published', 'sort_order'];
 
     protected $translatable = ['name', 'material', 'description'];
 
@@ -17,6 +17,12 @@ class Certificate extends Model
     public function media()
     {
         return $this->belongsTo(Media::class);
+    }
+
+    /** Logo/lencana sertifikat (gambar), opsional. */
+    public function logo()
+    {
+        return $this->belongsTo(Media::class, 'logo_media_id');
     }
 
     public function scopePublished($query)

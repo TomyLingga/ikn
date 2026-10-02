@@ -12,7 +12,7 @@ class CertificateController extends ApiController
     public function index()
     {
         return $this->data(CertificateResource::collection(
-            Certificate::with('media')->orderBy('sort_order')->orderBy('id')->get()
+            Certificate::with('media', 'logo')->orderBy('sort_order')->orderBy('id')->get()
         ));
     }
 
@@ -20,14 +20,14 @@ class CertificateController extends ApiController
     {
         $item = Certificate::create($this->attributes($request->validated()));
 
-        return $this->created(new CertificateResource($item->load('media')));
+        return $this->created(new CertificateResource($item->load('media', 'logo')));
     }
 
     public function update(CertificateRequest $request, Certificate $certificate)
     {
         $certificate->update($this->attributes($request->validated()));
 
-        return $this->data(new CertificateResource($certificate->fresh('media')));
+        return $this->data(new CertificateResource($certificate->fresh(['media', 'logo'])));
     }
 
     public function destroy(Certificate $certificate)
@@ -44,6 +44,7 @@ class CertificateController extends ApiController
             'material' => $data['material'] ?? null,
             'description' => $data['description'] ?? null,
             'media_id' => $data['mediaId'] ?? null,
+            'logo_media_id' => $data['logoMediaId'] ?? null,
             'is_published' => $data['isPublished'] ?? true,
             'sort_order' => $data['sortOrder'] ?? 0,
         ];

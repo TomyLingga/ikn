@@ -55,7 +55,7 @@ class MediaService
             : ($isVideo ? config('ikn.media.video_max_kb') : config('ikn.media.document_max_kb')));
 
         if ($file->getSize() > $limitKb * 1024) {
-            throw ApiException::tooLarge();
+            throw ApiException::tooLarge(__('api.file_too_large_max', ['max' => $limitKb >= 1024 ? round($limitKb / 1024).' MB' : $limitKb.' KB']));
         }
 
         $collection = Str::slug($collection) ?: 'general';

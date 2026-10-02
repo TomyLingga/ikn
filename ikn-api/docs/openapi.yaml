@@ -737,7 +737,7 @@ paths:
       - admin-media
       security:
       - cookieAuth: []
-      summary: Unggah ke disk public (gambar ≤ 5 MB, PDF ≤ 20 MB; mime dideteksi finfo)
+      summary: Unggah ke disk public (gambar ≤ 5 MB, dokumen hanya PDF ≤ 10 MB, video mp4/webm ≤ 100 MB; mime dideteksi finfo)
       requestBody:
         content:
           multipart/form-data:
@@ -5436,7 +5436,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: pdf/jpg/png/webp/xlsx/xls/docx/doc/csv/txt/zip ≤ 10 MB (ikn.commerce.attachment_*)
+                  description: dokumen PDF atau gambar jpg/png/webp ≤ 10 MB (ikn.commerce.attachment_*); berkas Office/zip → 415
                 label:
                   type: string
                   maxLength: 120
@@ -5692,6 +5692,11 @@ components:
               mediaId:
                 type: integer
                 nullable: true
+                description: berkas sertifikat; hanya media PDF (422 bila bukan PDF)
+              logoMediaId:
+                type: integer
+                nullable: true
+                description: logo/lencana sertifikat; hanya media gambar (422 bila bukan gambar)
               isPublished:
                 type: boolean
               sortOrder:
@@ -6094,6 +6099,10 @@ components:
               $ref: '#/components/schemas/I18n'
             footer_cta_label:
               $ref: '#/components/schemas/I18n'
+            footer_connect_text:
+              $ref: '#/components/schemas/I18n'
+            footer_contact_text:
+              $ref: '#/components/schemas/I18n'
             subsidiary_note:
               $ref: '#/components/schemas/I18n'
         seo:
@@ -6467,6 +6476,8 @@ components:
         description:
           $ref: '#/components/schemas/I18n'
         file:
+          $ref: '#/components/schemas/MediaSummary'
+        logo:
           $ref: '#/components/schemas/MediaSummary'
         isPublished:
           type: boolean

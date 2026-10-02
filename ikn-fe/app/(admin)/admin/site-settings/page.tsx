@@ -210,6 +210,26 @@ export default function AdminSiteSettings() {
               errorEn={firstError(errors, 'site.footer_cta_label.en')}
             />
             <I18nInput
+              label={t('Teks kolom "Terhubung"', '"Connect" column text')}
+              value={settings.site.footer_connect_text ?? { id: '', en: '' }}
+              onChange={(footer_connect_text) => patchSite({ footer_connect_text })}
+              multiline
+              rows={2}
+              maxLength={300}
+              errorId={firstError(errors, 'site.footer_connect_text.id', 'site.footer_connect_text')}
+              errorEn={firstError(errors, 'site.footer_connect_text.en')}
+            />
+            <I18nInput
+              label={t('Teks kolom "Hubungi kami"', '"Contact us" column text')}
+              value={settings.site.footer_contact_text ?? { id: '', en: '' }}
+              onChange={(footer_contact_text) => patchSite({ footer_contact_text })}
+              multiline
+              rows={2}
+              maxLength={300}
+              errorId={firstError(errors, 'site.footer_contact_text.id', 'site.footer_contact_text')}
+              errorEn={firstError(errors, 'site.footer_contact_text.en')}
+            />
+            <I18nInput
               label={t('Catatan anak perusahaan', 'Subsidiary note')}
               value={settings.site.subsidiary_note}
               onChange={(subsidiary_note) => patchSite({ subsidiary_note })}

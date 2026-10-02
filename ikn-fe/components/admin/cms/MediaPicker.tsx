@@ -9,6 +9,7 @@ import type { MediaItem, MediaSummary, PagedMeta } from '@/lib/cms';
 import MediaGrid, { formatBytes, isImageMedia } from './MediaGrid';
 import Pager from './Pager';
 import { mediaId, mediaSummary, type MediaValue } from './schema';
+import { FileLink } from '@/components/FileViewer';
 
 export type MediaKind = 'image' | 'document' | 'video' | 'visual';
 
@@ -102,9 +103,9 @@ export default function MediaPicker({
         <div className="admin-image-actions">
           {summary ? (
             <p className="admin-field-hint">
-              <a href={summary.url} target="_blank" rel="noopener noreferrer" className="cms-link">
+              <FileLink file={{ url: summary.url, name: summary.originalName, mime: summary.mime }} className="cms-link">
                 {summary.originalName}
-              </a>{' '}
+              </FileLink>{' '}
               · {formatBytes(summary.size)} · #{summary.id}
             </p>
           ) : id ? (

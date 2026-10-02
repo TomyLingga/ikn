@@ -14,6 +14,7 @@ import { t } from '@/lib/i18n';
 import { isPrimaryMenuItem, tr, type MenuNode } from '@/lib/cms';
 import Icon from '@/components/Icon';
 import styles from './Navbar.module.css';
+import { isSiteFile, openFile } from '@/components/FileViewer';
 
 const pathOf = (href: string) => href.split('#')[0] || '/';
 const hashOf = (href: string) => href.split('#')[1] || '';
@@ -137,7 +138,18 @@ export default function Navbar() {
       .map((doc) => {
         const desc = tr(doc.description, lang);
         return (
-          <a key={`doc-${doc.id}`} href={doc.targetUrl ?? '#'} target="_blank" rel="noopener noreferrer" className={styles.dropLink} role="menuitem">
+          <a
+            key={`doc-${doc.id}`}
+            href={doc.targetUrl ?? '#'}
+            {...(doc.file || isSiteFile(doc.targetUrl) ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+            onClick={(event) => {
+              if (!doc.targetUrl || !(doc.file || isSiteFile(doc.targetUrl)) || event.ctrlKey || event.metaKey || event.shiftKey) return;
+              event.preventDefault();
+              openFile(doc.file ? { url: doc.file.url, name: doc.file.originalName, mime: doc.file.mime } : { url: doc.targetUrl });
+            }}
+            className={styles.dropLink}
+            role="menuitem"
+          >
             <span className={styles.dropLabel}>
               {tr(doc.label, lang)} <span style={{ fontSize: '0.74rem', opacity: 0.75 }}>↗</span>
             </span>
