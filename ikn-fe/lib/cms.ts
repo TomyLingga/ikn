@@ -134,6 +134,36 @@ export interface AuthSlide {
   caption: I18n;
 }
 
+export type MailMode = 'server' | 'smtp' | 'off';
+export type MailEncryption = 'ssl' | 'tls' | '';
+
+/** Pengaturan email notifikasi (privat, hanya GET/PUT admin). password = MAIL_PASSWORD_MASK bila tersimpan. */
+export interface MailSettings {
+  /** server = ikut konfigurasi .env server; smtp = SMTP sendiri (webmail/cPanel); off = email tidak dikirim. */
+  mode: MailMode;
+  host: string;
+  port: number;
+  encryption: MailEncryption;
+  username: string;
+  password: string;
+  from_address: string;
+  from_name: string;
+}
+
+/** Nilai password yang dikembalikan API bila tersimpan; kirim balik apa adanya = tidak mengubah password. */
+export const MAIL_PASSWORD_MASK = '********';
+
+export const EMPTY_MAIL_SETTINGS: MailSettings = {
+  mode: 'server',
+  host: '',
+  port: 465,
+  encryption: 'ssl',
+  username: '',
+  password: '',
+  from_address: '',
+  from_name: '',
+};
+
 export interface SiteSettings {
   company: {
     name: string;
@@ -177,6 +207,13 @@ export interface SiteSettings {
     primary_deep: string;
     accent: string;
   };
+  /** Kop & kaki cetakan invoice dari gambar (ASUMSI A-83); kosong = dirender dari teks. */
+  invoice?: {
+    header_image: MediaSummary | null;
+    footer_image: MediaSummary | null;
+  };
+  /** Email notifikasi (ASUMSI A-82); hanya ada pada respons admin. */
+  mail?: MailSettings;
 }
 
 export interface SiteData {

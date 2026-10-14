@@ -150,6 +150,10 @@ export default function AdminCheckoutSettings() {
               {numberField('autoCompleteDays', t('Selesai otomatis setelah diterima', 'Auto-complete after delivery'), t('Order berstatus "Diterima" ditutup otomatis setelah sekian hari bila customer tidak mengonfirmasi (0 = manual).', 'Delivered orders are closed automatically after this many days if the customer does not confirm (0 = manual).'), { min: 0, max: 90, suffix: t('hari', 'days') })}
 
               <h3 className="admin-subtitle" style={{ marginTop: 8 }}>{t('Invoice', 'Invoice')}</h3>
+              <p className="admin-field-hint">
+                {t('Gambar kop dan kaki surat cetakan invoice diatur di', 'The invoice letterhead header/footer images are set in')}{' '}
+                <a href="/admin/site-settings">{t('Pengaturan Situs → Kop & kaki invoice', 'Site Settings → Invoice letterhead')}</a>.
+              </p>
               <label>
                 <span className="field-label">{t('Awalan nomor invoice', 'Invoice number prefix')}</span>
                 <input value={String(settings.invoicePrefix)} onChange={(e) => setSettings({ ...settings, invoicePrefix: e.target.value })} maxLength={40} />

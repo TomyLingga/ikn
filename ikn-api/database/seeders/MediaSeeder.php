@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Media;
+use App\Models\Setting;
 use App\Services\Media\MediaService;
 use Illuminate\Database\Seeder;
 
@@ -16,6 +17,15 @@ class MediaSeeder extends Seeder
         'kantor-direksi.png' => 'gallery',
         'resiprene-35.jpg' => 'gallery',
         'rubin-logo.png' => 'logos',
+        // Kop & kaki cetakan invoice (pindaian kop surat klien dari doc/Invoice), ASUMSI A-83.
+        'invoice-header.png' => 'invoice',
+        'invoice-footer.png' => 'invoice',
+    ];
+
+    /** Setting media yang diisi bawaan dari aset di atas bila masih kosong. */
+    public const SETTING_DEFAULTS = [
+        'invoice.header_image' => 'invoice-header.png',
+        'invoice.footer_image' => 'invoice-footer.png',
     ];
 
     public const DOCUMENTS = [
@@ -60,6 +70,12 @@ class MediaSeeder extends Seeder
             file_put_contents($tmp, self::placeholderPdf($title));
             $service->importFromPath($tmp, 'documents', Media::DISK_PUBLIC, $name);
             @unlink($tmp);
+        }
+
+        foreach (self::SETTING_DEFAULTS as $key => $file) {
+            if (! Setting::getValue($key) && ($id = self::id($file))) {
+                Setting::putValue($key, $id, explode('.', $key)[0], true);
+            }
         }
     }
 

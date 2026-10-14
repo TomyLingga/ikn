@@ -68,6 +68,12 @@ return [
         'team' => 'PT Industri Karet Nusantara Team',
         'footer' => 'This email was sent automatically by the PT Industri Karet Nusantara system. Please do not reply to this email.',
         'button_fallback' => 'If the button does not work, copy the following link into your browser:',
+        'test' => [
+            'subject' => 'PT Industri Karet Nusantara test email',
+            'intro' => 'This email was sent from the Site Settings page to confirm that notification email delivery works.',
+            'ok' => 'If you are reading this, email delivery from the website is working.',
+            'meta' => 'Sent by :name at :time via :via.',
+        ],
         'verify' => [
             'subject' => 'Verify your account email',
             'intro' => 'Thank you for registering with PT Industri Karet Nusantara. Click the button below to verify your email address.',

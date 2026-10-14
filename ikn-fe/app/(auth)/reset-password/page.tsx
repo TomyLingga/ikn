@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -24,6 +24,11 @@ function ResetForm() {
   const [confirm, setConfirm] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Tombol kirim aktif setelah hidrasi; sebelum itu form bisa terkirim sebagai GET biasa (isian masuk URL).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(true);
+  }, []);
   const [error, setError] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -99,7 +104,7 @@ function ResetForm() {
           confirm && <small className={styles.fieldOk}>✓ {validationText.confirmOk[lang]}</small>
         )}
       </label>
-      <button type="submit" className={styles.primaryButton} disabled={busy}>
+      <button type="submit" className={styles.primaryButton} disabled={busy || !ready}>
         {busy ? t('Menyimpan…', 'Saving…') : t('Simpan password baru', 'Save new password')} <Icon name="arrow" size={18} />
       </button>
     </form>

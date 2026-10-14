@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
@@ -16,6 +16,11 @@ export default function ForgotPasswordPage() {
   const [emailTouched, setEmailTouched] = useState(false);
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
+  // Tombol kirim aktif setelah hidrasi; sebelum itu form bisa terkirim sebagai GET biasa (isian masuk URL).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(true);
+  }, []);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
 
@@ -67,7 +72,7 @@ export default function ForgotPasswordPage() {
             <input name="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmailTouched(true)} placeholder="nama@perusahaan.com" aria-invalid={emailTouched && !!emailError(email, lang)} className={emailTouched && emailError(email, lang) ? styles.invalid : undefined} />
             {emailTouched && emailError(email, lang) && <small className={styles.fieldError} role="alert">{emailError(email, lang)}</small>}
           </label>
-          <button type="submit" className={styles.primaryButton} disabled={busy}>
+          <button type="submit" className={styles.primaryButton} disabled={busy || !ready}>
             {busy ? t('Mengirim…', 'Sending…') : t('Kirim tautan reset', 'Send reset link')} <Icon name="arrow" size={18} />
           </button>
         </form>

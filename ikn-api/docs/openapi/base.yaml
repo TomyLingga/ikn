@@ -409,6 +409,23 @@ paths:
       responses:
         '200': { description: '{ data, message }' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/site-settings/mail-test:
+    post:
+      tags: [admin-settings]
+      security: [{ cookieAuth: [] }]
+      summary: Kirim email uji (sinkron) memakai `mail` dari form (belum disimpan) atau pengaturan tersimpan bila `mail` tidak dikirim. Tidak menyimpan apa pun.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to: { type: string, format: email }
+                mail: { $ref: '#/components/schemas/SiteSettings/properties/mail' }
+      responses:
+        '200': { description: '{ data: MailTestResult, message }', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/MailTestResult' }, message: { type: string } } } } } }
+        '422': { description: 'ValidationError (to / mail.*), MAIL_TEST_FAILED (alasan dari server SMTP di message), MAIL_DISABLED (mode off)' }
 
   # ---------------------------------------------------------------- admin: CMS
   /admin/cms/section-types:
@@ -1125,9 +1142,35 @@ components:
             primary: { type: string, example: '#0b6fb8', description: 'tombol, tautan, label, ikon aktif' }
             primary_deep: { type: string, example: '#0a3f6b', description: 'footer dan blok latar gelap' }
             accent: { type: string, example: '#1785cc', description: 'nomor bagian, badge promo, sorotan kecil' }
+        invoice:
+          type: object
+          description: 'Kop & kaki cetakan invoice dari gambar (A-83), publik. PUT menerima id media gambar (PNG/JPG; PDF → 422) atau null/"" = kosong (FE merender kop/kaki dari teks). Bawaan seeder = pindaian kop surat klien. Media yang dipakai tidak bisa dihapus.'
+          properties:
+            header_image: { $ref: '#/components/schemas/MediaSummary' }
+            footer_image: { $ref: '#/components/schemas/MediaSummary' }
         admin:
           type: object
           description: privat (hanya GET/PUT admin)
+        mail:
+          type: object
+          description: 'Email notifikasi (A-82), privat. Diterapkan ke config mail saat runtime tanpa restart (HTTP dan worker antrean). mode smtp mewajibkan host + from_address; semua nilai dibersihkan dulu, satu saja tidak valid → tidak ada yang disimpan.'
+          properties:
+            mode: { type: string, enum: [server, smtp, off], description: 'server = ikut MAIL_* .env; smtp = SMTP di bawah (webmail klien); off = tidak kirim email (notifikasi in-app tetap jalan)' }
+            host: { type: string, example: smtp.hostinger.com }
+            port: { type: integer, minimum: 1, maximum: 65535, example: 465 }
+            encryption: { type: string, enum: [ssl, tls, ''], description: 'ssl (465), tls/STARTTLS (587), kosong = tanpa enkripsi' }
+            username: { type: string, example: noreply@ptikn.com }
+            password: { type: string, description: 'Disimpan terenkripsi (APP_KEY). Respons selalu "********" bila terisi; PUT dengan "********" = tidak mengubah, "" = hapus.' }
+            from_address: { type: string, format: email, description: 'lowercase; wajib pada mode smtp' }
+            from_name: { type: string, maxLength: 120 }
+    MailTestResult:
+      type: object
+      properties:
+        mode: { type: string, enum: [server, smtp, off] }
+        mailer: { type: string, description: 'mailer Laravel efektif (smtp, log, array, ...)' }
+        host: { type: string }
+        from: { type: string }
+        to: { type: string }
     Page:
       type: object
       properties:

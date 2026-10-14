@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
 import { ColorInput, I18nInput, ListField, MediaPicker, firstError, type FieldErrors } from '@/components/admin/cms';
+import MailSettingsCard from '@/components/admin/MailSettingsCard';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
-import type { SiteSettings, WhatsAppContact, AuthSlide } from '@/lib/cms';
+import { EMPTY_MAIL_SETTINGS, type MailSettings, type SiteSettings, type WhatsAppContact, type AuthSlide } from '@/lib/cms';
 import { THEME_DEFAULTS, THEME_VARIABLES, themeColor, type ThemeSettings } from '@/lib/theme';
 
 type CompanyPatch = Partial<SiteSettings['company']>;
@@ -76,6 +77,10 @@ export default function AdminSiteSettings() {
     setSettings((current) => (current ? { ...current, analytics: { ...(current.analytics ?? emptyAnalytics), ...patch } } : current));
   const patchTheme = (patch: ThemePatch) =>
     setSettings((current) => (current ? { ...current, theme: { ...(current.theme ?? emptyTheme), ...patch } } : current));
+  const patchInvoice = (patch: Partial<NonNullable<SiteSettings['invoice']>>) =>
+    setSettings((current) => (current ? { ...current, invoice: { header_image: null, footer_image: null, ...(current.invoice ?? {}), ...patch } } : current));
+  const patchMail = (patch: Partial<MailSettings>) =>
+    setSettings((current) => (current ? { ...current, mail: { ...(current.mail ?? EMPTY_MAIL_SETTINGS), ...patch } } : current));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,6 +98,8 @@ export default function AdminSiteSettings() {
           contact: settings.contact ?? emptyContact,
           analytics: settings.analytics ?? emptyAnalytics,
           theme: settings.theme ?? emptyTheme,
+          mail: settings.mail ?? EMPTY_MAIL_SETTINGS,
+          invoice: { header_image: settings.invoice?.header_image?.id ?? null, footer_image: settings.invoice?.footer_image?.id ?? null },
           auth: { slides: (settings.auth?.slides ?? []).filter((s) => s.media?.id).map((s) => ({ mediaId: s.media.id, caption: s.caption })) },
         },
       });
@@ -149,7 +156,7 @@ export default function AdminSiteSettings() {
     <div>
       <AdminPageHead
         title={t('Pengaturan Situs', 'Site Settings')}
-        desc={t('Identitas perusahaan, teks footer, SEO bawaan, kanal chat, dan tema warna situs.', 'Company identity, footer texts, default SEO, chat channel, and the site colour theme.')}
+        desc={t('Identitas perusahaan, teks footer, SEO bawaan, kanal chat, tema warna, dan email notifikasi.', 'Company identity, footer texts, default SEO, chat channel, colour theme, and notification email.')}
       />
 
       {notice && (
@@ -402,6 +409,42 @@ export default function AdminSiteSettings() {
             </div>
           </div>
         </AdminCard>
+
+        <AdminCard
+          title={t('Kop & kaki invoice', 'Invoice letterhead')}
+          desc={t(
+            'Cetakan invoice memakai gambar kop (atas) dan kaki surat (bawah) selebar halaman A4, bukan teks yang dirender. Kosongkan untuk kembali ke kop/kaki dari teks.',
+            'The printed invoice uses a full-width header and footer image on A4, not rendered text. Clear them to fall back to the text header/footer.',
+          )}
+        >
+          <div className="admin-form">
+            <div className="admin-form-row">
+              <MediaPicker
+                label={t('Gambar kop invoice', 'Invoice header image')}
+                value={settings.invoice?.header_image ?? null}
+                onChange={(header_image) => patchInvoice({ header_image })}
+                accept="image"
+                collection="invoice"
+                hint={t('PNG/JPG selebar halaman, mis. 2480×380 px (A4 300 dpi); latar putih.', 'Full-width PNG/JPG, e.g. 2480×380 px (A4 at 300 dpi); white background.')}
+                error={firstError(errors, 'invoice.header_image')}
+              />
+              <MediaPicker
+                label={t('Gambar kaki invoice', 'Invoice footer image')}
+                value={settings.invoice?.footer_image ?? null}
+                onChange={(footer_image) => patchInvoice({ footer_image })}
+                accept="image"
+                collection="invoice"
+                hint={t('PNG/JPG selebar halaman, mis. 2480×320 px; berisi nilai perusahaan dan alamat kantor pusat.', 'Full-width PNG/JPG, e.g. 2480×320 px; company values and head office address.')}
+                error={firstError(errors, 'invoice.footer_image')}
+              />
+            </div>
+            <p className="admin-field-hint">
+              {t('Teks lain pada invoice (awalan nomor, penanda tangan, tembusan) diatur di Pengaturan Checkout.', 'Other invoice texts (number prefix, signatory, cc) are set in Checkout Settings.')}
+            </p>
+          </div>
+        </AdminCard>
+
+        <MailSettingsCard value={settings.mail ?? EMPTY_MAIL_SETTINGS} onChange={patchMail} errors={errors} />
 
         <div className="row-actions">
           <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>

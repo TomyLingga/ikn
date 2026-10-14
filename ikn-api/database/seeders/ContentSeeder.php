@@ -78,6 +78,16 @@ class ContentSeeder extends Seeder
                     'en' => 'As a PTPN III subsidiary, IKN builds mutually beneficial natural rubber supply chain collaborations with local partners.',
                 ],
             ],
+            [
+                // Berita DRAF: contoh artikel yang masih disunting admin, belum tampil di situs.
+                'slug' => 'program-beasiswa-anak-karyawan-2026', 'category' => 'kegiatan', 'published_at' => '2026-10-20', 'cover' => 'kantor-direksi.png', 'is_published' => false,
+                'body' => [
+                    'id' => '<h2>Pendaftaran dibuka 1 November</h2><p>Program beasiswa untuk anak karyawan berprestasi jenjang SMA dan perguruan tinggi. Syarat dan formulir akan diumumkan melalui HRD.</p>',
+                    'en' => '<h2>Registration opens 1 November</h2><p>Scholarship programme for high-achieving children of employees at senior high school and university level. Requirements and forms will be announced through HR.</p>',
+                ],
+                'title' => ['id' => 'PT IKN membuka program beasiswa anak karyawan 2026', 'en' => 'PT IKN opens the 2026 employee children scholarship programme'],
+                'excerpt' => ['id' => 'Draf pengumuman program beasiswa; menunggu persetujuan manajemen sebelum terbit.', 'en' => 'Draft scholarship announcement; awaiting management approval before publishing.'],
+            ],
         ];
 
         foreach ($posts as $post) {
@@ -91,8 +101,8 @@ class ContentSeeder extends Seeder
                 'category_id' => PostCategory::where('slug', $post['category'])->value('id'),
                 'author' => 'Humas PT IKN',
                 'cover_media_id' => MediaSeeder::id($post['cover']),
-                'is_published' => true,
-                'published_at' => $post['published_at'].' 09:00:00',
+                'is_published' => $post['is_published'] ?? true,
+                'published_at' => ($post['is_published'] ?? true) ? $post['published_at'].' 09:00:00' : null,
             ]);
         }
     }

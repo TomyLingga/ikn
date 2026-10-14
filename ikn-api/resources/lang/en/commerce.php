@@ -16,6 +16,7 @@ return [
     'review_not_completed' => 'Reviews can only be submitted for completed orders.',
     'review_product_not_in_order' => 'Product is not part of this order.',
     'review_duplicate' => 'This product has already been reviewed for this order.',
+    'review_profanity' => 'The review contains inappropriate words. Please keep the language polite.',
     'due_invalid_status' => 'The deadline can only be changed while the order awaits payment or verification.',
     'due_in_past' => 'The payment deadline must be in the future.',
     'due_required' => 'Provide paymentDueAt or extendHours.',

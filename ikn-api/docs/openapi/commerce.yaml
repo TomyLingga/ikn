@@ -148,7 +148,7 @@ paths:
         '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { reviews: { type: array, items: { $ref: '#/components/schemas/Review' } }, order: { type: object, properties: { number: { type: string }, canReview: { type: boolean }, reviewedProductIds: { type: array, items: { type: integer } } } } } } } } } } }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { description: 'INVALID_TRANSITION bila order belum completed', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '422': { description: 'VALIDATION_ERROR: reviews.N.productSlug (bukan bagian order / sudah diulas), reviews.N.rating', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { description: 'VALIDATION_ERROR: reviews.N.productSlug (bukan bagian order / sudah diulas), reviews.N.rating, reviews.N.body (> 255 karakter atau kata kasar)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   # ---------------------------------------------------------------- pembayaran customer (kontrak 9–10)
   /customer/orders/{number}/payments:
@@ -667,7 +667,7 @@ components:
       properties:
         productSlug: { type: string }
         rating: { type: integer, minimum: 1, maximum: 5 }
-        body: { type: string, nullable: true, maxLength: 2000 }
+        body: { type: string, nullable: true, maxLength: 255, description: 'maks. 255 karakter; ditolak (422 reviews.N.body) bila mengandung kata kasar (config/profanity.php)' }
     OrderStatusInput:
       type: object
       required: [status]

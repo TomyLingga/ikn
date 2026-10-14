@@ -9,11 +9,11 @@
   gap: 12px;
 }
 
+/* Pil = ikon bulat saja; teks keterangan dilipat (lebar 0) dan melebar ke kiri saat hover/fokus/aktif. */
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 8px 8px 18px;
+  padding: 3px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
@@ -33,7 +33,30 @@
 .pillText {
   display: flex;
   flex-direction: column;
+  max-width: 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
   line-height: 1.2;
+  white-space: nowrap;
+  transition: max-width 0.24s var(--ease), padding 0.24s var(--ease), opacity 0.16s var(--ease);
+}
+
+/* Terbuka: hover/fokus pada pil, hover pada grup WhatsApp (ikon + daftar nomor), atau tombol sedang aktif. */
+.pill:focus-visible .pillText,
+.pillOn .pillText {
+  max-width: 260px;
+  padding: 0 10px 0 16px;
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .pill:hover .pillText,
+  .waWrap:hover .pillText {
+    max-width: 260px;
+    padding: 0 10px 0 16px;
+    opacity: 1;
+  }
 }
 
 .pillText small {
@@ -51,8 +74,8 @@
 
 .pillIcon {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   flex: none;
   display: grid;
   place-items: center;
@@ -84,7 +107,8 @@
   font-weight: 600;
 }
 
-/* Daftar nomor marketing (bila lebih dari satu) muncul di atas pil WhatsApp. */
+/* Daftar nomor marketing (bila lebih dari satu) di atas ikon WhatsApp: muncul saat hover grup (desktop) atau
+   tap ikon (layar sentuh). Pembungkusnya memakai padding, bukan jarak kosong, agar hover tidak putus saat kursor pindah. */
 .waWrap {
   position: relative;
   display: flex;
@@ -94,8 +118,19 @@
 .waMenu {
   position: absolute;
   right: 0;
-  bottom: calc(100% + 10px);
+  bottom: 100%;
+  display: none;
   width: min(300px, calc(100vw - 28px));
+  padding-bottom: 10px;
+}
+
+.waMenuOpen { display: block; }
+
+@media (hover: hover) {
+  .waWrap:hover .waMenu { display: block; }
+}
+
+.waMenuCard {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -167,8 +202,8 @@
 
 @media (max-width: 640px) {
   .stack { gap: 8px; right: 12px; bottom: 12px; }
-  .pill { padding: 3px; box-shadow: 0 6px 18px rgba(15, 27, 45, 0.22); }
-  .pillIcon { width: 42px; height: 42px; }
+  .pill { box-shadow: 0 6px 18px rgba(15, 27, 45, 0.22); }
+  .pillIcon { width: 44px; height: 44px; }
   .pillText { display: none; }
 }
 
@@ -177,5 +212,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pill { transition: none; }
+  .pill, .pillText { transition: none; }
+  .waMenuCard { animation: none; }
 }

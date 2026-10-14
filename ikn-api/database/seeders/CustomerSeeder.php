@@ -23,6 +23,14 @@ class CustomerSeeder extends Seeder
         ['12.71', 'Kota Medan'],
         ['12.71.06', 'Medan Deli'],
         ['12.71.06.1005', 'Mabar'],
+        ['35', 'Jawa Timur'],
+        ['35.78', 'Kota Surabaya'],
+        ['35.78.03', 'Rungkut'],
+        ['35.78.03.1001', 'Kalirungkut'],
+        ['14', 'Riau'],
+        ['14.71', 'Kota Pekanbaru'],
+        ['14.71.01', 'Sukajadi'],
+        ['14.71.01.1002', 'Jadirejo'],
     ];
 
     public function run(): void
@@ -30,6 +38,7 @@ class CustomerSeeder extends Seeder
         $this->ensureRegions();
 
         $password = Hash::make('password');
+        $approver = User::where('email', config('ikn.seed.super_admin_email'))->value('id');
 
         // 1. Customer aktif (user sudah dibuat UserSeeder; lengkapi profil + alamat).
         $buyer = User::firstOrCreate(
@@ -43,7 +52,7 @@ class CustomerSeeder extends Seeder
                 'approved_at' => now(),
             ]
         );
-        $buyer->forceFill(['locale' => 'id'])->save();
+        $buyer->forceFill(['locale' => 'id', 'approved_by' => $buyer->approved_by ?: $approver])->save();
 
         CustomerProfile::updateOrCreate(
             ['user_id' => $buyer->id],
@@ -86,6 +95,97 @@ class CustomerSeeder extends Seeder
             'note' => 'Hubungi satpam sebelum bongkar',
             'is_default' => false,
         ]);
+
+        // 1b. Customer aktif kedua (bahasa Inggris, alamat Surabaya → zona ongkir Jawa) agar daftar, chat, dan
+        //     laporan berisi lebih dari satu pelanggan.
+        $second = User::firstOrCreate(
+            ['email' => 'purchasing@mitrakimia.co.id'],
+            [
+                'name' => 'Siti Rahma',
+                'password' => $password,
+                'role' => User::ROLE_CUSTOMER,
+                'status' => User::STATUS_ACTIVE,
+                'locale' => 'en',
+                'email_verified_at' => now()->subDays(60),
+                'approved_at' => now()->subDays(59),
+                'approved_by' => $approver,
+            ]
+        );
+        CustomerProfile::updateOrCreate(
+            ['user_id' => $second->id],
+            [
+                'company' => 'PT Mitra Kimia Industri',
+                'position' => 'Purchasing Supervisor',
+                'company_email' => 'procurement@mitrakimia.co.id',
+                'company_phone' => '0318765432',
+                'tax_id' => '03.456.789.0-123.000',
+                'phone' => '081355566677',
+            ]
+        );
+        $this->address($second, 'Pabrik Surabaya', [
+            'recipient_name' => 'Siti Rahma / Gudang Bahan Baku',
+            'phone' => '081355566677',
+            'address_line' => 'Jl. Rungkut Industri III No. 27, SIER',
+            'province_code' => '35',
+            'regency_code' => '35.78',
+            'district_code' => '35.78.03',
+            'village_code' => '35.78.03.1001',
+            'postal_code' => '60293',
+            'lat' => -7.3312000,
+            'lng' => 112.7638000,
+            'note' => 'Bongkar di pintu gudang B, konfirmasi H-1',
+            'is_default' => true,
+        ]);
+
+        // 1c. Customer nonaktif: pernah aktif, dinonaktifkan admin (tidak bisa login/memesan).
+        $inactive = User::updateOrCreate(
+            ['email' => 'nonaktif@contoh.co.id'],
+            [
+                'name' => 'Hendra Wijaya',
+                'password' => $password,
+                'role' => User::ROLE_CUSTOMER,
+                'status' => User::STATUS_INACTIVE,
+                'locale' => 'id',
+                'email_verified_at' => now()->subDays(120),
+                'approved_at' => now()->subDays(119),
+                'approved_by' => $approver,
+                'rejection_reason' => null,
+            ]
+        );
+        CustomerProfile::updateOrCreate(
+            ['user_id' => $inactive->id],
+            [
+                'company' => 'CV Sumber Rejeki Makmur',
+                'position' => 'Direktur',
+                'tax_id' => '04.567.890.1-234.000',
+                'phone' => '081266677788',
+            ]
+        );
+
+        // 1d. Customer baru daftar, belum klik tautan verifikasi email.
+        $unverified = User::updateOrCreate(
+            ['email' => 'belum.verifikasi@contoh.co.id'],
+            [
+                'name' => 'Rudi Hartono',
+                'password' => $password,
+                'role' => User::ROLE_CUSTOMER,
+                'status' => User::STATUS_PENDING,
+                'locale' => 'id',
+                'email_verified_at' => null,
+                'approved_at' => null,
+                'approved_by' => null,
+                'rejection_reason' => null,
+            ]
+        );
+        CustomerProfile::updateOrCreate(
+            ['user_id' => $unverified->id],
+            [
+                'company' => 'PT Riau Agro Lestari',
+                'position' => 'Staff Logistik',
+                'tax_id' => '05.678.901.2-345.000',
+                'phone' => '081277788899',
+            ]
+        );
 
         // 2. Customer pending (sudah verifikasi email, menunggu persetujuan admin).
         $pending = User::updateOrCreate(

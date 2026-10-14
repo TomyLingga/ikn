@@ -5,6 +5,7 @@ namespace App\Services\Media;
 use App\Exceptions\ApiException;
 use App\Models\Media;
 use App\Models\PageSection;
+use App\Services\Cms\SettingsService;
 use App\Models\User;
 use App\Services\Cms\SectionRegistry;
 use Illuminate\Http\UploadedFile;
@@ -148,6 +149,13 @@ class MediaService
                 && DB::table($table)->whereRaw("jsonb_typeof($column) = 'array' AND $column @> ?::jsonb", [json_encode([[$key => (int) $media->id]])])->exists()) {
                 return true;
             }
+        }
+
+        // Setting bertipe media (nilai jsonb = angka id): dokumen profil perusahaan, kop/kaki invoice.
+        $settingKeys = SettingsService::mediaKeys();
+        if ($settingKeys && $this->tableExists('settings')
+            && DB::table('settings')->whereIn('key', $settingKeys)->whereRaw('value::text = ?', [(string) $media->id])->exists()) {
+            return true;
         }
 
         // Gambar yang disisipkan di HTML/JSON (isi berita, section, config metode bayar) dirujuk lewat path-nya.

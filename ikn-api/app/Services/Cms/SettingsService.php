@@ -5,15 +5,27 @@ namespace App\Services\Cms;
 use App\Models\Media;
 use App\Models\Setting;
 use App\Support\I18n;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Skema settings: kunci "group.name" → tipe, publik/privat, default.
  * GET mengembalikan bentuk bersarang { company: { name: ... } }.
+ *
+ * Tipe: text, i18n, media, json, color, whatsapp_contacts, media_slides, bool, int (min/max), enum (options),
+ * email, secret (dienkripsi di DB, output selalu SECRET_MASK bila terisi; kirim balik mask = tidak mengubah).
  */
 class SettingsService
 {
+    /** Nilai pengganti rahasia pada output; PUT dengan nilai ini mempertahankan rahasia tersimpan. */
+    public const SECRET_MASK = '********';
+
+    public const MAIL_MODES = ['server', 'smtp', 'off'];
+    public const MAIL_ENCRYPTIONS = ['ssl', 'tls', ''];
+
     public const SCHEMA = [
         'company.name' => ['type' => 'text', 'public' => true, 'default' => 'PT Industri Karet Nusantara'],
         'company.short' => ['type' => 'text', 'public' => true, 'default' => 'PT IKN'],
@@ -46,7 +58,28 @@ class SettingsService
         // Kosong = foto bawaan di FE (components/auth/AuthVisual).
         'auth.slides' => ['type' => 'media_slides', 'public' => true, 'default' => []],
         'admin.help_guide' => ['type' => 'json', 'public' => false, 'default' => ['title' => 'Panduan Admin', 'type' => 'url', 'url' => '', 'mediaId' => null]],
+        // Kop dan kaki cetakan invoice dari gambar (ASUMSI A-83): lebar penuh halaman, PNG/JPG; kosong = kop/kaki
+        // dirender FE dari teks. Bawaan diisi MediaSeeder (hasil pindai kop surat klien).
+        'invoice.header_image' => ['type' => 'media', 'mime' => 'image/', 'public' => true, 'default' => null],
+        'invoice.footer_image' => ['type' => 'media', 'mime' => 'image/', 'public' => true, 'default' => null],
+        // Pengiriman email notifikasi (ASUMSI A-82), privat. mode: server = ikut MAIL_* di .env server;
+        // smtp = SMTP di bawah (webmail/cPanel/Hostinger milik klien); off = email tidak dikirim, notifikasi
+        // dalam aplikasi tetap berjalan. Diterapkan ke config mail saat runtime oleh App\Services\Mail\MailConfigurator.
+        'mail.mode' => ['type' => 'enum', 'options' => self::MAIL_MODES, 'public' => false, 'default' => 'server'],
+        'mail.host' => ['type' => 'text', 'public' => false, 'default' => ''],
+        'mail.port' => ['type' => 'int', 'min' => 1, 'max' => 65535, 'public' => false, 'default' => 465],
+        'mail.encryption' => ['type' => 'enum', 'options' => self::MAIL_ENCRYPTIONS, 'public' => false, 'default' => 'ssl'],
+        'mail.username' => ['type' => 'text', 'public' => false, 'default' => ''],
+        'mail.password' => ['type' => 'secret', 'public' => false, 'default' => ''],
+        'mail.from_address' => ['type' => 'email', 'public' => false, 'default' => ''],
+        'mail.from_name' => ['type' => 'text', 'public' => false, 'default' => 'PT Industri Karet Nusantara'],
     ];
+
+    /** Kunci setting bertipe media (nilai = id media), dipakai MediaService untuk melindungi berkas dari hapus. */
+    public static function mediaKeys(): array
+    {
+        return array_keys(array_filter(self::SCHEMA, fn ($def) => $def['type'] === 'media'));
+    }
 
     public function all(bool $publicOnly = false): array
     {
@@ -74,11 +107,36 @@ class SettingsService
         return Setting::getValue($key, $def['default']);
     }
 
-    /** Terima bentuk bersarang atau datar; hanya kunci di skema yang disimpan. */
+    /** Nilai asli setting bertipe secret (didekripsi). Gagal dekripsi (APP_KEY berganti) dianggap kosong. */
+    public function secret(string $key): string
+    {
+        $def = self::SCHEMA[$key] ?? null;
+        if (! $def || $def['type'] !== 'secret') {
+            return '';
+        }
+        $stored = Setting::getValue($key, '');
+        if (! is_string($stored) || $stored === '') {
+            return '';
+        }
+
+        try {
+            return Crypt::decryptString($stored);
+        } catch (DecryptException $e) {
+            Log::warning("setting {$key} cannot be decrypted (APP_KEY changed?)");
+
+            return '';
+        }
+    }
+
+    /**
+     * Terima bentuk bersarang atau datar; hanya kunci di skema yang disimpan.
+     * Semua nilai dibersihkan dulu; bila ada yang tidak valid, tidak ada yang ditulis.
+     */
     public function update(array $input): array
     {
         $flat = Arr::dot($input);
         $errors = [];
+        $pending = [];
 
         foreach (self::SCHEMA as $key => $def) {
             $present = array_key_exists($key, $flat) || Arr::has($input, $key);
@@ -87,17 +145,30 @@ class SettingsService
             }
 
             $value = Arr::get($input, $key);
-            [$clean, $error] = $this->clean($def['type'], $value, $key);
+            if ($def['type'] === 'secret' && $value === self::SECRET_MASK) {
+                continue; // mask dikirim balik = rahasia tidak diubah
+            }
+            [$clean, $error] = $this->clean($def, $value, $key);
             if ($error) {
                 $errors[$key] = [$error];
                 continue;
             }
 
-            Setting::putValue($key, $clean, explode('.', $key)[0], $def['public']);
+            $pending[$key] = $clean;
         }
+
+        $errors += $this->validateMailGroup($pending);
 
         if ($errors) {
             throw ValidationException::withMessages($errors);
+        }
+
+        foreach ($pending as $key => $clean) {
+            $def = self::SCHEMA[$key];
+            if ($def['type'] === 'secret' && $clean !== '') {
+                $clean = Crypt::encryptString($clean);
+            }
+            Setting::putValue($key, $clean, explode('.', $key)[0], $def['public']);
         }
 
         return $this->all();
@@ -112,11 +183,67 @@ class SettingsService
         }
     }
 
-    private function clean(string $type, $value, string $key = ''): array
+    /** Mode smtp butuh host dan alamat pengirim (nilai tersimpan dihitung bila tidak dikirim). */
+    private function validateMailGroup(array $pending): array
     {
-        switch ($type) {
+        if (! array_filter(array_keys($pending), fn ($key) => str_starts_with($key, 'mail.'))) {
+            return [];
+        }
+        $mode = $pending['mail.mode'] ?? ($this->get('mail.mode') ?: 'server');
+        if ($mode !== 'smtp') {
+            return [];
+        }
+
+        $errors = [];
+        foreach (['mail.host', 'mail.from_address'] as $key) {
+            $value = array_key_exists($key, $pending) ? $pending[$key] : (string) $this->get($key);
+            if (trim((string) $value) === '') {
+                $errors[$key] = [__('validation.required', ['attribute' => $key])];
+            }
+        }
+
+        return $errors;
+    }
+
+    private function clean(array $def, $value, string $key = ''): array
+    {
+        switch ($def['type']) {
             case 'text':
                 return [is_scalar($value) || $value === null ? trim((string) $value) : '', null];
+            case 'secret':
+                return [is_scalar($value) || $value === null ? (string) $value : '', null];
+            case 'email':
+                $value = is_scalar($value) || $value === null ? trim((string) $value) : null;
+                if ($value === '') {
+                    return ['', null];
+                }
+                if ($value === null || filter_var($value, FILTER_VALIDATE_EMAIL) === false) {
+                    return [null, __('validation.email', ['attribute' => $key])];
+                }
+
+                return [strtolower($value), null];
+            case 'bool':
+                return [filter_var($value, FILTER_VALIDATE_BOOLEAN), null];
+            case 'int':
+                if ($value === '' || $value === null || ! is_numeric($value) || (int) $value != $value) {
+                    return [null, __('validation.integer', ['attribute' => $key])];
+                }
+                $value = (int) $value;
+                if (isset($def['min']) && $value < $def['min']) {
+                    return [null, __('validation.min.numeric', ['attribute' => $key, 'min' => $def['min']])];
+                }
+                if (isset($def['max']) && $value > $def['max']) {
+                    return [null, __('validation.max.numeric', ['attribute' => $key, 'max' => $def['max']])];
+                }
+
+                return [$value, null];
+            case 'enum':
+                $value = is_scalar($value) || $value === null ? strtolower(trim((string) $value)) : null;
+                if ($value === null || ! in_array($value, $def['options'], true)) {
+                    return [null, __('validation.in', ['attribute' => $key])];
+                }
+
+                return [$value, null];
             case 'color':
                 $value = is_scalar($value) || $value === null ? strtolower(trim((string) $value)) : null;
                 if ($value === '') {
@@ -136,11 +263,15 @@ class SettingsService
                 if ($value === null || $value === '') {
                     return [null, null];
                 }
-                if (! is_numeric($value) || ! Media::where('id', (int) $value)->exists()) {
+                $media = is_numeric($value) ? Media::find((int) $value) : null;
+                if (! $media) {
                     return [null, __('validation.exists', ['attribute' => 'mediaId'])];
                 }
+                if (! empty($def['mime']) && ! str_starts_with((string) $media->mime, $def['mime'])) {
+                    return [null, __('validation.mimes', ['attribute' => $key, 'values' => rtrim($def['mime'], '/')])];
+                }
 
-                return [(int) $value, null];
+                return [(int) $media->id, null];
             case 'json':
                 return [is_array($value) ? $value : null, null];
             case 'whatsapp_contacts':
@@ -224,6 +355,9 @@ class SettingsService
     {
         if ($type === 'i18n') {
             return I18n::normalize($value);
+        }
+        if ($type === 'secret') {
+            return is_string($value) && $value !== '' ? self::SECRET_MASK : '';
         }
         if ($type === 'media') {
             $media = $value ? Media::find((int) $value) : null;

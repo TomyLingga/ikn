@@ -26,7 +26,7 @@ function longDate(iso: string | null | undefined): string {
   return `${d.getDate().toString().padStart(2, '0')} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-// Cetakan invoice mengikuti format dokumen klien (doc/Invoice): kop perusahaan, "I N V O I C E" + nomor
+// Cetakan invoice mengikuti format dokumen klien (doc/Invoice): kop perusahaan (gambar dari Pengaturan Situs bila ada), "I N V O I C E" + nomor
 // PMS/X/INV/RA/{urut}/{bulan Romawi}/{tahun}, "Kepada Yth", tabel JUMLAH BARANG / URAIAN / HARGA SATUAN /
 // JUMLAH HARGA, blok Pembayaran (rekening tujuan), Jumlah / PPN / TOTAL, Terbilang, tembusan, tanda tangan,
 // dan kaki halaman nilai AKHLAK + alamat kantor pusat. Dibuka customer (order miliknya) maupun admin.
@@ -55,6 +55,9 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
   const officeEmail = site.contact?.emails?.[0]?.address || '';
   const companyName = (site.settings.company?.name || 'PT Industri Karet Nusantara').replace(/^PT\.?\s+/i, 'PT. ').toUpperCase();
   const invoice = config?.invoice;
+  // Kop & kaki dari gambar (Pengaturan Situs → Kop & kaki invoice, A-83); tanpa gambar = dirender dari teks.
+  const headerImage = site.settings.invoice?.header_image?.url || '';
+  const footerImage = site.settings.invoice?.footer_image?.url || '';
 
   if (error) {
     return (
@@ -96,20 +99,27 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
       </div>
 
       <article className={styles.sheet}>
-        <header className={styles.head}>
-          <div className={styles.headLeft}>
-            <Image src="/img/rubin-logo.png" alt="" width={74} height={74} priority />
-            <div>
-              <h1>{companyName}</h1>
-              <p>(NUSANTARA RUBBER INDUSTRY)</p>
-            </div>
-          </div>
-          <div className={styles.headRight}>
-            <strong>{site.settings.company?.parent || 'PTPN III (Persero)'}</strong>
-            <span>{tr(site.settings.site?.subsidiary_note, lang) || t('Anak Perusahaan PTPN III (Persero)', 'Subsidiary of PTPN III (Persero)')}</span>
-          </div>
-        </header>
-        <div className={styles.rule} />
+        {headerImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={headerImage} alt={companyName} className={styles.headImage} />
+        ) : (
+          <>
+            <header className={styles.head}>
+              <div className={styles.headLeft}>
+                <Image src="/img/rubin-logo.png" alt="" width={74} height={74} priority />
+                <div>
+                  <h1>{companyName}</h1>
+                  <p>(NUSANTARA RUBBER INDUSTRY)</p>
+                </div>
+              </div>
+              <div className={styles.headRight}>
+                <strong>{site.settings.company?.parent || 'PTPN III (Persero)'}</strong>
+                <span>{tr(site.settings.site?.subsidiary_note, lang) || t('Anak Perusahaan PTPN III (Persero)', 'Subsidiary of PTPN III (Persero)')}</span>
+              </div>
+            </header>
+            <div className={styles.rule} />
+          </>
+        )}
 
         <p className={styles.dateline}>
           {city}, {longDate(issuedAt)}
@@ -328,15 +338,22 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
           </div>
         </div>
 
-        <footer className={styles.pageFoot}>
-          <span className={styles.values}>– Amanah, Kompeten, Harmonis, Loyal, Adaptif, Kolaboratif</span>
-          <div className={styles.office}>
-            <strong>Head Office :</strong>
-            <span>{office?.address || 'Jl. Medan – Tg. Morawa Km. 9,5 Medan 20148'}</span>
-            {officePhones.length > 0 && <span>Telp. {officePhones.join(' – ')}</span>}
-            {officeEmail && <span>Email : {officeEmail}</span>}
-          </div>
-        </footer>
+        {footerImage ? (
+          <footer className={`${styles.pageFoot} ${styles.pageFootImage}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={footerImage} alt="" />
+          </footer>
+        ) : (
+          <footer className={styles.pageFoot}>
+            <span className={styles.values}>– Amanah, Kompeten, Harmonis, Loyal, Adaptif, Kolaboratif</span>
+            <div className={styles.office}>
+              <strong>Head Office :</strong>
+              <span>{office?.address || 'Jl. Medan – Tg. Morawa Km. 9,5 Medan 20148'}</span>
+              {officePhones.length > 0 && <span>Telp. {officePhones.join(' – ')}</span>}
+              {officeEmail && <span>Email : {officeEmail}</span>}
+            </div>
+          </footer>
+        )}
       </article>
     </div>
   );

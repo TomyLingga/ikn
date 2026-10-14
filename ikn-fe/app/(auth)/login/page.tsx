@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -42,6 +42,11 @@ function AuthCard() {
   const [error, setError] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // Tombol kirim aktif setelah hidrasi; sebelum itu form bisa terkirim sebagai GET biasa (isian masuk URL).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(true);
+  }, []);
   const [registered, setRegistered] = useState<string | null>(null);
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [notice, setNotice] = useState<Notice | null>(() => {
@@ -337,7 +342,7 @@ function AuthCard() {
                 <Link href="/forgot-password" className={styles.subtleLink}>{t('Lupa password?', 'Forgot password?')}</Link>
               </div>
 
-              <button type="submit" className={styles.primaryButton} disabled={busy}>
+              <button type="submit" className={styles.primaryButton} disabled={busy || !ready}>
                 {busy ? t('Memproses…', 'Processing…') : t('Masuk', 'Log in')} <Icon name="arrow" size={18} />
               </button>
             </form>
@@ -458,7 +463,7 @@ function AuthCard() {
                 )}
               </p>
 
-              <button type="submit" className={styles.primaryButton} disabled={busy}>
+              <button type="submit" className={styles.primaryButton} disabled={busy || !ready}>
                 {busy ? t('Mendaftarkan…', 'Registering…') : t('Buat akun', 'Create account')} <Icon name="arrow" size={18} />
               </button>
             </form>

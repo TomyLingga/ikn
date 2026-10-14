@@ -3673,3 +3673,16 @@ div.media-thumb {
   text-transform: none;
   white-space: normal;
 }
+
+/* ---- Input dengan tombol di kanan (mis. tampilkan password SMTP) + pesan sukses sebaris ---- */
+:is(.admin-app, .admin-modal-backdrop) .admin-input-affix { display: flex; gap: 6px; align-items: stretch; }
+:is(.admin-app, .admin-modal-backdrop) .admin-input-affix > input { flex: 1; min-width: 0; }
+:is(.admin-app, .admin-modal-backdrop) .admin-input-affix > .btn { flex: none; min-height: var(--adm-ctl, 40px); padding-inline: 10px; }
+:is(.admin-app, .admin-modal-backdrop) .admin-inline-ok {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--adm-r, 8px);
+  background: var(--ok-tint);
+  color: var(--ok);
+  font-size: 0.85rem;
+}

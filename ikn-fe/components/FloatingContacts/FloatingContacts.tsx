@@ -22,6 +22,8 @@ interface FloatingContactsProps {
 
 // Dua tombol melayang di pojok kanan bawah (situs publik + portal customer): "Chat WhatsApp" ke tim marketing
 // (nomor dari Pengaturan Situs, langsung membuka percakapan) dan "Live Chat Online" = widget chat dalam aplikasi.
+// Tampil sebagai ikon bulat saja; keterangan (label + judul) melebar saat hover/fokus atau saat tombol aktif.
+// Lebih dari satu nomor WhatsApp: hover (atau tap di layar sentuh) memunculkan daftar nomor di atas ikon.
 export default function FloatingContacts({ chatUnread }: FloatingContactsProps) {
   const { lang } = useLang();
   const { settings } = useSite();
@@ -90,25 +92,27 @@ export default function FloatingContacts({ chatUnread }: FloatingContactsProps) 
       <div className={styles.stack}>
         {contacts.length > 0 && (
           <div className={styles.waWrap} ref={waWrap}>
-            {waOpen && contacts.length > 1 && (
-              <div className={styles.waMenu} role="menu" aria-label={t('Pilih tim marketing', 'Choose a marketing team')}>
-                <span className={styles.waMenuTitle}>{t('Pilih tim yang ingin dihubungi', 'Choose who to chat with')}</span>
-                {contacts.map((contact) => (
-                  <a key={contact.number} href={contact.href} target="_blank" rel="noopener noreferrer" role="menuitem" className={styles.waItem} onClick={() => setWaOpen(false)}>
-                    <span className={styles.waItemIcon}>
-                      <WaGlyph size={18} />
-                    </span>
-                    <span className={styles.waItemText}>
-                      <strong>{contact.label}</strong>
-                      <small>{contact.display}</small>
-                    </span>
-                    <Icon name="arrow" size={15} />
-                  </a>
-                ))}
+            {contacts.length > 1 && (
+              <div className={`${styles.waMenu} ${waOpen ? styles.waMenuOpen : ''}`} role="menu" aria-label={t('Pilih tim marketing', 'Choose a marketing team')}>
+                <div className={styles.waMenuCard}>
+                  <span className={styles.waMenuTitle}>{t('Pilih tim yang ingin dihubungi', 'Choose who to chat with')}</span>
+                  {contacts.map((contact) => (
+                    <a key={contact.number} href={contact.href} target="_blank" rel="noopener noreferrer" role="menuitem" className={styles.waItem} onClick={() => setWaOpen(false)}>
+                      <span className={styles.waItemIcon}>
+                        <WaGlyph size={18} />
+                      </span>
+                      <span className={styles.waItemText}>
+                        <strong>{contact.label}</strong>
+                        <small>{contact.display}</small>
+                      </span>
+                      <Icon name="arrow" size={15} />
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
             {single ? (
-              <a href={single.href} target="_blank" rel="noopener noreferrer" className={styles.pill}>
+              <a href={single.href} target="_blank" rel="noopener noreferrer" className={styles.pill} aria-label={`${single.label} · ${t('Chat WhatsApp', 'Chat on WhatsApp')}`}>
                 <span className={styles.pillText}>
                   <small>{single.label}</small>
                   <strong>{t('Chat WhatsApp', 'Chat on WhatsApp')}</strong>
@@ -118,7 +122,7 @@ export default function FloatingContacts({ chatUnread }: FloatingContactsProps) 
                 </span>
               </a>
             ) : (
-              <button type="button" className={`${styles.pill} ${waOpen ? styles.pillOn : ''}`} onClick={() => setWaOpen((value) => !value)} aria-expanded={waOpen} aria-haspopup="menu">
+              <button type="button" className={`${styles.pill} ${waOpen ? styles.pillOn : ''}`} onClick={() => setWaOpen((value) => !value)} aria-expanded={waOpen} aria-haspopup="menu" aria-label={t('Chat WhatsApp dengan tim marketing', 'Chat on WhatsApp with the marketing team')}>
                 <span className={styles.pillText}>
                   <small>{t('Marketing', 'Marketing')} · {contacts.length} {t('nomor', 'numbers')}</small>
                   <strong>{t('Chat WhatsApp', 'Chat on WhatsApp')}</strong>
@@ -130,7 +134,7 @@ export default function FloatingContacts({ chatUnread }: FloatingContactsProps) 
             )}
           </div>
         )}
-        <button type="button" className={`${styles.pill} ${open ? styles.pillOn : ''}`} onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+        <button type="button" className={`${styles.pill} ${open ? styles.pillOn : ''}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={open ? t('Tutup chat', 'Close chat') : t('Live Chat Online', 'Live Chat Online')}>
           <span className={styles.pillText}>
             <small>{t('Konsultasi produk', 'Product consultation')}</small>
             <strong>{open ? t('Tutup chat', 'Close chat') : t('Live Chat Online', 'Live Chat Online')}</strong>

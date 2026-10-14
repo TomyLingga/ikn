@@ -62,7 +62,7 @@ Docker mem-publish port di luar ufw; karena itu hanya `caddy` yang boleh punya `
 
 ## 6. Email produksi
 
-Gunakan SMTP relay port 587 (Brevo/Mailgun/Postmark). Pasang SPF (`v=spf1 include:<provider> -all`), DKIM (CNAME dari provider), DMARC (`v=DMARC1; p=quarantine; rua=mailto:dmarc@<domain>`) pada domain pengirim `noreply@<domain>`. Uji kirim ke Gmail dan Outlook, cek folder spam. Verifikasi email customer memakai tautan `FRONTEND_URL/login?verified=1` sehingga `FRONTEND_URL` wajib benar.
+Admin dapat memasang SMTP webmail perusahaan (cPanel/Hostinger: `smtp.<domain>` atau `smtp.hostinger.com`, port 465 SSL, username = alamat email penuh) di **Pengaturan Situs → Notifikasi email**, lalu menekan "Kirim email uji"; nilai itu menimpa `MAIL_*` tanpa restart (worker antrean menerapkannya sebelum tiap job). `MAIL_*` di `.env.docker` hanya dipakai pada mode "Ikuti konfigurasi server". Alternatif: SMTP relay port 587 (Brevo/Mailgun/Postmark). Pasang SPF (`v=spf1 include:<provider> -all`), DKIM (CNAME dari provider), DMARC (`v=DMARC1; p=quarantine; rua=mailto:dmarc@<domain>`) pada domain pengirim `noreply@<domain>`. Uji kirim ke Gmail dan Outlook, cek folder spam. Verifikasi email customer memakai tautan `FRONTEND_URL/login?verified=1` sehingga `FRONTEND_URL` wajib benar.
 
 ## 7. Hardening aplikasi
 

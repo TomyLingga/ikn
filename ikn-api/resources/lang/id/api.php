@@ -24,6 +24,10 @@ return [
     'wbs_received' => 'Laporan Anda telah kami terima.',
     'contact_received' => 'Pesan Anda telah kami terima.',
     'settings_saved' => 'Pengaturan tersimpan.',
+    'mail_test_sent' => 'Email uji terkirim ke :to. Periksa kotak masuk (dan folder spam).',
+    'mail_test_failed' => 'Email uji gagal dikirim: :reason',
+    'mail_disabled' => 'Pengiriman email sedang dimatikan (mode "Tidak kirim email").',
+    'mail_via_server' => 'konfigurasi server',
     'cannot_deactivate_self' => 'Anda tidak dapat menonaktifkan akun sendiri.',
     'menu_location_unknown' => 'Lokasi menu tidak dikenal.',
 ];

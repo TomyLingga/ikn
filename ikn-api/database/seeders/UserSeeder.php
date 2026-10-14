@@ -39,6 +39,34 @@ class UserSeeder extends Seeder
             ]
         );
 
+        // Admin penjualan demo: hanya modul toko (order, pembayaran, produk, stok, customer, chat, ongkir, voucher, laporan).
+        User::firstOrCreate(
+            ['email' => 'penjualan@ptikn.com'],
+            [
+                'name' => 'Admin Penjualan',
+                'password' => $password,
+                'role' => User::ROLE_ADMIN,
+                'status' => User::STATUS_ACTIVE,
+                'permissions' => ['dashboard', 'orders', 'payments', 'products', 'categories', 'stock', 'customers', 'chat', 'shipping', 'vouchers', 'fees', 'bank_accounts', 'payment_methods', 'reports'],
+                'email_verified_at' => now(),
+                'approved_at' => now(),
+            ]
+        );
+
+        // Admin nonaktif (mantan staf): contoh akun yang dinonaktifkan super admin, tidak bisa login.
+        User::firstOrCreate(
+            ['email' => 'mantan@ptikn.com'],
+            [
+                'name' => 'Admin Nonaktif',
+                'password' => $password,
+                'role' => User::ROLE_ADMIN,
+                'status' => User::STATUS_INACTIVE,
+                'permissions' => ['dashboard', 'news', 'gallery'],
+                'email_verified_at' => now(),
+                'approved_at' => now(),
+            ]
+        );
+
         // Customer demo (dipakai phase e-commerce; login customer FE masih mock).
         User::firstOrCreate(
             ['email' => 'buyer@coatingsolutions.co.id'],

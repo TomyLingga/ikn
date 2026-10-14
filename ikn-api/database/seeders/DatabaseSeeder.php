@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             CatalogSeeder::class,        // kategori, produk, gambar, stok awal (ledger), ulasan
             CommerceConfigSeeder::class, // rekening, fee, zona/tarif ongkir, voucher, metode bayar, settings commerce
             CommerceDemoSeeder::class,   // order demo di berbagai status + payment
+            DemoCasesSeeder::class,      // kasus lain: WBS, pesan kontak, stok rendah/habis, audit log
         ]);
     }
 }

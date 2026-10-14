@@ -16,6 +16,7 @@ return [
     'review_not_completed' => 'Ulasan hanya dapat diberikan untuk order yang sudah selesai.',
     'review_product_not_in_order' => 'Produk tidak ada dalam order ini.',
     'review_duplicate' => 'Produk ini sudah diulas untuk order ini.',
+    'review_profanity' => 'Ulasan mengandung kata yang tidak pantas. Mohon gunakan bahasa yang sopan.',
     'due_invalid_status' => 'Batas waktu hanya dapat diubah saat order menunggu pembayaran atau verifikasi.',
     'due_in_past' => 'Batas waktu pembayaran harus di masa depan.',
     'due_required' => 'Isi paymentDueAt atau extendHours.',

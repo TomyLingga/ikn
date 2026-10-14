@@ -56,6 +56,15 @@
 
 .sheet h1, .sheet h2, .sheet p { margin: 0; color: #000; }
 
+/* ---- Kop dari gambar (A-83): selebar lembar, menembus padding ---- */
+.headImage {
+  display: block;
+  width: calc(100% + 28mm);
+  max-width: none;
+  height: auto;
+  margin: -14mm -14mm 10mm;
+}
+
 /* ---- Kop ---- */
 .head {
   display: flex;
@@ -286,8 +295,25 @@
   line-height: 1.35;
 }
 
+/* Kaki dari gambar: selebar lembar di dasar halaman, tanpa garis/teks render. */
+.pageFootImage {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: block;
+  padding: 0;
+  border-top: 0;
+}
+
+.pageFootImage img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 @media screen and (max-width: 640px) {
   .sheet { padding: 12mm 8mm 42mm; font-size: 9.5pt; }
+  .headImage { width: calc(100% + 16mm); margin: -12mm -8mm 8mm; }
   .parties { grid-template-columns: 1fr; }
   .headLeft h1 { font-size: 13pt; }
 }
@@ -296,5 +322,6 @@
   .sheetWrap { min-height: 0; padding: 0; background: #fff; }
   .toolbar { display: none !important; }
   .sheet { width: auto; min-height: 0; margin: 0; padding: 0 0 38mm; box-shadow: none; }
+  .headImage { width: 100%; margin: 0 0 8mm; }
   .pageFoot { position: fixed; right: 0; bottom: 0; left: 0; }
 }

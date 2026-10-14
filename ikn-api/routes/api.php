@@ -80,6 +80,7 @@ Route::prefix('admin')
             // Pengaturan situs (company profile). /admin/settings dicadangkan untuk pengaturan commerce (kontrak 11.5).
             Route::get('site-settings', [Admin\SettingController::class, 'index']);
             Route::put('site-settings', [Admin\SettingController::class, 'update']);
+            Route::post('site-settings/mail-test', [Admin\SettingController::class, 'testMail']);
         });
 
         Route::middleware('module:users')->group(function () {

@@ -87,7 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const themeCss = themeStyle(settings.theme);
 
   return (
-    <html lang="id" className={`${archivo.variable} ${plexMono.variable}`}>
+    <html lang="id" className={`${archivo.variable} ${plexMono.variable}`} suppressHydrationWarning>
       <head>
         {gscToken && <meta name="google-site-verification" content={gscToken} />}
         {themeCss && <style id="site-theme" dangerouslySetInnerHTML={{ __html: themeCss }} />}

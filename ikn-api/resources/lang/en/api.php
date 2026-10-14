@@ -24,6 +24,10 @@ return [
     'wbs_received' => 'Your report has been received.',
     'contact_received' => 'Your message has been received.',
     'settings_saved' => 'Settings saved.',
+    'mail_test_sent' => 'Test email sent to :to. Check the inbox (and the spam folder).',
+    'mail_test_failed' => 'Test email could not be sent: :reason',
+    'mail_disabled' => 'Email delivery is switched off ("Do not send email" mode).',
+    'mail_via_server' => 'server configuration',
     'cannot_deactivate_self' => 'You cannot deactivate your own account.',
     'menu_location_unknown' => 'Unknown menu location.',
 ];

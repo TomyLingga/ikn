@@ -69,6 +69,12 @@ return [
         'team' => 'Tim PT Industri Karet Nusantara',
         'footer' => 'Email ini dikirim otomatis oleh sistem PT Industri Karet Nusantara. Mohon tidak membalas email ini.',
         'button_fallback' => 'Jika tombol tidak berfungsi, salin tautan berikut ke peramban Anda:',
+        'test' => [
+            'subject' => 'Email uji PT Industri Karet Nusantara',
+            'intro' => 'Email ini dikirim dari halaman Pengaturan Situs untuk memastikan pengaturan email notifikasi berfungsi.',
+            'ok' => 'Jika Anda membaca email ini, pengiriman email dari website sudah berhasil.',
+            'meta' => 'Dikirim oleh :name pada :time lewat :via.',
+        ],
         'verify' => [
             'subject' => 'Verifikasi email akun Anda',
             'intro' => 'Terima kasih telah mendaftar di PT Industri Karet Nusantara. Klik tombol di bawah untuk memverifikasi alamat email Anda.',

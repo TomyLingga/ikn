@@ -3,9 +3,10 @@
 namespace App\Http\Requests\Customer;
 
 use App\Http\Requests\Concerns\CommerceAttributes;
+use App\Rules\CleanText;
 use Illuminate\Foundation\Http\FormRequest;
 
-// POST /customer/orders/{number}/reviews: [{ productSlug, rating 1-5, body? }] (list di root) atau { reviews: [...] }.
+// POST /customer/orders/{number}/reviews: [{ productSlug, rating 1-5, body? ≤255 tanpa kata kasar }] (list di root) atau { reviews: [...] }.
 class StoreReviewsRequest extends FormRequest
 {
     use CommerceAttributes;
@@ -28,7 +29,8 @@ class StoreReviewsRequest extends FormRequest
             'reviews' => ['required', 'array', 'min:1', 'max:100'],
             'reviews.*.productSlug' => ['required', 'string', 'max:160'],
             'reviews.*.rating' => ['required', 'integer', 'min:1', 'max:5'],
-            'reviews.*.body' => ['nullable', 'string', 'max:2000'],
+            // Isi ulasan singkat (maks. 255 karakter) dan tanpa kata kasar (config/profanity.php).
+            'reviews.*.body' => ['nullable', 'string', 'max:255', new CleanText],
         ];
     }
 

@@ -35,6 +35,9 @@ const RATING_LABELS_EN: [string, string, string, string, string] = ['Bad', 'Poor
 
 // Detail pesanan customer: GET /customer/orders/{number}. Semua aksi memanggil API lalu memuat ulang
 // order sehingga status dan flag (canX) selalu mengikuti state machine server.
+
+// Batas isi ulasan (sama dengan StoreReviewsRequest di API).
+const REVIEW_MAX = 255;
 export default function CustomerOrderDetail({ number }: { number: string }) {
   const { customer } = useAuth();
   const { lang } = useLang();
@@ -59,6 +62,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [bodies, setBodies] = useState<Record<string, string>>({});
   const [reviewError, setReviewError] = useState('');
+  const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
   const scrolled = useRef(false);
 
   const load = useCallback(async () => {
@@ -142,6 +146,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
     }
     setBusy(true);
     setReviewError('');
+    setBodyErrors({});
     setActionOk('');
     try {
       await api(path('/reviews'), { method: 'POST', body: { reviews } });
@@ -150,7 +155,19 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
       await load();
       setActionOk(t('Terima kasih, ulasan Anda sudah dikirim.', 'Thank you, your review has been submitted.'));
     } catch (err) {
-      setReviewError(errorMessage(err));
+      // 422 per produk (reviews.N.body: > 255 karakter / kata kasar) ditampilkan di bawah kotak teksnya.
+      if (err instanceof ApiError && err.status === 422 && err.errors) {
+        const perProduct: Record<string, string> = {};
+        for (const [key, messages] of Object.entries(err.errors)) {
+          const match = key.match(/^reviews\.(\d+)\./);
+          const slug = match ? reviews[Number(match[1])]?.productSlug : undefined;
+          if (slug && messages[0]) perProduct[slug] = messages[0];
+        }
+        setBodyErrors(perProduct);
+        setReviewError(Object.keys(perProduct).length ? t('Periksa ulasan yang ditandai.', 'Please check the marked reviews.') : err.message);
+      } else {
+        setReviewError(errorMessage(err));
+      }
     } finally {
       setBusy(false);
     }
@@ -432,11 +449,23 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                           </span>
                           <textarea
                             rows={3}
-                            maxLength={2000}
+                            maxLength={REVIEW_MAX}
                             value={bodies[item.productSlug] || ''}
-                            onChange={(e) => setBodies((b) => ({ ...b, [item.productSlug]: e.target.value }))}
-                            placeholder={t('Ceritakan kualitas produk, pengemasan, dan pengirimannya (opsional).', 'Tell us about product quality, packaging, and delivery (optional).')}
+                            onChange={(e) => {
+                              setBodyErrors((errs) => (errs[item.productSlug] ? { ...errs, [item.productSlug]: '' } : errs));
+                              setBodies((b) => ({ ...b, [item.productSlug]: e.target.value.slice(0, REVIEW_MAX) }));
+                            }}
+                            placeholder={t('Ceritakan kualitas produk, pengemasan, dan pengirimannya (opsional, maks. 255 karakter).', 'Tell us about product quality, packaging, and delivery (optional, max 255 characters).')}
+                            aria-invalid={bodyErrors[item.productSlug] ? true : undefined}
                           />
+                          <small className={styles.muted} style={{ display: 'block', textAlign: 'right', marginTop: 4 }}>
+                            {(bodies[item.productSlug] || '').length}/{REVIEW_MAX}
+                          </small>
+                          {bodyErrors[item.productSlug] && (
+                            <small className="form-error" role="alert" style={{ display: 'block', marginTop: 4 }}>
+                              {bodyErrors[item.productSlug]}
+                            </small>
+                          )}
                         </label>
                       </div>
                     ))}

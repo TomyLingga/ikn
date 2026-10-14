@@ -48,6 +48,18 @@ class CommerceConfigSeeder extends Seeder
         if (! Fee::where('type', Fee::TYPE_ADMIN)->exists()) {
             Fee::create(['name' => ['id' => 'Biaya administrasi', 'en' => 'Administration fee'], 'type' => Fee::TYPE_ADMIN, 'amount' => 5000, 'is_active' => true, 'sort_order' => 0]);
         }
+
+        // Biaya tambahan hanya untuk customer tertentu (ASUMSI A-67): dikenakan ke PT Mitra Kimia Industri saja.
+        $second = User::where('email', 'purchasing@mitrakimia.co.id')->first();
+        if ($second && ! Fee::where('name->id', 'Biaya penanganan dokumen ekspor')->exists()) {
+            $fee = Fee::create(['name' => ['id' => 'Biaya penanganan dokumen ekspor', 'en' => 'Export document handling fee'], 'type' => Fee::TYPE_OTHER, 'amount' => 25000, 'is_active' => true, 'sort_order' => 1, 'audience' => Fee::AUDIENCE_CUSTOMERS]);
+            $fee->customers()->syncWithoutDetaching([$second->id]);
+        }
+
+        // Biaya tambahan NONAKTIF (contoh biaya musiman yang sedang dimatikan).
+        if (! Fee::where('name->id', 'Biaya pengemasan kayu (crating)')->exists()) {
+            Fee::create(['name' => ['id' => 'Biaya pengemasan kayu (crating)', 'en' => 'Wooden crating fee'], 'type' => Fee::TYPE_OTHER, 'amount' => 150000, 'is_active' => false, 'sort_order' => 2]);
+        }
     }
 
     private function shipping(): void
@@ -99,7 +111,7 @@ class CommerceConfigSeeder extends Seeder
         Voucher::firstOrCreate(['code' => 'IKN10'], [
             'type' => Voucher::TYPE_PERCENT, 'value' => 10, 'min_subtotal' => 5000000, 'max_discount' => 2000000,
             'quota' => 100, 'used_count' => 0, 'per_user_limit' => 2, 'scope' => ['type' => Voucher::SCOPE_ALL],
-            'starts_at' => now()->startOfDay(), 'ends_at' => now()->addYear()->endOfDay(), 'is_active' => true,
+            'starts_at' => now()->subMonths(6)->startOfDay(), 'ends_at' => now()->addYear()->endOfDay(), 'is_active' => true,
         ]);
 
         $resiprene = Category::where('slug', 'resiprene')->first();
@@ -107,7 +119,21 @@ class CommerceConfigSeeder extends Seeder
             'type' => Voucher::TYPE_FIXED, 'value' => 150000, 'min_subtotal' => 0, 'max_discount' => null,
             'quota' => null, 'used_count' => 0, 'per_user_limit' => null,
             'scope' => $resiprene ? ['type' => Voucher::SCOPE_CATEGORY, 'categoryIds' => [$resiprene->id]] : ['type' => Voucher::SCOPE_ALL],
-            'starts_at' => now()->startOfDay(), 'ends_at' => now()->addYear()->endOfDay(), 'is_active' => true,
+            'starts_at' => now()->subMonths(6)->startOfDay(), 'ends_at' => now()->addYear()->endOfDay(), 'is_active' => true,
+        ]);
+
+        // Voucher yang sudah KEDALUWARSA (masa berlaku lewat): tampil di daftar admin, ditolak saat checkout.
+        Voucher::firstOrCreate(['code' => 'PROMOAWAL'], [
+            'type' => Voucher::TYPE_PERCENT, 'value' => 15, 'min_subtotal' => 1000000, 'max_discount' => 500000,
+            'quota' => 50, 'used_count' => 0, 'per_user_limit' => 1, 'scope' => ['type' => Voucher::SCOPE_ALL],
+            'starts_at' => now()->subMonths(6)->startOfDay(), 'ends_at' => now()->subMonths(3)->endOfDay(), 'is_active' => true,
+        ]);
+
+        // Voucher NONAKTIF (dimatikan admin walau masa berlaku masih ada).
+        Voucher::firstOrCreate(['code' => 'PAMERAN2026'], [
+            'type' => Voucher::TYPE_FIXED, 'value' => 100000, 'min_subtotal' => 1000000, 'max_discount' => null,
+            'quota' => 20, 'used_count' => 0, 'per_user_limit' => 1, 'scope' => ['type' => Voucher::SCOPE_ALL],
+            'starts_at' => now()->subMonth()->startOfDay(), 'ends_at' => now()->addMonths(2)->endOfDay(), 'is_active' => false,
         ]);
 
         // Contoh voucher untuk customer tertentu (ASUMSI A-67): hanya customer demo aktif yang bisa memakainya,
@@ -117,7 +143,7 @@ class CommerceConfigSeeder extends Seeder
             $partner = Voucher::firstOrCreate(['code' => 'MITRA250'], [
                 'type' => Voucher::TYPE_FIXED, 'value' => 250000, 'min_subtotal' => 2500000, 'max_discount' => null,
                 'quota' => null, 'used_count' => 0, 'per_user_limit' => 3, 'scope' => ['type' => Voucher::SCOPE_ALL],
-                'starts_at' => now()->startOfDay(), 'ends_at' => now()->addYear()->endOfDay(), 'is_active' => true,
+                'starts_at' => now()->subMonths(6)->startOfDay(), 'ends_at' => now()->addYear()->endOfDay(), 'is_active' => true,
                 'audience' => Voucher::AUDIENCE_CUSTOMERS,
             ]);
             if ($partner->wasRecentlyCreated) {
