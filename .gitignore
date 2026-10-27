@@ -19,3 +19,6 @@ graphify-out/
 
 # Dokumen klien, manual book, dan aset mentah: tidak ikut repo
 doc/
+
+# Alat bantu lokal (demo tunnel, skrip pemilik): tidak ikut repo
+tools/

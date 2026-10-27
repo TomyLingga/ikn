@@ -82,7 +82,6 @@
 
 .itemDrop { position: relative; display: inline-flex; }
 .caret { opacity: 0.55; transition: transform 0.25s var(--ease); }
-.itemDrop:hover .caret { transform: rotate(180deg); }
 
 .dropdown {
   position: absolute;
@@ -97,12 +96,17 @@
   transform: translate(-50%, 6px);
   transition: opacity 0.22s var(--ease), transform 0.22s var(--ease), visibility 0.22s var(--ease);
 }
-.itemDrop:hover .dropdown,
-.itemDrop:focus-within .dropdown {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translate(-50%, 0);
+/* Hover/fokus hanya di layar lebar: di mobile panel ada di dalam laci dan dibuka lewat .expanded.
+   (Tanpa pembatas ini, :focus-within setelah tap menggeser panel −50% ke kiri laci.) */
+@media (min-width: 901px) {
+  .itemDrop:hover .caret { transform: rotate(180deg); }
+  .itemDrop:hover .dropdown,
+  .itemDrop:focus-within .dropdown {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* Kisi menu utama: maksimal 6 per baris; item ke-7 dst. turun ke baris berikutnya
