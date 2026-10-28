@@ -218,7 +218,7 @@ export default function AdminWhistleblowing() {
             </button>
           ))}
         </div>
-        <DataTable columns={columns} rows={reports} empty={loading ? t('Memuat laporan...', 'Loading reports...') : t('Belum ada laporan.', 'No reports yet.')} />
+        <DataTable columns={columns} rows={reports} loading={loading} empty={loading ? t('Memuat laporan...', 'Loading reports...') : t('Belum ada laporan.', 'No reports yet.')} />
       </AdminCard>
 
       {detail && (

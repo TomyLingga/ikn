@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Spinner from '@/components/Spinner';
 import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
 import FileUploadDropzone from '@/components/admin/FileUploadDropzone/FileUploadDropzone';
 import { MediaGrid, Pager } from '@/components/admin/cms';
@@ -174,7 +175,7 @@ export default function AdminMediaLibrary() {
       </div>
 
       {loading ? (
-        <div className="admin-empty">{t('Memuat media...', 'Loading media...')}</div>
+        <div className="admin-empty admin-loading"><Spinner block size={30} label={t('Memuat media...', 'Loading media...')} /></div>
       ) : (
         <MediaGrid
           items={items}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import Spinner from '@/components/Spinner';
 import Link from 'next/link';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
@@ -151,7 +152,7 @@ export default function StockPanel({ product, onClose, onChanged }: StockPanelPr
 
         <h3 className="admin-subtitle">{t('Riwayat mutasi (ledger)', 'Movement history (ledger)')}</h3>
         {loading && !summary ? (
-          <p className="admin-field-hint">{t('Memuat...', 'Loading...')}</p>
+          <p className="admin-field-hint"><Spinner size={18} label={t('Memuat...', 'Loading...')} /></p>
         ) : summary && summary.movements.length === 0 ? (
           <p className="admin-empty">{t('Belum ada mutasi.', 'No movements yet.')}</p>
         ) : (

@@ -200,7 +200,7 @@ export default function AdminProductCategories() {
       )}
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat kategori...', 'Loading categories...') : t('Belum ada kategori.', 'No categories yet.')} />
+      <DataTable columns={columns} rows={rows} loading={loading} empty={loading ? t('Memuat kategori...', 'Loading categories...') : t('Belum ada kategori.', 'No categories yet.')} />
 
       {formOpen && (
         <AdminModal title={editing ? `${t('Edit kategori', 'Edit category')}: ${tr(editing.name, lang)}` : t('Tambah kategori', 'Add category')} onClose={() => setFormOpen(false)}>

@@ -153,7 +153,7 @@ export default function AdminReviews() {
         </span>
       </form>
 
-      <DataTable columns={columns} rows={rows} pagination={false} empty={loading ? t('Memuat ulasan...', 'Loading reviews...') : t('Belum ada ulasan.', 'No reviews yet.')} />
+      <DataTable columns={columns} rows={rows} pagination={false} loading={loading} empty={loading ? t('Memuat ulasan...', 'Loading reviews...') : t('Belum ada ulasan.', 'No reviews yet.')} />
       <Pager meta={meta} onPage={setPage} disabled={loading} />
     </div>
   );

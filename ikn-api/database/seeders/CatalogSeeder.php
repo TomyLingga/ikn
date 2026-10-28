@@ -27,8 +27,8 @@ class CatalogSeeder extends Seeder
     private function categories(): array
     {
         $rows = [
-            ['slug' => 'resiprene', 'name' => ['id' => 'Resiprene', 'en' => 'Resiprene'], 'description' => ['id' => 'Cyclised natural rubber untuk protective coating & marine paint.', 'en' => 'Cyclised natural rubber for protective coatings and marine paints.'], 'sort_order' => 0],
-            ['slug' => 'rubber-articles', 'name' => ['id' => 'Aneka Barang Karet', 'en' => 'Rubber Articles'], 'description' => ['id' => 'Komponen dan perlengkapan karet industri untuk berbagai sektor perkebunan dan pabrik.', 'en' => 'Industrial rubber components and equipment for plantation and factory sectors.'], 'sort_order' => 1],
+            ['slug' => 'resiprene', 'name' => ['id' => 'Resiprene', 'en' => 'Resiprene'], 'description' => ['id' => 'Resiprene 35, cyclised natural rubber untuk cat pelindung, cat kapal, coating, dan tinta.', 'en' => 'Resiprene 35, cyclised natural rubber for protective and marine paints, coatings and inks.'], 'sort_order' => 0],
+            ['slug' => 'rubber-articles', 'name' => ['id' => 'Aneka Barang Karet', 'en' => 'Rubber Articles'], 'description' => ['id' => 'Sarung egrek, sepatu boots, packing, ring, dan komponen karet lain untuk perkebunan dan pabrik kelapa sawit.', 'en' => 'Sickle covers, boots, packing, rings and other rubber parts for plantations and palm oil mills.'], 'sort_order' => 1],
         ];
 
         $out = [];
@@ -122,7 +122,7 @@ class CatalogSeeder extends Seeder
                 'name' => ['id' => 'Sarung Egrek', 'en' => 'Rubber Palm Sickle Cover'], 'kind' => 'Rubber Articles',
                 'aliases' => ['sarung egrek', 'sarung pisau egrek', 'sarung egrek sawit', 'egrek', 'cover egrek'],
                 'price_mode' => 'fixed', 'price' => 125000, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 350, 'length_cm' => 20, 'width_cm' => 15, 'height_cm' => 5, 'stock' => 500,
-                'summary' => ['id' => 'Sarung pelindung pisau egrek kelapa sawit berbahan karet alam berkualitas tinggi untuk keselamatan kerja panen dan perlindungan mata pisau.', 'en' => 'Protective palm sickle cover made of high-grade natural rubber for harvesting safety and blade longevity.'],
+                'summary' => ['id' => 'Sarung egrek dari karet alam tebal untuk menutup mata pisau egrek kelapa sawit saat dibawa antar blok. Klip karet fleksibel mengunci sarung agar tidak lepas.', 'en' => 'Thick natural rubber cover for oil palm harvesting sickles, worn while the sickle is carried between blocks. A flexible rubber clip keeps it locked on the blade.'],
                 'highlights' => ['id' => ['Karet alam tebal & elastis', 'Pengait pengunci presisi & aman', 'Tahan benturan & sayatan pisau'], 'en' => ['Thick, elastic natural rubber', 'Precise and secure locking hook', 'Resistant to impact and blade cuts']],
                 'specs' => [['Material', 'Karet Alam Tebal'], ['Fungsi', 'Pelindung Pisau Egrek Sawit'], ['Sistem Kancing', 'Klip Karet Fleksibel'], ['Aplikasi', 'Perkebunan Kelapa Sawit']],
                 'applications' => ['id' => ['Perkebunan Kelapa Sawit', 'Keamanan Kerja Panen', 'Perlindungan Alat Perkebunan'], 'en' => ['Oil palm plantations', 'Harvesting safety', 'Plantation tool protection']],
@@ -133,7 +133,7 @@ class CatalogSeeder extends Seeder
                 'name' => ['id' => 'Sepatu Boots', 'en' => 'Industrial Rubber Boots'], 'kind' => 'Rubber Articles',
                 'aliases' => ['sepatu boots', 'boots karet', 'sepatu boots industri', 'sepatu perkebunan', 'boots ptpn', 'rubin boots'],
                 'price_mode' => 'fixed', 'price' => 170000, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 1800, 'length_cm' => 30, 'width_cm' => 20, 'height_cm' => 8, 'stock' => 350,
-                'summary' => ['id' => 'Sepatu boots karet industri dan perkebunan standar mutu tinggi dengan logo Rubin PTPN. Tahan air, anti-slip, fleksibel, dan kuat di medan berat.', 'en' => 'High-standard industrial and plantation rubber boots branded Rubin PTPN. Waterproof, anti-slip, flexible, and built for heavy-duty field work.'],
+                'summary' => ['id' => 'Sepatu boots karet berlogo Rubin PTPN untuk pekerja kebun sawit, kebun karet, dan pabrik. Tahan air dan lumpur, bersol anti-slip dengan alur dalam, setinggi betis.', 'en' => 'Rubin PTPN rubber boots for oil palm and rubber estate workers and factory crews. Water and mud resistant, with a deep-tread anti-slip sole, calf height.'],
                 'highlights' => ['id' => ['Sol anti-slip berdaya cengkeram kuat', 'Tahan air & tahan lumpur', 'Nyaman digunakan seharian', 'Standar resmi Rubin & PTPN'], 'en' => ['High-grip anti-slip sole', 'Waterproof and mud resistant', 'Comfortable for all-day wear', 'Official Rubin & PTPN standard']],
                 'specs' => [['Material', '100% Karet Alam / Lateks'], ['Tinggi', 'Tinggi Betis Standar Industri'], ['Fitur Sol', 'Deep Tread Anti-Slip'], ['Standar', 'Perkebunan & Industri']],
                 'applications' => ['id' => ['Perkebunan Kelapa Sawit & Karet', 'Pabrik & Manufaktur Industri', 'Pertanian & Konstruksi'], 'en' => ['Oil palm and rubber plantations', 'Factories and manufacturing', 'Agriculture and construction']],
@@ -144,7 +144,7 @@ class CatalogSeeder extends Seeder
                 'name' => ['id' => 'Resiprene 35', 'en' => 'Resiprene 35'], 'kind' => 'Cyclised Natural Rubber',
                 'aliases' => ['resiprine', 'respirine', 'resiprene 35', 'karet siklis', 'cyclised rubber'],
                 'price_mode' => 'fixed', 'price' => 185000, 'unit' => 'kg', 'moq' => 25, 'weight_gram' => 1000, 'length_cm' => 40, 'width_cm' => 30, 'height_cm' => 25, 'stock' => 1200,
-                'summary' => ['id' => 'Karet alam tersiklisasi dalam bentuk padatan/serpihan kristal amber dengan kelarutan sangat baik pada pelarut tak berbau. Bahan andalan untuk cat pelindung, coating perawatan, dan cat marine.', 'en' => 'Cyclised natural rubber in amber crystal solid/flake form with excellent solubility in odourless solvents. A key material for protective coatings, maintenance coatings, and marine paints.'],
+                'summary' => ['id' => 'Karet alam tersiklisasi (cyclised natural rubber) berupa serpihan kristal amber. Larut sempurna dalam white spirit dan pelarut tak berbau, dipakai untuk cat pelindung, coating perawatan, cat kapal, dan tinta.', 'en' => 'Cyclised natural rubber in amber crystal flakes. Dissolves fully in white spirit and odourless solvents and is used in protective paints, maintenance coatings, marine paints and inks.'],
                 'highlights' => ['id' => ['Cepat kering', 'Sangat tahan air', 'Tahan kimia (alkali & asam)', 'Adhesi baik ke beragam substrat'], 'en' => ['Fast drying', 'Highly water resistant', 'Chemical resistant (alkali & acid)', 'Good adhesion to various substrates']],
                 'specs' => [['Bentuk', 'Padatan / Serpihan Amber'], ['Softening Point', '125–145 °C'], ['Viscosity', '18–24 detik (DIN 53211)'], ['Color', '11–13 Lovibond'], ['Acid Value', 'Maks. 5 mg KOH/g'], ['Density', '0,88–0,98 g/ml'], ['Appearance', 'Clear']],
                 'applications' => ['id' => ['Protective coatings', 'Cat kapal / anti-fouling', 'Concrete coating (baru & lapuk)', 'Odor-free finishing'], 'en' => ['Protective coatings', 'Marine / anti-fouling paints', 'Concrete coating (new & weathered)', 'Odour-free finishing']],

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import Spinner from '@/components/Spinner';
 import Link from 'next/link';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
@@ -217,7 +218,7 @@ export default function AdminPageEditor({ params }: { params: { id: string } }) 
   }, [types, page, typeQuery, lang]);
 
   if (loading) {
-    return <div className="admin-empty">{t('Memuat halaman...', 'Loading page...')}</div>;
+    return <div className="admin-empty admin-loading"><Spinner block size={30} label={t('Memuat halaman...', 'Loading page...')} /></div>;
   }
 
   if (!page || !meta) {

@@ -158,7 +158,7 @@ export default function AdminAuditLogs() {
         </span>
       </form>
 
-      <DataTable columns={columns} rows={rows} pagination={false} empty={loading ? t('Memuat audit log...', 'Loading audit log...') : t('Tidak ada catatan pada filter ini.', 'No entries match this filter.')} />
+      <DataTable columns={columns} rows={rows} pagination={false} loading={loading} empty={loading ? t('Memuat audit log...', 'Loading audit log...') : t('Tidak ada catatan pada filter ini.', 'No entries match this filter.')} />
       <Pager meta={meta} onPage={setPage} disabled={loading} />
 
       {detail && (

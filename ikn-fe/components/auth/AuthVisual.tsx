@@ -17,8 +17,8 @@ interface Slide {
 
 // Foto bawaan bila admin belum mengisi Pengaturan Situs → "Halaman login" (settings.auth.slides).
 const DEFAULT_SLIDES: Slide[] = [
-  { src: '/img/pabrik-2-1.png', kind: 'image', caption: { id: 'Karet hilir Nusantara, diproses untuk dunia.', en: 'Nusantara downstream rubber, made for the world.' } },
-  { src: '/img/produksi-karet-1.webp', kind: 'image', caption: { id: 'Mutu teruji sejak 1965.', en: 'Proven quality since 1965.' } },
+  { src: '/img/pabrik-2-1.png', kind: 'image', caption: { id: 'Barang karet industri dari Medan, sejak 1965.', en: 'Industrial rubber goods from Medan since 1965.' } },
+  { src: '/img/produksi-karet-1.webp', kind: 'image', caption: { id: 'Resiprene 35 untuk cat, tinta, dan coating.', en: 'Resiprene 35 for paints, inks and coatings.' } },
   { src: '/img/karet-1-1-scaled.jpg', kind: 'image', caption: { id: 'Pesan produk karet industri secara online.', en: 'Order industrial rubber products online.' } },
 ];
 const INTERVAL_MS = 5500;

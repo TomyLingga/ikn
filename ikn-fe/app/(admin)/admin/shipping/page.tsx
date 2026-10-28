@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, RowActions } from '@/components/admin/AdminPage';
@@ -393,7 +394,7 @@ export default function AdminShipping() {
       )}
 
       {loading ? (
-        <p className="admin-field-hint">{t('Memuat zona...', 'Loading zones...')}</p>
+        <p className="admin-field-hint"><Spinner size={18} label={t('Memuat zona...', 'Loading zones...')} /></p>
       ) : zones.length === 0 ? (
         <div className="admin-empty">{t('Belum ada zona ongkir. Tambahkan zona (mis. "Jawa", "Sumatera Utara", "Indonesia lainnya").', 'No shipping zones yet. Add zones (e.g. "Java", "North Sumatra", "Rest of Indonesia").')}</div>
       ) : (

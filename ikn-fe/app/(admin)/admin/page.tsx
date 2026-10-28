@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import StatusBadge from '@/components/StatusBadge';
 import AdminSalesChart from '@/components/admin/AdminSalesChart';
 import { AdminPageHead, DataTable, type Column } from '@/components/admin/AdminPage';
@@ -11,7 +12,9 @@ import { useLang } from '@/components/LanguageProvider';
 import { orderLabel, paymentLabel } from '@/lib/commerce';
 import { api, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
+import type { CSSProperties } from 'react';
 import { formatIDR, formatDate, formatDateTime } from '@/lib/format';
+import CountUp from '@/components/CountUp';
 import type { DashboardData, DashboardMetric, DashboardWorkQueue } from '@/lib/admin';
 import type { IconName, Lang, OrderSummary } from '@/lib/types';
 import styles from './AdminDashboard.module.css';
@@ -139,7 +142,7 @@ export default function AdminDashboard() {
             <Icon name="clock" size={14} /> {periodText}
           </span>
           <button type="button" className="btn btn-line btn-sm" onClick={() => void refresh()} disabled={loading}>
-            {loading ? t('Memuat...', 'Loading...') : t('Segarkan', 'Refresh')}
+            {loading ? <Spinner size={16} label={t('Memuat...', 'Loading...')} /> : t('Segarkan', 'Refresh')}
           </button>
         </div>
       </div>
@@ -148,12 +151,12 @@ export default function AdminDashboard() {
 
       {/* KPI: bulan berjalan s.d. hari ini vs rentang yang sama bulan lalu */}
       <section className={styles.kpis} aria-label={t('Kinerja bulan ini', 'This month performance')}>
-        {kpiCards.map((card) => (
-          <Link key={card.key} href={card.href} className={styles.kpiCard}>
+        {kpiCards.map((card, i) => (
+          <Link key={card.key} href={card.href} className={styles.kpiCard} style={{ '--i': i } as CSSProperties}>
             <span className={styles.kpiLabel}>
               <Icon name={card.icon} size={18} strokeWidth={1.8} /> {card.label}
             </span>
-            <strong className={styles.kpiValue}>{card.money ? formatIDR(card.metric.current) : card.metric.current}</strong>
+            <strong className={styles.kpiValue}><CountUp value={card.metric.current} format={card.money ? formatIDR : undefined} /></strong>
             <span className={styles.kpiCompare}>
               <Delta metric={card.metric} t={t} lang={lang} />
               <span className={styles.kpiPrev}>

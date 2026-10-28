@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import Spinner from '@/components/Spinner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
@@ -134,7 +135,7 @@ export default function AdminNewsEditor({ params }: { params: { id: string } }) 
   }
 
   if (loading) {
-    return <div className="admin-empty">{t('Memuat berita...', 'Loading post...')}</div>;
+    return <div className="admin-empty admin-loading"><Spinner block size={30} label={t('Memuat berita...', 'Loading post...')} /></div>;
   }
 
   if (!isNew && !post) {

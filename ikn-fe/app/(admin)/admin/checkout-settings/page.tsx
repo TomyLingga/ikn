@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import Spinner from '@/components/Spinner';
 import Link from 'next/link';
 import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
 import { firstError, type FieldErrors } from '@/components/admin/cms';
@@ -123,7 +124,7 @@ export default function AdminCheckoutSettings() {
             </p>
           )}
           {!settings ? (
-            <p className="admin-field-hint">{t('Memuat pengaturan...', 'Loading settings...')}</p>
+            <p className="admin-field-hint"><Spinner size={18} label={t('Memuat pengaturan...', 'Loading settings...')} /></p>
           ) : (
             <form className="admin-form" onSubmit={(e) => void submitSettings(e)}>
               {numberField('paymentDueHours', t('Batas waktu pembayaran', 'Payment deadline'), t('Order yang belum dibayar sampai batas ini otomatis kedaluwarsa dan stoknya dikembalikan.', 'Unpaid orders expire automatically after this period and stock is released.'), { min: 1, max: 720, suffix: t('jam', 'hours') })}

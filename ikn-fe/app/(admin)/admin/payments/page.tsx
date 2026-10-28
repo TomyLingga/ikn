@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
@@ -393,12 +394,11 @@ export default function AdminPayments() {
       <DataTable
         columns={columns}
         rows={rows}
-        pagination={false}
-        empty={loading ? t('Memuat pembayaran...', 'Loading payments...') : t('Tidak ada pembayaran pada filter ini.', 'No payments match this filter.')}
+        pagination={false} loading={loading} empty={loading ? t('Memuat pembayaran...', 'Loading payments...') : t('Tidak ada pembayaran pada filter ini.', 'No payments match this filter.')}
       />
       <Pager meta={meta} onPage={setPage} disabled={loading} />
 
-      {detailLoading && <p className="admin-field-hint" style={{ marginTop: 12 }}>{t('Memuat detail pembayaran...', 'Loading payment details...')}</p>}
+      {detailLoading && <p className="admin-field-hint" style={{ marginTop: 12 }}><Spinner size={18} label={t('Memuat detail pembayaran...', 'Loading payment details...')} /></p>}
 
       {detail && !detailLoading && (
         <AdminModal title={`${t('Detail pembayaran', 'Payment details')} #${detail.id}`} onClose={() => setDetail(null)} width={880}>

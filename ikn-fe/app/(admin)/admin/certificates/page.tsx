@@ -209,7 +209,7 @@ export default function AdminCertificates() {
 
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat sertifikat...', 'Loading certificates...') : t('Belum ada sertifikat.', 'No certificates yet.')} />
+      <DataTable columns={columns} rows={rows} loading={loading} empty={loading ? t('Memuat sertifikat...', 'Loading certificates...') : t('Belum ada sertifikat.', 'No certificates yet.')} />
 
       {formOpen && (
         <AdminModal title={editingId ? t('Edit sertifikat', 'Edit certificate') : t('Tambah sertifikat', 'Add certificate')} onClose={closeForm} width={880}>

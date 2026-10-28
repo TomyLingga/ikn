@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import { ChatComposer, ChatThread } from '@/components/chat';
 import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage, type Envelope } from '@/lib/api';
@@ -287,7 +288,7 @@ function ConversationList({ conversations, loading, error, query, activeIds, lan
       {conversations.length === 0 && !error && (
         <p className={styles.empty}>
           {loading
-            ? t('Memuat percakapan…', 'Loading conversations…')
+            ? <Spinner size={18} label={t('Memuat percakapan…', 'Loading conversations…')} />
             : query
               ? t('Tidak ada percakapan yang cocok.', 'No matching conversations.')
               : t('Belum ada percakapan.', 'No conversations yet.')}

@@ -34,7 +34,7 @@ const plexMono = IBM_Plex_Mono({
 
 export const dynamic = 'force-dynamic';
 
-const FALLBACK_TITLE = 'PT Industri Karet Nusantara — Hilir Karet Berkualitas';
+const FALLBACK_TITLE = 'PT Industri Karet Nusantara | Pabrik Karet Industri Medan';
 const FALLBACK_DESCRIPTION =
   'PT Industri Karet Nusantara (PT IKN) adalah perusahaan hilir karet berpengalaman sejak 1965, memproduksi Resiprene 35 dan aneka barang karet dari Medan, Sumatera Utara.';
 

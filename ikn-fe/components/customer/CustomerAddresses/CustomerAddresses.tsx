@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import AddressForm from '@/components/customer/AddressForm';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
@@ -63,7 +64,7 @@ export default function CustomerAddresses() {
     void mutate(() => api(`/customer/addresses/${id}`, { method: 'DELETE' }));
   };
 
-  if (loading) return <p className="form-note">{t('Memuat…', 'Loading…')}</p>;
+  if (loading) return <p className="form-note"><Spinner label={t('Memuat alamat…', 'Loading addresses…')} /></p>;
   if (loadError) return <p className="form-error" role="alert">{loadError}</p>;
 
   return (

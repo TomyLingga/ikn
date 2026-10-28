@@ -372,7 +372,7 @@ export default function AdminVouchers() {
         </span>
       </form>
 
-      <DataTable columns={columns} rows={rows} pagination={false} empty={loading ? t('Memuat voucher...', 'Loading vouchers...') : t('Belum ada voucher.', 'No vouchers yet.')} />
+      <DataTable columns={columns} rows={rows} pagination={false} loading={loading} empty={loading ? t('Memuat voucher...', 'Loading vouchers...') : t('Belum ada voucher.', 'No vouchers yet.')} />
       <Pager meta={meta} onPage={setPage} disabled={loading} />
 
       {formOpen && (

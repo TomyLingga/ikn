@@ -215,6 +215,7 @@ final class SectionDefinitions
             'timeline' => self::type('Linimasa', 'Timeline',
                 'Tonggak berurutan di sepanjang "jalan" waktu (sejarah perusahaan): nama entitas di atas pin tahun, kotak uraian + produk di bawahnya; geser mendatar di layar lebar. Di halaman Tentang menjadi anchor #sejarah.',
                 'Milestones along a time "road" (company history): entity name above the year pin, description + products box below; horizontal scroll on wide screens. On the About page it is the #sejarah anchor.', self::labelHeading() + [
+                    'start' => self::f('select', 'Posisi awal', 'Start position', ['options' => ['oldest' => 'Mulai dari tonggak tertua (kiri), geser ke kanan', 'newest' => 'Mulai dari tonggak terbaru (kanan), geser ke kiri'], 'default' => 'oldest']),
                     'items' => self::list('Tonggak', 'Milestones', [
                         'year' => self::f('text', 'Tahun (label pin)', 'Year (pin label)', ['required' => true, 'max' => 24]),
                         'name' => self::f('i18n_text', 'Nama entitas / tahap (di atas pin)', 'Entity / stage name (above the pin)'),

@@ -139,8 +139,7 @@ export default function AdminContactMessages() {
       <DataTable
         columns={columns}
         rows={items}
-        pagination={false}
-        empty={loading ? t('Memuat pesan...', 'Loading messages...') : t('Tidak ada pesan.', 'No messages.')}
+        pagination={false} loading={loading} empty={loading ? t('Memuat pesan...', 'Loading messages...') : t('Tidak ada pesan.', 'No messages.')}
       />
       <Pager meta={meta} onPage={setPage} disabled={loading} />
 

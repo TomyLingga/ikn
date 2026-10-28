@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import Spinner from '@/components/Spinner';
 import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
 import { ColorInput, I18nInput, ListField, MediaPicker, firstError, type FieldErrors } from '@/components/admin/cms';
 import MailSettingsCard from '@/components/admin/MailSettingsCard';
@@ -117,7 +118,7 @@ export default function AdminSiteSettings() {
     }
   }
 
-  if (loading) return <div className="admin-empty">{t('Memuat pengaturan...', 'Loading settings...')}</div>;
+  if (loading) return <div className="admin-empty admin-loading"><Spinner block size={30} label={t('Memuat pengaturan...', 'Loading settings...')} /></div>;
 
   if (!settings) {
     return (

@@ -196,7 +196,7 @@ export const t: Record<Lang, UIStrings> = {
       companyProfile: 'Profil perusahaan',
     },
     footer: {
-      headline: 'Karet hilir Nusantara, diproses untuk dunia.',
+      headline: 'Barang karet industri dari Medan, sejak 1965.',
       startConvo: 'Mulai percakapan',
       nav: 'Navigasi',
       contact: 'Kontak',
@@ -236,7 +236,7 @@ export const t: Record<Lang, UIStrings> = {
       companyProfile: 'Company profile',
     },
     footer: {
-      headline: 'Nusantara downstream rubber, processed for the world.',
+      headline: 'Industrial rubber goods from Medan since 1965.',
       startConvo: 'Start a conversation',
       nav: 'Navigation',
       contact: 'Contact',

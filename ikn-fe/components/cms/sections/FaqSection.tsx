@@ -4,6 +4,7 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { paragraphs, tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
+import JsonLd from '@/components/JsonLd';
 import SecHead from './SecHead';
 import { asList, type FaqContent } from '../utils';
 
@@ -19,6 +20,18 @@ export default function FaqSection({ section }: { section: PageSection }) {
 
   return (
     <section className="section-tight" id={section.key || undefined}>
+      {/* FAQPage untuk hasil kaya Google; teks sama dengan yang terlihat. */}
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: items.map((item) => ({
+            '@type': 'Question',
+            name: tr(item.question, lang),
+            acceptedAnswer: { '@type': 'Answer', text: tr(item.answer, lang) },
+          })),
+        }}
+      />
       <div className="container faq">
         <div className="faq-intro">
           {(label || heading) && <SecHead label={label} heading={heading} reveal={false} />}

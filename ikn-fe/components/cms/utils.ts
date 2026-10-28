@@ -116,6 +116,8 @@ export interface TimelineContent {
   heading: I18n;
   /** `name` (di atas pin) dan `products` opsional; konten lama hanya year/title/body. */
   items: { year: string; name?: I18n; title: I18n; body: I18n; products?: I18n }[];
+  /** Posisi awal geser: oldest (bawaan, mulai di kiri) atau newest (track digulir ke ujung kanan saat dimuat). Urutan tetap lama → baru. */
+  start?: 'oldest' | 'newest';
 }
 
 export interface VisionMissionContent {
@@ -383,10 +385,10 @@ export function breadcrumbItems(
 /** Page metadata from the CMS SEO block (Indonesian text; an RSC cannot know the visitor's language). */
 export function pageMetadata(page: PageData | null, fallbackTitle: string): Metadata {
   if (!page) return { title: fallbackTitle };
-  // Beranda tanpa judul SEO memakai judul kaya kata kunci (bukan "Beranda") — judul ini yang tampil di Google.
+  // Beranda tanpa judul SEO memakai judul berkata kunci (bukan "Beranda"); judul ini yang tampil di Google.
   const title =
     page.seo?.title?.id ||
-    (page.slug === 'home' ? 'PT Industri Karet Nusantara — Pabrik Karet Industri & Resiprene 35 di Medan' : page.title?.id || fallbackTitle);
+    (page.slug === 'home' ? 'Pabrik Karet Industri & Resiprene 35 di Medan | PT IKN' : page.title?.id || fallbackTitle);
   // Deskripsi: SEO halaman, else paragraf pembuka kepala halaman (agar tiap halaman punya deskripsi unik di Google).
   const header = page.sections?.find((s) => s.type === 'page_header' || s.type === 'hero');
   const headerContent = (header?.content ?? {}) as Record<string, unknown>;

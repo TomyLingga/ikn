@@ -152,8 +152,11 @@
   height: var(--h);
   border-radius: 6px 6px 2px 2px;
   background: #fff;
-  transition: height 0.5s var(--ease);
+  transition: height 0.6s var(--ease) calc(var(--i, 0) * 45ms);
 }
+
+/* Sebelum siap semua batang 3px, lalu tumbuh berurutan (--i dari kolom). */
+.spendBars:not(.spendReady) .spendFill { height: 3px; }
 
 .spendZero {
   height: 3px;
@@ -623,4 +626,29 @@
 
 @media (prefers-reduced-motion: reduce) {
   .openTile, .spendFill { transition: none; }
+}
+
+/* Kartu "smooth": masuk bertahap (--i) dan terangkat halus saat hover; angka memakai CountUp. */
+.openTile,
+.stat,
+.actionCard {
+  animation: dashIn 0.5s var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.stat,
+.actionCard {
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.stat:hover,
+.actionCard:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--line));
+  box-shadow: 0 16px 30px -22px color-mix(in srgb, var(--primary) 50%, rgba(15, 27, 45, 0.35));
+}
+@keyframes dashIn {
+  from { opacity: 0; transform: translateY(12px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .openTile, .stat, .actionCard { animation: none; }
+  .stat, .actionCard { transition: none; }
 }

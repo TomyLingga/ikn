@@ -861,6 +861,15 @@
   background: var(--surface);
 }
 
+/* Kolom galeri menyerap sisa lebar layar; tanpa batas tinggi foto persegi bisa >1000px dan terpotong (cover).
+   Di layar lebar panggung dibatasi tingginya dan foto ditampilkan utuh. */
+@media (min-width: 621px) {
+  .pdp-gallery [class*='ProductGallery_stage'],
+  .pdp-gallery [class*='ProductGallery_placeholder'] { aspect-ratio: auto; height: clamp(280px, 56vh, 520px); }
+  .pdp-gallery [class*='ProductGallery_frame'] { background: var(--surface); }
+  .pdp-gallery [class*='ProductGallery_slide'] img { object-fit: contain; padding: 12px; }
+}
+
 .pdp-aside { grid-area: aside; min-width: 0; align-self: stretch; }
 .pdp-content { grid-area: content; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
 

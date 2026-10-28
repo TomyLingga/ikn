@@ -281,8 +281,7 @@ export default function ProductManager() {
       <DataTable
         columns={columns}
         rows={items}
-        pagination={false}
-        empty={loading ? t('Memuat produk...', 'Loading products...') : t('Produk tidak ditemukan.', 'No products found.')}
+        pagination={false} loading={loading} empty={loading ? t('Memuat produk...', 'Loading products...') : t('Produk tidak ditemukan.', 'No products found.')}
       />
       <Pager meta={meta} onPage={setPage} disabled={loading} />
 

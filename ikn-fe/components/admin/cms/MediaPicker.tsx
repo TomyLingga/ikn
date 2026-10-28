@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import AdminModal from '@/components/admin/AdminModal';
 import { useLang } from '@/components/LanguageProvider';
 import { apiPaged, errorMessage, uploadMedia } from '@/lib/api';
@@ -233,7 +234,7 @@ export function MediaLibraryModal({ accept, selectedId, onPick, onClose }: Media
         </div>
         {error && <p className="form-error">{error}</p>}
         {loading ? (
-          <div className="admin-empty">{t('Memuat media...', 'Loading media...')}</div>
+          <div className="admin-empty admin-loading"><Spinner block size={30} label={t('Memuat media...', 'Loading media...')} /></div>
         ) : (
           <MediaGrid
             items={items}

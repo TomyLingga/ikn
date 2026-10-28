@@ -8,6 +8,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import Breadcrumb from '@/components/Breadcrumb';
 import EmptyState from '@/components/EmptyState';
 import AddressForm from '@/components/customer/AddressForm';
@@ -259,7 +260,7 @@ export default function CheckoutPage() {
     return (
       <>
         <PageHead title="Checkout." t={t} />
-        <section className="section-tight"><div className="container"><p className="form-note">{t('Memuat…', 'Loading…')}</p></div></section>
+        <section className="section-tight"><div className="container"><p className="form-note"><Spinner label={t('Memuat…', 'Loading…')} /></p></div></section>
       </>
     );
   }
@@ -358,7 +359,7 @@ export default function CheckoutPage() {
                 <div className="co-block">
                   <h2 className="h3 pd-sec-title">{t('Alamat pengiriman', 'Shipping address')}</h2>
                   {addresses === null ? (
-                    <p className="form-note">{t('Memuat alamat…', 'Loading addresses…')}</p>
+                    <p className="form-note"><Spinner label={t('Memuat alamat…', 'Loading addresses…')} /></p>
                   ) : (
                     <>
                       <div className="co-address-list">

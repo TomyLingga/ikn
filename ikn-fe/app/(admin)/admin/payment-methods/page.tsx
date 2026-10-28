@@ -239,7 +239,7 @@ export default function AdminPaymentMethods() {
       )}
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable columns={columns} rows={rows} pagination={false} empty={loading ? t('Memuat metode...', 'Loading methods...') : t('Belum ada metode pembayaran.', 'No payment methods yet.')} />
+      <DataTable columns={columns} rows={rows} pagination={false} loading={loading} empty={loading ? t('Memuat metode...', 'Loading methods...') : t('Belum ada metode pembayaran.', 'No payment methods yet.')} />
 
       <p className="cms-hint" style={{ marginTop: 18 }}>
         {t(

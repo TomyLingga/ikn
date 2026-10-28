@@ -5,6 +5,7 @@ namespace Tests\Feature\Cms;
 use Database\Seeders\CmsPageSeeder;
 use Database\Seeders\MediaSeeder;
 use Database\Seeders\MenuSeeder;
+use App\Models\PageSection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -40,7 +41,7 @@ class SeededPagesTest extends TestCase
         $this->assertSame(['header', 'esg', 'sertifikat', 'pelanggan', 'reach', 'whistleblowing', 'wbs-form'], array_column($keberlanjutan, 'key'));
 
         $bisnis = $this->getJson('/api/v1/content/pages/bisnis')->assertOk()->json('data.sections');
-        $this->assertSame(['header', 'resiprene-35', 'barang-karet', 'links', 'unduhan', 'cta'], array_column($bisnis, 'key'));
+        $this->assertSame(['header', 'resiprene-35', 'barang-karet', 'cara-pesan', 'links', 'unduhan', 'tanya-jawab', 'cta'], array_column($bisnis, 'key'));
 
         $media = $this->getJson('/api/v1/content/pages/media')->assertOk()->json('data.sections');
         $this->assertSame(['page_header', 'link_cards'], array_column($media, 'type'));
@@ -58,5 +59,21 @@ class SeededPagesTest extends TestCase
         $this->assertTrue($urls->contains('/bisnis#produk'));
         $this->assertFalse($urls->contains('/catalog'));
         $this->assertFalse($urls->contains(fn ($url) => str_starts_with($url, '/keberlanjutan/') || $url === '/unduhan' || str_starts_with($url, '/produk')));
+    }
+
+    public function test_every_seeded_section_passes_admin_validation(): void
+    {
+        // Seeder menulis konten langsung ke DB; pastikan editor admin bisa menyimpannya kembali tanpa galat validasi.
+        Storage::fake('public');
+        $this->seed(MediaSeeder::class);
+        $this->seed(MenuSeeder::class);
+        $this->seed(CmsPageSeeder::class);
+        $admin = $this->superAdmin();
+
+        foreach (PageSection::with('page')->get() as $section) {
+            $this->actingAs($admin)->putJson('/api/v1/admin/sections/'.$section->id, ['content' => $section->content])
+                ->assertOk()
+                ->assertJsonPath('data.key', $section->key, "{$section->page->slug}#{$section->key}");
+        }
     }
 }

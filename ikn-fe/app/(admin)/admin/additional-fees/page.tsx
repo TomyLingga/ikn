@@ -233,7 +233,7 @@ export default function AdminAdditionalFees() {
         </span>
       </div>
 
-      <DataTable columns={columns} rows={visible} pagination={false} empty={loading ? t('Memuat biaya...', 'Loading fees...') : t('Belum ada biaya tambahan.', 'No additional fees yet.')} />
+      <DataTable columns={columns} rows={visible} pagination={false} loading={loading} empty={loading ? t('Memuat biaya...', 'Loading fees...') : t('Belum ada biaya tambahan.', 'No additional fees yet.')} />
 
       <p className="admin-field-hint" style={{ marginTop: 12 }}>
         {t('Ongkos kirim diatur per zona wilayah di menu', 'Shipping costs are configured per region zone under')}{' '}

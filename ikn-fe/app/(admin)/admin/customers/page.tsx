@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react';
+import Spinner from '@/components/Spinner';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import StatusBadge from '@/components/StatusBadge';
@@ -281,10 +282,10 @@ function AdminCustomers() {
         </span>
       </form>
 
-      <DataTable columns={columns} rows={rows} pagination={false} empty={loading ? t('Memuat customer...', 'Loading customers...') : t('Tidak ada customer pada filter ini.', 'No customers match this filter.')} />
+      <DataTable columns={columns} rows={rows} pagination={false} loading={loading} empty={loading ? t('Memuat customer...', 'Loading customers...') : t('Tidak ada customer pada filter ini.', 'No customers match this filter.')} />
       <Pager meta={meta} onPage={setPage} disabled={loading} />
 
-      {detailLoading && <p className="admin-field-hint" style={{ marginTop: 12 }}>{t('Memuat detail customer...', 'Loading customer details...')}</p>}
+      {detailLoading && <p className="admin-field-hint" style={{ marginTop: 12 }}><Spinner size={18} label={t('Memuat detail customer...', 'Loading customer details...')} /></p>}
 
       {detail && !detailLoading && (
         <AdminModal title={`${t('Detail customer', 'Customer details')}: ${detail.company || detail.name}`} onClose={() => setDetail(null)} width={920}>

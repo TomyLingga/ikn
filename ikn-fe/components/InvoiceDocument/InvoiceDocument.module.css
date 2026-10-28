@@ -312,10 +312,10 @@
 }
 
 @media screen and (max-width: 640px) {
-  .sheet { padding: 12mm 8mm 42mm; font-size: 9.5pt; }
-  .headImage { width: calc(100% + 16mm); margin: -12mm -8mm 8mm; }
-  .parties { grid-template-columns: 1fr; }
-  .headLeft h1 { font-size: 13pt; }
+  /* Ponsel: lembar tetap selebar A4 agar tata letak dokumen tidak rusak; digeser mendatar / dizoom seperti PDF. */
+  .sheetWrap { padding: 12px 0 32px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .toolbar { width: auto; margin: 0 12px 10px; flex-wrap: wrap; }
+  .sheet { width: 210mm; min-width: 210mm; margin: 0 12px; }
 }
 
 @media print {

@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     : 'Harga berdasarkan penawaran.';
   const summary = (product.summary?.id || '').trim().replace(/[.\s]+$/, '');
   return buildMetadata({
-    title: `${product.name.id}${product.category ? ` — ${product.category.name.id}` : ''}`,
+    title: `${product.name.id}${product.category ? ` | ${product.category.name.id}` : ''}`,
     description: `${product.name.id} ${price} ${summary ? `${summary}. ` : ''}Langsung dari pabrik PT Industri Karet Nusantara, Medan.`,
     path: `/catalog/${product.slug}`,
     image: product.image,

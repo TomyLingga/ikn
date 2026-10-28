@@ -146,7 +146,7 @@ export default function AdminBankAccounts() {
 
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat rekening...', 'Loading accounts...') : t('Belum ada rekening.', 'No bank accounts yet.')} />
+      <DataTable columns={columns} rows={rows} loading={loading} empty={loading ? t('Memuat rekening...', 'Loading accounts...') : t('Belum ada rekening.', 'No bank accounts yet.')} />
 
       {formOpen && (
         <AdminModal title={editing ? t('Edit rekening', 'Edit account') : t('Tambah rekening', 'Add account')} onClose={() => setFormOpen(false)} small>

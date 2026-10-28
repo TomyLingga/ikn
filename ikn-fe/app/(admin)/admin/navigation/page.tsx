@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import Spinner from '@/components/Spinner';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
 import { AdminCard, AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
@@ -311,7 +312,7 @@ export default function AdminNavigation() {
         )}
 
         {loading ? (
-          <div className="admin-empty">{t('Memuat menu...', 'Loading menus...')}</div>
+          <div className="admin-empty admin-loading"><Spinner block size={30} label={t('Memuat menu...', 'Loading menus...')} /></div>
         ) : (
           <div className="admin-form">
             <MenuEditor
@@ -342,7 +343,7 @@ export default function AdminNavigation() {
         )}
         action={{ label: t('Tambah tautan', 'Add link'), icon: 'plus', onClick: () => openDocForm(null) }}
       >
-        <DataTable columns={docColumns} rows={docLinks} empty={loading ? t('Memuat...', 'Loading...') : t('Belum ada tautan dokumen.', 'No document links yet.')} />
+        <DataTable columns={docColumns} rows={docLinks} loading={loading} empty={loading ? t('Memuat...', 'Loading...') : t('Belum ada tautan dokumen.', 'No document links yet.')} />
       </AdminCard>
 
       {docFormOpen && (

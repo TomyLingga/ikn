@@ -324,7 +324,7 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
             </button>
           </div>
           <h2>{t('Hai, kami siap membantu Anda', 'Hi, we are here to help')}</h2>
-          <p>{t('Hubungi kami kapan saja, kami membuat segalanya mudah untuk Anda.', 'Reach out any time; we make everything easy for you.')}</p>
+          <p>{t('Tanyakan harga, stok, atau spesifikasi produk. Tim marketing kami membalas langsung di sini.', 'Ask about prices, stock or product specs. Our sales team replies right here.')}</p>
           <button type="button" className={styles.startCard} onClick={() => setStage('form')}>
             <span className={styles.startText}>
               <strong>{t('Kami sedang online', 'We are online')}</strong>

@@ -17,6 +17,7 @@ export default function TimelineSection({ section }: { section: PageSection }) {
   const { lang } = useLang();
   const c = section.content as TimelineContent;
   const items = asList<TimelineContent['items'][number]>(c.items);
+  const startNewest = c.start === 'newest';
   const track = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ start: true, end: true });
 
@@ -25,6 +26,8 @@ export default function TimelineSection({ section }: { section: PageSection }) {
     const el = track.current;
     if (!el) return;
     const update = () => setEdge({ start: el.scrollLeft <= 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 });
+    // Posisi awal 'newest': mulai dari tonggak terbaru di ujung kanan (urutan tetap lama → baru), pengunjung menggeser ke kiri.
+    if (startNewest) el.scrollLeft = el.scrollWidth;
     update();
     el.addEventListener('scroll', update, { passive: true });
     const observer = new ResizeObserver(update);
@@ -33,7 +36,7 @@ export default function TimelineSection({ section }: { section: PageSection }) {
       el.removeEventListener('scroll', update);
       observer.disconnect();
     };
-  }, [items.length]);
+  }, [items.length, startNewest]);
 
   function scrollBy(direction: -1 | 1) {
     const el = track.current;

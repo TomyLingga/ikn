@@ -6,6 +6,7 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import type { IconName } from '@/lib/types';
 import Select from '@/components/Select';
+import Spinner from '@/components/Spinner';
 
 // Header standar tiap halaman admin: judul, deskripsi, dan tombol aksi opsional.
 interface AdminPageHeadProps {
@@ -52,6 +53,8 @@ interface DataTableProps<T> {
   columns: Column<T>[];
   rows: T[];
   empty?: ReactNode;
+  /** Sedang memuat: tanpa baris = ikon loading + teks `empty`; dengan baris = bilah kemajuan di atas tabel. */
+  loading?: boolean;
   rowKey?: keyof T;
   pagination?: boolean;
   defaultPageSize?: number;
@@ -64,6 +67,7 @@ export function DataTable<T extends object>({
   columns,
   rows,
   empty = 'Belum ada data.',
+  loading = false,
   rowKey = 'id' as keyof T,
   pagination = true,
   defaultPageSize = 10,
@@ -76,6 +80,14 @@ export function DataTable<T extends object>({
   const [sort, setSort] = useState<TableSort | null>(defaultSort ?? null);
 
   if (!rows || rows.length === 0) {
+    if (loading) {
+      return (
+        <div className="admin-empty admin-loading">
+          <Spinner block size={30} label={typeof empty === 'string' ? empty : undefined} />
+          {typeof empty !== 'string' && empty}
+        </div>
+      );
+    }
     return <div className="admin-empty">{empty}</div>;
   }
 
@@ -113,7 +125,8 @@ export function DataTable<T extends object>({
 
   return (
     <div>
-      <div className="admin-table-wrap">
+      <div className={`admin-table-wrap${loading ? ' is-loading' : ''}`} aria-busy={loading || undefined}>
+        {loading && <span className="admin-table-progress" aria-hidden="true" />}
         <table className="admin-table admin-table-cards">
           <thead>
             <tr>
@@ -146,7 +159,7 @@ export function DataTable<T extends object>({
           </thead>
           <tbody>
             {visibleRows.map((row, i) => (
-              <tr key={(row[rowKey] as Key) ?? i}>
+              <tr key={(row[rowKey] as Key) ?? i} style={{ '--i': i } as CSSProperties}>
                 {columns.map((c) => (
                   <td key={c.key} data-label={c.label} className={isActionColumn(c.key) ? 'admin-col-actions' : undefined} style={c.align ? { textAlign: c.align as CSSProperties['textAlign'] } : undefined}>
                     {c.render

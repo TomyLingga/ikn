@@ -11,7 +11,7 @@ import { findFieldHelp } from '@/lib/field-help';
 // mengganggu urutan elemen milik React. Field tanpa entri kamus tidak mendapat tombol.
 
 const SCOPES = '.admin-app .field-label, .admin-modal-backdrop .field-label';
-const SKIP = '.admin-toolbar, .admin-filter, .admin-search, .admin-tabs, .admin-tab-groups';
+const SKIP = '.admin-toolbar, .admin-filter, .admin-search, .admin-tabs, .admin-folder';
 const CONTROLS = 'input, select, textarea, button, [contenteditable="true"]';
 
 const helpNodes = new WeakMap<Element, HTMLDivElement>();

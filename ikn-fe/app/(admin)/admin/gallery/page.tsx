@@ -207,7 +207,7 @@ export default function AdminGallery() {
 
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat galeri...', 'Loading gallery...') : t('Belum ada item galeri.', 'No gallery items yet.')} />
+      <DataTable columns={columns} rows={rows} loading={loading} empty={loading ? t('Memuat galeri...', 'Loading gallery...') : t('Belum ada item galeri.', 'No gallery items yet.')} />
 
       {formOpen && (
         <AdminModal title={editingId ? t('Edit item galeri', 'Edit gallery item') : t('Tambah item galeri', 'Add gallery item')} onClose={closeForm}>

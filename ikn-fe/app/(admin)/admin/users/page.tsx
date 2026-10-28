@@ -278,7 +278,7 @@ export default function AdminUsers() {
       {error && <p className="form-error">{error}</p>}
 
       {tab === 'users' && isSuperAdmin && (
-        <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat akun...', 'Loading accounts...') : t('Belum ada akun admin.', 'No admin accounts yet.')} />
+        <DataTable columns={columns} rows={rows} loading={loading} empty={loading ? t('Memuat akun...', 'Loading accounts...') : t('Belum ada akun admin.', 'No admin accounts yet.')} />
       )}
 
       {tab === 'guide' && (

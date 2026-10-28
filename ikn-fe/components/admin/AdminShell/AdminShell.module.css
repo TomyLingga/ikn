@@ -367,18 +367,22 @@
 .userMeta {
   display: flex;
   flex-direction: column;
-  line-height: 1.15;
+  gap: 3px; /* nama dan peran sebelumnya saling menempel */
+  line-height: 1.2;
 }
 
 .userMeta strong {
   font-size: 0.86rem;
-  font-weight: 600;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .userMeta small {
   color: var(--ink-soft);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .content {

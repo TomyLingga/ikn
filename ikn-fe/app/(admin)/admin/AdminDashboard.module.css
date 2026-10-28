@@ -144,3 +144,20 @@
   .kpiValue { font-size: 1.12rem; }
   .delta { font-size: 0.7rem; }
 }
+
+/* Kartu KPI: muncul bertahap (--i dari urutan kartu) dan terangkat halus saat hover; angkanya berjalan naik (CountUp). */
+.kpiCard {
+  animation: dashCardIn 0.55s var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+  transition: transform 0.22s var(--ease), box-shadow 0.22s var(--ease), border-color 0.22s var(--ease);
+}
+.kpiCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 32px -22px color-mix(in srgb, var(--adm-primary, var(--primary)) 55%, rgba(15, 27, 45, 0.35));
+}
+@keyframes dashCardIn {
+  from { opacity: 0; transform: translateY(12px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpiCard { animation: none; transition: none; }
+}

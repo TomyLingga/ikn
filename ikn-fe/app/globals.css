@@ -351,3 +351,24 @@ p { color: var(--ink-soft); }
   border: 0;
   white-space: nowrap;
 }
+
+/* Tombol selebar wadahnya (mis. Checkout di laci keranjang portal). */
+.btn-full { width: 100%; justify-content: center; }
+
+/* ---------- Spinner (components/Spinner): cincin bergradasi merek, busur memanjang-memendek ---------- */
+.spin { display: inline-flex; align-items: center; gap: 10px; color: var(--ink-soft); font-size: 0.9rem; }
+.spin-block { flex-direction: column; justify-content: center; gap: 12px; padding: 8px 0; }
+.spin-label { line-height: 1.4; }
+.spin-ring { flex: none; animation: spin-rotate 1.4s linear infinite; }
+.spin-track { stroke: color-mix(in srgb, var(--primary) 14%, transparent); }
+.spin-arc { stroke-dasharray: 120; stroke-dashoffset: 90; transform-origin: 50% 50%; animation: spin-dash 1.6s var(--ease) infinite; }
+@keyframes spin-rotate { to { transform: rotate(360deg); } }
+@keyframes spin-dash {
+  0% { stroke-dashoffset: 105; transform: rotate(0deg); }
+  50% { stroke-dashoffset: 40; transform: rotate(120deg); }
+  100% { stroke-dashoffset: 105; transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin-ring { animation-duration: 3s; }
+  .spin-arc { animation: none; stroke-dashoffset: 70; }
+}

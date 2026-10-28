@@ -64,7 +64,7 @@ class PostCategoryTest extends TestCase
 
         $list = $this->getJson('/api/v1/content/news')->assertOk()->json('data');
         $this->assertNotEmpty($list);
-        $this->assertSame('produk', $list[0]['category']['slug']);
+        $this->assertSame('berita-perusahaan', $list[0]['category']['slug']); // terbaru: panduan cara memesan
         $this->assertGreaterThanOrEqual(3, PostCategory::count());
     }
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage, type Envelope } from '@/lib/api';
 import { tr } from '@/lib/cms';
@@ -132,7 +133,7 @@ export default function NotificationBell({ unread }: NotificationBellProps) {
             {!error && items.length === 0 && (
               <div className={styles.empty}>
                 <Icon name="bell" size={30} strokeWidth={1.3} />
-                <p>{loading ? t('Memuat notifikasi…', 'Loading notifications…') : t('Belum ada notifikasi. Update pesanan dan akun Anda akan muncul di sini.', 'No notifications yet. Updates on your orders and account will show up here.')}</p>
+                <p>{loading ? <Spinner label={t('Memuat notifikasi…', 'Loading notifications…')} /> : t('Belum ada notifikasi. Update pesanan dan akun Anda akan muncul di sini.', 'No notifications yet. Updates on your orders and account will show up here.')}</p>
               </div>
             )}
             {items.map((item) => (
@@ -150,7 +151,7 @@ export default function NotificationBell({ unread }: NotificationBellProps) {
             ))}
             {page < lastPage && (
               <button type="button" className={styles.more} onClick={() => void load(page + 1)} disabled={loading}>
-                {loading ? t('Memuat…', 'Loading…') : t('Muat lebih banyak', 'Load more')}
+                {loading ? <Spinner size={16} label={t('Memuat…', 'Loading…')} /> : t('Muat lebih banyak', 'Load more')}
               </button>
             )}
           </div>

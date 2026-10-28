@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import Reveal from '@/components/Reveal';
+import CountUp from '@/components/CountUp';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
@@ -28,7 +29,7 @@ export default function StatsSection({ section }: { section: PageSection }) {
             {items.map((s, i) => (
               <Reveal key={i} className="datacell" delay={i * 70}>
                 <div className="datacell-num">
-                  {asText(s.value)}
+                  <CountUp text={asText(s.value)} delay={i * 70} />
                   {asText(s.unit) && <span className="datacell-unit">{asText(s.unit)}</span>}
                 </div>
                 <p className="datacell-label">{tr(s.label, lang)}</p>

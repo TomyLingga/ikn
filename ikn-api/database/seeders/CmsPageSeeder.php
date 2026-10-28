@@ -30,36 +30,36 @@ class CmsPageSeeder extends Seeder
 
         return [
             'home' => [
-                'title' => $t('PT Industri Karet Nusantara — Pabrik Karet Industri & Resiprene 35 di Medan', 'PT Industri Karet Nusantara — Industrial Rubber Manufacturer & Resiprene 35, Medan'),
-                'description' => $t('Produsen barang karet industri sejak 1965 di Medan: Resiprene 35 (cyclised rubber), sarung egrek, sepatu boots, rubber membrane. Pesan online langsung dari pabrik.', 'Industrial rubber manufacturer since 1965 in Medan, Indonesia: Resiprene 35 (cyclised rubber), harvesting sickle sheaths, boots, rubber membranes. Order online direct from the factory.'),
+                'title' => $t('Pabrik Karet Industri & Resiprene 35 di Medan | PT IKN', 'Industrial Rubber & Resiprene 35 Maker in Medan | PT IKN'),
+                'description' => $t('Produsen Resiprene 35 dan barang karet industri di Medan sejak 1965: sarung egrek, sepatu boots, packing pintu rebusan. Lihat spesifikasi dan pesan online.', 'Maker of Resiprene 35 and industrial rubber goods in Medan, Indonesia, since 1965: palm sickle covers, rubber boots, sterilizer door packing. Order online.'),
             ],
             'tentang' => [
-                'title' => $t('Tentang PT IKN — Sejarah, Visi Misi & Struktur Organisasi', 'About PT IKN — History, Vision, Mission & Organisation'),
-                'description' => $t('Profil PT Industri Karet Nusantara, anak perusahaan PTPN III: sejarah sejak 1965, visi misi, nilai AKHLAK, dan struktur organisasi pabrik karet di Medan.', 'Profile of PT Industri Karet Nusantara, a PTPN III subsidiary: history since 1965, vision, mission, AKHLAK values and organisation of the Medan rubber plant.'),
+                'title' => $t('Tentang PT IKN: Sejarah Sejak 1965, Visi Misi & Struktur', 'About PT IKN: History Since 1965, Vision & Structure'),
+                'description' => $t('Profil PT Industri Karet Nusantara, anak usaha PTPN III di Medan: sejarah pabrik karet sejak 1965, visi dan misi, nilai AKHLAK, serta struktur organisasi.', 'Profile of PT Industri Karet Nusantara, a PTPN III subsidiary in Medan: rubber plant history since 1965, vision and mission, AKHLAK values and organisation.'),
             ],
             'bisnis' => [
-                'title' => $t('Produk Karet Industri — Resiprene 35 & Aneka Barang Karet', 'Industrial Rubber Products — Resiprene 35 & Rubber Goods'),
-                'description' => $t('Lini bisnis PT IKN: Resiprene 35 untuk cat, tinta, dan coating, serta barang karet industri untuk perkebunan dan pabrik. Lihat spesifikasi, harga, dan pesan online.', 'PT IKN business lines: Resiprene 35 for paints, inks and coatings, and industrial rubber goods for plantations and factories. See specifications, prices and order online.'),
+                'title' => $t('Resiprene 35 & Barang Karet Industri | PT IKN', 'Resiprene 35 & Industrial Rubber Goods | PT IKN'),
+                'description' => $t('Resiprene 35 (karet siklis) untuk cat, tinta, dan coating, serta barang karet untuk perkebunan dan pabrik kelapa sawit. Spesifikasi, cara pesan, dan tanya jawab.', 'Resiprene 35 (cyclised rubber) for paints, inks and coatings, plus rubber goods for plantations and palm oil mills. Specifications, how to order and FAQ.'),
             ],
             'keberlanjutan' => [
-                'title' => $t('Keberlanjutan, Sertifikasi & Pelanggan PT IKN', 'Sustainability, Certifications & Customers of PT IKN'),
-                'description' => $t('Komitmen ESG PT Industri Karet Nusantara: sertifikasi ISO dan REACH, pelanggan industri dalam dan luar negeri, serta saluran Whistle Blowing System.', 'ESG commitment of PT Industri Karet Nusantara: ISO and REACH certifications, domestic and international industrial customers, and the Whistle Blowing System.'),
+                'title' => $t('Sertifikat ISO 37001, REACH & Keberlanjutan | PT IKN', 'ISO 37001, REACH & Sustainability | PT IKN'),
+                'description' => $t('Pilar lingkungan, sosial, dan tata kelola PT Industri Karet Nusantara, sertifikat ISO 37001 dan REACH, pelanggan industri, serta Whistle Blowing System.', 'Environmental, social and governance pillars of PT Industri Karet Nusantara, ISO 37001 and REACH certificates, industrial customers and the Whistle Blowing System.'),
             ],
             'media' => [
-                'title' => $t('Media PT IKN — Berita, Galeri & Unduhan Brosur', 'PT IKN Media — News, Gallery & Brochure Downloads'),
-                'description' => $t('Kabar terbaru, galeri foto dan video produksi, serta brosur produk karet PT Industri Karet Nusantara yang dapat diunduh.', 'Latest news, production photo and video gallery, and downloadable rubber product brochures from PT Industri Karet Nusantara.'),
+                'title' => $t('Berita, Galeri & Brosur Produk Karet | PT IKN', 'News, Gallery & Rubber Product Brochures | PT IKN'),
+                'description' => $t('Berita perusahaan, foto dan video pabrik, serta brosur produk karet PT Industri Karet Nusantara yang bisa diunduh dalam format PDF.', 'Company news, plant photos and videos, and PT Industri Karet Nusantara rubber product brochures to download as PDF.'),
             ],
             'berita' => [
-                'title' => $t('Berita & Artikel Industri Karet — PT IKN', 'Rubber Industry News & Articles — PT IKN'),
-                'description' => $t('Berita perusahaan, kegiatan, dan artikel seputar industri karet hilir dari PT Industri Karet Nusantara, Medan.', 'Company news, activities and downstream rubber industry articles from PT Industri Karet Nusantara, Medan.'),
+                'title' => $t('Berita & Artikel Industri Karet | PT IKN', 'Rubber Industry News & Articles | PT IKN'),
+                'description' => $t('Kabar perusahaan dan artikel tentang Resiprene 35, barang karet industri, serta cara memesan produk dari PT Industri Karet Nusantara di Medan.', 'Company news and articles on Resiprene 35, industrial rubber goods and how to order products from PT Industri Karet Nusantara in Medan.'),
             ],
             'galeri' => [
-                'title' => $t('Galeri Foto & Video Pabrik Karet PT IKN', 'PT IKN Rubber Plant Photo & Video Gallery'),
-                'description' => $t('Dokumentasi foto dan video pabrik, proses produksi, dan kegiatan PT Industri Karet Nusantara.', 'Photos and videos of the plant, production process and activities of PT Industri Karet Nusantara.'),
+                'title' => $t('Galeri Foto & Video Pabrik Karet | PT IKN', 'Rubber Plant Photo & Video Gallery | PT IKN'),
+                'description' => $t('Foto dan video pabrik barang karet di Tanjung Morawa, pabrik Resiprene di Sei Bamban, dan kegiatan PT Industri Karet Nusantara.', 'Photos and videos of the rubber goods plant in Tanjung Morawa, the Resiprene plant in Sei Bamban and PT Industri Karet Nusantara activities.'),
             ],
             'kontak' => [
-                'title' => $t('Kontak PT IKN — Alamat Pabrik, WhatsApp & Penawaran Harga', 'Contact PT IKN — Plant Address, WhatsApp & Price Quotes'),
-                'description' => $t('Hubungi PT Industri Karet Nusantara di Jl. Medan–Tanjung Morawa Km 9,5 Medan: telepon, email, WhatsApp marketing, dan formulir permintaan penawaran.', 'Contact PT Industri Karet Nusantara at Jl. Medan–Tanjung Morawa Km 9.5, Medan: phone, email, marketing WhatsApp and quote request form.'),
+                'title' => $t('Kontak & Permintaan Penawaran Harga | PT IKN', 'Contact & Price Quotes | PT IKN'),
+                'description' => $t('Alamat kantor dan pabrik PT Industri Karet Nusantara di Jl. Medan Tanjung Morawa Km 9,5, telepon, email, WhatsApp marketing, dan formulir permintaan penawaran.', 'Office and plant address of PT Industri Karet Nusantara on Jl. Medan Tanjung Morawa Km 9.5, phone, email, sales WhatsApp and the quote request form.'),
             ],
         ];
     }
@@ -95,7 +95,7 @@ class CmsPageSeeder extends Seeder
         return [
             'home' => [
                 'title' => $t('Beranda', 'Home'),
-                'description' => $t('PT Industri Karet Nusantara — hilir karet berkualitas sejak 1965.', 'PT Industri Karet Nusantara — quality downstream rubber since 1965.'),
+                'description' => $t('PT Industri Karet Nusantara, produsen Resiprene 35 dan barang karet industri sejak 1965.', 'PT Industri Karet Nusantara, maker of Resiprene 35 and industrial rubber goods since 1965.'),
                 'sections' => [
                     ['key' => 'hero', 'type' => 'hero', 'content' => [
                         'meta' => [
@@ -103,8 +103,8 @@ class CmsPageSeeder extends Seeder
                             ['text' => $t('Anak usaha PT Perkebunan Nusantara III', 'Subsidiary of PT Perkebunan Nusantara III'), 'color' => ''],
                             ['text' => $t('Medan, Sumatera Utara', 'Medan, North Sumatra'), 'color' => ''],
                         ],
-                        'title' => $t("Menghadirkan\nProduk Karet Berkualitas\nuntuk Industri Global", "Delivering\nQuality Rubber Products\nfor Global Industries"),
-                        'subtitle' => $t('PT Industri Karet Nusantara adalah perusahaan mapan yang berspesialisasi dalam produk hilir karet.', 'PT Industri Karet Nusantara is a well-established company specializing in downstream rubber products.'),
+                        'title' => $t("Barang karet industri\ndan Resiprene 35\nlangsung dari pabrik", "Industrial rubber goods\nand Resiprene 35\nstraight from the factory"),
+                        'subtitle' => $t('Kami mengolah karet alam Sumatera Utara menjadi Resiprene 35 untuk industri cat serta barang karet untuk perkebunan dan pabrik kelapa sawit. Pelanggan perusahaan bisa melihat harga dan memesan secara online.', 'We turn North Sumatra natural rubber into Resiprene 35 for the paint industry and rubber goods for plantations and palm oil mills. Business customers can see prices and order online.'),
                         'buttons' => [
                             ['label' => $t('Lihat produk', 'View products'), 'url' => '/bisnis', 'style' => 'solid', 'profile_document' => false, 'new_tab' => false],
                             ['label' => $t('Profil perusahaan', 'Company profile'), 'url' => '/tentang', 'style' => 'outline', 'profile_document' => true, 'new_tab' => false],
@@ -128,49 +128,58 @@ class CmsPageSeeder extends Seeder
                     ]],
                     ['key' => 'capabilities', 'type' => 'capabilities', 'content' => [
                         'label' => $t('/ Kenapa IKN', '/ Why IKN'),
-                        'heading' => $t('Tiga hal yang membuat produk kami konsisten dari batch ke batch.', 'Three things that keep our products consistent batch after batch.'),
+                        'heading' => $t('Alasan pelanggan industri memesan dari kami.', 'Why industrial buyers order from us.'),
                         'items' => [
-                            ['icon' => 'leaf', 'title' => $t('Bahan baku lokal', 'Local raw materials'), 'body' => $t('Karet alam Sumatera Utara diolah menjadi produk hilir bernilai tambah tinggi, dekat dengan sumber kebun.', 'North Sumatra natural rubber processed into high value-added downstream products, close to the plantations.')],
-                            ['icon' => 'flask', 'title' => $t('Mutu terkontrol', 'Controlled quality'), 'body' => $t('Setiap tahap produksi melewati kontrol kualitas agar hasil akhir konsisten dan sesuai standar.', 'Every production stage passes quality control so the final result is consistent and to standard.')],
-                            ['icon' => 'handshake', 'title' => $t('Kemitraan global', 'Global partnerships'), 'body' => $t('Membangun kerja sama saling menguntungkan dengan pelanggan dan pemangku kepentingan lintas negara.', 'Building mutually beneficial cooperation with customers and stakeholders across countries.')],
+                            ['icon' => 'leaf', 'title' => $t('Karet alam Sumatera Utara', 'North Sumatra natural rubber'), 'body' => $t('Bahan baku karet alam berasal dari Sumatera Utara, dekat dengan pabrik kami di Tanjung Morawa dan Sei Bamban.', 'Our natural rubber comes from North Sumatra, close to our plants in Tanjung Morawa and Sei Bamban.')],
+                            ['icon' => 'flask', 'title' => $t('Spesifikasi yang terukur', 'Measured specifications'), 'body' => $t('Softening point, viskositas, warna, dan acid value Resiprene 35 tercantum di katalog dan brosur. Pabrik punya laboratorium analisis sendiri.', 'Softening point, viscosity, colour and acid value of Resiprene 35 are listed in the catalog and brochure. The plant runs its own analysis lab.')],
+                            ['icon' => 'bag', 'title' => $t('Pesan langsung dari pabrik', 'Order direct from the factory'), 'body' => $t('Harga, stok, dan minimum order tampil di katalog setelah login. Bayar lewat transfer bank atau QRIS, lalu pantau pengiriman dengan nomor resi.', 'Prices, stock and minimum order show in the catalog after login. Pay by bank transfer or QRIS, then track the shipment with its tracking number.')],
                         ],
                     ]],
                     ['key' => 'products', 'type' => 'product_highlights', 'content' => [
                         'label' => $t('/ Lini produk', '/ Product lines'),
-                        'heading' => $t('Produk andalan kami.', 'Our flagship products.'),
+                        'heading' => $t('Produk utama kami.', 'Our main products.'),
                         'link_label' => $t('Semua produk', 'All products'),
                         'link_url' => '/bisnis',
                         'items' => [
-                            ['code' => 'IKN-PRD-001', 'name' => 'Sarung Egrek', 'kind' => 'Rubber Articles', 'url' => '/bisnis#sarung-egrek', 'summary' => $t('Sarung pelindung pisau egrek kelapa sawit berbahan karet alam berkualitas tinggi untuk keselamatan kerja panen dan perlindungan mata pisau.', 'Protective sheath for oil palm harvesting sickles made of high quality natural rubber, for harvest safety and blade protection.')],
-                            ['code' => 'IKN-PRD-002', 'name' => 'Sepatu Boots', 'kind' => 'Rubber Articles', 'url' => '/bisnis#sepatu-boots', 'summary' => $t('Sepatu boots karet industri dan perkebunan standar mutu tinggi dengan logo Rubin PTPN. Tahan air, anti-slip, fleksibel, dan kuat di medan berat.', 'High quality industrial and plantation rubber boots with the Rubin PTPN logo. Waterproof, anti-slip, flexible, and tough on rough terrain.')],
-                            ['code' => 'RSP-35', 'name' => 'Resiprene 35', 'kind' => 'Cyclised Natural Rubber', 'url' => '/bisnis#resiprene-35', 'summary' => $t('Karet alam tersiklisasi dalam bentuk padatan kristal amber dengan kelarutan sangat baik pada pelarut tak berbau. Bahan andalan untuk cat pelindung, coating perawatan, dan cat marine.', 'Cyclised natural rubber in amber crystalline solid form with excellent solubility in odourless solvents. A staple for protective paints, maintenance coatings, and marine paints.')],
+                            ['code' => 'IKN-PRD-001', 'name' => 'Sarung Egrek', 'kind' => 'Rubber Articles', 'url' => '/bisnis#sarung-egrek', 'summary' => $t('Sarung karet untuk pisau egrek kelapa sawit. Karet alam tebal dengan klip pengunci melindungi pemanen dan mata pisau saat egrek dibawa.', 'Rubber sheath for oil palm harvesting sickles. Thick natural rubber with a locking clip protects harvesters and the blade while the sickle is carried.')],
+                            ['code' => 'IKN-PRD-002', 'name' => 'Sepatu Boots', 'kind' => 'Rubber Articles', 'url' => '/bisnis#sepatu-boots', 'summary' => $t('Sepatu boots karet berlogo Rubin PTPN untuk perkebunan dan pabrik. Tahan air dan lumpur, bersol anti-slip, dan nyaman dipakai seharian.', 'Rubin PTPN rubber boots for plantations and factories. Water and mud resistant, with an anti-slip sole, comfortable for a full shift.')],
+                            ['code' => 'RSP-35', 'name' => 'Resiprene 35', 'kind' => 'Cyclised Natural Rubber', 'url' => '/bisnis#resiprene-35', 'summary' => $t('Karet alam tersiklisasi berupa serpihan kristal amber yang larut sempurna dalam white spirit dan pelarut tak berbau. Dipakai untuk cat pelindung, coating perawatan, cat kapal, dan tinta.', 'Cyclised natural rubber in amber crystal flakes that dissolve fully in white spirit and odourless solvents. Used in protective paints, maintenance coatings, marine paints and inks.')],
                         ],
                     ]],
                     ['key' => 'videos', 'type' => 'video_gallery', 'content' => [
                         'label' => $t('/ Galeri video', '/ Video gallery'),
                         'heading' => $t('Lihat proses dan profil kami.', 'See our process and profile.'),
                         'videos' => [
-                            ['youtube_id' => 'FGJQW6l2hrk', 'title' => $t('Company Profile — PT Industri Karet Nusantara', 'Company Profile — PT Industri Karet Nusantara'), 'desc' => $t('Gambaran fasilitas produksi, sejarah, visi, misi, dan kontribusi PT IKN dalam rantai pasok hilirisasi karet.', 'An overview of production facilities, history, vision, mission, and PT IKN’s contribution to the downstream rubber supply chain.')],
-                            ['youtube_id' => '-CSAwkNrNzY', 'title' => $t('Proses Pengolahan & Mutu Produk Hilir', 'Processing & Quality of Downstream Products'), 'desc' => $t('Liputan pengolahan karet alam menjadi Resiprene 35 dan aneka barang karet bermutu tinggi.', 'Coverage of processing natural rubber into Resiprene 35 and high quality rubber articles.')],
+                            ['youtube_id' => 'FGJQW6l2hrk', 'title' => $t('Company Profile PT Industri Karet Nusantara', 'PT Industri Karet Nusantara company profile'), 'desc' => $t('Fasilitas produksi, sejarah, serta visi dan misi PT IKN.', 'Production facilities, history, and the vision and mission of PT IKN.')],
                         ],
                     ]],
+                    ['key' => 'news', 'type' => 'latest_news', 'content' => [
+                        'label' => $t('/ Artikel', '/ Articles'),
+                        'heading' => $t('Kabar dan panduan produk.', 'News and product guides.'),
+                        'count' => 3,
+                        'link_label' => $t('Semua berita', 'All news'),
+                        'link_url' => '/berita',
+                    ]],
                     ['key' => 'cta', 'type' => 'cta', 'content' => [
-                        'label' => $t('/ Mari bekerja sama', '/ Let’s work together'),
-                        'title' => $t('Punya kebutuhan produk karet? Ceritakan pada kami.', 'Need rubber products? Tell us about it.'),
+                        'label' => $t('/ Mari bekerja sama', '/ Work with us'),
+                        'title' => $t('Punya kebutuhan produk karet? Ceritakan pada kami.', 'Need rubber products? Tell us what you need.'),
+                        'body' => $t('Sebutkan jenis produk, ukuran, dan jumlahnya. Tim marketing akan membalas dengan harga dan waktu pengerjaan.', 'Tell us the product, size and quantity. Our sales team will reply with a price and lead time.'),
                         'button_label' => $t('Hubungi kami', 'Contact us'),
                         'button_url' => '/kontak',
+                        'secondary_label' => $t('Buka katalog', 'Open catalog'),
+                        'secondary_url' => '/catalog',
                     ]],
                 ],
             ],
 
             'tentang' => [
                 'title' => $t('Tentang Kami', 'About Us'),
-                'description' => $t('Profil PT Industri Karet Nusantara — sejarah sejak 1965, visi, misi, dan nilai AKHLAK.', 'Profile of PT Industri Karet Nusantara — history since 1965, vision, mission, and AKHLAK values.'),
+                'description' => $t('Profil PT Industri Karet Nusantara: sejarah sejak 1965, visi, misi, dan nilai AKHLAK.', 'Profile of PT Industri Karet Nusantara: history since 1965, vision, mission and AKHLAK values.'),
                 'sections' => [
                     ['key' => 'header', 'type' => 'page_header', 'content' => [
-                        'label' => $t('/ 01 — Tentang', '/ 01 — About'),
-                        'title' => $t('Berpengalaman sejak 1965.', 'Experienced since 1965.'),
-                        'lead' => $t('PT Industri Karet Nusantara adalah perusahaan hilir karet yang mapan, anak perusahaan PT Perkebunan Nusantara III, berbasis di Medan, Sumatera Utara.', 'PT Industri Karet Nusantara is an established downstream rubber company, a subsidiary of PT Perkebunan Nusantara III, based in Medan, North Sumatra.'),
+                        'label' => $t('/ 01 Tentang', '/ 01 About'),
+                        'title' => $t('Mengolah karet alam sejak 1965.', 'Processing natural rubber since 1965.'),
+                        'lead' => $t('PT Industri Karet Nusantara adalah anak perusahaan PT Perkebunan Nusantara III yang memproduksi Resiprene 35 dan barang karet industri di Sumatera Utara, dengan kantor pusat di Medan.', 'PT Industri Karet Nusantara is a subsidiary of PT Perkebunan Nusantara III that makes Resiprene 35 and industrial rubber goods in North Sumatra, headquartered in Medan.'),
                         'media' => self::headerMedia(['kantor-direksi.png', 'pabrik-2-1.png']),
                         'interval' => 6,
                         'layout' => 'split',
@@ -178,10 +187,10 @@ class CmsPageSeeder extends Seeder
                     ]],
                     ['key' => 'profile', 'type' => 'text_visual', 'content' => [
                         'label' => $t('/ Profil', '/ Profile'),
-                        'heading' => $t('Dari kebun karet Nusantara ke industri hilir.', 'From Nusantara rubber plantations to downstream industry.'),
+                        'heading' => $t('Dari pabrik ban sepeda ke Resiprene 35.', 'From a bicycle tyre factory to Resiprene 35.'),
                         'body' => $t(
-                            "Berdiri dan berkembang sejak 1965, IKN mengolah kekayaan karet alam Indonesia menjadi produk hilir bernilai tambah tinggi — mulai dari Resiprene 35 hingga beragam barang karet industri.\n\nSebagai bagian dari PT Perkebunan Nusantara III, kami menjunjung tata kelola perusahaan yang baik serta terus berinovasi mengikuti kebutuhan pasar global.",
-                            "Established and growing since 1965, IKN turns Indonesia’s natural rubber into high value-added downstream products — from Resiprene 35 to a range of industrial rubber articles.\n\nAs part of PT Perkebunan Nusantara III, we uphold good corporate governance and keep innovating to meet global market needs."
+                            "Pabrik ini berawal pada 1965 sebagai Pabrik Ban Sepeda TAVIP di Sumatera Utara. Pengelolanya berganti beberapa kali, dari DATAK, PT Perkebunan II, hingga PT Perkebunan Nusantara III, sampai menjadi PT Industri Karet Nusantara pada 4 April 2006.\n\nSekarang kami memproduksi Resiprene 35 di pabrik Sei Bamban, Serdang Bedagai, dan barang karet industri di pabrik Tanjung Morawa, dari karet alam Sumatera Utara.",
+                            "The plant started in 1965 as the TAVIP Bicycle Tyre Factory in North Sumatra. It changed hands several times, from DATAK and PT Perkebunan II to PT Perkebunan Nusantara III, and became PT Industri Karet Nusantara on 4 April 2006.\n\nToday we make Resiprene 35 at the Sei Bamban plant in Serdang Bedagai and industrial rubber goods at the Tanjung Morawa plant, from North Sumatra natural rubber."
                         ),
                         'button_label' => $t('', ''), 'button_url' => '',
                         'visual_label' => '/ Est. 1965', 'visual_mark' => 'IKN',
@@ -208,7 +217,7 @@ class CmsPageSeeder extends Seeder
                     self::orgChartSection($t),
                     ['key' => 'values', 'type' => 'values', 'content' => [
                         'label' => $t('/ Nilai inti', '/ Core values'),
-                        'heading' => $t('AKHLAK — cara kami bekerja.', 'AKHLAK — how we work.'),
+                        'heading' => $t('AKHLAK, cara kami bekerja.', 'AKHLAK: how we work.'),
                         'items' => [
                             ['title' => $t('Amanah', 'Amanah (Trust)'), 'body' => $t('Memegang teguh kepercayaan yang diberikan.', 'Holding firmly to the trust given.')],
                             ['title' => $t('Kompeten', 'Kompeten (Competence)'), 'body' => $t('Terus belajar dan mengembangkan kapabilitas.', 'Continuously learning and developing capabilities.')],
@@ -223,12 +232,12 @@ class CmsPageSeeder extends Seeder
 
             'kontak' => [
                 'title' => $t('Kontak', 'Contact'),
-                'description' => $t('Hubungi PT Industri Karet Nusantara — lokasi kantor, pabrik, email, dan media sosial.', 'Contact PT Industri Karet Nusantara — office and plant locations, email, and social media.'),
+                'description' => $t('Hubungi PT Industri Karet Nusantara: lokasi kantor dan pabrik, email, serta media sosial.', 'Contact PT Industri Karet Nusantara: office and plant locations, email and social media.'),
                 'sections' => [
                     ['key' => 'header', 'type' => 'page_header', 'content' => [
                         'label' => $t('/ Kontak', '/ Contact'),
-                        'title' => $t('Mari terhubung.', 'Let’s connect.'),
-                        'lead' => $t('Punya pertanyaan seputar produk, kemitraan, atau kunjungan pabrik? Tim kami siap membantu.', 'Questions about products, partnerships, or plant visits? Our team is ready to help.'),
+                        'title' => $t('Hubungi tim marketing PT IKN.', 'Talk to the PT IKN sales team.'),
+                        'lead' => $t('Tanyakan harga, spesifikasi teknis, atau jadwal kunjungan pabrik. Isi formulir di bawah, hubungi WhatsApp marketing, atau datang ke kantor kami di Jl. Medan Tanjung Morawa Km 9,5.', 'Ask about prices, technical specifications or a plant visit. Use the form below, message our sales WhatsApp, or visit our office on Jl. Medan Tanjung Morawa Km 9.5.'),
                         'media' => self::headerMedia(['kantor-direksi.png']),
                         'interval' => 6,
                         'layout' => 'split',
@@ -259,7 +268,7 @@ class CmsPageSeeder extends Seeder
 
             'keberlanjutan' => [
                 'title' => $t('Keberlanjutan', 'Sustainability'),
-                'description' => $t('Komitmen keberlanjutan PT Industri Karet Nusantara — lingkungan, sosial, tata kelola, sertifikat, pelanggan, REACH, dan whistle blowing.', 'PT Industri Karet Nusantara’s sustainability commitment — environment, social, governance, certificates, customers, REACH, and whistle blowing.'),
+                'description' => $t('Keberlanjutan PT Industri Karet Nusantara: lingkungan, sosial, tata kelola, sertifikat, pelanggan, REACH, dan whistle blowing.', 'Sustainability at PT Industri Karet Nusantara: environment, social, governance, certificates, customers, REACH and whistle blowing.'),
                 'sections' => self::sustainabilitySections($t, $reachUrl),
             ],
 
@@ -273,16 +282,16 @@ class CmsPageSeeder extends Seeder
                 'title' => $t('Galeri', 'Gallery'),
                 'description' => $t('Galeri foto dan video fasilitas produksi PT Industri Karet Nusantara.', 'Photo and video gallery of PT Industri Karet Nusantara’s production facilities.'),
                 'sections' => [
-                    ['key' => 'header', 'type' => 'page_header', 'content' => ['label' => $t('/ Media — Galeri', '/ Media — Gallery'), 'title' => $t('Galeri foto & video.', 'Photo & video gallery.'), 'lead' => $t('Cuplikan fasilitas produksi, bahan baku, dan proses hilirisasi karet di PT Industri Karet Nusantara.', 'Glimpses of production facilities, raw materials, and downstream rubber processing at PT Industri Karet Nusantara.'), 'breadcrumb' => false]],
+                    ['key' => 'header', 'type' => 'page_header', 'content' => ['label' => $t('/ Media: Galeri', '/ Media: Gallery'), 'title' => $t('Galeri foto & video.', 'Photo & video gallery.'), 'lead' => $t('Cuplikan fasilitas produksi, bahan baku, dan proses hilirisasi karet di PT Industri Karet Nusantara.', 'Glimpses of production facilities, raw materials, and downstream rubber processing at PT Industri Karet Nusantara.'), 'breadcrumb' => false]],
                     ['key' => 'gallery', 'type' => 'gallery', 'content' => ['photos_label' => $t('/ Foto', '/ Photos'), 'videos_label' => $t('/ Video', '/ Videos'), 'empty_text' => $t('Belum ada media yang dipublikasikan.', 'No media published yet.')]],
                 ],
             ],
 
             'berita' => [
                 'title' => $t('Berita', 'News'),
-                'description' => $t('Kabar terbaru dari PT Industri Karet Nusantara — kegiatan, produk, dan perkembangan perusahaan.', 'Latest news from PT Industri Karet Nusantara — activities, products, and company developments.'),
+                'description' => $t('Kabar terbaru dari PT Industri Karet Nusantara tentang kegiatan, produk, dan perusahaan.', 'Latest news from PT Industri Karet Nusantara on activities, products and the company.'),
                 'sections' => [
-                    ['key' => 'header', 'type' => 'page_header', 'content' => ['label' => $t('/ Media — Berita', '/ Media — News'), 'title' => $t('Berita perusahaan.', 'Company news.'), 'lead' => $t('Informasi terbaru mengenai perusahaan, produk, kegiatan, dan kemitraan PT Industri Karet Nusantara.', 'The latest on the company, products, activities, and partnerships of PT Industri Karet Nusantara.'), 'breadcrumb' => false]],
+                    ['key' => 'header', 'type' => 'page_header', 'content' => ['label' => $t('/ Media: Berita', '/ Media: News'), 'title' => $t('Berita perusahaan.', 'Company news.'), 'lead' => $t('Informasi terbaru mengenai perusahaan, produk, kegiatan, dan kemitraan PT Industri Karet Nusantara.', 'The latest on the company, products, activities, and partnerships of PT Industri Karet Nusantara.'), 'breadcrumb' => false]],
                     ['key' => 'list', 'type' => 'news', 'content' => ['empty_text' => $t('Belum ada berita yang dipublikasikan.', 'No news published yet.')]],
                 ],
             ],
@@ -290,7 +299,7 @@ class CmsPageSeeder extends Seeder
             // Halaman Bisnis (/bisnis, dulu /produk): lini bisnis, produk dari katalog (dirender rute FE), tautan lanjutan, CTA.
             'bisnis' => [
                 'title' => $t('Bisnis', 'Business'),
-                'description' => $t('Lini bisnis PT Industri Karet Nusantara — Resiprene 35 (cyclised natural rubber) dan aneka barang karet industri, tersedia di katalog online.', 'PT Industri Karet Nusantara’s business lines — Resiprene 35 (cyclised natural rubber) and industrial rubber articles, available in the online catalog.'),
+                'description' => $t('Lini bisnis PT Industri Karet Nusantara: Resiprene 35 (cyclised natural rubber) dan barang karet industri yang bisa dipesan di katalog online.', 'PT Industri Karet Nusantara business lines: Resiprene 35 (cyclised natural rubber) and industrial rubber goods you can order in the online catalog.'),
                 'sections' => self::businessSections($t),
             ],
         ];
@@ -302,38 +311,50 @@ class CmsPageSeeder extends Seeder
         return [
             ['key' => 'header', 'type' => 'page_header', 'content' => [
                 'label' => $t('/ Bisnis', '/ Business'),
-                'title' => $t('Hilirisasi karet bernilai tambah.', 'Value-added rubber downstreaming.'),
-                'lead' => $t('Dua lini bisnis kami mengolah karet alam Nusantara menjadi bahan baku industri cat serta produk karet siap pakai untuk perkebunan, otomotif, dan infrastruktur.', 'Our two business lines turn Nusantara natural rubber into raw material for the paint industry and ready-to-use rubber products for plantations, automotive, and infrastructure.'),
+                'title' => $t('Resiprene 35 dan barang karet industri.', 'Resiprene 35 and industrial rubber goods.'),
+                'lead' => $t('Pabrik Sei Bamban memproduksi Resiprene 35 untuk industri cat, tinta, dan coating. Pabrik Tanjung Morawa membuat barang karet untuk perkebunan dan pabrik kelapa sawit, dari sarung egrek sampai packing pintu rebusan.', 'The Sei Bamban plant makes Resiprene 35 for the paint, ink and coating industries. The Tanjung Morawa plant makes rubber goods for plantations and palm oil mills, from sickle covers to sterilizer door packing.'),
                 'media' => self::headerMedia(['produksi-karet-1.webp', 'karet-1-1-scaled.jpg']),
                 'interval' => 6,
                 'layout' => 'split',
                 'breadcrumb' => false,
             ]],
             ['key' => 'resiprene-35', 'type' => 'text_visual', 'content' => [
-                'label' => $t('/ Lini bisnis 01 — Resiprene 35', '/ Business line 01 — Resiprene 35'),
+                'label' => $t('/ Lini bisnis 01: Resiprene 35', '/ Business line 01: Resiprene 35'),
                 'heading' => $t('Cyclised natural rubber untuk cat dan coating.', 'Cyclised natural rubber for paints and coatings.'),
                 'body' => $t(
-                    "Resiprene 35 adalah karet alam tersiklisasi berbentuk padatan kristal amber dengan kelarutan sangat baik pada pelarut tak berbau. Bahan andalan untuk cat pelindung, coating perawatan, cat marine, dan tinta cetak.\n\nDiproduksi di pabrik Sei Bamban dengan kontrol mutu laboratorium bersertifikat dan telah memenuhi kepatuhan REACH untuk pasar Eropa.",
-                    "Resiprene 35 is cyclised natural rubber in amber crystalline solid form with excellent solubility in odourless solvents. A staple for protective paints, maintenance coatings, marine paints, and printing inks.\n\nProduced at the Sei Bamban plant under certified laboratory quality control and REACH-compliant for the European market."
+                    "Resiprene 35 adalah karet alam tersiklisasi berupa padatan kristal amber. Bahan ini larut sempurna dalam white spirit, pelarut petroleum 100 sampai 140 °C, dan aromatic oil, sehingga mudah diformulasikan menjadi cat pelindung, coating perawatan, cat kapal, dan tinta cetak.\n\nResiprene 35 diproduksi di pabrik Sei Bamban dengan kontrol mutu laboratorium dan sudah terdaftar REACH untuk pasar Uni Eropa. Penjualan per kilogram dengan minimum order 25 kg.",
+                    "Resiprene 35 is cyclised natural rubber in amber crystalline form. It dissolves fully in white spirit, petroleum solvent 100 to 140 °C and aromatic oil, so it is easy to formulate into protective paints, maintenance coatings, marine paints and printing inks.\n\nResiprene 35 is made at the Sei Bamban plant under laboratory quality control and is REACH registered for the European market. It is sold per kilogram with a 25 kg minimum order."
                 ),
                 'button_label' => $t('Lihat Resiprene 35 di katalog', 'View Resiprene 35 in the catalog'),
-                'button_url' => '/catalog',
+                'button_url' => '/catalog/resiprene-35',
                 'visual_label' => 'Cyclised Natural Rubber',
                 'visual_mark' => 'RSP-35',
             ]],
             ['key' => 'barang-karet', 'type' => 'text_visual', 'content' => [
-                'label' => $t('/ Lini bisnis 02 — Aneka barang karet', '/ Business line 02 — Rubber articles'),
+                'label' => $t('/ Lini bisnis 02: Barang karet', '/ Business line 02: Rubber goods'),
                 'heading' => $t('Produk karet siap pakai untuk perkebunan dan industri.', 'Ready-to-use rubber products for plantations and industry.'),
                 'body' => $t(
-                    "Pabrik barang karet di Tanjung Morawa memproduksi sarung egrek, sepatu boots, dan komponen karet teknis lainnya dari karet alam berkualitas tinggi.\n\nSemua produk dibuat sesuai standar mutu PTPN dan dapat dipesan langsung melalui katalog online oleh pelanggan perusahaan.",
-                    "The rubber articles plant in Tanjung Morawa produces harvesting sickle sheaths, rubber boots, and other technical rubber components from high quality natural rubber.\n\nEvery product is made to PTPN quality standards and can be ordered directly through the online catalog by business customers."
+                    "Pabrik barang karet di Tanjung Morawa membuat sarung egrek, sarung kampak, dan sepatu boots untuk pekerja kebun, serta komponen teknis pabrik kelapa sawit seperti packing pintu rebusan, acting rubber, rubber ring, flange packing, dan flexible joint.\n\nProduk yang ada stoknya bisa langsung dipesan lewat katalog online. Membran filter press, kopling karet, dan komponen berukuran khusus dibuat sesuai gambar teknik melalui permintaan penawaran.",
+                    "The Tanjung Morawa rubber goods plant makes sickle covers, axe sheaths and rubber boots for plantation workers, plus technical parts for palm oil mills such as sterilizer door packing, acting rubber, rubber rings, flange packing and flexible joints.\n\nItems in stock can be ordered straight from the online catalog. Filter press membranes, rubber couplings and custom-size parts are made to your engineering drawing through a quote request."
                 ),
-                'button_label' => $t('Lihat barang karet di katalog', 'View rubber articles in the catalog'),
-                'button_url' => '/catalog',
+                'button_label' => $t('Lihat barang karet di katalog', 'View rubber goods in the catalog'),
+                'button_url' => '/catalog/kategori/rubber-articles',
                 // Panel di kiri agar dua lini bisnis berselang-seling (teks kiri, lalu teks kanan).
                 'image_side' => 'left',
                 'visual_label' => 'Rubber Articles',
                 'visual_mark' => 'IKN-PRD',
+            ]],
+            ['key' => 'cara-pesan', 'type' => 'steps', 'content' => [
+                'label' => $t('/ Cara memesan', '/ How to order'),
+                'heading' => $t('Dari daftar akun sampai barang tiba.', 'From sign-up to delivery.'),
+                'lead' => $t('Pemesanan online terbuka untuk pelanggan perusahaan. Untuk kebutuhan khusus, hubungi tim marketing lewat formulir kontak atau WhatsApp.', 'Online ordering is open to business customers. For special requirements, contact our sales team through the contact form or WhatsApp.'),
+                'items' => [
+                    ['icon' => 'users', 'title' => $t('Daftar akun perusahaan', 'Register a company account'), 'body' => $t('Isi data perusahaan, NPWP, dan PIC, lalu buka tautan verifikasi yang kami kirim ke email Anda.', 'Enter your company details, tax ID and contact person, then open the verification link we send to your email.')],
+                    ['icon' => 'shieldCheck', 'title' => $t('Tunggu persetujuan', 'Wait for approval'), 'body' => $t('Tim kami memeriksa data pendaftaran. Setelah akun disetujui, Anda bisa checkout.', 'Our team checks your registration. Once the account is approved, you can check out.')],
+                    ['icon' => 'bag', 'title' => $t('Pilih produk dan pengiriman', 'Choose products and delivery'), 'body' => $t('Masukkan produk ke keranjang sesuai minimum order, pilih alamat, lalu bandingkan layanan pengiriman beserta ongkirnya.', 'Add products to the cart at or above the minimum order, choose an address, then compare delivery services and their shipping cost.')],
+                    ['icon' => 'wallet', 'title' => $t('Bayar dan unggah bukti', 'Pay and upload proof'), 'body' => $t('Bayar dengan transfer bank atau QRIS, lalu unggah bukti pembayaran. Invoice terbit setelah pembayaran diverifikasi.', 'Pay by bank transfer or QRIS, then upload the payment proof. The invoice is issued once the payment is verified.')],
+                    ['icon' => 'truck', 'title' => $t('Pantau sampai diterima', 'Track until it arrives'), 'body' => $t('Status pesanan dan nomor resi tampil di dashboard. Setelah barang diterima, selesaikan pesanan dan beri ulasan.', 'Order status and the tracking number show in your dashboard. When the goods arrive, complete the order and leave a review.')],
+                ],
             ]],
             ['key' => 'links', 'type' => 'link_cards', 'content' => [
                 'label' => $t('/ Selanjutnya', '/ Next steps'),
@@ -350,7 +371,21 @@ class CmsPageSeeder extends Seeder
                 'heading' => $t('Brosur & dokumen produk.', 'Product brochures & documents.'),
                 'empty_text' => $t('Belum ada dokumen yang dipublikasikan.', 'No documents published yet.'),
             ]],
-            ['key' => 'cta', 'type' => 'cta', 'content' => ['label' => $t('/ Butuh spesifikasi teknis?', '/ Need technical specifications?'), 'title' => $t('Tim kami bantu memilih grade dan formulasi yang tepat.', 'Our team helps you choose the right grade and formulation.'), 'button_label' => $t('Hubungi kami', 'Contact us'), 'button_url' => '/kontak']],
+            ['key' => 'tanya-jawab', 'type' => 'faq', 'content' => [
+                'label' => $t('/ Tanya jawab', '/ FAQ'),
+                'heading' => $t('Pertanyaan yang sering diajukan.', 'Frequently asked questions.'),
+                'lead' => $t('Belum menemukan jawabannya? Tanyakan lewat live chat di pojok kanan bawah.', 'Did not find your answer? Ask through the live chat in the bottom-right corner.'),
+                'items' => [
+                    ['question' => $t('Siapa yang bisa memesan secara online?', 'Who can order online?'), 'answer' => $t('Pelanggan perusahaan yang sudah mendaftar, memverifikasi email, dan disetujui tim kami. Harga tampil setelah login, dan checkout terbuka setelah akun disetujui.', 'Business customers who have registered, verified their email and been approved by our team. Prices show after login, and checkout opens once the account is approved.')],
+                    ['question' => $t('Berapa minimum order?', 'What is the minimum order?'), 'answer' => $t('Minimum order berbeda per produk dan tertulis di halaman produk. Contohnya Resiprene 35 minimum 25 kg, rubber ring minimum 10 buah, dan sarung egrek bisa dipesan mulai satu buah.', 'The minimum order differs per product and is shown on each product page. For example, Resiprene 35 starts at 25 kg, rubber rings at 10 pieces, and sickle covers can be ordered from one piece.')],
+                    ['question' => $t('Metode pembayaran apa yang tersedia?', 'Which payment methods are available?'), 'answer' => $t('Transfer bank ke rekening perusahaan atau QRIS. Setelah membayar, unggah bukti di halaman pesanan. Tim kami memverifikasinya dan invoice terbit otomatis.', 'Bank transfer to the company account or QRIS. After paying, upload the proof on the order page. Our team verifies it and the invoice is issued automatically.')],
+                    ['question' => $t('Bagaimana ongkos kirim dihitung?', 'How is shipping calculated?'), 'answer' => $t('Ongkir dihitung saat checkout dari zona alamat tujuan, jarak dari pabrik, berat, dan volume kiriman. Tandai lokasi alamat di peta agar semua layanan pengiriman bisa ditawarkan.', 'Shipping is calculated at checkout from the destination zone, distance from the plant, weight and volume. Pin your address on the map so every delivery service can be offered.')],
+                    ['question' => $t('Bisa pesan ukuran atau spesifikasi khusus?', 'Can I order custom sizes or specifications?'), 'answer' => $t('Bisa. Produk bertanda Penawaran, seperti membran filter press, kopling karet, dan flexible joint, dibuat sesuai gambar teknik. Kirim kebutuhan Anda lewat formulir kontak, live chat, atau WhatsApp untuk mendapat penawaran harga.', 'Yes. Products marked Quote, such as filter press membranes, rubber couplings and flexible joints, are made to your engineering drawing. Send your requirements through the contact form, live chat or WhatsApp to get a quote.')],
+                    ['question' => $t('Di mana saya mendapat dokumen teknis Resiprene 35?', 'Where can I get Resiprene 35 technical documents?'), 'answer' => $t('Brosur spesifikasi dan safety data sheet bisa diunduh di bagian Unduhan halaman ini. Sertifikat REACH ada di halaman Keberlanjutan.', 'The specification brochure and safety data sheet can be downloaded in the Downloads section of this page. The REACH certificate is on the Sustainability page.')],
+                    ['question' => $t('Apakah faktur pajak dan surat jalan disediakan?', 'Do you provide tax invoices and delivery notes?'), 'answer' => $t('Ya. Tim kami mengunggah faktur pajak, surat jalan, atau dokumen lain ke halaman pesanan, dan Anda mendapat notifikasi saat dokumen tersedia.', 'Yes. Our team uploads the tax invoice, delivery note or other documents to the order page, and you are notified when they are available.')],
+                ],
+            ]],
+            ['key' => 'cta', 'type' => 'cta', 'content' => ['label' => $t('/ Butuh spesifikasi teknis?', '/ Need technical specifications?'), 'title' => $t('Ceritakan aplikasi dan jumlah yang Anda butuhkan.', 'Tell us your application and the quantity you need.'), 'body' => $t('Tim marketing kami akan menyiapkan penawaran harga dan jadwal pengirimannya.', 'Our sales team will prepare a quote and a delivery schedule.'), 'button_label' => $t('Hubungi kami', 'Contact us'), 'button_url' => '/kontak']],
         ];
     }
 
@@ -396,14 +431,14 @@ class CmsPageSeeder extends Seeder
             ['key' => 'pelanggan', 'type' => 'customer_logos', 'content' => [
                 'label' => $t('/ Pelanggan Kami', '/ Our Customers'),
                 'heading' => $t('Dipercaya lintas industri.', 'Trusted across industries.'),
-                'lead' => $t('Produk Resiprene 35 dan barang karet kami digunakan oleh mitra di industri coating, marine, semen, dan kelapa sawit — di dalam maupun luar negeri.', 'Our Resiprene 35 and rubber articles are used by partners in the coating, marine, cement, and palm oil industries — at home and abroad.'),
+                'lead' => $t('Resiprene 35 dan barang karet kami dipakai mitra di industri coating, marine, semen, dan kelapa sawit, di dalam maupun luar negeri.', 'Our Resiprene 35 and rubber goods are used by partners in the coating, marine, cement and palm oil industries, in Indonesia and abroad.'),
             ]],
             ['key' => 'reach', 'type' => 'text_visual', 'content' => [
                 'label' => $t('/ REACH Compliance', '/ REACH Compliance'),
                 'heading' => $t('Terdaftar REACH untuk ekspor ke Uni Eropa.', 'REACH-registered for export to the European Union.'),
                 'body' => $t(
-                    "REACH (Registration, Evaluation, Authorisation and Restriction of Chemicals) adalah regulasi Uni Eropa untuk memastikan keamanan bahan kimia. Produk Resiprene PT Industri Karet Nusantara telah memenuhi persyaratan registrasi REACH.\n\nKepatuhan ini memperkuat posisi produk kami di pasar ekspor Eropa, khususnya untuk aplikasi coating dan cat marine.",
-                    "REACH (Registration, Evaluation, Authorisation and Restriction of Chemicals) is the European Union regulation that ensures the safety of chemicals. PT Industri Karet Nusantara’s Resiprene products meet the REACH registration requirements.\n\nThis compliance strengthens our position in European export markets, especially for coating and marine paint applications."
+                    "REACH (Registration, Evaluation, Authorisation and Restriction of Chemicals) adalah regulasi Uni Eropa tentang keamanan bahan kimia. Resiprene produksi PT Industri Karet Nusantara telah memenuhi persyaratan registrasi REACH.\n\nDengan registrasi ini Resiprene bisa dipasok ke produsen coating dan cat kapal di Uni Eropa. Sertifikatnya dapat diunduh dari tombol di bawah.",
+                    "REACH (Registration, Evaluation, Authorisation and Restriction of Chemicals) is the European Union regulation on chemical safety. Resiprene made by PT Industri Karet Nusantara meets the REACH registration requirements.\n\nWith this registration Resiprene can be supplied to coating and marine paint makers in the European Union. Download the certificate with the button below."
                 ),
                 'button_label' => $t('Sertifikat REACH', 'REACH certificate'),
                 'button_url' => $reachUrl,

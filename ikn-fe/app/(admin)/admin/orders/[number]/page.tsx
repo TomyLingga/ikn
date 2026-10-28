@@ -562,13 +562,23 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                       </span>
                     )}
                     {payment.proof && (
-                      <span>
-                        {t('Bukti', 'Proof')}:{' '}
-                        <FileLink file={{ url: payment.proof.url || `/api/v1/files/${payment.proof.mediaId}`, name: payment.proof.originalName, mime: payment.proof.mime }} className="link">
-                          {payment.proof.originalName}
-                        </FileLink>{' '}
-                        · {formatDateTime(payment.proof.uploadedAt, lang)}
-                      </span>
+                      <div className={`${styles.proofBox} ${payment.status === 'awaiting_verification' ? styles.proofBoxHot : ''}`}>
+                        {(payment.proof.mime || '').startsWith('image/') ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={payment.proof.url || `/api/v1/files/${payment.proof.mediaId}`} alt="" className={styles.proofThumb} />
+                        ) : (
+                          <span className={styles.proofDoc}>{(payment.proof.mime || '').includes('pdf') ? 'PDF' : t('BERKAS', 'FILE')}</span>
+                        )}
+                        <span className={styles.proofMeta}>
+                          <strong>{t('Bukti pembayaran', 'Payment proof')}</strong>
+                          <small>
+                            {payment.proof.originalName} · {formatDateTime(payment.proof.uploadedAt, lang)}
+                          </small>
+                          <FileLink file={{ url: payment.proof.url || `/api/v1/files/${payment.proof.mediaId}`, name: payment.proof.originalName, mime: payment.proof.mime }} className="btn btn-line btn-sm">
+                            <Icon name="eye" size={15} /> {t('Lihat bukti', 'View proof')}
+                          </FileLink>
+                        </span>
+                      </div>
                     )}
                     {payment.paidAt && (
                       <span>

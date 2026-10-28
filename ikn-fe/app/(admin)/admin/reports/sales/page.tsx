@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
 import StatusBadge from '@/components/StatusBadge';
 import AdminSalesChart from '@/components/admin/AdminSalesChart';
+import CountUp from '@/components/CountUp';
 import { AdminCard, AdminPageHead, DataTable, type Column } from '@/components/admin/AdminPage';
 import { useLang } from '@/components/LanguageProvider';
 import { orderLabel, paymentLabel } from '@/lib/commerce';
@@ -209,39 +210,39 @@ export default function AdminSalesReport() {
       {report && (
         <div aria-busy={loading}>
           <div className="admin-stat-grid admin-stat-grid-4">
-            <div className="admin-stat">
+            <div className="admin-stat" style={{ '--i': 0 } as CSSProperties}>
               <span>{t('Order dibayar', 'Paid orders')}</span>
-              <strong>{report.summary.orders}</strong>
+              <strong><CountUp value={report.summary.orders} /></strong>
             </div>
-            <div className="admin-stat">
+            <div className="admin-stat" style={{ '--i': 1 } as CSSProperties}>
               <span>{t('Total penjualan', 'Total revenue')}</span>
-              <strong>{formatIDR(report.summary.revenue)}</strong>
+              <strong><CountUp value={report.summary.revenue} format={formatIDR} delay={70} /></strong>
             </div>
-            <div className="admin-stat">
+            <div className="admin-stat" style={{ '--i': 2 } as CSSProperties}>
               <span>{t('Rata-rata per order', 'Average per order')}</span>
-              <strong>{formatIDR(report.summary.avgOrder)}</strong>
+              <strong><CountUp value={report.summary.avgOrder} format={formatIDR} delay={140} /></strong>
             </div>
-            <div className="admin-stat">
+            <div className="admin-stat" style={{ '--i': 3 } as CSSProperties}>
               <span>{t('Unit terjual', 'Units sold')}</span>
-              <strong>{report.summary.items}</strong>
+              <strong><CountUp value={report.summary.items} delay={210} /></strong>
             </div>
           </div>
 
           <div className="admin-breakdown">
             <span>
-              Subtotal <b>{formatIDR(report.summary.subtotal)}</b>
+              Subtotal <b><CountUp value={report.summary.subtotal} format={formatIDR} /></b>
             </span>
             <span>
-              {t('Diskon', 'Discount')} <b>−{formatIDR(report.summary.discount)}</b>
+              {t('Diskon', 'Discount')} <b><CountUp value={report.summary.discount} format={(n) => `−${formatIDR(n)}`} /></b>
             </span>
             <span>
-              {t('Ongkir', 'Shipping')} <b>{formatIDR(report.summary.shipping)}</b>
+              {t('Ongkir', 'Shipping')} <b><CountUp value={report.summary.shipping} format={formatIDR} /></b>
             </span>
             <span>
-              {t('Biaya', 'Fees')} <b>{formatIDR(report.summary.fees)}</b>
+              {t('Biaya', 'Fees')} <b><CountUp value={report.summary.fees} format={formatIDR} /></b>
             </span>
             <span>
-              {t('PPN', 'VAT')} <b>{formatIDR(report.summary.tax)}</b>
+              {t('PPN', 'VAT')} <b><CountUp value={report.summary.tax} format={formatIDR} /></b>
             </span>
           </div>
 

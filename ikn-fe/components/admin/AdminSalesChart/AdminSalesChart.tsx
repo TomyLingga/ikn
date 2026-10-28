@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
@@ -100,6 +100,12 @@ export default function AdminSalesChart({
   eyebrow,
 }: AdminSalesChartProps) {
   const { lang } = useLang();
+  // Batang tumbuh dari dasar pada render pertama (kelas barsReady dipasang satu frame setelah mount).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const months = lang === 'en' ? MONTHS_EN : MONTHS_ID;
 
@@ -268,8 +274,8 @@ export default function AdminSalesChart({
             ))}
           </div>
 
-          <div className={styles.bars} role="group" aria-label={`${t('Penjualan bulanan tahun', 'Monthly sales for')} ${year}`}>
-            {yearData.map((point) => {
+          <div className={`${styles.bars} ${ready ? styles.barsReady : ''}`} role="group" aria-label={`${t('Penjualan bulanan tahun', 'Monthly sales for')} ${year}`}>
+            {yearData.map((point, index) => {
               const selected = selectedPoint?.monthIndex === point.monthIndex;
               const active = activePoint?.ym === point.ym;
               return (
@@ -279,6 +285,7 @@ export default function AdminSalesChart({
                   className={`${styles.col} ${selected ? styles.selected : ''} ${active ? styles.active : ''}`}
                   style={
                     {
+                      '--i': index,
                       '--h-revenue': `${Math.min(100, (point.total / revenueTop) * 100)}%`,
                       '--h-orders': `${Math.min(100, (point.orders / ordersTop) * 100)}%`,
                     } as CSSProperties

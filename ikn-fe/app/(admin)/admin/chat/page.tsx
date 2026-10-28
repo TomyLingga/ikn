@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import { ChatComposer, ChatThread } from '@/components/chat';
 import { AdminPageHead } from '@/components/admin/AdminPage';
 import { useLang } from '@/components/LanguageProvider';
@@ -228,7 +229,7 @@ function AdminChat() {
             {conversations.length === 0 && (
               <p className={styles.listEmpty}>
                 {listLoading
-                  ? t('Memuat percakapan…', 'Loading conversations…')
+                  ? <Spinner size={18} label={t('Memuat percakapan…', 'Loading conversations…')} />
                   : q || unreadOnly
                     ? t('Tidak ada percakapan yang cocok.', 'No matching conversations.')
                     : t('Belum ada percakapan. Pesan dari customer akan muncul di sini.', 'No conversations yet. Customer messages will show up here.')}

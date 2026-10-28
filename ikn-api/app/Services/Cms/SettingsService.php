@@ -32,14 +32,14 @@ class SettingsService
         'company.parent' => ['type' => 'text', 'public' => true, 'default' => 'PT Perkebunan Nusantara III'],
         'company.since' => ['type' => 'text', 'public' => true, 'default' => '1965'],
         'company.location' => ['type' => 'text', 'public' => true, 'default' => 'Medan, Sumatera Utara'],
-        'company.tagline' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'Menghilirkan karet Nusantara jadi produk kelas dunia.', 'en' => 'Turning Nusantara rubber into world-class products.']],
+        'company.tagline' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'Resiprene 35 dan barang karet industri dari Sumatera Utara.', 'en' => 'Resiprene 35 and industrial rubber goods from North Sumatra.']],
         'company.profile_document' => ['type' => 'media', 'public' => true, 'default' => null],
-        'site.footer_headline' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'Karet hilir Nusantara, diproses untuk dunia.', 'en' => 'Nusantara downstream rubber, processed for the world.']],
+        'site.footer_headline' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'Barang karet industri dari Medan, sejak 1965.', 'en' => 'Industrial rubber goods from Medan since 1965.']],
         'site.footer_cta_label' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'Mulai percakapan', 'en' => 'Start a conversation']],
         'site.footer_connect_text' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'Ikuti kabar terbaru produk, sertifikasi, dan kegiatan PT IKN di media sosial kami.', 'en' => 'Follow the latest on PT IKN products, certifications, and activities on our social channels.']],
         'site.footer_contact_text' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'Butuh penawaran, sampel, atau spesifikasi teknis? Tim marketing kami siap membantu.', 'en' => 'Need a quote, a sample, or technical specs? Our sales team is ready to help.']],
         'site.subsidiary_note' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'Anak perusahaan PTPN III (Persero)', 'en' => 'Subsidiary of PTPN III (Persero)']],
-        'seo.default_title' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'PT Industri Karet Nusantara — Hilir Karet Berkualitas', 'en' => 'PT Industri Karet Nusantara — Quality Downstream Rubber']],
+        'seo.default_title' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'PT Industri Karet Nusantara | Pabrik Karet Industri Medan', 'en' => 'PT Industri Karet Nusantara | Industrial Rubber Maker, Medan']],
         'seo.default_description' => ['type' => 'i18n', 'public' => true, 'default' => ['id' => 'PT Industri Karet Nusantara (PT IKN) adalah perusahaan hilir karet berpengalaman sejak 1965, memproduksi Resiprene 35 dan aneka barang karet dari Medan, Sumatera Utara.', 'en' => 'PT Industri Karet Nusantara (PT IKN) is a downstream rubber company established in 1965, producing Resiprene 35 and rubber articles in Medan, North Sumatra.']],
         // Kanal chat & analitik (checklist digital marketing klien: WhatsApp Business, Google Analytics, Search Console).
         'contact.whatsapp' => ['type' => 'text', 'public' => true, 'default' => '628116123993'], // nomor uji pemilik 2026-10-01, ganti di Pengaturan Situs

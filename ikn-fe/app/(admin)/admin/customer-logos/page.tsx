@@ -187,7 +187,7 @@ export default function AdminCustomerLogos() {
 
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat logo...', 'Loading logos...') : t('Belum ada logo pelanggan.', 'No customer logos yet.')} />
+      <DataTable columns={columns} rows={rows} loading={loading} empty={loading ? t('Memuat logo...', 'Loading logos...') : t('Belum ada logo pelanggan.', 'No customer logos yet.')} />
 
       {formOpen && (
         <AdminModal title={editingId ? t('Edit logo pelanggan', 'Edit customer logo') : t('Tambah logo pelanggan', 'Add customer logo')} onClose={closeForm}>

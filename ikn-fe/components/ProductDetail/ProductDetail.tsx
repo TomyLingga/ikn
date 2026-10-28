@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import ProductGallery from '@/components/ProductGallery';
 import Breadcrumb from '@/components/Breadcrumb';
 import StatusBadge from '@/components/StatusBadge';
@@ -88,7 +89,7 @@ export default function ProductDetail({ product, reviewPageSize = 10 }: Props) {
         {reviewError && <p className="form-error" role="alert">{reviewError}</p>}
         {hasMore && (
           <button type="button" className="btn btn-line btn-sm" style={{ marginTop: 16 }} onClick={loadMoreReviews} disabled={loadingMore}>
-            {loadingMore ? t('Memuat…', 'Loading…') : t('Muat ulasan lainnya', 'Load more reviews')} <Icon name="arrowDown" />
+            {loadingMore ? <Spinner size={16} label={t('Memuat…', 'Loading…')} /> : <>{t('Muat ulasan lainnya', 'Load more reviews')} <Icon name="arrowDown" /></>}
           </button>
         )}
       </div>

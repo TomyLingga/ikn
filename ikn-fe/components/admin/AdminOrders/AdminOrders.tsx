@@ -257,8 +257,7 @@ export default function AdminOrders() {
         columns={columns}
         rows={rows}
         rowKey="number"
-        pagination={false}
-        empty={loading ? t('Memuat order...', 'Loading orders...') : t('Belum ada order yang cocok.', 'No matching orders.')}
+        pagination={false} loading={loading} empty={loading ? t('Memuat order...', 'Loading orders...') : t('Belum ada order yang cocok.', 'No matching orders.')}
       />
       <Pager meta={meta} onPage={setPage} disabled={loading} />
     </div>

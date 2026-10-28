@@ -3494,40 +3494,81 @@ div.media-thumb {
   color: var(--adm-primary, var(--primary));
 }
 
-/* Tab berkelompok: tiap kelompok satu baris (judul kiri, tab kiri-rata), digeser horizontal di layar sempit. */
-.admin-app .admin-tab-groups {
-  display: grid;
-  margin-bottom: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--adm-r-lg, 12px);
-  background: var(--surface);
-  overflow: hidden;
+/* Tab map (folder) AdminTabs, referensi pemilik 2026-10-28: tab trapesium bersudut bulat yang makin gelap ke kanan,
+   tab aktif berwarna panel dan menyatu dengannya; toolbar pencarian sesudahnya menempel sehingga tab, status, dan
+   pencarian terbaca sebagai satu kartu. */
+.admin-app .admin-folder { margin-bottom: 14px; }
+.admin-app .admin-folder:has(+ .admin-toolbar) { margin-bottom: 0; }
+
+.admin-app .admin-folder-tabs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 4px;
 }
 
-.admin-app .admin-tab-group {
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
+.admin-app .admin-folder-tab {
+  --tab-tint: 10%;
+  position: relative;
+  isolation: isolate;
+  flex: 0 0 auto;
+  min-height: 46px;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 6px 6px 16px;
-}
-
-.admin-app .admin-tab-group + .admin-tab-group { border-top: 1px solid var(--line); }
-
-.admin-app .admin-tab-group-label {
-  display: flex;
-  flex-direction: column;
-  color: var(--ink);
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.admin-app .admin-tab-group-label small {
+  margin-right: -6px;
+  padding: 0 28px;
+  border: 0;
+  background: transparent;
   color: var(--ink-soft);
-  font-size: 0.7rem;
-  font-weight: 500;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
 }
+.admin-app .admin-folder-tab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--adm-line-soft);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: color-mix(in srgb, var(--adm-primary) var(--tab-tint), var(--paper-2));
+  transform: perspective(100px) rotateX(14deg);
+  transform-origin: bottom;
+  transition: background 0.18s var(--ease);
+}
+.admin-app .admin-folder-tab:nth-child(1) { z-index: 6; }
+.admin-app .admin-folder-tab:nth-child(2) { z-index: 5; --tab-tint: 13%; }
+.admin-app .admin-folder-tab:nth-child(3) { z-index: 4; --tab-tint: 16%; }
+.admin-app .admin-folder-tab:nth-child(4) { z-index: 3; --tab-tint: 19%; }
+.admin-app .admin-folder-tab:nth-child(n + 5) { z-index: 2; --tab-tint: 22%; }
+.admin-app .admin-folder-tab:hover { color: var(--ink); }
+.admin-app .admin-folder-tab:hover::before { background: color-mix(in srgb, var(--adm-primary) 6%, var(--surface)); }
+.admin-app .admin-folder-tab:focus-visible { outline: 0; }
+.admin-app .admin-folder-tab:focus-visible::before { box-shadow: var(--adm-ring); }
+.admin-app .admin-folder-tab.is-active { z-index: 10; color: var(--ink); font-weight: 700; }
+.admin-app .admin-folder-tab.is-active::before { background: var(--surface); }
+.admin-app .admin-folder-tab small { color: var(--ink-soft); font-size: 0.7rem; font-weight: 500; }
+.admin-app .admin-folder-tab .admin-tab-count { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.admin-app .admin-folder-tab.is-active .admin-tab-count { background: var(--adm-tint); color: var(--adm-primary); }
+
+/* Panel di bawah tab map: baris status kelompok aktif. Garis atasnya tertutup tab aktif (strip tab berada di atas). */
+.admin-app .admin-folder-panel {
+  position: relative;
+  margin-top: -1px;
+  padding: 10px 12px;
+  border: 1px solid var(--adm-line-soft);
+  border-radius: 0 16px 16px 16px;
+  background: var(--surface);
+  box-shadow: var(--adm-shadow-sm);
+}
+.admin-app .admin-folder:has(+ .admin-toolbar) .admin-folder-panel { border-bottom: 1px dashed var(--line); border-radius: 0 16px 0 0; box-shadow: none; }
+.admin-app .admin-folder + .admin-toolbar { margin-top: -1px; border-top-left-radius: 0; }
+.admin-app .admin-folder.has-panel + .admin-toolbar { border-top: 0; border-radius: 0 0 16px 16px; }
 
 .admin-app .admin-tab-row {
   display: flex;
@@ -3535,12 +3576,13 @@ div.media-thumb {
   gap: 4px;
 }
 
-.admin-app .admin-tab-row::-webkit-scrollbar { display: none; }
+.admin-app .admin-tab-row::-webkit-scrollbar,
+.admin-app .admin-folder-tabs::-webkit-scrollbar { display: none; }
 .admin-app .admin-tab-row .admin-tab { flex: 0 0 auto; justify-content: flex-start; }
 
 @media (max-width: 720px) {
-  .admin-app .admin-tab-group { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 10px 6px 6px; }
-  .admin-app .admin-tab-group-label { flex-direction: row; gap: 6px; align-items: baseline; padding-left: 8px; }
+  .admin-app .admin-folder-tabs { overflow-x: auto; scrollbar-width: none; }
+  .admin-app .admin-folder-tab { padding: 0 20px; }
   .admin-app .admin-tab-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .admin-app .admin-tabs { flex-wrap: nowrap; overflow-x: auto; }
   .admin-app .admin-tabs .admin-tab { flex: 0 0 auto; }
@@ -3685,4 +3727,250 @@ div.media-thumb {
   background: var(--ok-tint);
   color: var(--ok);
   font-size: 0.85rem;
+}
+
+/* ---- Kartu "smooth" (2026-10-27): kartu admin masuk bertahap dan diberi bayangan halus saat hover.
+   Tanpa translate agar tabel/form yang panjang tidak bergeser; kartu kecil dashboard punya efek angkat sendiri. ---- */
+.admin-app .admin-card {
+  animation: admin-card-in 0.45s var(--ease) backwards;
+  transition: box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+.admin-app .admin-card:nth-child(2) { animation-delay: 60ms; }
+.admin-app .admin-card:nth-child(3) { animation-delay: 120ms; }
+.admin-app .admin-card:nth-child(4) { animation-delay: 180ms; }
+.admin-app .admin-card:nth-child(5) { animation-delay: 240ms; }
+.admin-app .admin-card:nth-child(n + 6) { animation-delay: 300ms; }
+@keyframes admin-card-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-app .admin-card { animation: none; transition: none; }
+}
+
+/* =====================================================================
+   LAPISAN GLOW-UP ADMIN (2026-10-27)
+   Nuansa dashboard modern (referensi video pemilik, tanpa kaca transparan): latar konten bergradasi lembut, bilah atas
+   semi-transparan, kartu beradius 16px dengan bayangan berlapis halus, tombol utama bergradasi merek, tabel dengan
+   kepala sans kecil dan baris menyala saat hover, kartu statistik bertahap, modal masuk dengan animasi.
+   Cakupan sama dengan lapisan rapi; hanya properti kosmetik (tanpa perubahan ukuran/tata letak).
+   ===================================================================== */
+:is(.admin-app, .admin-modal-backdrop, .row-menu) {
+  --adm-r: 10px;
+  --adm-r-lg: 16px;
+  --adm-shadow-sm: 0 1px 2px rgba(15, 27, 45, 0.04), 0 8px 20px -16px rgba(15, 27, 45, 0.3);
+  --adm-shadow-md: 0 2px 4px rgba(15, 27, 45, 0.05), 0 18px 40px -24px rgba(15, 27, 45, 0.38);
+  --adm-grad: linear-gradient(135deg, var(--adm-primary) 0%, var(--adm-primary-deep, var(--adm-primary)) 100%);
+  --adm-tint: color-mix(in srgb, var(--adm-primary) 8%, var(--surface));
+  --adm-line-soft: color-mix(in srgb, var(--line) 80%, transparent);
+}
+[data-theme='dark'] :is(.admin-app, .admin-modal-backdrop, .row-menu) {
+  --adm-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px -14px rgba(0, 0, 0, 0.6);
+  --adm-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.35), 0 20px 44px -24px rgba(0, 0, 0, 0.7);
+  --adm-tint: color-mix(in srgb, var(--adm-primary) 16%, var(--surface));
+}
+
+/* Latar konten & bilah atas */
+.admin-app [class*='AdminShell_main'] {
+  background:
+    radial-gradient(900px 420px at 16% -10%, color-mix(in srgb, var(--adm-primary) 10%, transparent), transparent 62%),
+    var(--paper);
+}
+.admin-app [class*='AdminShell_topbar'] {
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+}
+
+/* Sidebar: item beradius, penanda aktif bergaris kiri, geser halus saat hover */
+.admin-app [class*='AdminShell_navLink'],
+.admin-app [class*='AdminShell_menuHead'] {
+  border-radius: 10px;
+  transition: background 0.18s var(--ease), color 0.18s var(--ease), transform 0.18s var(--ease);
+}
+.admin-app [class*='AdminShell_navLink']:hover { transform: translateX(2px); }
+.admin-app [class*='AdminShell_navLink'][class*='AdminShell_active'] {
+  background: var(--adm-tint);
+  color: var(--primary);
+  box-shadow: inset 3px 0 0 var(--adm-primary);
+}
+
+/* Judul halaman */
+.admin-app .admin-head .admin-title { font-weight: 750; letter-spacing: -0.02em; }
+
+/* Kartu, toolbar, tabel */
+:is(.admin-app, .admin-modal-backdrop) .admin-card {
+  border-radius: var(--adm-r-lg);
+  border-color: var(--adm-line-soft);
+  box-shadow: var(--adm-shadow-sm);
+}
+:is(.admin-app, .admin-modal-backdrop) .admin-card:hover { box-shadow: var(--adm-shadow-md); }
+.admin-app .admin-toolbar { border-radius: 14px; border-color: var(--adm-line-soft); box-shadow: var(--adm-shadow-sm); }
+.admin-app .admin-table tbody tr { animation: adm-row-in 0.45s var(--ease) backwards; animation-delay: calc(min(var(--i, 0), 12) * 45ms); }
+@keyframes adm-row-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* Tab status: pil */
+.admin-app .admin-tab { border-radius: 10px; }
+.admin-app .admin-tab.is-active { background: var(--adm-tint); color: var(--primary); border-bottom-color: transparent; }
+
+/* Tombol */
+:is(.admin-app, .admin-modal-backdrop) .btn {
+  transition: background 0.18s var(--ease), border-color 0.18s var(--ease), color 0.18s var(--ease), box-shadow 0.18s var(--ease), transform 0.18s var(--ease), filter 0.18s var(--ease);
+}
+:is(.admin-app, .admin-modal-backdrop) .btn-solid {
+  border-color: transparent;
+  background: var(--adm-grad);
+  box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--adm-primary) 70%, transparent);
+}
+:is(.admin-app, .admin-modal-backdrop) .btn-solid:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -12px color-mix(in srgb, var(--adm-primary) 80%, transparent);
+}
+:is(.admin-app, .admin-modal-backdrop) .btn:not(.btn-solid):not(.btn-danger):hover:not(:disabled) { background: var(--adm-hover); }
+
+/* Kartu statistik (laporan, ringkasan): kartu terpisah bergradasi lembut, masuk bertahap (--i), terangkat saat hover */
+.admin-app .admin-stat-grid { gap: 12px; border: 0; background: transparent; }
+.admin-app .admin-stat {
+  padding: 16px 18px;
+  border: 1px solid var(--adm-line-soft);
+  border-radius: 14px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--adm-primary) 7%, var(--surface)) 0%, var(--surface) 60%);
+  box-shadow: var(--adm-shadow-sm);
+  animation: admin-card-in 0.5s var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.admin-app .admin-stat:hover { transform: translateY(-3px); box-shadow: var(--adm-shadow-md); }
+.admin-app .admin-stat strong { font-size: 1.35rem; font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+
+/* Batang proporsi di tabel (produk terlaris): tumbuh dari nol */
+.admin-app .admin-bar-fill { animation: adm-bar-grow 0.7s var(--ease) backwards; }
+@keyframes adm-bar-grow { from { width: 0; } }
+
+/* Modal */
+.admin-modal-backdrop { background: rgba(8, 16, 30, 0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.admin-modal-backdrop .admin-modal { border-radius: 18px; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.55); animation: adm-modal-in 0.22s var(--ease); }
+@keyframes adm-modal-in { from { opacity: 0; transform: translateY(10px) scale(0.985); } }
+
+/* Pagination & pil filter */
+:is(.admin-app, .admin-modal-backdrop) .filter-pill { border-radius: 999px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-app .admin-table tbody tr,
+  .admin-app .admin-stat,
+  .admin-app .admin-bar-fill,
+  .admin-modal-backdrop .admin-modal { animation: none; }
+  .admin-app .admin-stat, :is(.admin-app, .admin-modal-backdrop) .btn { transition: none; }
+}
+
+/* =====================================================================
+   TABEL MODERN (2026-10-28, referensi pemilik): kepala tabel berupa pil abu-abu lembut di dalam kartu, baris lega tanpa
+   garis tegak dengan pemisah tipis, tombol aksi bergaris warna merek, paginasi kotak kecil, bilah kemajuan saat memuat
+   ulang, dan ikon loading (components/Spinner) saat belum ada data. Hanya kosmetik; DataTable/markup tidak berubah.
+   ===================================================================== */
+.admin-app .admin-table-wrap {
+  position: relative;
+  padding: 6px 10px 10px;
+  border: 1px solid var(--adm-line-soft);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--adm-shadow-sm);
+  transition: opacity 0.2s var(--ease);
+}
+.admin-app .admin-table-wrap.is-loading { opacity: 0.72; }
+@media (min-width: 641px) {
+  .admin-app .admin-table { border-collapse: separate; border-spacing: 0; }
+  .admin-app .admin-table th {
+    padding: 12px 14px;
+    border: 0;
+    background: color-mix(in srgb, var(--adm-primary) 5%, var(--paper-2));
+    color: var(--ink-soft);
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+  .admin-app .admin-table th:first-child { border-radius: 12px 0 0 12px; }
+  .admin-app .admin-table th:last-child { border-radius: 0 12px 12px 0; }
+  .admin-app .admin-table td {
+    padding: 15px 14px;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+    font-weight: 500;
+  }
+  .admin-app .admin-table tr:last-child td { border-bottom: 0; }
+  .admin-app .admin-table tbody tr { transition: background 0.15s var(--ease), transform 0.15s var(--ease); }
+  .admin-app .admin-table tbody tr:hover { background: color-mix(in srgb, var(--adm-primary) 4%, var(--surface)); }
+  .admin-app .admin-table tbody tr:hover td:first-child { border-radius: 10px 0 0 10px; }
+  .admin-app .admin-table tbody tr:hover td:last-child { border-radius: 0 10px 10px 0; }
+  /* Kolom aksi menempel: tanpa garis tegak; latar pekat mengikuti kepala/baris. */
+  .admin-app .admin-table :is(th, td).admin-col-actions { border-left: 0; box-shadow: none; }
+  .admin-app .admin-table th.admin-col-actions { background: color-mix(in srgb, var(--adm-primary) 5%, var(--paper-2)); }
+  .admin-app .admin-table td.admin-col-actions { background: var(--surface); }
+  .admin-app .admin-table tbody tr:hover td.admin-col-actions { background: color-mix(in srgb, var(--adm-primary) 4%, var(--surface)); }
+  /* Sel teks boleh membungkus agar tabel 8 kolom (Order) muat tanpa gulir di laptop; kode, nominal, aksi tetap satu baris. */
+  .admin-app .admin-table td { white-space: normal; }
+  .admin-app .admin-table td .mono,
+  .admin-app .admin-table td [class*='amount'],
+  .admin-app .admin-table td.admin-col-actions { white-space: nowrap; }
+  .admin-app .admin-table td [class*='StatusBadge_badge'] { white-space: nowrap; }
+  .admin-app .admin-table .admin-cell-sub { font-weight: 400; }
+}
+
+/* Tombol aksi baris: garis tipis warna merek, seperti "Notice / Reply / Cancel" pada referensi */
+:is(.admin-app, .admin-modal-backdrop) .row-act { min-height: 32px; padding: 0 13px; border-radius: 8px; font-weight: 600; }
+:is(.admin-app, .admin-modal-backdrop) .row-act:not(.row-act-danger):not(.row-act-success):not(.row-act-more) {
+  border-color: color-mix(in srgb, var(--adm-primary) 45%, var(--line));
+  color: var(--primary);
+}
+:is(.admin-app, .admin-modal-backdrop) .row-act:hover:not(:disabled) { transform: translateY(-1px); }
+:is(.admin-app, .admin-modal-backdrop) .row-act:not(.row-act-danger):not(.row-act-success):not(.row-act-more):hover:not(:disabled) {
+  border-color: var(--adm-primary);
+  background: var(--adm-tint);
+  color: var(--primary);
+}
+:is(.admin-app, .admin-modal-backdrop) .row-act-more { color: var(--ink-soft); border-color: var(--line); }
+:is(.admin-app, .admin-modal-backdrop) .row-act-more:hover:not(:disabled) { background: var(--adm-hover); color: var(--ink); border-color: var(--line-strong); }
+
+/* Paginasi: kotak kecil, halaman aktif bergaris merek */
+.admin-app .pagination-wrap { margin-top: 14px; }
+.admin-app .pagination-btn { min-width: 34px; min-height: 34px; padding: 0 10px; border-radius: 8px; }
+.admin-app .pagination-btn.is-active { background: var(--surface); border-color: var(--adm-primary); color: var(--primary); box-shadow: 0 0 0 1px var(--adm-primary) inset; }
+
+/* Memuat ulang: bilah kemajuan tak tentu di tepi atas kartu tabel */
+.admin-app .admin-table-progress {
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 0 0 3px 3px;
+  background: color-mix(in srgb, var(--adm-primary) 14%, transparent);
+}
+.admin-app .admin-table-progress::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  border-radius: 3px;
+  background: var(--adm-grad);
+  animation: adm-progress 1.1s var(--ease) infinite;
+}
+@keyframes adm-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(290%); }
+}
+
+/* Kotak kosong / sedang memuat */
+.admin-app .admin-empty { border-radius: 16px; border-color: var(--adm-line-soft); background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.admin-app .admin-empty.admin-loading { border-style: solid; padding: 54px 20px; }
+.admin-app .admin-empty.admin-loading .spin { color: var(--ink-soft); font-weight: 500; }
+
+@media (max-width: 640px) {
+  .admin-app .admin-table-wrap { padding: 0; border: 0; box-shadow: none; }
+  .admin-app .admin-table-progress { left: 0; right: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-app .admin-table-progress::after { animation: none; width: 100%; opacity: 0.5; }
+  :is(.admin-app, .admin-modal-backdrop) .row-act:hover:not(:disabled) { transform: none; }
 }

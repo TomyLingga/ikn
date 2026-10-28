@@ -1486,8 +1486,8 @@ a.cert-card-media { cursor: zoom-in; }
 .vg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 8px; }
 .vg-card { display: flex; flex-direction: column; gap: 14px; width: 100%; padding: 0; border: 0; background: none; text-align: left; color: inherit; cursor: pointer; font: inherit; }
 .vg-thumb { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: var(--paper-2); box-shadow: var(--shadow-sm); }
-.vg-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s var(--ease); }
-.vg-card:hover .vg-thumb img { transform: scale(1.04); }
+.vg-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(var(--fit, 1)); transition: transform 0.6s var(--ease); } /* --fit: zoom pemotong pita hitam (lib/letterbox.ts) */
+.vg-card:hover .vg-thumb img { transform: scale(calc(var(--fit, 1) * 1.04)); }
 .vg-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10, 22, 40, 0) 45%, rgba(10, 22, 40, 0.55) 100%); }
 .vg-play { position: absolute; left: 50%; top: 50%; z-index: 1; width: 64px; height: 64px; display: grid; place-items: center; border-radius: 50%; background: rgba(255, 255, 255, 0.92); color: var(--primary); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); transform: translate(-50%, -50%); transition: transform 0.25s var(--ease), background 0.25s var(--ease), color 0.25s var(--ease); }
 .vg-play svg { margin-left: 3px; }

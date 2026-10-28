@@ -192,8 +192,7 @@ export default function AdminPages() {
       <DataTable
         columns={columns}
         rows={rows}
-        defaultPageSize={20}
-        empty={loading ? t('Memuat halaman...', 'Loading pages...') : t('Belum ada halaman.', 'No pages yet.')}
+        defaultPageSize={20} loading={loading} empty={loading ? t('Memuat halaman...', 'Loading pages...') : t('Belum ada halaman.', 'No pages yet.')}
       />
 
       {formOpen && (

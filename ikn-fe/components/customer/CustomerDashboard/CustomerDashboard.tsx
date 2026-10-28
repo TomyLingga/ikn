@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import StatusBadge from '@/components/StatusBadge';
 import AccountStatusBanner from '@/components/customer/AccountStatusBanner';
 import OrderThumbs from '@/components/customer/OrderThumbs';
@@ -12,6 +13,7 @@ import { orderLabel } from '@/lib/commerce';
 import { api, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
 import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
+import CountUp from '@/components/CountUp';
 import { isoDay, monthToDate } from '@/lib/shop';
 import type { CustomerDashboardData, IconName, OrderSummary } from '@/lib/types';
 import styles from './CustomerDashboard.module.css';
@@ -54,6 +56,12 @@ function compactIDR(value: number): string {
 // - "Ringkasan periode" (total pesanan, selesai, nilai transaksi, pesanan pada periode) mengikuti rentang
 //   tanggal; bawaan awal bulan sampai hari ini.
 export default function CustomerDashboard() {
+  // Batang belanja tumbuh dari dasar setelah mount (kelas spendReady).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   const { customer } = useAuth();
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
@@ -181,13 +189,14 @@ export default function CustomerDashboard() {
         <div className={styles.spend} aria-label={t('Belanja enam bulan terakhir', 'Spending in the last six months')}>
           <div className={styles.spendHead}>
             <span>{t('Belanja 6 bulan terakhir', 'Spending, last 6 months')}</span>
-            <strong>{formatIDR(monthlyTotal)}</strong>
+            <strong><CountUp value={monthlyTotal} format={formatIDR} /></strong>
           </div>
-          <div className={styles.spendBars}>
-            {monthly.map((month) => (
+          <div className={`${styles.spendBars} ${ready ? styles.spendReady : ''}`}>
+            {monthly.map((month, i) => (
               <div
                 key={month.ym}
                 className={styles.spendCol}
+                style={{ '--i': i } as CSSProperties}
                 title={`${lang === 'en' ? MONTHS_EN[month.monthIndex - 1] : month.month} ${month.year}: ${formatIDR(month.total)} · ${month.orders} ${t('pesanan', 'orders')}`}
               >
                 <span className={styles.spendValue}>{month.total > 0 ? compactIDR(month.total) : ''}</span>
@@ -197,7 +206,7 @@ export default function CustomerDashboard() {
                 <span className={styles.spendLabel}>{lang === 'en' ? MONTHS_EN[month.monthIndex - 1] : month.month}</span>
               </div>
             ))}
-            {monthly.length === 0 && <p className={styles.spendEmpty}>{loading ? t('Memuat…', 'Loading…') : t('Belum ada transaksi.', 'No transactions yet.')}</p>}
+            {monthly.length === 0 && <p className={styles.spendEmpty}>{loading ? <Spinner size={18} label={t('Memuat…', 'Loading…')} /> : t('Belum ada transaksi.', 'No transactions yet.')}</p>}
           </div>
         </div>
       </section>
@@ -216,13 +225,13 @@ export default function CustomerDashboard() {
           </div>
         </div>
         <div className={styles.openGrid}>
-          {openTiles.map((tile) => (
-            <Link key={tile.key} href={tile.href} className={`${styles.openTile} ${tile.tone || ''}`}>
+          {openTiles.map((tile, i) => (
+            <Link key={tile.key} href={tile.href} className={`${styles.openTile} ${tile.tone || ''}`} style={{ '--i': i } as CSSProperties}>
               <span className={styles.openIcon}>
                 <Icon name={tile.icon} size={20} />
               </span>
               <span className={styles.openBody}>
-                <strong>{tile.value}</strong>
+                <strong>{typeof tile.value === 'number' ? <CountUp value={tile.value} delay={i * 60} /> : tile.value}</strong>
                 <span>{tile.label}</span>
                 <small>{tile.hint}</small>
               </span>
@@ -299,19 +308,19 @@ export default function CustomerDashboard() {
         </div>
 
         <div className={styles.statGrid} aria-busy={loading}>
-          <div className={styles.stat}>
+          <div className={styles.stat} style={{ '--i': 0 } as CSSProperties}>
             <span>{t('Total pesanan', 'Total orders')}</span>
-            <strong>{stats.totalOrders}</strong>
+            <strong><CountUp value={stats.totalOrders} /></strong>
             <small>{t('dibuat pada periode ini', 'placed in this period')}</small>
           </div>
-          <div className={styles.stat}>
+          <div className={styles.stat} style={{ '--i': 1 } as CSSProperties}>
             <span>{t('Selesai', 'Completed')}</span>
-            <strong>{stats.completed}</strong>
+            <strong><CountUp value={stats.completed} delay={60} /></strong>
             <small>{t('dari pesanan periode ini', 'of the orders in this period')}</small>
           </div>
-          <div className={`${styles.stat} ${styles.statWide}`}>
+          <div className={`${styles.stat} ${styles.statWide}`} style={{ '--i': 2 } as CSSProperties}>
             <span>{t('Nilai transaksi', 'Transaction value')}</span>
-            <strong>{formatIDR(stats.transactionValue)}</strong>
+            <strong><CountUp value={stats.transactionValue} format={formatIDR} delay={120} /></strong>
             <small>{t('pembayaran terverifikasi pada periode ini', 'payments verified in this period')}</small>
           </div>
         </div>
@@ -326,7 +335,7 @@ export default function CustomerDashboard() {
           {recent.length === 0 ? (
             <div className={styles.recentEmpty}>
               <Icon name="orders" size={28} strokeWidth={1.3} />
-              <p>{loading ? t('Memuat pesanan…', 'Loading orders…') : t('Belum ada pesanan pada periode ini.', 'No orders in this period yet.')}</p>
+              <p>{loading ? <Spinner label={t('Memuat pesanan…', 'Loading orders…')} /> : t('Belum ada pesanan pada periode ini.', 'No orders in this period yet.')}</p>
               {!loading && (
                 <Link href="/dashboard/katalog" className={styles.textLink}>
                   {t('Mulai belanja', 'Start shopping')} <Icon name="arrow" size={15} />

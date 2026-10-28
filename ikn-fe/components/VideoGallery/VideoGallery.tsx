@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { letterboxZoom } from '@/lib/letterbox';
 import Reveal from '@/components/Reveal';
 import Icon from '@/components/Icon';
 
@@ -15,11 +16,14 @@ export interface Video {
 // Klik membuka pemutar layar penuh (iframe youtube-nocookie) — video tidak dimuat sebelum diklik.
 function VideoCard({ video, delay, onOpen }: { video: Video; delay: number; onOpen: () => void }) {
   const [thumb, setThumb] = useState(`https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg`);
+  // Pita hitam yang terbakar di thumbnail (video sinematik) dipotong lewat zoom (--fit) agar memenuhi bingkai.
+  // Diukur dari mqdefault (16:9, ~15 KB, framing sama dengan maxres) setelah gambar tampil, jadi ikut lazy-load.
+  const [fit, setFit] = useState(1);
 
   return (
     <Reveal delay={delay}>
       <button type="button" className="vg-card" onClick={onOpen} aria-label={`Putar: ${video.title}`}>
-        <span className="vg-thumb">
+        <span className="vg-thumb" style={{ '--fit': fit } as CSSProperties}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={thumb}
@@ -28,6 +32,7 @@ function VideoCard({ video, delay, onOpen }: { video: Video; delay: number; onOp
             onLoad={(e) => {
               // YouTube mengirim placeholder 120x90 bila maxres tidak ada.
               if (e.currentTarget.naturalWidth < 200 && !thumb.includes('hqdefault')) setThumb(`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`);
+              else letterboxZoom(`https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`).then(setFit);
             }}
             onError={() => setThumb(`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`)}
           />

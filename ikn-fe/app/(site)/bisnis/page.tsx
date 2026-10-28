@@ -20,7 +20,7 @@ export default async function Bisnis() {
   const [extra, products] = await Promise.all([fetchSectionExtra(page.sections), fetchProducts({ perPage: 50 }, { cached: true })]);
 
   const meta = { slug: page.slug, title: page.title };
-  const cut = page.sections.findIndex((s) => s.type === 'link_cards' || s.type === 'brochures' || s.type === 'cta');
+  const cut = page.sections.findIndex((s) => ['steps', 'link_cards', 'brochures', 'faq', 'cta'].includes(s.type));
   const before = cut === -1 ? page.sections : page.sections.slice(0, cut);
   const after = cut === -1 ? [] : page.sections.slice(cut);
 

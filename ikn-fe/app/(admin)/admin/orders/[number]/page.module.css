@@ -334,3 +334,34 @@
   .fileRow { grid-template-columns: 36px minmax(0, 1fr); }
   .fileRow > button { grid-column: 2; justify-self: start; }
 }
+
+/* Bukti pembayaran: blok mencolok (thumbnail + tombol Lihat bukti) agar admin tidak mencari-cari tautan kecil. */
+.proofBox {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin: 6px 0 2px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-2);
+}
+.proofBoxHot {
+  border-color: color-mix(in srgb, var(--warn, #c97b00) 55%, var(--line));
+  background: color-mix(in srgb, var(--warn, #c97b00) 9%, var(--surface));
+}
+.proofThumb,
+.proofDoc {
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.proofThumb { display: block; object-fit: cover; }
+.proofDoc { display: grid; place-items: center; color: var(--ink-soft); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; }
+.proofMeta { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.proofMeta strong { font-size: 0.92rem; }
+.proofMeta small { color: var(--ink-soft); overflow-wrap: anywhere; }

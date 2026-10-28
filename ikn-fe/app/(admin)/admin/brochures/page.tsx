@@ -189,7 +189,7 @@ export default function AdminBrochures() {
 
       {error && <p className="form-error">{error}</p>}
 
-      <DataTable columns={columns} rows={rows} empty={loading ? t('Memuat brosur...', 'Loading brochures...') : t('Belum ada brosur.', 'No brochures yet.')} />
+      <DataTable columns={columns} rows={rows} loading={loading} empty={loading ? t('Memuat brosur...', 'Loading brochures...') : t('Belum ada brosur.', 'No brochures yet.')} />
 
       {formOpen && (
         <AdminModal title={editingId ? t('Edit brosur', 'Edit brochure') : t('Tambah brosur', 'Add brochure')} onClose={closeForm} width={880}>

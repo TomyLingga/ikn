@@ -67,6 +67,8 @@ class MenuSeeder extends Seeder
                 self::c('Aneka Barang Karet', 'Rubber Articles', '/bisnis#barang-karet', 'Produk karet siap pakai', 'Ready-to-use rubber products'),
                 // Menuju blok produk di halaman Bisnis; tombol di blok itu membawa ke toko (/catalog).
                 self::c('Katalog Produk', 'Product Catalog', '/bisnis#produk', 'Produk kami & pemesanan online', 'Our products & online ordering'),
+                self::c('Cara Memesan', 'How to Order', '/bisnis#cara-pesan', 'Daftar, bayar, lacak kiriman', 'Sign up, pay, track delivery'),
+                self::c('Tanya Jawab', 'FAQ', '/bisnis#tanya-jawab', 'Minimum order, ongkir, dokumen', 'Minimum order, shipping, documents'),
                 self::c('Unduhan', 'Downloads', '/bisnis#unduhan', 'Brosur produk (PDF)', 'Product brochures (PDF)'),
             ]),
             // Media = halaman hub (/media) dengan kartu ke Berita dan Galeri.
