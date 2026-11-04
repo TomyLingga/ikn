@@ -15,7 +15,7 @@ import Marquee from '@/components/Marquee';
 import { useLang } from '@/components/LanguageProvider';
 import { lines, tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
-import { asList, asText, contactMapPoints, type HeroButtonItem, type HeroContent, type HeroMetaItem, type HeroSlideItem, type MarqueeContent } from '../utils';
+import { asList, asText, contactMapPoints, mapsUrl, type HeroButtonItem, type HeroContent, type HeroMetaItem, type HeroSlideItem, type MarqueeContent } from '../utils';
 
 interface Props {
   section: PageSection;
@@ -119,7 +119,36 @@ function HeroGrid({
   const site = useSite();
   const videos = [c.video?.url, ...asList<{ file?: { url?: string } | null }>(c.videos).map((v) => v.file?.url)].filter((u): u is string => !!u);
   const links = asList<{ title: HeroContent['title']; note?: HeroContent['title']; image?: { url?: string } | null; url: string }>(c.links).filter((l) => tr(l.title, lang) && asText(l.url));
-  const mapPoints = c.tile_map && site.contact ? contactMapPoints(site.contact, lang) : [];
+  // Lokasi fasilitas di ubin peta: daftar dari CMS (`locations`), kosong = lokasi blok kontak halaman Kontak.
+  const ownFacilities = asList<NonNullable<HeroContent['locations']>[number]>(c.locations)
+    .map((l) => {
+      const lat = l.geo?.lat;
+      const lng = l.geo?.lng;
+      const ok = typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng);
+      return { name: tr(l.name, lang), note: tr(l.note, lang), lat: ok ? lat : null, lng: ok ? lng : null };
+    })
+    .filter((f) => f.name);
+  const facilities =
+    ownFacilities.length > 0 || !c.tile_map || !site.contact
+      ? ownFacilities
+      : contactMapPoints(site.contact, lang).map((p) => ({ name: p.name, note: p.address, lat: p.lat as number | null, lng: p.lng as number | null }));
+  const pins = c.tile_map ? facilities.flatMap((f, index) => (f.lat !== null && f.lng !== null ? [{ index, name: f.name, lat: f.lat, lng: f.lng }] : [])) : [];
+  const [activeFac, setActiveFac] = useState<number | null>(null);
+  const tileRef = useRef<HTMLDivElement>(null);
+  const pickFacility = (i: number) => setActiveFac((cur) => (cur === i ? null : i));
+  useEffect(() => {
+    if (activeFac === null) return;
+    // Kartu info ditutup dengan Escape atau klik di luar ubin.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setActiveFac(null);
+    const onDown = (e: PointerEvent) => !tileRef.current?.contains(e.target as Node) && setActiveFac(null);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onDown);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onDown);
+    };
+  }, [activeFac]);
+  const active = activeFac !== null ? facilities[activeFac] : undefined;
   const stats = asList<{ value: string; label: HeroContent['title'] }>(c.stats).filter((s) => asText(s.value));
   const overlay = Math.min(90, Math.max(0, typeof c.overlay === 'number' ? c.overlay : 45)) / 100;
   const videoId = asText(c.video_id);
@@ -127,7 +156,7 @@ function HeroGrid({
   const cardNote = tr(c.card_note, lang);
   // {year} di teks pojok diganti tahun berjalan (mis. "Copyright © 1965-{year} ...").
   const corner = tr(c.corner_text, lang).replace(/\{year\}/g, String(new Date().getFullYear()));
-  const watch = lang === 'en' ? 'Watch video' : 'Tonton video';
+  const watch = lang === 'en' ? 'Watch Video' : 'Tonton Video';
 
   return (
     <section className="hgrid" style={{ '--hgrid-overlay': overlay } as CSSProperties}>
@@ -188,7 +217,19 @@ function HeroGrid({
                     )}
                     <span className="hgrid-link-text">
                       <strong>{tr(l.title, lang)}</strong>
-                      {tr(l.note, lang) && <small>{tr(l.note, lang)}</small>}
+                      {/* "Jenis · Lokasi" = dua baris: jenis produk lalu lokasi pabrik berikon pin. */}
+                      {tr(l.note, lang)
+                        .split(' · ')
+                        .filter(Boolean)
+                        .map((part, j) =>
+                          j === 0 ? (
+                            <small key={j}>{part}</small>
+                          ) : (
+                            <small key={j} className="hgrid-link-place">
+                              <Icon name="pin" size={11} /> {part}
+                            </small>
+                          ),
+                        )}
                     </span>
                     <Icon name="arrow" size={16} />
                   </SmartLink>
@@ -198,17 +239,58 @@ function HeroGrid({
           )}
         </div>
 
-        <div className={`hgrid-cell hgrid-tile${mapPoints.length > 0 ? ' has-map' : ''}`}>
-          {mapPoints.length > 0 && (
+        <div ref={tileRef} className={`hgrid-cell hgrid-tile${pins.length > 0 ? ' has-map' : ''}${facilities.length > 0 ? ' is-facilities' : ''}`}>
+          {pins.length > 0 && (
             <span className="hgrid-tile-map" aria-hidden="true">
-              <HeroTileMap points={mapPoints} />
+              <HeroTileMap pins={pins} active={activeFac} onSelect={pickFacility} />
             </span>
           )}
-          {stats[1] && (
+          {facilities.length > 0 ? (
             <>
-              <strong>{asText(stats[1].value)}</strong>
-              <span>{tr(stats[1].label, lang)}</span>
+              <div className="hgrid-fac-head">
+                <span className="hgrid-fac-label">{tr(c.tile_label, lang) || (lang === 'en' ? 'Facility locations' : 'Lokasi fasilitas')}</span>
+                {stats[1] && (
+                  <span className="hgrid-fac-count">
+                    <strong>{asText(stats[1].value)}</strong>
+                    <small>{tr(stats[1].label, lang)}</small>
+                  </span>
+                )}
+              </div>
+              <div className="hgrid-fac-body">
+                <ul className="hgrid-fac-list">
+                  {facilities.map((f, i) => (
+                    <li key={i}>
+                      <button type="button" className={activeFac === i ? 'is-active' : undefined} aria-expanded={activeFac === i} aria-controls="hgrid-fac-card" onClick={() => pickFacility(i)}>
+                        <i aria-hidden="true" />
+                        {f.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {active && (
+                <div className="hgrid-fac-card" id="hgrid-fac-card" role="region" aria-label={active.name}>
+                  <button type="button" className="hgrid-fac-close" onClick={() => setActiveFac(null)} aria-label={lang === 'en' ? 'Close' : 'Tutup'}>
+                    <Icon name="close" size={14} />
+                  </button>
+                  <small>{lang === 'en' ? 'Production facility' : 'Fasilitas produksi'}</small>
+                  <strong>{active.name}</strong>
+                  {active.note && <p>{active.note}</p>}
+                  {active.lat !== null && active.lng !== null && (
+                    <a href={mapsUrl(active.lat, active.lng)} target="_blank" rel="noopener noreferrer">
+                      {lang === 'en' ? 'Open in Maps' : 'Buka di peta'} <Icon name="arrow" size={12} style={{ transform: 'rotate(-45deg)' }} />
+                    </a>
+                  )}
+                </div>
+              )}
             </>
+          ) : (
+            stats[1] && (
+              <>
+                <strong>{asText(stats[1].value)}</strong>
+                <span>{tr(stats[1].label, lang)}</span>
+              </>
+            )
           )}
         </div>
 

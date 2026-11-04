@@ -1014,9 +1014,13 @@
   position: absolute;
   inset: 0;
   z-index: -1;
+  /* Berlapis: pita atas (navbar), pita bawah (baris kartu), bayangan lembut di belakang judul, lalu gradasi kiri-kanan
+     dari nilai `overlay` CMS. Kontras teks tetap terjaga di frame terang tanpa menggelapkan seluruh footage. */
   background:
-    linear-gradient(90deg, rgba(10, 26, 48, calc(var(--hgrid-overlay) + 0.15)) 0%, rgba(10, 26, 48, var(--hgrid-overlay)) 45%, rgba(10, 26, 48, calc(var(--hgrid-overlay) * 0.45)) 100%),
-    linear-gradient(180deg, rgba(10, 26, 48, 0.35) 0%, transparent 25%);
+    linear-gradient(180deg, rgba(10, 26, 48, 0.42) 0%, rgba(10, 26, 48, 0) 22%),
+    linear-gradient(0deg, rgba(10, 26, 48, 0.5) 0%, rgba(10, 26, 48, 0) 36%),
+    radial-gradient(ellipse 55% 50% at 40% 46%, rgba(10, 26, 48, calc(var(--hgrid-overlay) * 0.55)) 0%, rgba(10, 26, 48, 0) 72%),
+    linear-gradient(90deg, rgba(10, 26, 48, calc(var(--hgrid-overlay) + 0.1)) 0%, rgba(10, 26, 48, calc(var(--hgrid-overlay) * 0.8)) 50%, rgba(10, 26, 48, calc(var(--hgrid-overlay) * 0.35)) 100%);
 }
 .site-v2 .hgrid-cells {
   flex: 1;
@@ -1032,52 +1036,72 @@
 .site-v2 .hgrid-stat { grid-area: stat; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding-left: max(var(--gutter), 2vw); }
 .site-v2 .hgrid-stat strong { font-size: clamp(2.2rem, 3.6vw, 3.2rem); font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
 .site-v2 .hgrid-stat span { margin-top: 8px; font-size: 0.95rem; color: rgba(255, 255, 255, 0.85); max-width: 16ch; }
-.site-v2 .hgrid-main { grid-area: main; display: flex; flex-direction: column; justify-content: center; padding-block: clamp(20px, 3.2vh, 44px); }
+.site-v2 .hgrid-main { grid-area: main; display: flex; flex-direction: column; justify-content: center; padding-block: clamp(20px, 3.2vh, 44px); container-type: inline-size; }
 .site-v2 .hgrid-meta { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: clamp(12px, 1.8vh, 20px); }
 .site-v2 .hgrid-meta-item { font-size: 0.74rem; font-weight: 650; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255, 255, 255, 0.86); }
 .site-v2 .hgrid-meta-item:first-child { color: var(--c-sky); }
-.site-v2 .hgrid-title { display: flex; flex-direction: column; font-size: clamp(2.3rem, min(4.4vw, 7.2vh), 4.4rem); font-weight: 650; line-height: 1.02; letter-spacing: -0.04em; color: #fff; text-wrap: balance; }
-.site-v2 .hgrid-sub { max-width: 60ch; margin-top: clamp(12px, 2vh, 22px); font-size: clamp(0.98rem, 1.15vw, 1.08rem); line-height: 1.55; color: rgba(255, 255, 255, 0.88) !important; }
-.site-v2 .hgrid-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: clamp(16px, 2.6vh, 30px); }
+/* Ukuran judul mengikuti lebar kolom tengah (cqi) agar tiap baris judul muat utuh: dua baris seimbang di layar lebar. */
+.site-v2 .hgrid-title { display: flex; flex-direction: column; max-width: 17em; font-size: clamp(2.1rem, min(7cqi, 7.6vh), 4.6rem); font-weight: 650; line-height: 1.05; letter-spacing: -0.035em; color: #fff; text-wrap: balance; text-shadow: 0 2px 28px rgba(8, 20, 38, 0.28); }
+.site-v2 .hgrid-sub { max-width: 54ch; margin-top: clamp(16px, 2.4vh, 26px); font-size: clamp(1rem, 1.1vw, 1.1rem); line-height: 1.65; color: rgba(255, 255, 255, 0.9) !important; text-shadow: 0 1px 14px rgba(8, 20, 38, 0.3); }
+.site-v2 .hgrid-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: clamp(20px, 3vh, 34px); }
 .site-v2 .hgrid-actions .hero-actions { margin: 0; }
-.site-v2 .hgrid-actions .btn-solid { background: var(--c-blue); border-color: var(--c-blue); color: #fff; border-radius: 4px; padding: 16px 28px; }
-.site-v2 .hgrid-actions .btn-solid:hover { background: #fff; border-color: #fff; color: var(--c-deep); }
+.site-v2 .hgrid-actions .btn-solid,
 .site-v2 .hgrid-watch {
   display: inline-flex;
   align-items: center;
-  gap: 14px;
-  padding: 15px 22px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  justify-content: center;
+  gap: 12px;
+  box-sizing: border-box;
+  min-height: 54px;
+  padding: 0 26px;
+  border: 1px solid transparent;
   border-radius: 4px;
-  background: transparent;
-  color: #fff;
-  font: inherit;
+  font-family: var(--font-sans);
+  font-size: 1rem;
   font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
   cursor: pointer;
-  transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
+  transition: background 0.25s var(--ease), border-color 0.25s var(--ease), color 0.25s var(--ease);
 }
-.site-v2 .hgrid-watch:hover { background: rgba(255, 255, 255, 0.12); border-color: #fff; }
+.site-v2 .hgrid-actions .btn-solid { background: var(--c-blue); border-color: var(--c-blue); color: #fff; }
+.site-v2 .hgrid-actions .btn-solid:hover { background: #fff; border-color: #fff; color: var(--c-deep); }
+.site-v2 .hgrid-watch { border-color: rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.04); color: #fff; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.site-v2 .hgrid-watch:hover { background: rgba(255, 255, 255, 0.14); border-color: #fff; }
+.site-v2 .hgrid-actions svg { transition: transform 0.25s var(--ease); }
+.site-v2 .hgrid-actions .btn-solid:hover svg { transform: translateX(3px); }
+.site-v2 .hgrid-watch:hover svg { transform: scale(1.15); }
+.site-v2 .hgrid-actions .btn-solid:focus-visible,
+.site-v2 .hgrid-watch:focus-visible { outline: 2px solid var(--c-sky); outline-offset: 3px; }
 .site-v2 .hgrid-aside { grid-area: aside; display: flex; flex-direction: column; justify-content: flex-end; }
-.site-v2 .hgrid-links { list-style: none; display: grid; gap: 10px; width: 100%; max-width: 300px; margin: 0 0 4px auto; padding: 0; }
+.site-v2 .hgrid-links { list-style: none; display: grid; gap: 10px; width: 100%; max-width: 280px; margin: 0 0 4px auto; padding: 0; }
 .site-v2 .hgrid-link {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px 10px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 10px;
-  background: rgba(10, 26, 48, 0.42);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 9px 14px 9px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 10px 28px -18px rgba(0, 0, 0, 0.55);
   color: #fff;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  transition: background 0.25s var(--ease), border-color 0.25s var(--ease), transform 0.25s var(--ease);
 }
-.site-v2 .hgrid-link:hover { background: rgba(23, 105, 170, 0.6); border-color: rgba(255, 255, 255, 0.5); transform: translateX(-3px); }
-.site-v2 .hgrid-link-img { position: relative; display: block; width: 52px; height: 52px; border-radius: 8px; overflow: hidden; background: rgba(255, 255, 255, 0.12); }
-.site-v2 .hgrid-link-text { display: flex; flex-direction: column; min-width: 0; }
-.site-v2 .hgrid-link-text strong { font-size: 0.98rem; font-weight: 650; line-height: 1.2; }
-.site-v2 .hgrid-link-text small { margin-top: 2px; font-size: 0.78rem; color: rgba(255, 255, 255, 0.75); }
+.site-v2 .hgrid-link:hover,
+.site-v2 .hgrid-link:focus-visible { background: rgba(23, 105, 170, 0.42); border-color: rgba(66, 165, 213, 0.75); transform: translateX(-4px); }
+.site-v2 .hgrid-link:focus-visible { outline: 2px solid var(--c-sky); outline-offset: 2px; }
+.site-v2 .hgrid-link > svg { opacity: 0.75; transition: transform 0.25s var(--ease), opacity 0.25s var(--ease); }
+.site-v2 .hgrid-link:hover > svg { opacity: 1; transform: translateX(3px); }
+/* Latar putih: foto produk berlatar putih tampil utuh dan proporsional. */
+.site-v2 .hgrid-link-img { position: relative; display: block; width: 48px; height: 48px; border-radius: 8px; overflow: hidden; background: #fff; }
+.site-v2 .hgrid-link-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.site-v2 .hgrid-link-text strong { font-size: 0.95rem; font-weight: 650; line-height: 1.2; }
+.site-v2 .hgrid-link-text small { font-size: 0.76rem; line-height: 1.35; color: rgba(255, 255, 255, 0.78); }
+.site-v2 .hgrid-link-text .hgrid-link-place { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; letter-spacing: 0.02em; color: var(--c-sky); }
 .site-v2 .hgrid-tile {
   grid-area: tile;
   display: flex;
@@ -1089,48 +1113,94 @@
   background: var(--c-deep);
 }
 .site-v2 .hgrid-tile:empty { background: transparent; }
-.site-v2 .hgrid-tile.has-map { overflow: hidden; isolation: isolate; }
-.site-v2 .hgrid-tile-map { position: absolute; inset: 0; z-index: -1; display: block; }
+.site-v2 .hgrid-tile.has-map { isolation: isolate; }
+/* Peta dipotong di dalam ubin; kartu info lokasi (popover) boleh keluar ke atas ubin. */
+.site-v2 .hgrid-tile-map { position: absolute; inset: 0; z-index: -1; display: block; overflow: hidden; }
 .site-v2 .hgrid-tile-map > .leaflet-container { position: absolute; inset: 0; }
 .site-v2 .hgrid-tile-map .leaflet-container { background: var(--c-deep); }
-.site-v2 .hgrid-tile-map::after { content: ''; position: absolute; inset: 0; z-index: 500; pointer-events: none; background: linear-gradient(200deg, rgba(10, 26, 48, 0.15), rgba(10, 26, 48, 0.78)); }
+.site-v2 .hgrid-tile-map::after { content: ''; position: absolute; inset: 0; z-index: 500; pointer-events: none; background: linear-gradient(180deg, rgba(10, 26, 48, 0.62) 0%, rgba(10, 26, 48, 0.18) 42%, rgba(10, 26, 48, 0.8) 100%); }
 .site-v2 .hgrid-tile.has-map strong,
 .site-v2 .hgrid-tile.has-map > span:not(.hgrid-tile-map) { position: relative; z-index: 1; text-shadow: 0 1px 10px rgba(8, 20, 38, 0.6); }
-.site-v2 .hgrid-map-pin span { display: block; width: 16px; height: 16px; border: 3px solid #fff; border-radius: 50%; background: var(--c-sky); box-shadow: 0 0 0 4px rgba(66, 165, 213, 0.35); }
+.site-v2 .hgrid-map-pin { display: grid; place-items: center; cursor: pointer; }
+.site-v2 .hgrid-map-pin span { position: relative; display: block; width: 16px; height: 16px; border: 3px solid #fff; border-radius: 50%; background: var(--c-sky); box-shadow: 0 0 0 4px rgba(66, 165, 213, 0.35), 0 2px 8px rgba(0, 0, 0, 0.45); transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.2s var(--ease); }
+.site-v2 .hgrid-map-pin:hover span { transform: scale(1.2); box-shadow: 0 0 0 7px rgba(66, 165, 213, 0.38), 0 2px 8px rgba(0, 0, 0, 0.45); }
+.site-v2 .hgrid-map-pin.is-active span { background: #fff; border-color: var(--c-sky); transform: scale(1.25); }
+.site-v2 .hgrid-map-pin.is-active span::after { content: ''; position: absolute; inset: -9px; border: 2px solid var(--c-sky); border-radius: 50%; animation: hgridPinPulse 1.8s ease-out infinite; }
+@keyframes hgridPinPulse { from { opacity: 0.9; transform: scale(0.6); } to { opacity: 0; transform: scale(1.6); } }
+@media (prefers-reduced-motion: reduce) { .site-v2 .hgrid-map-pin.is-active span::after { animation: none; opacity: 0.7; } }
+.site-v2 .hgrid-tile.is-facilities { justify-content: space-between; gap: 12px; }
+.site-v2 .hgrid-fac-head { position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+/* Lapisan teks tidak menangkap klik agar pin peta di bawahnya tetap bisa diklik; hanya tombol yang aktif. */
+.site-v2 .hgrid-fac-head,
+.site-v2 .hgrid-fac-body { pointer-events: none; }
+.site-v2 .hgrid-fac-list button { pointer-events: auto; }
+.site-v2 .hgrid-fac-count { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; }
+.site-v2 .hgrid-fac-count small { max-width: 12ch; font-size: 0.68rem; font-weight: 600; line-height: 1.25; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.8); text-shadow: 0 1px 8px rgba(8, 20, 38, 0.6); }
+.site-v2 .hgrid-fac-label { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 0.7rem; font-weight: 650; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-sky); }
+.site-v2 .hgrid-fac-label::before { content: ''; width: 18px; height: 1.5px; background: currentColor; }
+.site-v2 .hgrid-tile.is-facilities .hgrid-fac-head strong { align-self: auto; font-size: clamp(2rem, 3vw, 2.8rem); text-shadow: 0 1px 10px rgba(8, 20, 38, 0.6); }
+.site-v2 .hgrid-fac-body { position: relative; z-index: 1; display: grid; gap: 6px; }
+.site-v2 .hgrid-fac-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.site-v2 .hgrid-fac-list button { display: inline-flex; align-items: center; gap: 10px; padding: 3px 0; border: 0; background: none; color: #fff; font: inherit; font-size: clamp(1rem, 1.2vw, 1.15rem); font-weight: 600; letter-spacing: -0.01em; text-align: left; text-shadow: 0 1px 10px rgba(8, 20, 38, 0.65); cursor: pointer; transition: color 0.2s var(--ease); }
+.site-v2 .hgrid-fac-list button i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--c-sky); box-shadow: 0 0 0 3px rgba(66, 165, 213, 0.3); transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease); }
+.site-v2 .hgrid-fac-list button:hover i,
+.site-v2 .hgrid-fac-list button.is-active i { transform: scale(1.25); box-shadow: 0 0 0 5px rgba(66, 165, 213, 0.35); }
+.site-v2 .hgrid-fac-list button.is-active { color: var(--c-sky); }
+.site-v2 .hgrid-fac-list button:focus-visible { outline: 2px solid var(--c-sky); outline-offset: 3px; border-radius: 2px; }
+.site-v2 .hgrid-fac-card {
+  position: absolute;
+  left: max(var(--gutter), 2vw);
+  bottom: calc(100% - 12px);
+  z-index: 5;
+  width: 270px;
+  max-width: calc(100vw - 2 * var(--gutter));
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  background: rgba(10, 26, 48, 0.8);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.65);
+  color: #fff;
+  animation: hgridFacIn 0.22s var(--ease) both;
+}
+@keyframes hgridFacIn { from { opacity: 0; transform: translateY(6px); } }
+.site-v2 .hgrid-fac-card small { display: block; padding-right: 28px; font-size: 0.66rem; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-sky); }
+.site-v2 .hgrid-tile .hgrid-fac-card strong { display: block; align-self: auto; margin-top: 4px; font-size: 1.15rem; font-weight: 650; line-height: 1.2; letter-spacing: -0.01em; text-shadow: none; }
+.site-v2 .hgrid-fac-card p { margin-top: 6px; font-size: 0.86rem; line-height: 1.45; color: rgba(255, 255, 255, 0.82) !important; }
+.site-v2 .hgrid-fac-card a { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 0.8rem; font-weight: 600; color: var(--c-sky); }
+.site-v2 .hgrid-fac-card a:hover { color: #fff; }
+.site-v2 .hgrid-fac-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.1); color: #fff; cursor: pointer; }
+.site-v2 .hgrid-fac-close:hover { background: rgba(255, 255, 255, 0.2); }
 .site-v2 .hgrid-tile strong { align-self: flex-end; font-size: clamp(2.2rem, 3.4vw, 3rem); font-weight: 600; line-height: 1; letter-spacing: -0.03em; }
 .site-v2 .hgrid-tile > span:not(.hgrid-tile-map) { font-size: 1.02rem; line-height: 1.25; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.9); max-width: 14ch; }
 .site-v2 .hgrid-card-cell { grid-area: card; padding: 0; }
 .site-v2 .hgrid-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) auto;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) auto;
   height: 100%;
   min-height: clamp(140px, 22vh, 220px);
-  background: var(--c-soft);
+  background: linear-gradient(135deg, #e8f1fa 0%, var(--c-soft) 70%);
   color: var(--c-deep);
 }
-.site-v2 .hgrid-card-text { display: flex; flex-direction: column; justify-content: space-between; gap: 18px; padding: clamp(20px, 2.6vw, 36px); }
-.site-v2 .hgrid-card-title { font-size: clamp(1.2rem, min(1.9vw, 3.2vh), 1.9rem); font-weight: 500; line-height: 1.08; letter-spacing: -0.02em; color: var(--c-deep) !important; white-space: pre-line; }
+.site-v2 .hgrid-card-text { display: flex; flex-direction: column; justify-content: space-between; gap: 18px; padding: clamp(22px, 2.6vw, 38px); }
+.site-v2 .hgrid-card-title { max-width: 17ch; font-size: clamp(1.25rem, min(1.9vw, 3.3vh), 2rem); font-weight: 500; line-height: 1.12; letter-spacing: -0.02em; color: var(--c-deep) !important; white-space: pre-line; text-wrap: balance; }
 .site-v2 .hgrid-card-note { display: inline-flex; align-items: center; gap: 8px; font-size: 0.92rem; color: var(--c-slate); }
 .site-v2 .hgrid-card-note i { width: 8px; height: 8px; border-radius: 50%; background: var(--c-blue); }
-.site-v2 .hgrid-card-img { position: relative; display: block; margin-top: calc(-1 * clamp(24px, 5vh, 60px)); }
+.site-v2 .hgrid-card-img { position: relative; display: block; margin-top: calc(-1 * clamp(28px, 6vh, 72px)); margin-bottom: 6px; }
 /* Foto produk berlatar putih menyatu dengan warna kartu. */
 .site-v2 .hgrid-card-img { mix-blend-mode: multiply; }
-.site-v2 .hgrid-play { display: flex; flex-direction: column; align-items: center; gap: 10px; align-self: start; margin: clamp(20px, 2.6vw, 32px); padding: 0; border: 0; background: none; color: var(--c-deep); font: inherit; cursor: pointer; }
-.site-v2 .hgrid-play span { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; background: var(--c-deep); color: #fff; transition: transform 0.25s var(--ease), background 0.25s var(--ease); }
+.site-v2 .hgrid-play { display: flex; flex-direction: column; align-items: center; gap: 10px; align-self: start; margin: clamp(22px, 2.6vw, 34px) clamp(22px, 2.6vw, 34px) 0 0; padding: 0; border: 0; background: none; color: var(--c-deep); font: inherit; font-weight: 600; cursor: pointer; }
+.site-v2 .hgrid-play span { display: grid; place-items: center; width: 62px; height: 62px; border-radius: 50%; background: var(--c-deep); color: #fff; box-shadow: 0 12px 26px -12px rgba(16, 45, 80, 0.6); transition: transform 0.25s var(--ease), background 0.25s var(--ease); }
+.site-v2 .hgrid-play:focus-visible span { outline: 2px solid var(--c-blue); outline-offset: 3px; }
 .site-v2 .hgrid-play:hover span { transform: scale(1.06); background: var(--c-blue); }
 .site-v2 .hgrid-play small { font-size: 0.92rem; }
-[data-theme='dark'] .site-v2 .hgrid-card { background: rgba(16, 45, 80, 0.86); color: #fff; backdrop-filter: blur(8px); }
-[data-theme='dark'] .site-v2 .hgrid-card-title { color: #fff !important; }
-[data-theme='dark'] .site-v2 .hgrid-card-note { color: rgba(255, 255, 255, 0.8); }
-[data-theme='dark'] .site-v2 .hgrid-card-note i { background: var(--c-sky); }
-[data-theme='dark'] .site-v2 .hgrid-card-img { mix-blend-mode: normal; }
-[data-theme='dark'] .site-v2 .hgrid-play { color: #fff; }
-[data-theme='dark'] .site-v2 .hgrid-play span { background: var(--c-blue); }
+/* Kartu sorotan sengaja tetap biru muda di mode gelap (permintaan pemilik 2026-11-04): tanpa aturan [data-theme='dark']. */
 .site-v2 .hgrid-corner { grid-area: corner; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 12px; }
 .site-v2 .hgrid-corner-img { position: relative; display: block; width: 96px; height: 96px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255, 255, 255, 0.8); }
 .site-v2 .hgrid-corner { padding-right: 104px; }
-.site-v2 .hgrid-corner p { max-width: 26ch; font-size: 0.86rem; line-height: 1.4; letter-spacing: 0.02em; color: rgba(255, 255, 255, 0.86) !important; }
+.site-v2 .hgrid-corner p { white-space: pre-line; max-width: 30ch; font-size: 0.86rem; line-height: 1.4; letter-spacing: 0.02em; color: rgba(255, 255, 255, 0.86) !important; }
 
 @media (max-width: 1100px) {
   .site-v2 .hgrid { height: auto; min-height: 100svh; }
@@ -1141,12 +1211,21 @@
 }
 @media (max-width: 720px) {
   .site-v2 .hgrid { height: auto; min-height: 100svh; }
-  .site-v2 .hgrid-cells { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'main main' 'stat tile' 'card card'; }
-  .site-v2 .hgrid-aside { display: none; }
+  .site-v2 .hgrid-cells { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'main' 'aside' 'stat' 'tile' 'card'; }
   .site-v2 .hgrid-main { padding: 28px var(--gutter); }
+  .site-v2 .hgrid-aside { padding: 16px var(--gutter); }
+  .site-v2 .hgrid-links { max-width: none; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); margin: 0; }
+  .site-v2 .hgrid-stat { flex-direction: row; align-items: center; gap: 14px; padding: 16px var(--gutter); }
+  .site-v2 .hgrid-stat span { margin-top: 0; max-width: none; }
   .site-v2 .hgrid-stat,
-  .site-v2 .hgrid-tile { padding: 20px var(--gutter); min-height: 0; }
+  .site-v2 .hgrid-tile { min-height: 0; }
+  .site-v2 .hgrid-tile { padding: 20px var(--gutter); }
+  .site-v2 .hgrid-tile.is-facilities { min-height: 190px; }
   .site-v2 .hgrid-tile strong { align-self: flex-start; }
+  /* Kartu info lokasi mengalir di bawah daftar (tanpa popover) agar tidak menutupi isi lain. */
+  .site-v2 .hgrid-fac-card { position: relative; left: auto; bottom: auto; width: auto; max-width: none; }
+  .site-v2 .hgrid-actions .btn-solid,
+  .site-v2 .hgrid-watch { flex: 1 1 auto; }
   .site-v2 .hgrid-card { grid-template-columns: minmax(0, 1fr) auto; min-height: 0; }
   .site-v2 .hgrid-card-img { display: none; }
 }

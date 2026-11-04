@@ -321,8 +321,8 @@ class CmsPageSeeder extends Seeder
                 ],
                 'title' => $t("Merekayasa solusi karet\nuntuk hari esok yang lebih baik.", "Engineering Rubber Solutions\nfor a Better Tomorrow."),
                 'subtitle' => $t(
-                    'Dengan pengalaman puluhan tahun di industri karet, PT Industri Karet Nusantara menghadirkan produk berbasis karet dan solusi industri yang inovatif, sambil terus menerapkan praktik manufaktur yang berkelanjutan.',
-                    'With decades of experience in the rubber industry, PT Industri Karet Nusantara delivers innovative rubber-based products and industrial solutions while continuously embracing sustainable manufacturing practices.'
+                    'Berbekal pengalaman lebih dari enam dekade di industri karet, PT Industri Karet Nusantara menghadirkan produk dan solusi inovatif untuk berbagai kebutuhan industri, dengan komitmen terhadap manufaktur yang berkelanjutan.',
+                    'Drawing on more than six decades in the rubber industry, PT Industri Karet Nusantara delivers innovative products and solutions for a wide range of industrial needs, with a commitment to sustainable manufacturing.'
                 ),
                 'buttons' => [
                     ['label' => $t('Jelajahi Bisnis Kami', 'Explore Our Business'), 'url' => '/bisnis', 'style' => 'solid', 'profile_document' => false, 'new_tab' => false],
@@ -340,20 +340,25 @@ class CmsPageSeeder extends Seeder
                 'overlay' => 45,
                 'stats' => [
                     ['value' => '60+', 'label' => $t('Tahun pengalaman manufaktur karet', 'Years of rubber manufacturing')],
-                    ['value' => '02', 'label' => $t('Lini bisnis, dua pabrik', 'Business lines, two plants')],
+                    ['value' => '02', 'label' => $t('Fasilitas produksi', 'Production facilities')],
                 ],
-                // Ubin "02" berlatar peta satelit kedua pabrik (titik dari blok kontak).
+                // Ubin "Lokasi fasilitas": peta satelit kedua pabrik, pin bisa diklik (titik = perkiraan dari alamat, sama dengan blok kontak).
                 'tile_map' => true,
+                'tile_label' => $t('Lokasi fasilitas', 'Facility locations'),
+                'locations' => [
+                    ['name' => $t('Sei Bamban', 'Sei Bamban'), 'note' => $t('Fasilitas produksi Resiprene 35, Serdang Bedagai', 'Resiprene 35 production facility, Serdang Bedagai'), 'geo' => self::GEO_RESIPRENE_PLANT],
+                    ['name' => $t('Tanjung Morawa', 'Tanjung Morawa'), 'note' => $t('Fasilitas produksi Rubber Articles dan kantor pusat, Medan', 'Rubber Articles production facility and head office, Medan'), 'geo' => self::GEO_HEAD_OFFICE],
+                ],
                 'links' => [
                     ['title' => $t('Resiprene 35', 'Resiprene 35'), 'note' => $t('Cyclised natural rubber · Sei Bamban', 'Cyclised natural rubber · Sei Bamban'), 'image' => MediaSeeder::id('resiprene-35.jpg'), 'url' => '/bisnis#resiprene-35'],
                     ['title' => $t('Rubber Articles', 'Rubber Articles'), 'note' => $t('Barang karet industri · Tanjung Morawa', 'Industrial rubber goods · Tanjung Morawa'), 'image' => MediaSeeder::id('rubber-articles-packing-endless.jpg'), 'url' => '/bisnis#barang-karet'],
                 ],
-                'card_title' => $t("Resiprene 35 dipakai produsen coating\ndi 13 negara.", "Resiprene 35 serves coating makers\nin 13 countries."),
+                'card_title' => $t('Resiprene 35 dipakai produsen coating di 13 negara.', 'Resiprene 35 serves coating makers in 13 countries.'),
                 'card_note' => $t('Terdaftar REACH untuk Uni Eropa', 'REACH-registered for the EU'),
                 'card_image' => MediaSeeder::id('resiprene-35-cutout.png'),
                 'video_id' => 'FGJQW6l2hrk',
                 // {year} diganti tahun berjalan oleh FE.
-                'corner_text' => $t('Copyright © {year} PT Industri Karet Nusantara', 'Copyright © {year} PT Industri Karet Nusantara'),
+                'corner_text' => $t("Copyright © {year}\nPT Industri Karet Nusantara", "Copyright © {year}\nPT Industri Karet Nusantara"),
                 'corner_image' => null,
             ]],
             ['key' => 'glance', 'type' => 'stats', 'content' => [

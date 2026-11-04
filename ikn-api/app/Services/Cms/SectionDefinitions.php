@@ -186,6 +186,13 @@ final class SectionDefinitions
                         'url' => self::f('url', 'Tautan', 'URL', ['required' => true]),
                     ], ['max_items' => 3]),
                     'tile_map' => self::f('boolean', 'Peta lokasi pabrik di ubin angka kedua', 'Plant location map in the second figure tile'),
+                    // Ubin "Lokasi fasilitas" (2026-11-04): pin peta bisa diklik untuk kartu info; kosong = lokasi blok kontak.
+                    'tile_label' => self::f('i18n_text', 'Label kecil ubin peta', 'Map tile eyebrow', ['max' => 40]),
+                    'locations' => self::list('Lokasi fasilitas di ubin peta', 'Facility locations in the map tile', [
+                        'name' => self::f('i18n_text', 'Nama fasilitas', 'Facility name', ['required' => true, 'max' => 60]),
+                        'note' => self::f('i18n_text', 'Keterangan fasilitas', 'Facility note', ['max' => 120]),
+                        'geo' => self::f('geo', 'Titik fasilitas', 'Facility point'),
+                    ], ['max_items' => 4]),
                     'corner_text' => self::f('i18n_textarea', 'Teks pojok kanan bawah', 'Bottom-right corner text', ['max' => 120]),
                     'corner_image' => self::f('media', 'Gambar pojok kanan bawah', 'Bottom-right corner image', ['accept' => 'image']),
                 ], ['home']),

@@ -65,6 +65,8 @@ export interface HeroContent {
   videos?: { file: MediaSummary | null }[];
   links?: { title: I18n; note?: I18n; image?: MediaSummary | null; url: string }[];
   tile_map?: boolean;
+  tile_label?: I18n;
+  locations?: { name: I18n; note?: I18n; geo?: { lat: number | null; lng: number | null } | null }[];
   // Konten lama (sebelum migrasi ke daftar tombol).
   primary_label?: I18n;
   primary_url?: string;
