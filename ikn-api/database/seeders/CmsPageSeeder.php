@@ -329,10 +329,32 @@ class CmsPageSeeder extends Seeder
                     ['label' => $t('Kenali Perusahaan Kami', 'Discover Our Company'), 'url' => '/tentang', 'style' => 'outline', 'profile_document' => false, 'new_tab' => false],
                 ],
                 'slides' => self::mediaItems([
+                    'hero-perkebunan-drone.jpg' => $t('Foto udara perkebunan karet', 'Aerial view of a rubber plantation'),
                     'pabrik-2-1.png' => $t('Foto udara kompleks pabrik PT IKN', 'Aerial view of a PT IKN plant complex'),
-                    'karet-1-1-scaled.jpg' => $t('Penyadapan getah karet alam', 'Tapping natural rubber latex'),
                     'produksi-karet-1.webp' => $t('Pemotongan slab karet di pabrik', 'Cutting rubber slabs at the plant'),
                 ], 'image', 'alt'),
+                // Tata letak kisi layar penuh (2026-11-04): video drone kebun karet klien, dua angka, kartu sorotan.
+                'layout' => 'grid',
+                'video' => MediaSeeder::id('hero-perkebunan-drone.mp4'),
+                'videos' => array_values(array_filter([['file' => MediaSeeder::id('hero-perkebunan-drone-2.mp4')]], fn ($v) => $v['file'] !== null)),
+                'overlay' => 45,
+                'stats' => [
+                    ['value' => '60+', 'label' => $t('Tahun pengalaman manufaktur karet', 'Years of rubber manufacturing')],
+                    ['value' => '02', 'label' => $t('Lini bisnis, dua pabrik', 'Business lines, two plants')],
+                ],
+                // Ubin "02" berlatar peta satelit kedua pabrik (titik dari blok kontak).
+                'tile_map' => true,
+                'links' => [
+                    ['title' => $t('Resiprene 35', 'Resiprene 35'), 'note' => $t('Cyclised natural rubber · Sei Bamban', 'Cyclised natural rubber · Sei Bamban'), 'image' => MediaSeeder::id('resiprene-35.jpg'), 'url' => '/bisnis#resiprene-35'],
+                    ['title' => $t('Rubber Articles', 'Rubber Articles'), 'note' => $t('Barang karet industri · Tanjung Morawa', 'Industrial rubber goods · Tanjung Morawa'), 'image' => MediaSeeder::id('rubber-articles-packing-endless.jpg'), 'url' => '/bisnis#barang-karet'],
+                ],
+                'card_title' => $t("Resiprene 35 dipakai produsen coating\ndi 13 negara.", "Resiprene 35 serves coating makers\nin 13 countries."),
+                'card_note' => $t('Terdaftar REACH untuk Uni Eropa', 'REACH-registered for the EU'),
+                'card_image' => MediaSeeder::id('resiprene-35-cutout.png'),
+                'video_id' => 'FGJQW6l2hrk',
+                // {year} diganti tahun berjalan oleh FE.
+                'corner_text' => $t('Copyright © {year} PT Industri Karet Nusantara', 'Copyright © {year} PT Industri Karet Nusantara'),
+                'corner_image' => null,
             ]],
             ['key' => 'glance', 'type' => 'stats', 'content' => [
                 'label' => $t('/ Sekilas perusahaan', '/ Company at a glance'),
@@ -442,12 +464,6 @@ class CmsPageSeeder extends Seeder
                     'pengemasan-muat-2.jpg' => $t('Pemeriksaan muatan sebelum pengiriman', 'Checking the load before shipment'),
                 ], 'image', 'caption'),
             ]],
-            ['key' => 'history', 'type' => 'timeline', 'content' => [
-                'label' => $t('/ Sejarah & tonggak', '/ History & milestones'),
-                'heading' => $t('Dari pabrik ban sepeda pada 1965 hingga PT IKN.', 'From a bicycle tyre factory in 1965 to PT IKN.'),
-                'start' => 'oldest',
-                'items' => self::historyItems($t),
-            ]],
             ['key' => 'kualitas', 'type' => 'pillars', 'content' => [
                 'label' => $t('/ Kualitas & sertifikasi', '/ Quality & certifications'),
                 'heading' => $t('Kualitas yang dapat Anda percaya.', 'Quality You Can Trust.'),
@@ -500,6 +516,7 @@ class CmsPageSeeder extends Seeder
             ['key' => 'pilar-keberlanjutan', 'type' => 'pillars', 'content' => [
                 'label' => $t('', ''),
                 'heading' => $t('', ''),
+                'bg_media' => MediaSeeder::id('kebun-karet-2.jpg'), 'bg_opacity' => 14, 'bg_tone' => 'light',
                 'items' => [
                     ['key' => 'lingkungan', 'icon' => 'leaf', 'title' => $t('Tanggung jawab lingkungan', 'Environmental responsibility'), 'body' => $t(
                         'Karet alam adalah bahan baku utama kami. Kami berupaya memakainya secara efisien dan mengelola limbah produksi secara terkendali di kedua pabrik.',
@@ -523,14 +540,8 @@ class CmsPageSeeder extends Seeder
                     ), 'points' => []],
                 ],
             ]],
-            ['key' => 'pelanggan', 'type' => 'customer_logos', 'content' => [
-                'label' => $t('/ Pelanggan & mitra', '/ Our customers & partners'),
-                'heading' => $t('Membangun kemitraan industri yang kuat.', 'Building Strong Industrial Partnerships.'),
-                'lead' => $t(
-                    'Barang karet kami dipasok ke unit kebun dan pabrik PT Perkebunan Nusantara II, III, IV, dan V serta PT Socfin Indonesia. Resiprene 35 dipakai pelanggan di Indonesia dan luar negeri, antara lain Italia, Belgia, Spanyol, Tiongkok, Taiwan, Vietnam, Thailand, Malaysia, Amerika Serikat, dan Brasil.',
-                    'Our rubber articles are supplied to estate and mill units of PT Perkebunan Nusantara II, III, IV and V and PT Socfin Indonesia. Resiprene 35 is used by customers in Indonesia and abroad, including Italy, Belgium, Spain, China, Taiwan, Vietnam, Thailand, Malaysia, the United States and Brazil.'
-                ),
-            ]],
+            // Pengganti blok pelanggan (permintaan pemilik 2026-11-04): kartu lanjutan dari halaman Bisnis.
+            self::nextStepsSection($t, 'selanjutnya'),
             ['key' => 'news', 'type' => 'latest_news', 'content' => [
                 'label' => $t('/ Berita & kegiatan', '/ News & activities'),
                 'heading' => $t('Berita & kabar terbaru.', 'Latest News & Updates.'),
@@ -575,7 +586,28 @@ class CmsPageSeeder extends Seeder
         ];
     }
 
+    /** Kartu "Selanjutnya": katalog, kualitas, kemitraan (dulu di halaman Bisnis, kini di beranda). */
+    public static function nextStepsSection(callable $t, string $key = 'links'): array
+    {
+        return ['key' => $key, 'type' => 'link_cards', 'content' => [
+            'label' => $t('/ Selanjutnya', '/ Next steps'),
+            'heading' => $t('Dari spesifikasi sampai pemesanan.', 'From specifications to ordering.'),
+            'lead' => $t('', ''),
+            'items' => [
+                ['icon' => 'bag', 'title' => $t('Katalog & pemesanan online', 'Catalog & online ordering'), 'body' => $t('Lihat harga dan stok, lalu pesan langsung sebagai pelanggan perusahaan.', 'See prices and stock, then order directly as a business customer.'), 'url' => '/catalog', 'link_label' => $t('Buka katalog', 'Open catalog')],
+                ['icon' => 'microscope', 'title' => $t('Kualitas & sertifikat', 'Quality & certificates'), 'body' => $t('Parameter uji, standar produk, dan sertifikat yang kami pegang.', 'Test parameters, product standards and the certificates we hold.'), 'url' => '/kualitas', 'link_label' => $t('Lihat kualitas', 'View quality')],
+                ['icon' => 'handshake', 'title' => $t('Kemitraan & permintaan', 'Partnership & inquiries'), 'body' => $t('Pelanggan kami dan cara mengajukan kerja sama atau penawaran.', 'Our customers and how to send a business or quotation inquiry.'), 'url' => '/kemitraan', 'link_label' => $t('Ke kemitraan', 'Go to partnership')],
+            ],
+        ]];
+    }
+
     /** Kartu pimpinan: nama + jabatan; detail lain kosong sampai datanya tersedia (jabatan saat ini = data terverifikasi). */
+    /** Daftar pelanggan customer_map dari nama dipisah koma (logo dan titik sendiri kosong = titik negara). */
+    private static function customerList(string $names): array
+    {
+        return array_map(fn ($name) => ['name' => trim($name), 'logo' => null, 'geo' => ['lat' => null, 'lng' => null]], explode(',', $names));
+    }
+
     private static function person(callable $t, string $name, string $positionId, string $positionEn): array
     {
         return [
@@ -735,23 +767,34 @@ class CmsPageSeeder extends Seeder
             ]],
             ['key' => 'kapabilitas', 'type' => 'spec_table', 'content' => [
                 'label' => $t('/ Kemampuan produksi', '/ Production capabilities'),
-                'heading' => $t('Mesin produksi aktif di Tanjung Morawa.', 'Production equipment in use at Tanjung Morawa.'),
+                'heading' => $t('Kapasitas dan mesin di dua pabrik.', 'Capacity and equipment at both plants.'),
                 'lead' => $t(
-                    'Barang karet dicampur, dikalender, dicetak, dan diselesaikan di pabrik sendiri. Ukuran, profil, dan logo dapat disesuaikan dengan kebutuhan pelanggan, dan compound juga dipasok sebagai bahan baku produk karet lain.',
-                    'Rubber articles are mixed, calendered, moulded and finished in house. Sizes, profiles and logos can be made to customer requirements, and compound is also supplied as raw material for other rubber products.'
+                    'Barang karet dicampur, dikalender, dicetak, dan diselesaikan di Tanjung Morawa; ukuran, profil, dan logo dapat disesuaikan dengan kebutuhan pelanggan. Resiprene 35 diolah dari karet alam di Sei Bamban.',
+                    'Rubber articles are mixed, calendered, moulded and finished at Tanjung Morawa; sizes, profiles and logos can be made to customer requirements. Resiprene 35 is processed from natural rubber at Sei Bamban.'
                 ),
-                'rows' => [
-                    ['label' => $t('Mesin calender', 'Calender machine'), 'value' => $t('1 unit', '1 unit')],
-                    ['label' => $t('Mix mill', 'Mix mill'), 'value' => $t('2 unit', '2 units')],
-                    ['label' => $t('Set press pompa hidrolik', 'Hydraulic pump press set'), 'value' => $t('2 unit', '2 units')],
-                    ['label' => $t('Square press', 'Square press'), 'value' => $t('5 unit', '5 units')],
-                    ['label' => $t('Hand press', 'Hand press'), 'value' => $t('2 unit', '2 units')],
-                    ['label' => $t('Ball cutter', 'Ball cutter'), 'value' => $t('1 unit', '1 unit')],
-                    ['label' => $t('Sand blasting', 'Sand blasting'), 'value' => $t('1 unit', '1 unit')],
-                ],
+                'rows' => array_merge(
+                    array_map(fn ($r) => ['group' => $t('Tanjung Morawa · Rubber Articles', 'Tanjung Morawa · Rubber Articles')] + $r, [
+                        ['label' => $t('Kapasitas produksi', 'Production capacity'), 'value' => $t('50 ton/tahun', '50 tonnes/year')],
+                        ['label' => $t('Mesin calender', 'Calender machine'), 'value' => $t('1 unit', '1 unit')],
+                        ['label' => $t('Mix mill', 'Mix mill'), 'value' => $t('2 unit', '2 units')],
+                        ['label' => $t('Set press pompa hidrolik', 'Hydraulic pump press set'), 'value' => $t('2 unit', '2 units')],
+                        ['label' => $t('Square press', 'Square press'), 'value' => $t('5 unit', '5 units')],
+                        ['label' => $t('Hand press', 'Hand press'), 'value' => $t('2 unit', '2 units')],
+                        ['label' => $t('Ball cutter', 'Ball cutter'), 'value' => $t('1 unit', '1 unit')],
+                        ['label' => $t('Sand blasting', 'Sand blasting'), 'value' => $t('1 unit', '1 unit')],
+                    ]),
+                    array_map(fn ($r) => ['group' => $t('Sei Bamban · Resiprene 35', 'Sei Bamban · Resiprene 35')] + $r, [
+                        ['label' => $t('Kapasitas terpasang', 'Installed capacity'), 'value' => $t('800 ton/tahun', '800 tonnes/year')],
+                        ['label' => $t('Realisasi produksi', 'Actual output'), 'value' => $t('500 ton/tahun', '500 tonnes/year')],
+                        ['label' => $t('Dibangun / mulai produksi', 'Built / in production'), 'value' => $t('1996 / 1998', '1996 / 1998')],
+                        ['label' => $t('Bahan baku', 'Raw material'), 'value' => $t('Karet alam dari Gunung Para, 36 km', 'Natural rubber from Gunung Para, 36 km away')],
+                        ['label' => $t('Luas lahan', 'Site area'), 'value' => $t('66.538 m²', '66,538 m²')],
+                    ])
+                ),
                 'note' => $t('Sumber: profil perusahaan PT IKN.', 'Source: PT IKN company profile.'),
             ]],
             ['key' => 'cara-pesan', 'type' => 'steps', 'content' => [
+                'bg_media' => MediaSeeder::id('pengemasan-muat-2.jpg'), 'bg_opacity' => 22, 'bg_tone' => 'dark',
                 'label' => $t('/ Cara memesan', '/ How to order'),
                 'heading' => $t('Dari daftar akun sampai barang tiba.', 'From sign-up to delivery.'),
                 'lead' => $t('Pemesanan online terbuka untuk pelanggan perusahaan. Untuk kebutuhan khusus, hubungi tim marketing lewat formulir kontak atau WhatsApp.', 'Online ordering is open to business customers. For special requirements, contact our marketing team through the contact form or WhatsApp.'),
@@ -761,16 +804,6 @@ class CmsPageSeeder extends Seeder
                     ['icon' => 'bag', 'title' => $t('Pilih produk dan pengiriman', 'Choose products and delivery'), 'body' => $t('Masukkan produk ke keranjang sesuai minimum order, pilih alamat, lalu bandingkan layanan pengiriman beserta ongkirnya.', 'Add products to the cart at or above the minimum order, choose an address, then compare delivery services and their shipping cost.')],
                     ['icon' => 'wallet', 'title' => $t('Bayar dan unggah bukti', 'Pay and upload proof'), 'body' => $t('Bayar dengan transfer bank atau QRIS, lalu unggah bukti pembayaran. Invoice terbit setelah pembayaran diverifikasi.', 'Pay by bank transfer or QRIS, then upload the payment proof. The invoice is issued once the payment is verified.')],
                     ['icon' => 'truck', 'title' => $t('Pantau sampai diterima', 'Track until it arrives'), 'body' => $t('Status pesanan dan nomor resi tampil di dashboard. Setelah barang diterima, selesaikan pesanan dan beri ulasan.', 'Order status and the tracking number show in your dashboard. When the goods arrive, complete the order and leave a review.')],
-                ],
-            ]],
-            ['key' => 'links', 'type' => 'link_cards', 'content' => [
-                'label' => $t('/ Selanjutnya', '/ Next steps'),
-                'heading' => $t('Dari spesifikasi sampai pemesanan.', 'From specifications to ordering.'),
-                'lead' => $t('', ''),
-                'items' => [
-                    ['icon' => 'bag', 'title' => $t('Katalog & pemesanan online', 'Catalog & online ordering'), 'body' => $t('Lihat harga dan stok, lalu pesan langsung sebagai pelanggan perusahaan.', 'See prices and stock, then order directly as a business customer.'), 'url' => '/catalog', 'link_label' => $t('Buka katalog', 'Open catalog')],
-                    ['icon' => 'microscope', 'title' => $t('Kualitas & sertifikat', 'Quality & certificates'), 'body' => $t('Parameter uji, standar produk, dan sertifikat yang kami pegang.', 'Test parameters, product standards and the certificates we hold.'), 'url' => '/kualitas', 'link_label' => $t('Lihat kualitas', 'View quality')],
-                    ['icon' => 'handshake', 'title' => $t('Kemitraan & permintaan', 'Partnership & inquiries'), 'body' => $t('Pelanggan kami dan cara mengajukan kerja sama atau penawaran.', 'Our customers and how to send a business or quotation inquiry.'), 'url' => '/kemitraan', 'link_label' => $t('Ke kemitraan', 'Go to partnership')],
                 ],
             ]],
             ['key' => 'unduhan', 'type' => 'brochures', 'content' => [
@@ -839,6 +872,7 @@ class CmsPageSeeder extends Seeder
                 'visual_mark' => '',
             ]],
             ['key' => 'pengembangan', 'type' => 'pillars', 'content' => [
+                'bg_media' => MediaSeeder::id('bahan-baku-gudang.jpg'), 'bg_opacity' => 10, 'bg_tone' => 'light',
                 'label' => $t('/ Riset & pengembangan', '/ Research & development'),
                 'heading' => $t('Pengembangan yang berangkat dari aplikasi pelanggan.', 'Development driven by customer applications.'),
                 'items' => [
@@ -1117,19 +1151,19 @@ class CmsPageSeeder extends Seeder
                 'lead' => $t('Resiprene 35 dikirim dari Pelabuhan Belawan ke produsen cat, tinta, coating, dan pita perekat di Asia, Eropa, Timur Tengah, dan Amerika.', 'Resiprene 35 ships from Belawan port to paint, ink, coating and adhesive tape makers in Asia, Europe, the Middle East and the Americas.'),
                 'origin_label' => $t('Belawan, Indonesia', 'Belawan, Indonesia'),
                 'items' => [
-                    ['region' => 'asia', 'country' => $t('Indonesia', 'Indonesia'), 'geo' => ['lat' => -6.2, 'lng' => 106.85], 'customers' => 'Unichem, PT Wan Mei, PT Java Agro Timber Investama'],
-                    ['region' => 'asia', 'country' => $t('Malaysia', 'Malaysia'), 'geo' => ['lat' => 3.14, 'lng' => 101.69], 'customers' => 'Chemzone, Stallion Chemical, VE-GE'],
-                    ['region' => 'asia', 'country' => $t('Thailand', 'Thailand'), 'geo' => ['lat' => 13.76, 'lng' => 100.5], 'customers' => 'CMS Alliance Co. Ltd, Innovachem, Selic, Megachem'],
-                    ['region' => 'asia', 'country' => $t('Vietnam', 'Vietnam'), 'geo' => ['lat' => 10.82, 'lng' => 106.63], 'customers' => 'Huy An, Thinh Phat'],
-                    ['region' => 'asia', 'country' => $t('Tiongkok', 'China'), 'geo' => ['lat' => 31.23, 'lng' => 121.47], 'customers' => 'Shanghai Recky'],
-                    ['region' => 'asia', 'country' => $t('Taiwan', 'Taiwan'), 'geo' => ['lat' => 25.03, 'lng' => 121.56], 'customers' => 'Champion Ink, Euroland'],
-                    ['region' => 'asia', 'country' => $t('Korea Selatan', 'South Korea'), 'geo' => ['lat' => 37.57, 'lng' => 126.98], 'customers' => 'Hanval'],
-                    ['region' => 'middle_east', 'country' => $t('Uni Emirat Arab', 'United Arab Emirates'), 'geo' => ['lat' => 25.2, 'lng' => 55.27], 'customers' => 'Tawazon Chemical'],
-                    ['region' => 'europe', 'country' => $t('Italia', 'Italy'), 'geo' => ['lat' => 45.46, 'lng' => 9.19], 'customers' => 'Eigenmann & Veronelli, Eigenmann Iberica, Fenzi, Resine Italiane'],
-                    ['region' => 'europe', 'country' => $t('Belgia', 'Belgium'), 'geo' => ['lat' => 50.85, 'lng' => 4.35], 'customers' => 'Ter Hell'],
-                    ['region' => 'europe', 'country' => $t('Spanyol', 'Spain'), 'geo' => ['lat' => 40.42, 'lng' => -3.7], 'customers' => 'Trinity Paints'],
-                    ['region' => 'americas', 'country' => $t('Amerika Serikat', 'United States'), 'geo' => ['lat' => 35.23, 'lng' => -80.84], 'customers' => 'Tesa Tape'],
-                    ['region' => 'americas', 'country' => $t('Brasil', 'Brazil'), 'geo' => ['lat' => -23.55, 'lng' => -46.63], 'customers' => 'Promaflex'],
+                    ['region' => 'asia', 'country' => $t('Indonesia', 'Indonesia'), 'geo' => ['lat' => -6.2, 'lng' => 106.85], 'customers' => self::customerList('Unichem, PT Wan Mei, PT Java Agro Timber Investama')],
+                    ['region' => 'asia', 'country' => $t('Malaysia', 'Malaysia'), 'geo' => ['lat' => 3.14, 'lng' => 101.69], 'customers' => self::customerList('Chemzone, Stallion Chemical, VE-GE')],
+                    ['region' => 'asia', 'country' => $t('Thailand', 'Thailand'), 'geo' => ['lat' => 13.76, 'lng' => 100.5], 'customers' => self::customerList('CMS Alliance Co. Ltd, Innovachem, Selic, Megachem')],
+                    ['region' => 'asia', 'country' => $t('Vietnam', 'Vietnam'), 'geo' => ['lat' => 10.82, 'lng' => 106.63], 'customers' => self::customerList('Huy An, Thinh Phat')],
+                    ['region' => 'asia', 'country' => $t('Tiongkok', 'China'), 'geo' => ['lat' => 31.23, 'lng' => 121.47], 'customers' => self::customerList('Shanghai Recky')],
+                    ['region' => 'asia', 'country' => $t('Taiwan', 'Taiwan'), 'geo' => ['lat' => 25.03, 'lng' => 121.56], 'customers' => self::customerList('Champion Ink, Euroland')],
+                    ['region' => 'asia', 'country' => $t('Korea Selatan', 'South Korea'), 'geo' => ['lat' => 37.57, 'lng' => 126.98], 'customers' => self::customerList('Hanval')],
+                    ['region' => 'middle_east', 'country' => $t('Uni Emirat Arab', 'United Arab Emirates'), 'geo' => ['lat' => 25.2, 'lng' => 55.27], 'customers' => self::customerList('Tawazon Chemical')],
+                    ['region' => 'europe', 'country' => $t('Italia', 'Italy'), 'geo' => ['lat' => 45.46, 'lng' => 9.19], 'customers' => self::customerList('Eigenmann & Veronelli, Eigenmann Iberica, Fenzi, Resine Italiane')],
+                    ['region' => 'europe', 'country' => $t('Belgia', 'Belgium'), 'geo' => ['lat' => 50.85, 'lng' => 4.35], 'customers' => self::customerList('Ter Hell')],
+                    ['region' => 'europe', 'country' => $t('Spanyol', 'Spain'), 'geo' => ['lat' => 40.42, 'lng' => -3.7], 'customers' => self::customerList('Trinity Paints')],
+                    ['region' => 'americas', 'country' => $t('Amerika Serikat', 'United States'), 'geo' => ['lat' => 35.23, 'lng' => -80.84], 'customers' => self::customerList('Tesa Tape')],
+                    ['region' => 'americas', 'country' => $t('Brasil', 'Brazil'), 'geo' => ['lat' => -23.55, 'lng' => -46.63], 'customers' => self::customerList('Promaflex')],
                 ],
             ]],
             // info_blocks + contact_form berdampingan = satu blok dua kolom (ContactGrid), anchor = key.

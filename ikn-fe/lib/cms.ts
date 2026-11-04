@@ -372,9 +372,12 @@ export interface FieldDef {
   type: FieldType;
   name: I18n;
   required?: boolean;
+  /** Panjang maksimum (teks) atau nilai maksimum (number). */
   max?: number;
+  /** Nilai minimum (number); min + max pada number = slider. */
+  min?: number;
   options?: Record<string, string>;
-  default?: string;
+  default?: string | number;
   accept?: 'image' | 'document' | 'video' | 'visual'; // visual = gambar + video
   fields?: Record<string, FieldDef>;
   max_items?: number;

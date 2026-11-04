@@ -9,7 +9,8 @@ import { tr } from '@/lib/cms';
 import type { Product } from '@/lib/types';
 
 // Pratinjau produk di halaman Bisnis (company profile): kartu ringkas berisi foto, jenis, nama, ringkasan,
-// dua spesifikasi utama, dan tautan ke katalog. id = slug agar bisa dituju anchor (mis. /bisnis#resiprene-35).
+// spesifikasi utama, dan tautan ke katalog. id = slug agar bisa dituju anchor (mis. /bisnis#resiprene-35).
+// Produk pertama = kartu besar (2×2 sel, empat spesifikasi); sisanya kartu kecil tanpa ringkasan/spesifikasi.
 export default function ProductShowcase({ products }: { products: Product[] }) {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
@@ -17,16 +18,17 @@ export default function ProductShowcase({ products }: { products: Product[] }) {
   return (
     <div className="biz-prod-grid">
       {products.map((p, i) => {
+        const big = i === 0;
         const name = tr(p.name, lang);
         const href = `/catalog/${p.slug}`;
         const kind = p.kind || tr(p.category?.name, lang);
-        const summary = tr(p.summary, lang);
-        const specs = (p.specs || []).slice(0, 2);
+        const summary = big ? tr(p.summary, lang) : '';
+        const specs = big ? (p.specs || []).slice(0, 4) : [];
         return (
-          <Reveal as="article" key={p.slug} id={p.slug} className="biz-prod" delay={(i % 4) * 60}>
+          <Reveal as="article" key={p.slug} id={p.slug} className={`biz-prod${big ? ' is-featured' : ''}`} delay={(i % 4) * 60}>
             <Link href={href} className="biz-prod-media" aria-label={name} tabIndex={-1}>
               {p.image ? (
-                <Image src={p.image} alt={name} fill sizes="(max-width: 600px) 100vw, (max-width: 1100px) 50vw, 300px" />
+                <Image src={p.image} alt={name} fill sizes={big ? '(max-width: 1100px) 100vw, 640px' : '(max-width: 600px) 100vw, (max-width: 1100px) 50vw, 300px'} />
               ) : (
                 <Icon name="drop" size={56} strokeWidth={1} />
               )}

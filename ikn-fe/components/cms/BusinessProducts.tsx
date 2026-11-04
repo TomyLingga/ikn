@@ -7,9 +7,17 @@ import SecHead from './sections/SecHead';
 import { useLang } from '@/components/LanguageProvider';
 import type { Product } from '@/lib/types';
 
-// Blok "Produk kami" di halaman Bisnis: daftar produk terbit dari katalog (GET /catalog/products) + tautan ke katalog.
-export default function BusinessProducts({ products }: { products: Product[] }) {
+// shortcut: pilihan produk tertulis di kode (slug); bila admin perlu mengaturnya sendiri, jadikan field CMS.
+// Urutan = tampilan: pertama kartu besar, sisanya kartu kecil. Slug yang hilang diganti produk terbit lain.
+const FEATURED = ['resiprene-35', 'sarung-egrek', 'sepatu-boots', 'packing-pintu-rebusan', 'rubber-membrane'];
+
+// Blok "Produk kami" di halaman Bisnis: 5 produk terbit dari katalog (GET /catalog/products) + tautan ke katalog.
+export default function BusinessProducts({ products: all }: { products: Product[] }) {
   const { lang } = useLang();
+  const products = [
+    ...FEATURED.flatMap((slug) => all.filter((p) => p.slug === slug)),
+    ...all.filter((p) => !FEATURED.includes(p.slug)),
+  ].slice(0, 5);
   if (products.length === 0) return null;
 
   return (

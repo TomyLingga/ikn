@@ -8,5 +8,5 @@ const CustomerWorldMap = dynamic(() => import('./CustomerWorldMap'), {
   loading: () => <div className="cmap-map cmap-map-loading" aria-hidden="true" />,
 });
 
-export type { CustomerWorldMapProps, MapCountry } from './CustomerWorldMap';
+export type { CustomerWorldMapProps, MapPoint } from './CustomerWorldMap';
 export default CustomerWorldMap;

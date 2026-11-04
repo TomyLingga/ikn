@@ -22,7 +22,17 @@ export default function CtaSection({ section }: { section: PageSection }) {
 
   return (
     <section className={`cta${background ? ' cta-has-bg' : ''}`} id={section.key || undefined}>
-      {background && <Image src={background} alt="" fill sizes="100vw" className="cta-bg" style={{ objectFit: 'cover' }} />}
+      {background && (
+        <Image
+          src={background}
+          alt=""
+          fill
+          sizes="100vw"
+          className="cta-bg"
+          // Kekuatan latar (bg_opacity, 0-100) dari pengaturan section; kosong = penuh seperti sebelumnya.
+          style={{ objectFit: 'cover', opacity: typeof c.bg_opacity === 'number' ? Math.min(100, Math.max(0, c.bg_opacity)) / 100 : undefined }}
+        />
+      )}
       <div className="container cta-inner">
         <div className="cta-text">
           {label && <span className="label cta-label">{label}</span>}

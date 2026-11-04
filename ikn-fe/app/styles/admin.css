@@ -2418,7 +2418,8 @@ div.media-thumb {
 .geo-picker-results button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font: inherit; font-size: 0.86rem; text-align: left; cursor: pointer; }
 .geo-picker-results li:last-child button { border-bottom: 0; }
 .geo-picker-results button:hover { background: var(--primary-tint); color: var(--primary); }
-.geo-picker .addr-map { width: 100%; height: 280px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+/* z-index 0 = konteks tumpukan sendiri: panel Leaflet (z 400+) tidak menimpa kepala modal yang sticky saat digulir. */
+.geo-picker .addr-map { position: relative; z-index: 0; width: 100%; height: 280px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .geo-picker .addr-map-loading { display: grid; place-items: center; color: var(--ink-soft); font-size: 0.86rem; background: var(--paper-2); }
 
 /* ---------- Pemilih customer sasaran (voucher, biaya tambahan) ---------- */
@@ -4424,3 +4425,11 @@ div.media-thumb {
 @media (max-width: 640px) {
   .admin-app .rp-funnel-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Field angka bergeser (min & max dari definisi section, mis. kekuatan latar), 2026-11-04. */
+.admin-app .cms-range,
+.admin-modal-backdrop .cms-range { display: flex; align-items: center; gap: 12px; }
+.admin-app .cms-range input[type='range'],
+.admin-modal-backdrop .cms-range input[type='range'] { flex: 1; accent-color: var(--adm-primary); }
+.admin-app .cms-range output,
+.admin-modal-backdrop .cms-range output { min-width: 3ch; font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }

@@ -1,13 +1,14 @@
 'use client';
 
 import { Fragment } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type {
   BrochureData,
   CertificateData,
   CustomerLogoData,
   GalleryItemData,
   I18n,
+  MediaSummary,
   PageSection,
   PostCategory,
   PostSummary,
@@ -194,6 +195,32 @@ function withSurface(section: PageSection, node: ReactNode): ReactNode {
   );
 }
 
+/**
+ * Latar umum section (2026-11-04): foto/video `bg_media` dengan kekuatan `bg_opacity` (0-100, persen terlihat) dan
+ * nada `bg_tone` (light = lapisan terang, teks gelap; dark = dasar biru tua, teks terang). Tanpa media = tidak dibungkus.
+ */
+function withBackground(section: PageSection, node: ReactNode): ReactNode {
+  const c = section.content as { bg_media?: MediaSummary | null; bg_opacity?: number | null; bg_tone?: string } | null;
+  const media = c?.bg_media;
+  if (!media?.url) return node;
+  const opacity = Math.min(100, Math.max(0, typeof c?.bg_opacity === 'number' ? c.bg_opacity : 25)) / 100;
+  const tone = c?.bg_tone === 'dark' ? 'dark' : 'light';
+  return (
+    <div className={`sec-bg sec-bg-${tone}`} style={{ '--sec-bg-op': opacity } as CSSProperties}>
+      <div className="sec-bg-media" aria-hidden="true">
+        {media.mime?.startsWith('video/') ? (
+          <video src={media.url} autoPlay muted loop playsInline preload="metadata" />
+        ) : (
+          // Ukuran latar tidak diketahui; img biasa + object-fit cover.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={media.url} alt="" loading="lazy" decoding="async" />
+        )}
+      </div>
+      <div className="sec-bg-body">{node}</div>
+    </div>
+  );
+}
+
 function block(section: PageSection, node: ReactNode): ReactNode {
   return (
     <div className="sec-block" data-section-key={section.key || undefined} data-section-type={section.type}>
@@ -244,7 +271,10 @@ export default function SectionRenderer({ sections, extra = {}, page = null, blo
     }
 
     const node = renderSection(section, extra, page);
-    if (node) nodes.push(<Fragment key={section.id}>{blocks ? block(section, withSurface(section, node)) : withSurface(section, node)}</Fragment>);
+    if (node) {
+      const wrapped = withBackground(section, withSurface(section, node));
+      nodes.push(<Fragment key={section.id}>{blocks ? block(section, wrapped) : wrapped}</Fragment>);
+    }
   }
 
   return <>{nodes}</>;

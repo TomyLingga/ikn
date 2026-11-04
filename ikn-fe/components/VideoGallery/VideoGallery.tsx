@@ -52,7 +52,7 @@ function VideoCard({ video, delay, onOpen }: { video: Video; delay: number; onOp
   );
 }
 
-function VideoLightbox({ video, onClose }: { video: Video; onClose: () => void }) {
+export function VideoLightbox({ video, onClose }: { video: Video; onClose: () => void }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();

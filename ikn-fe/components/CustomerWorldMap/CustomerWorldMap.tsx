@@ -1,23 +1,26 @@
 'use client';
 
-// Peta dunia pelanggan (Leaflet + tile Esri World Light Gray, tanpa API key): titik per negara berwarna menurut
+// Peta dunia pelanggan (Leaflet + tile Esri World Light Gray, tanpa API key): titik per negara/pelanggan berwarna menurut
 // kawasan dan garis putus-putus melengkung dari titik asal (Pelabuhan Belawan). Selalu dimuat lewat dynamic import
 // ssr:false (index.tsx) karena Leaflet menyentuh `window` saat diimpor.
 import { useEffect } from 'react';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-export interface MapCountry {
-  region: string;
-  country: string;
+export interface MapPoint {
+  key: string;
   lat: number;
   lng: number;
-  customers: string[];
+  color: string;
+  title: string;
+  subtitle: string;
+  logo: string | null;
+  /** md = titik negara, sm = titik lokasi pelanggan sendiri. */
+  size: 'md' | 'sm';
 }
 
 export interface CustomerWorldMapProps {
-  countries: MapCountry[];
-  colors: Record<string, string>;
+  points: MapPoint[];
   origin: { lat: number; lng: number; label: string };
 }
 
@@ -49,9 +52,9 @@ function Fit({ points }: { points: [number, number][] }) {
   return null;
 }
 
-export default function CustomerWorldMap({ countries, colors, origin }: CustomerWorldMapProps) {
-  // Negara di benua Amerika digeser +360° agar rute dari Indonesia melintasi Pasifik (jalur terpendek).
-  const placed = countries.map((c) => ({ ...c, lng: c.lng < -30 ? c.lng + 360 : c.lng }));
+export default function CustomerWorldMap({ points, origin }: CustomerWorldMapProps) {
+  // Titik di benua Amerika digeser +360° agar rute dari Indonesia melintasi Pasifik (jalur terpendek).
+  const placed = points.map((c) => ({ ...c, lng: c.lng < -30 ? c.lng + 360 : c.lng }));
   const lngs = [origin.lng, ...placed.map((c) => c.lng)];
   const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
 
@@ -75,22 +78,30 @@ export default function CustomerWorldMap({ countries, colors, origin }: Customer
         />
         {placed.map((c) => (
           <Polyline
-            key={`arc-${c.country}`}
+            key={`arc-${c.key}`}
             positions={arc([origin.lat, origin.lng], [c.lat, c.lng])}
-            pathOptions={{ color: colors[c.region] ?? '#1769aa', weight: 1.4, opacity: 0.65, dashArray: '3 6' }}
+            pathOptions={{ color: c.color, weight: c.size === 'sm' ? 1.1 : 1.4, opacity: 0.65, dashArray: '3 6' }}
           />
         ))}
         {placed.map((c) => (
           <CircleMarker
-            key={c.country}
+            key={c.key}
             center={[c.lat, c.lng]}
-            radius={7}
-            pathOptions={{ color: '#ffffff', weight: 2, fillColor: colors[c.region] ?? '#1769aa', fillOpacity: 1 }}
+            radius={c.size === 'sm' ? 5 : 7}
+            pathOptions={{ color: '#ffffff', weight: 2, fillColor: c.color, fillOpacity: 1 }}
           >
-            <Tooltip direction="top" offset={[0, -6]}>
-              <strong>{c.country}</strong>
-              <br />
-              {c.customers.join(', ')}
+            <Tooltip direction="top" offset={[0, -6]} className="cmap-tip">
+              {c.logo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.logo} alt="" className="cmap-tip-logo" />
+              )}
+              <strong>{c.title}</strong>
+              {c.subtitle && (
+                <>
+                  <br />
+                  {c.subtitle}
+                </>
+              )}
             </Tooltip>
           </CircleMarker>
         ))}

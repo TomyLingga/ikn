@@ -49,8 +49,16 @@ class DemoSeedersTest extends TestCase
         $this->assertSame(2, PaymentTerm::count());
 
         $usd = Order::where('user_id', $exporter->id)->get();
-        $this->assertCount(2, $usd);
-        $order = $usd->firstWhere('delivery_term', 'fob');
+        // Cakupan ekspor (2026-11-04): FOB & CIF di berbagai status, dua syarat bayar.
+        $this->assertCount(11, $usd);
+        $this->assertEqualsCanonicalizing(['pending_payment', 'payment_review', 'shipped', 'completed', 'expired'], $usd->where('delivery_term', 'fob')->pluck('status')->unique()->values()->all());
+        $this->assertEqualsCanonicalizing(['awaiting_freight', 'pending_payment', 'completed', 'cancelled'], $usd->where('delivery_term', 'cif')->pluck('status')->unique()->values()->all());
+        $this->assertEqualsCanonicalizing(['tt_advance', 'tt_30_70'], $usd->pluck('payment_term_code')->unique()->values()->all());
+        $this->assertEqualsCanonicalizing(
+            ['pending_payment', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'expired'],
+            Order::where('delivery_term', 'loco')->pluck('status')->unique()->values()->all()
+        );
+        $order = $usd->first(fn (Order $o) => $o->delivery_term === 'fob' && $o->status === Order::STATUS_PENDING_PAYMENT);
         $this->assertNotNull($order);
         $this->assertSame('USD', $order->currency);
         $this->assertSame('fob', $order->delivery_term);
@@ -72,7 +80,7 @@ class DemoSeedersTest extends TestCase
         $this->assertSame('PI/'.$order->number, $proforma->label());
 
         // Order CIF (ASUMSI A-89): menunggu penawaran ongkir, tanpa payment, pelabuhan tujuan tersimpan, satu penawaran admin 3 baris.
-        $cif = $usd->firstWhere('delivery_term', 'cif');
+        $cif = $usd->first(fn (Order $o) => $o->delivery_term === 'cif' && $o->status === Order::STATUS_AWAITING_FREIGHT && ($o->destination_port['name'] ?? '') === 'Port Klang');
         $this->assertNotNull($cif);
         $this->assertSame(Order::STATUS_AWAITING_FREIGHT, $cif->status);
         $this->assertNull($cif->payment_due_at);
@@ -97,7 +105,8 @@ class DemoSeedersTest extends TestCase
         $this->assertSame($fees, Fee::count());
         $this->assertSame($banks, BankAccount::count());
         $this->assertSame(2, PaymentTerm::count());
-        $this->assertSame(1, OrderProforma::count());
-        $this->assertSame(1, OrderFreightQuote::count());
+        $this->assertSame(2, OrderProforma::count());
+        // Putaran penawaran CIF: diajukan, ditawar balik (lama digantikan), diterima, kedaluwarsa.
+        $this->assertSame(6, OrderFreightQuote::count());
     }
 }

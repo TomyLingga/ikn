@@ -51,6 +51,20 @@ export interface HeroContent {
   subtitle: I18n;
   buttons?: HeroButtonItem[];
   slides: HeroSlideItem[];
+  // Tata letak kisi layar penuh (2026-11-04).
+  layout?: 'classic' | 'grid' | '';
+  video?: MediaSummary | null;
+  overlay?: number | null;
+  stats?: { value: string; label: I18n }[];
+  card_title?: I18n;
+  card_note?: I18n;
+  card_image?: MediaSummary | null;
+  video_id?: string;
+  corner_text?: I18n;
+  corner_image?: MediaSummary | null;
+  videos?: { file: MediaSummary | null }[];
+  links?: { title: I18n; note?: I18n; image?: MediaSummary | null; url: string }[];
+  tile_map?: boolean;
   // Konten lama (sebelum migrasi ke daftar tombol).
   primary_label?: I18n;
   primary_url?: string;
@@ -105,6 +119,8 @@ export interface CtaContent {
   secondary_label?: I18n;
   secondary_url?: string;
   background?: MediaSummary | null;
+  /** Kekuatan foto latar 0-100 (2026-11-04); kosong = penuh. */
+  bg_opacity?: number | null;
 }
 
 export interface TextVisualContent {
@@ -157,6 +173,7 @@ export interface ContactInfoContent {
   emails: { address: string }[];
   social: { label: string; handle: string; url: string; icon?: MediaSummary | null }[];
   background?: MediaSummary | null;
+  bg_opacity?: number | null;
 }
 
 // Titik peta dari lokasi kontak yang punya koordinat (Kontak: semua; footer: lokasi pertama).
@@ -275,7 +292,7 @@ export interface FaqContent extends SectionHeadContent {
 
 export interface SpecTableContent extends SectionHeadContent {
   lead?: I18n;
-  rows: { label: I18n; value: I18n }[];
+  rows: { group?: I18n; label: I18n; value: I18n }[];
   note?: I18n;
 }
 
@@ -316,7 +333,12 @@ export interface ProductShowcaseContent extends SectionHeadContent {
 export interface CustomerMapContent extends SectionHeadContent {
   lead?: I18n;
   origin_label?: I18n;
-  items: { region: string; country: I18n; geo?: { lat: number | null; lng: number | null } | null; customers: string }[];
+  items: {
+    region: string;
+    country: I18n;
+    geo?: { lat: number | null; lng: number | null } | null;
+    customers: { name: string; logo?: MediaSummary | null; geo?: { lat: number | null; lng: number | null } | null }[];
+  }[];
 }
 
 export interface TestimonialsContent extends SectionHeadContent {

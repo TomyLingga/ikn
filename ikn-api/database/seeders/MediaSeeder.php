@@ -31,6 +31,12 @@ class MediaSeeder extends Seeder
         'kebun-karet-2.jpg' => 'gallery',
         'pohon-karet-sadap.jpg' => 'gallery',
         'pabrik-udara-2.jpg' => 'gallery',
+        // Video latar hero: potongan 10 detik footage drone kebun karet klien (DJI_0772, 1600 px, tanpa suara) + poster.
+        'hero-perkebunan-drone.mp4' => 'hero',
+        'hero-perkebunan-drone.jpg' => 'hero',
+        'hero-perkebunan-drone-2.mp4' => 'hero', // potongan 12 detik DJI_0771 (jalan kebun), diputar bergantian
+        // Butiran Resiprene 35 berlatar transparan (dipotong dari foto produk klien) untuk kartu sorotan hero.
+        'resiprene-35-cutout.png' => 'products',
         // Foto per tonggak sejarah: foto produk klien (doc/IKN/BAHAN FOTO IKN/Foto Produk Kamera IKN) dan dua foto ilustrasi
         // sementara dari Wikimedia Commons (lisensi & atribusi di assets/CREDITS.md), 2026-11-04.
         'sejarah-ban-sepeda.jpg' => 'gallery',

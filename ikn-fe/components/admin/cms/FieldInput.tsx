@@ -52,6 +52,17 @@ export default function FieldInput({ label, def, value, onChange, icons = [], er
       control = <textarea rows={4} value={text} maxLength={def.max} onChange={(e) => onChange(e.target.value)} />;
       break;
     case 'number':
+      // Bila definisi punya min & max (mis. kekuatan latar 0-100) tampil sebagai slider + angka.
+      if (typeof def.min === 'number' && typeof def.max === 'number') {
+        const current = typeof value === 'number' ? value : typeof def.default === 'number' ? def.default : def.min;
+        control = (
+          <span className="cms-range">
+            <input type="range" min={def.min} max={def.max} step={1} value={current} onChange={(e) => onChange(Number(e.target.value))} />
+            <output>{current}</output>
+          </span>
+        );
+        break;
+      }
       control = (
         <input
           type="number"

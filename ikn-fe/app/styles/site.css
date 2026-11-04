@@ -266,6 +266,10 @@
 @media (max-width: 640px) {
   .page-v2 .spec-sheet-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }
+/* Kelompok kolom (mis. satu kolom per pabrik): kolom berdampingan, tiap kolom berjudul. */
+.page-v2 .spec-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: clamp(28px, 4vw, 56px); align-items: start; }
+.page-v2 .spec-group-title { margin-bottom: 14px; font-size: clamp(1.1rem, 1.6vw, 1.3rem); letter-spacing: -0.015em; color: var(--hv-heading); }
+.page-v2 .spec-group .spec-sheet-row { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
 
 /* ---------- Kartu pilar ---------- */
 .page-v2 .sustain-grid { gap: clamp(14px, 1.8vw, 20px); }
@@ -881,6 +885,8 @@
 .site-v2 .cmap-map { height: clamp(320px, 46vw, 560px); border-radius: 14px; overflow: hidden; background: #f3f6fa; }
 .site-v2 .cmap-map .leaflet-container { background: #f3f6fa; font-family: var(--font-sans); }
 .site-v2 .cmap-origin-tip { font-weight: 650; color: #102d50; }
+.site-v2 .cmap-tip { max-width: 260px; white-space: normal; }
+.site-v2 .cmap-tip-logo { display: block; max-width: 120px; max-height: 40px; margin-bottom: 6px; object-fit: contain; }
 .site-v2 .cmap-legend { position: absolute; left: 28px; bottom: 26px; z-index: 500; display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 10px 14px; list-style: none; background: rgba(255, 255, 255, 0.9); border: 1px solid var(--hv-line); border-radius: 10px; font-size: 0.78rem; color: #344054; }
 .site-v2 .cmap-legend li,
 .site-v2 .cmap-region h3 { display: inline-flex; align-items: center; gap: 8px; }
@@ -956,3 +962,213 @@
 .site-v2 .contact-band p,
 .site-v2 .contact-band .contact-card-lines { color: rgba(255, 255, 255, 0.82); }
 .site-v2 .contact-band .label { color: var(--c-sky); }
+
+/* =====================================================================
+   BAGIAN 4 (2026-11-04). Latar umum section + hero kisi layar penuh.
+   ===================================================================== */
+
+/* ---------- Latar section (SectionRenderer withBackground) ---------- */
+.site-v2 .sec-bg { position: relative; isolation: isolate; }
+.site-v2 .sec-bg-media { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.site-v2 .sec-bg-media img,
+.site-v2 .sec-bg-media video { width: 100%; height: 100%; object-fit: cover; opacity: var(--sec-bg-op, 0.25); }
+/* Section bawaan punya warna latar datar; saat ada foto latar, warna itu mengalah agar foto terlihat. */
+.site-v2 .sec-bg-body > section,
+.site-v2 .sec-bg-body > .sec-surface > section { background: transparent !important; }
+/* Nada gelap: dasar biru tua di bawah foto, teks terang. */
+.site-v2 .sec-bg-dark {
+  --ink: #fff;
+  --ink-soft: rgba(255, 255, 255, 0.8);
+  --hv-heading: #fff;
+  --hv-text: rgba(255, 255, 255, 0.82);
+  --hv-muted: rgba(255, 255, 255, 0.66);
+  --hv-line: rgba(255, 255, 255, 0.16);
+  --hv-line-strong: rgba(255, 255, 255, 0.26);
+  background: var(--c-deep);
+  color: #fff;
+}
+.site-v2 .sec-bg-dark .label { color: var(--c-sky); }
+.site-v2 .sec-bg-dark p { color: rgba(255, 255, 255, 0.82); }
+
+/* ---------- Hero kisi layar penuh ---------- */
+.site-v2 .hgrid {
+  --hgrid-line: rgba(255, 255, 255, 0.34);
+  --hgrid-line-w: 1.5px;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  /* Tepat satu layar (navbar ikut di dalamnya); layar pendek tetap memberi ruang minimum. */
+  height: max(100svh, 660px);
+  padding-top: var(--nav-h);
+  overflow: hidden;
+  color: #fff;
+  background: var(--c-deep);
+}
+.site-v2 .hgrid-media { position: absolute; inset: 0; z-index: -2; }
+.site-v2 .hgrid-media video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.site-v2 .hgrid-video { opacity: 0; transition: opacity 1.2s ease; }
+.site-v2 .hgrid-video.is-active { opacity: 1; }
+.site-v2 .hgrid-media .hero-slider-arrow,
+.site-v2 .hgrid-media .hero-slider-dots { display: none; }
+.site-v2 .hgrid-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(10, 26, 48, calc(var(--hgrid-overlay) + 0.15)) 0%, rgba(10, 26, 48, var(--hgrid-overlay)) 45%, rgba(10, 26, 48, calc(var(--hgrid-overlay) * 0.45)) 100%),
+    linear-gradient(180deg, rgba(10, 26, 48, 0.35) 0%, transparent 25%);
+}
+.site-v2 .hgrid-cells {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 2.3fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: 'stat main aside' 'tile card corner';
+  border-top: var(--hgrid-line-w) solid var(--hgrid-line);
+}
+.site-v2 .hgrid-cell { position: relative; min-width: 0; padding: clamp(20px, 2.6vw, 40px); border-right: var(--hgrid-line-w) solid var(--hgrid-line); }
+.site-v2 .hgrid-cell:nth-child(3n) { border-right: 0; }
+.site-v2 .hgrid-cell:nth-child(-n + 3) { border-bottom: var(--hgrid-line-w) solid var(--hgrid-line); }
+.site-v2 .hgrid-stat { grid-area: stat; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding-left: max(var(--gutter), 2vw); }
+.site-v2 .hgrid-stat strong { font-size: clamp(2.2rem, 3.6vw, 3.2rem); font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+.site-v2 .hgrid-stat span { margin-top: 8px; font-size: 0.95rem; color: rgba(255, 255, 255, 0.85); max-width: 16ch; }
+.site-v2 .hgrid-main { grid-area: main; display: flex; flex-direction: column; justify-content: center; padding-block: clamp(20px, 3.2vh, 44px); }
+.site-v2 .hgrid-meta { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: clamp(12px, 1.8vh, 20px); }
+.site-v2 .hgrid-meta-item { font-size: 0.74rem; font-weight: 650; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255, 255, 255, 0.86); }
+.site-v2 .hgrid-meta-item:first-child { color: var(--c-sky); }
+.site-v2 .hgrid-title { display: flex; flex-direction: column; font-size: clamp(2.3rem, min(4.4vw, 7.2vh), 4.4rem); font-weight: 650; line-height: 1.02; letter-spacing: -0.04em; color: #fff; text-wrap: balance; }
+.site-v2 .hgrid-sub { max-width: 60ch; margin-top: clamp(12px, 2vh, 22px); font-size: clamp(0.98rem, 1.15vw, 1.08rem); line-height: 1.55; color: rgba(255, 255, 255, 0.88) !important; }
+.site-v2 .hgrid-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: clamp(16px, 2.6vh, 30px); }
+.site-v2 .hgrid-actions .hero-actions { margin: 0; }
+.site-v2 .hgrid-actions .btn-solid { background: var(--c-blue); border-color: var(--c-blue); color: #fff; border-radius: 4px; padding: 16px 28px; }
+.site-v2 .hgrid-actions .btn-solid:hover { background: #fff; border-color: #fff; color: var(--c-deep); }
+.site-v2 .hgrid-watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.site-v2 .hgrid-watch:hover { background: rgba(255, 255, 255, 0.12); border-color: #fff; }
+.site-v2 .hgrid-aside { grid-area: aside; display: flex; flex-direction: column; justify-content: flex-end; }
+.site-v2 .hgrid-links { list-style: none; display: grid; gap: 10px; width: 100%; max-width: 300px; margin: 0 0 4px auto; padding: 0; }
+.site-v2 .hgrid-link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px 10px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(10, 26, 48, 0.42);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.site-v2 .hgrid-link:hover { background: rgba(23, 105, 170, 0.6); border-color: rgba(255, 255, 255, 0.5); transform: translateX(-3px); }
+.site-v2 .hgrid-link-img { position: relative; display: block; width: 52px; height: 52px; border-radius: 8px; overflow: hidden; background: rgba(255, 255, 255, 0.12); }
+.site-v2 .hgrid-link-text { display: flex; flex-direction: column; min-width: 0; }
+.site-v2 .hgrid-link-text strong { font-size: 0.98rem; font-weight: 650; line-height: 1.2; }
+.site-v2 .hgrid-link-text small { margin-top: 2px; font-size: 0.78rem; color: rgba(255, 255, 255, 0.75); }
+.site-v2 .hgrid-tile {
+  grid-area: tile;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: clamp(140px, 22vh, 220px);
+  padding-left: max(var(--gutter), 2vw);
+  background: var(--c-deep);
+}
+.site-v2 .hgrid-tile:empty { background: transparent; }
+.site-v2 .hgrid-tile.has-map { overflow: hidden; isolation: isolate; }
+.site-v2 .hgrid-tile-map { position: absolute; inset: 0; z-index: -1; display: block; }
+.site-v2 .hgrid-tile-map > .leaflet-container { position: absolute; inset: 0; }
+.site-v2 .hgrid-tile-map .leaflet-container { background: var(--c-deep); }
+.site-v2 .hgrid-tile-map::after { content: ''; position: absolute; inset: 0; z-index: 500; pointer-events: none; background: linear-gradient(200deg, rgba(10, 26, 48, 0.15), rgba(10, 26, 48, 0.78)); }
+.site-v2 .hgrid-tile.has-map strong,
+.site-v2 .hgrid-tile.has-map > span:not(.hgrid-tile-map) { position: relative; z-index: 1; text-shadow: 0 1px 10px rgba(8, 20, 38, 0.6); }
+.site-v2 .hgrid-map-pin span { display: block; width: 16px; height: 16px; border: 3px solid #fff; border-radius: 50%; background: var(--c-sky); box-shadow: 0 0 0 4px rgba(66, 165, 213, 0.35); }
+.site-v2 .hgrid-tile strong { align-self: flex-end; font-size: clamp(2.2rem, 3.4vw, 3rem); font-weight: 600; line-height: 1; letter-spacing: -0.03em; }
+.site-v2 .hgrid-tile > span:not(.hgrid-tile-map) { font-size: 1.02rem; line-height: 1.25; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.9); max-width: 14ch; }
+.site-v2 .hgrid-card-cell { grid-area: card; padding: 0; }
+.site-v2 .hgrid-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) auto;
+  height: 100%;
+  min-height: clamp(140px, 22vh, 220px);
+  background: var(--c-soft);
+  color: var(--c-deep);
+}
+.site-v2 .hgrid-card-text { display: flex; flex-direction: column; justify-content: space-between; gap: 18px; padding: clamp(20px, 2.6vw, 36px); }
+.site-v2 .hgrid-card-title { font-size: clamp(1.2rem, min(1.9vw, 3.2vh), 1.9rem); font-weight: 500; line-height: 1.08; letter-spacing: -0.02em; color: var(--c-deep) !important; white-space: pre-line; }
+.site-v2 .hgrid-card-note { display: inline-flex; align-items: center; gap: 8px; font-size: 0.92rem; color: var(--c-slate); }
+.site-v2 .hgrid-card-note i { width: 8px; height: 8px; border-radius: 50%; background: var(--c-blue); }
+.site-v2 .hgrid-card-img { position: relative; display: block; margin-top: calc(-1 * clamp(24px, 5vh, 60px)); }
+/* Foto produk berlatar putih menyatu dengan warna kartu. */
+.site-v2 .hgrid-card-img { mix-blend-mode: multiply; }
+.site-v2 .hgrid-play { display: flex; flex-direction: column; align-items: center; gap: 10px; align-self: start; margin: clamp(20px, 2.6vw, 32px); padding: 0; border: 0; background: none; color: var(--c-deep); font: inherit; cursor: pointer; }
+.site-v2 .hgrid-play span { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; background: var(--c-deep); color: #fff; transition: transform 0.25s var(--ease), background 0.25s var(--ease); }
+.site-v2 .hgrid-play:hover span { transform: scale(1.06); background: var(--c-blue); }
+.site-v2 .hgrid-play small { font-size: 0.92rem; }
+[data-theme='dark'] .site-v2 .hgrid-card { background: rgba(16, 45, 80, 0.86); color: #fff; backdrop-filter: blur(8px); }
+[data-theme='dark'] .site-v2 .hgrid-card-title { color: #fff !important; }
+[data-theme='dark'] .site-v2 .hgrid-card-note { color: rgba(255, 255, 255, 0.8); }
+[data-theme='dark'] .site-v2 .hgrid-card-note i { background: var(--c-sky); }
+[data-theme='dark'] .site-v2 .hgrid-card-img { mix-blend-mode: normal; }
+[data-theme='dark'] .site-v2 .hgrid-play { color: #fff; }
+[data-theme='dark'] .site-v2 .hgrid-play span { background: var(--c-blue); }
+.site-v2 .hgrid-corner { grid-area: corner; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 12px; }
+.site-v2 .hgrid-corner-img { position: relative; display: block; width: 96px; height: 96px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255, 255, 255, 0.8); }
+.site-v2 .hgrid-corner { padding-right: 104px; }
+.site-v2 .hgrid-corner p { max-width: 26ch; font-size: 0.86rem; line-height: 1.4; letter-spacing: 0.02em; color: rgba(255, 255, 255, 0.86) !important; }
+
+@media (max-width: 1100px) {
+  .site-v2 .hgrid { height: auto; min-height: 100svh; }
+  .site-v2 .hgrid-cells { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); grid-template-areas: 'main main' 'stat aside' 'tile card'; grid-template-rows: auto auto auto; }
+  .site-v2 .hgrid-cell { border-right: 0; border-bottom: var(--hgrid-line-w) solid var(--hgrid-line); }
+  .site-v2 .hgrid-stat { align-items: flex-start; text-align: left; }
+  .site-v2 .hgrid-corner { display: none; }
+}
+@media (max-width: 720px) {
+  .site-v2 .hgrid { height: auto; min-height: 100svh; }
+  .site-v2 .hgrid-cells { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'main main' 'stat tile' 'card card'; }
+  .site-v2 .hgrid-aside { display: none; }
+  .site-v2 .hgrid-main { padding: 28px var(--gutter); }
+  .site-v2 .hgrid-stat,
+  .site-v2 .hgrid-tile { padding: 20px var(--gutter); min-height: 0; }
+  .site-v2 .hgrid-tile strong { align-self: flex-start; }
+  .site-v2 .hgrid-card { grid-template-columns: minmax(0, 1fr) auto; min-height: 0; }
+  .site-v2 .hgrid-card-img { display: none; }
+}
+
+/* ---------- Produk kami (Bisnis): 1 kartu besar 2×2 + 4 kartu kecil ---------- */
+.page-v2 .biz-prod-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.page-v2 .biz-prod.is-featured { grid-column: span 2; grid-row: span 2; }
+.page-v2 .biz-prod.is-featured .biz-prod-media { flex: 1; aspect-ratio: auto; min-height: 280px; }
+.page-v2 .biz-prod.is-featured .biz-prod-body { flex: 0 0 auto; gap: 10px; padding: clamp(20px, 2.4vw, 30px); }
+.page-v2 .biz-prod.is-featured .biz-prod-name { font-size: clamp(1.4rem, 2.2vw, 1.9rem); }
+.page-v2 .biz-prod.is-featured .biz-prod-sum { -webkit-line-clamp: 3; line-clamp: 3; font-size: 0.98rem; }
+.page-v2 .biz-prod.is-featured .biz-prod-specs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+.page-v2 .biz-prod:not(.is-featured) .biz-prod-body { padding: 16px 18px 18px; }
+@media (max-width: 1100px) {
+  .page-v2 .biz-prod-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .page-v2 .biz-prod.is-featured { grid-row: auto; }
+  .page-v2 .biz-prod.is-featured .biz-prod-media { flex: none; aspect-ratio: 16 / 9; min-height: 0; }
+}
+@media (max-width: 560px) {
+  /* Kartu besar selebar layar, empat kartu kecil tetap dua kolom agar blok tidak terlalu panjang. */
+  .page-v2 .biz-prod-grid { gap: 12px; }
+  .page-v2 .biz-prod.is-featured .biz-prod-specs { grid-template-columns: minmax(0, 1fr); }
+  .page-v2 .biz-prod:not(.is-featured) .biz-prod-body { gap: 6px; padding: 12px 12px 14px; }
+  .page-v2 .biz-prod:not(.is-featured) .biz-prod-name { font-size: 0.98rem; }
+}

@@ -372,3 +372,7 @@ p { color: var(--ink-soft); }
   .spin-ring { animation-duration: 3s; }
   .spin-arc { animation: none; stroke-dashoffset: 70; }
 }
+
+/* Leaflet: garis putih di sambungan tile pada skala layar pecahan (125%/150%). Bawaan Leaflet `plus-lighter` menjumlahkan
+   piksel tepi yang bertumpuk (jadi terang); tile dilebarkan setengah piksel dan ditumpuk biasa agar sambungan tertutup. */
+.leaflet-container img.leaflet-tile { width: 256.5px !important; height: 256.5px !important; mix-blend-mode: normal !important; }

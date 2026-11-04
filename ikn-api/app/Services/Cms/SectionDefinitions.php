@@ -78,8 +78,33 @@ final class SectionDefinitions
     /** Pilihan "Tampilan blok" yang ditambahkan ke setiap tipe section (kosong = plain). */
     public const SURFACES = ['plain' => 'Polos', 'card' => 'Kartu timbul', 'band' => 'Pita berwarna'];
 
+    /** Kawasan peta pelanggan (customer_map); key baru wajib ditambah juga di REGIONS CustomerMapSection (warna). */
+    public const CUSTOMER_REGIONS = [
+        'asia' => 'Asia', 'europe' => 'Eropa', 'middle_east' => 'Timur Tengah', 'africa' => 'Afrika',
+        'americas' => 'Amerika', 'oceania' => 'Oseania',
+    ];
+
     /** Tipe yang selebar layar atau punya latar sendiri: tidak mendapat pilihan tampilan blok. */
     public const NO_SURFACE = ['page_header', 'hero', 'marquee', 'cta', 'contact_info'];
+
+    /**
+     * Tipe tanpa latar umum (2026-11-04): hero/kepala halaman sudah bermedia penuh; cta & contact_info punya foto
+     * latar sendiri dan hanya mendapat `bg_opacity` untuk mengatur kekuatannya.
+     */
+    public const NO_BACKGROUND = ['page_header', 'hero', 'marquee', 'cta', 'contact_info'];
+
+    /** Field latar umum: foto/video, kekuatan (persen terlihat), dan nada lapisan agar teks tetap terbaca. */
+    private static function backgroundFields(bool $withMedia): array
+    {
+        $fields = [];
+        if ($withMedia) {
+            $fields['bg_media'] = self::f('media', 'Latar section (foto/video, opsional)', 'Section background (photo/video, optional)', ['accept' => 'visual']);
+            $fields['bg_tone'] = self::f('select', 'Nada latar', 'Background tone', ['options' => ['light' => 'Terang (teks gelap)', 'dark' => 'Gelap (teks terang)'], 'default' => 'light']);
+        }
+        $fields['bg_opacity'] = self::f('number', 'Kekuatan latar (%)', 'Background strength (%)', ['min' => 0, 'max' => 100, 'default' => 25]);
+
+        return $fields;
+    }
 
     public static function all(): array
     {
@@ -88,6 +113,11 @@ final class SectionDefinitions
             $types[$key]['group'] = self::GROUP_OF[$key] ?? 'content';
             if (! in_array($key, self::NO_SURFACE, true)) {
                 $types[$key]['fields']['surface'] = self::f('select', 'Tampilan blok', 'Block style', ['options' => self::SURFACES, 'default' => 'plain']);
+            }
+            if (! in_array($key, self::NO_BACKGROUND, true)) {
+                $types[$key]['fields'] += self::backgroundFields(true);
+            } elseif (in_array($key, ['cta', 'contact_info'], true)) {
+                $types[$key]['fields'] += self::backgroundFields(false);
             }
         }
 
@@ -133,6 +163,31 @@ final class SectionDefinitions
                         'image' => self::f('media', 'Gambar', 'Image', ['required' => true, 'accept' => 'image']),
                         'alt' => self::f('i18n_text', 'Teks alternatif', 'Alt text'),
                     ]),
+                    // Tata letak kisi layar penuh (2026-11-04): video/foto penuh, garis kisi, sel angka, kartu sorotan.
+                    'layout' => self::f('select', 'Tata letak hero', 'Hero layout', ['options' => ['classic' => 'Klasik (judul di bawah)', 'grid' => 'Kisi layar penuh'], 'default' => 'classic']),
+                    'video' => self::f('media', 'Video latar (opsional, menggantikan foto)', 'Background video (optional, replaces photos)', ['accept' => 'video']),
+                    // Video tambahan diputar bergantian setelah `video` selesai (urut, berulang).
+                    'videos' => self::list('Video latar berikutnya (bergantian)', 'Next background videos (rotating)', [
+                        'file' => self::f('media', 'Video', 'Video', ['required' => true, 'accept' => 'video']),
+                    ], ['max_items' => 4]),
+                    'overlay' => self::f('number', 'Kegelapan lapisan (%)', 'Overlay darkness (%)', ['min' => 0, 'max' => 90, 'default' => 45]),
+                    'stats' => self::list('Angka di sel kisi', 'Grid cell figures', [
+                        'value' => self::f('text', 'Nilai', 'Value', ['required' => true, 'max' => 20]),
+                        'label' => self::f('i18n_text', 'Keterangan', 'Label', ['required' => true, 'max' => 80]),
+                    ], ['max_items' => 2]),
+                    'card_title' => self::f('i18n_textarea', 'Judul kartu sorotan', 'Highlight card title', ['max' => 160]),
+                    'card_note' => self::f('i18n_text', 'Catatan kartu (bertitik)', 'Card note (with dot)', ['max' => 80]),
+                    'card_image' => self::f('media', 'Gambar kartu (PNG transparan disarankan)', 'Card image (transparent PNG recommended)', ['accept' => 'image']),
+                    'video_id' => self::f('text', 'ID video YouTube (tombol Tonton)', 'YouTube video ID (Watch button)', ['max' => 40]),
+                    'links' => self::list('Kartu tautan kolom kanan', 'Right column link cards', [
+                        'title' => self::f('i18n_text', 'Judul', 'Title', ['required' => true, 'max' => 60]),
+                        'note' => self::f('i18n_text', 'Keterangan', 'Note', ['max' => 80]),
+                        'image' => self::f('media', 'Gambar kecil', 'Thumbnail', ['accept' => 'image']),
+                        'url' => self::f('url', 'Tautan', 'URL', ['required' => true]),
+                    ], ['max_items' => 3]),
+                    'tile_map' => self::f('boolean', 'Peta lokasi pabrik di ubin angka kedua', 'Plant location map in the second figure tile'),
+                    'corner_text' => self::f('i18n_textarea', 'Teks pojok kanan bawah', 'Bottom-right corner text', ['max' => 120]),
+                    'corner_image' => self::f('media', 'Gambar pojok kanan bawah', 'Bottom-right corner image', ['accept' => 'image']),
                 ], ['home']),
 
             'marquee' => self::type('Teks berjalan', 'Marquee',
@@ -430,6 +485,8 @@ final class SectionDefinitions
                 'Parameter and value pairs (product technical data, company facts) with an optional footnote.', self::labelHeading() + [
                     'lead' => self::f('i18n_textarea', 'Teks pengantar', 'Lead text'),
                     'rows' => self::list('Baris', 'Rows', [
+                        // Baris dengan kelompok sama tampil sebagai satu kolom berjudul (mis. satu kolom per pabrik).
+                        'group' => self::f('i18n_text', 'Kelompok kolom (opsional)', 'Column group (optional)', ['max' => 80]),
                         'label' => self::f('i18n_text', 'Parameter', 'Parameter', ['required' => true, 'max' => 120]),
                         'value' => self::f('i18n_text', 'Nilai', 'Value', ['required' => true, 'max' => 200]),
                     ], ['max_items' => 40]),
@@ -505,10 +562,15 @@ final class SectionDefinitions
                     'lead' => self::f('i18n_textarea', 'Teks pengantar', 'Lead text'),
                     'origin_label' => self::f('i18n_text', 'Label titik asal', 'Origin label', ['max' => 60]),
                     'items' => self::list('Negara', 'Countries', [
-                        'region' => self::f('select', 'Kawasan', 'Region', ['options' => ['asia' => 'Asia', 'europe' => 'Eropa', 'middle_east' => 'Timur Tengah', 'americas' => 'Amerika'], 'default' => 'asia']),
+                        'region' => self::f('select', 'Kawasan', 'Region', ['options' => self::CUSTOMER_REGIONS, 'default' => 'asia']),
                         'country' => self::f('i18n_text', 'Negara', 'Country', ['required' => true, 'max' => 80]),
                         'geo' => self::f('geo', 'Titik peta', 'Map point'),
-                        'customers' => self::f('textarea', 'Pelanggan (pisahkan dengan koma)', 'Customers (comma separated)', ['required' => true, 'max' => 600]),
+                        // Pelanggan per item (2026-11-04): logo + titik sendiri opsional; tanpa titik = memakai titik negara.
+                        'customers' => self::list('Pelanggan', 'Customers', [
+                            'name' => self::f('text', 'Nama pelanggan', 'Customer name', ['required' => true, 'max' => 120]),
+                            'logo' => self::f('media', 'Logo pelanggan (opsional)', 'Customer logo (optional)', ['accept' => 'image']),
+                            'geo' => self::f('geo', 'Titik lokasi pelanggan (opsional)', 'Customer location (optional)'),
+                        ], ['max_items' => 40]),
                     ], ['max_items' => 60]),
                 ], ['kemitraan']),
 

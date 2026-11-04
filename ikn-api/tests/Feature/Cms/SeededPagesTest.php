@@ -26,14 +26,14 @@ class SeededPagesTest extends TestCase
         // pelanggan, berita, galeri + video, CTA.
         $home = $this->getJson('/api/v1/content/pages/home')->assertOk()->json('data.sections');
         $this->assertSame(
-            ['hero', 'glance', 'about', 'products', 'manufaktur', 'fasilitas', 'history', 'kualitas', 'sertifikat', 'keberlanjutan', 'pilar-keberlanjutan', 'pelanggan', 'news', 'galeri', 'videos', 'cta'],
+            ['hero', 'glance', 'about', 'products', 'manufaktur', 'fasilitas', 'kualitas', 'sertifikat', 'keberlanjutan', 'pilar-keberlanjutan', 'selanjutnya', 'news', 'galeri', 'videos', 'cta'],
             array_column($home, 'key')
         );
         $this->assertSame('Engineering Rubber Solutions'."\n".'for a Better Tomorrow.', $home[0]['content']['title']['en']);
         $this->assertCount(2, $home[3]['content']['items']);
         $this->assertNotEmpty($home[3]['content']['items'][0]['applications']);
-        $this->assertCount(7, $home[6]['content']['items']); // tonggak sejarah sejak 1965
-        $this->assertSame('/galeri', $home[13]['content']['link_url']);
+        $this->assertSame('link_cards', $home[10]['type']); // kartu lanjutan (dulu di Bisnis), pengganti blok pelanggan
+        $this->assertSame('/galeri', $home[12]['content']['link_url']);
 
         // Susunan konten brief 2026-11-04 (About, Business, Quality, Sustainability, News & Media, Partnership, Contact).
         $keys = fn (string $slug) => array_column($this->getJson("/api/v1/content/pages/{$slug}")->assertOk()->json('data.sections'), 'key');
@@ -56,7 +56,7 @@ class SeededPagesTest extends TestCase
 
         // Anchor dropdown navbar (#esg, #sertifikat, #pelanggan, #reach, #whistleblowing) tetap ada.
         $this->assertSame(['header', 'lingkungan', 'k3', 'tata-kelola', 'esg', 'reach', 'sertifikat', 'pelanggan', 'whistleblowing', 'wbs-form'], $keys('keberlanjutan'));
-        $this->assertSame(['header', 'lini-bisnis', 'ragam-produk', 'fasilitas', 'fasilitas-foto', 'kapabilitas', 'cara-pesan', 'links', 'unduhan', 'tanya-jawab', 'cta'], $keys('bisnis'));
+        $this->assertSame(['header', 'lini-bisnis', 'ragam-produk', 'fasilitas', 'fasilitas-foto', 'kapabilitas', 'cara-pesan', 'unduhan', 'tanya-jawab', 'cta'], $keys('bisnis'));
         $this->assertSame(['header', 'jaminan-mutu', 'pengembangan', 'laboratorium', 'standar-produk', 'sertifikasi', 'cta'], $keys('kualitas'));
         $this->assertSame(['header', 'berita-terbaru', 'kegiatan', 'galeri', 'video'], $keys('media'));
         $this->assertSame(['header', 'pelanggan', 'pelanggan-resiprene', 'kerja-sama', 'form', 'permintaan-produk'], $keys('kemitraan'));

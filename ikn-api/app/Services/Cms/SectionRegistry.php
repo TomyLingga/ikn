@@ -93,7 +93,8 @@ class SectionRegistry
                     $rules[$fieldPath] = [$req, 'string', 'in:'.implode(',', array_keys($field['options'] ?? []))];
                     break;
                 case 'number':
-                    $rules[$fieldPath] = [$req, 'numeric'];
+                    // Batas opsional dari definisi (mis. kekuatan latar 0-100).
+                    $rules[$fieldPath] = array_merge([$req, 'numeric'], isset($field['min']) ? ['min:'.$field['min']] : [], isset($field['max']) ? ['max:'.$field['max']] : []);
                     break;
                 case 'boolean':
                     $rules[$fieldPath] = [$req, 'boolean'];

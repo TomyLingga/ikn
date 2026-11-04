@@ -21,6 +21,7 @@ use App\Services\Commerce\OrderCalculator;
 use App\Services\Commerce\OrderNotifier;
 use App\Services\Commerce\OrderStateMachine;
 use App\Services\Commerce\ProformaService;
+use App\Services\Stock\StockLedger;
 use App\Services\Media\MediaService;
 use App\Services\Payment\PaymentService;
 use Illuminate\Database\Seeder;
@@ -108,9 +109,14 @@ class CommerceDemoSeeder extends Seeder
 
         $now = now();
         try {
+            // Produksi Resiprene tambahan agar skenario ekspor (FOB/CIF) tidak kehabisan stok.
+            $resiprene = Product::where('slug', 'resiprene-35')->first();
+            $this->at($now->copy()->subMonths(12)->startOfMonth(), fn () => app(StockLedger::class)->in($resiprene, 5000, 'Produksi batch Resiprene Sei Bamban (seeder)', $this->admin, 'seed:stock:resiprene-batch'));
+
             $this->as($budi);
             $this->budiHistory($now);
             $this->budiCurrent($now);
+            $this->localCoverage($now);
 
             $siti = User::where('email', 'purchasing@mitrakimia.co.id')->where('status', User::STATUS_ACTIVE)->first();
             if ($siti && $siti->addresses()->exists()) {
@@ -305,6 +311,153 @@ class CommerceDemoSeeder extends Seeder
             ['label' => 'Port charges', 'amount' => 12000],
             ['label' => 'Insurance', 'amount' => 4500],
         ], $now->copy()->addDays(7), 'Rate valid for shipment within two weeks after payment.'));
+
+        $this->exportCoverage($now, $usdBank);
+    }
+
+    // ------------------------------------------------------------------ cakupan kasus (2026-11-04)
+
+    /**
+     * Kasus lokal yang belum terwakili order lain: siklus Loco lengkap (bayar, diambil, batal), Loco dua pabrik
+     * (Resiprene dari Sei Bamban + barang karet dari Tanjung Morawa = dua titik ambil), Franco dua pabrik asal,
+     * dan pembayaran QRIS yang lunas sampai selesai.
+     */
+    private function localCoverage(Carbon $now): void
+    {
+        if (DeliveryTerm::active()->where('code', 'loco')->exists()) {
+            // Loco SELESAI (sudah diambil) 40 hari lalu.
+            $done = $this->paidOrder($now->copy()->subDays(40)->setTime(10, 0), [['sepatu-boots', 20]], ['term' => 'loco', 'note' => 'Diambil sopir kebun Pagar Merbau.']);
+            $this->at($done->created_at->copy()->addDay()->setTime(9, 0), fn () => $this->sm->transition($done, Order::STATUS_PROCESSING, $this->salesAdmin));
+            $this->at($done->created_at->copy()->addDays(2)->setTime(10, 0), fn () => $this->sm->transition($done, Order::STATUS_SHIPPED, $this->salesAdmin));
+            $this->at($done->created_at->copy()->addDays(3)->setTime(14, 0), fn () => $this->sm->transition($done, Order::STATUS_DELIVERED, $this->salesAdmin));
+            $this->at($done->created_at->copy()->addDays(4)->setTime(9, 0), fn () => $this->sm->transition($done, Order::STATUS_COMPLETED, $this->buyer));
+
+            // Loco SUDAH DIAMBIL (delivered), menunggu konfirmasi customer.
+            $picked = $this->paidOrder($now->copy()->subDays(4)->setTime(8, 40), [['rubber-ring', 40]], ['term' => 'loco']);
+            $this->at($picked->created_at->copy()->addHours(20), fn () => $this->sm->transition($picked, Order::STATUS_PROCESSING, $this->salesAdmin));
+            $this->at($picked->created_at->copy()->addDays(2)->setTime(9, 30), fn () => $this->sm->transition($picked, Order::STATUS_SHIPPED, $this->salesAdmin));
+            $this->at($picked->created_at->copy()->addDays(3)->setTime(11, 15), fn () => $this->sm->transition($picked, Order::STATUS_DELIVERED, $this->salesAdmin));
+
+            // Loco DUA PABRIK, dibayar dan sedang disiapkan (dua titik ambil: Sei Bamban + Tanjung Morawa).
+            $twoPoints = $this->paidOrder($now->copy()->subDays(1)->setTime(13, 0), [['resiprene-35', 50], ['sarung-egrek', 30]], ['term' => 'loco', 'note' => 'Resiprene diambil di Sei Bamban, sarung egrek di Tanjung Morawa.']);
+            $this->at($twoPoints->created_at->copy()->addHours(4), fn () => $this->sm->transition($twoPoints, Order::STATUS_PROCESSING, $this->salesAdmin));
+
+            // Loco MENUNGGU PEMBAYARAN (30 menit lalu).
+            $this->at($now->copy()->subMinutes(30), fn () => $this->place([['sepatu-boots', 6]], 'Akan diambil hari Jumat.', null, null, null, 'loco'));
+
+            // Loco DIBATALKAN customer sebelum bayar.
+            $cancel = $this->at($now->copy()->subDays(6)->setTime(15, 0), fn () => $this->place([['rubber-flange-packing', 10]], null, null, null, null, 'loco'));
+            $this->at($cancel->created_at->copy()->addHours(2), fn () => $this->sm->transition($cancel, Order::STATUS_CANCELLED, $this->buyer, ['reason' => 'Beralih ke pengiriman ke gudang.']));
+
+            // Loco KEDALUWARSA (tidak dibayar).
+            $late = $this->at($now->copy()->subDays(9)->setTime(10, 0), fn () => $this->place([['sarung-egrek', 10]], null, null, null, null, 'loco'));
+            $this->at($late->created_at->copy()->addHours(25), fn () => $this->payments->expire($late));
+        }
+
+        // Franco DUA PABRIK ASAL (ongkir dihitung per pabrik), dibayar dan diproses.
+        $twoOrigins = $this->paidOrder($now->copy()->subDays(2)->setTime(9, 0), [['resiprene-35', 25], ['rubber-ring', 30]], ['note' => 'Satu alamat, dua pabrik asal.']);
+        $this->at($twoOrigins->created_at->copy()->addHours(6), fn () => $this->sm->transition($twoOrigins, Order::STATUS_PROCESSING, $this->salesAdmin));
+
+        // QRIS LUNAS sampai selesai (12 hari lalu).
+        if ($this->qris) {
+            $paid = $this->at($now->copy()->subDays(12)->setTime(11, 0), fn () => $this->place([['sarung-egrek', 20]], null, null, null, $this->qris));
+            $this->at($paid->created_at->copy()->addMinutes(10), fn () => $this->payments->attachProof($paid, $paid->activePayment(), $this->proofMedia('bukti-qris-lunas.png'), $this->buyer));
+            $this->at($paid->created_at->copy()->addHours(1), fn () => $this->payments->accept($paid->fresh()->activePayment(), $this->salesAdmin));
+            $this->at($paid->created_at->copy()->addDay()->setTime(9, 0), fn () => $this->sm->transition($paid->fresh(), Order::STATUS_PROCESSING, $this->salesAdmin));
+            $this->at($paid->created_at->copy()->addDays(2)->setTime(14, 0), fn () => $this->sm->transition($paid->fresh(), Order::STATUS_SHIPPED, $this->salesAdmin, ['courier' => 'J&T Cargo', 'trackingNumber' => 'JTC2026102301']));
+            $this->at($paid->created_at->copy()->addDays(4)->setTime(10, 0), fn () => $this->sm->transition($paid->fresh(), Order::STATUS_DELIVERED, $this->buyer));
+            $this->at($paid->created_at->copy()->addDays(5)->setTime(9, 0), fn () => $this->sm->transition($paid->fresh(), Order::STATUS_COMPLETED, $this->buyer));
+        }
+    }
+
+    /**
+     * Siklus order ekspor tambahan (USD): FOB dengan syarat 30/70 sampai selesai (kapal + B/L, dana diterima dikurangi
+     * biaya bank), FOB on board, FOB menunggu verifikasi, FOB kedaluwarsa, CIF tanpa penawaran, CIF ditawar balik
+     * customer, CIF disepakati (menunggu bayar), CIF selesai, dan CIF dibatalkan karena penawaran kedaluwarsa.
+     */
+    private function exportCoverage(Carbon $now, ?BankAccount $usdBank): void
+    {
+        $fob = fn (string $termCode) => ['paymentTermCode' => $termCode, 'bankAccountId' => $usdBank?->id];
+        $port = ['name' => 'Port Klang', 'country' => 'Malaysia', 'countryCode' => 'MY', 'lat' => 2.9997, 'lng' => 101.3929];
+        $cif = fn (string $termCode, array $destination) => $fob($termCode) + ['destinationPort' => $destination];
+        $proof = fn (Order $order, Carbon $time) => $this->at($time, fn () => $this->payments->attachProof($order, $order->fresh()->activePayment(), $this->proofMedia('bukti-tt-usd.pdf'), $this->buyer));
+        $accept = fn (Order $order, Carbon $time, int $received, int $charges) => $this->at($time, fn () => $this->payments->accept($order->fresh()->activePayment(), $this->salesAdmin, [
+            'receivedAmount' => $received, 'bankCharges' => $charges, 'receivedNote' => 'Diterima di rekening USD setelah potongan bank koresponden.',
+        ]));
+        $ship = fn (Order $order, Carbon $time, string $vessel, string $bl) => $this->at($time, fn () => $this->sm->transition($order->fresh(), Order::STATUS_SHIPPED, $this->salesAdmin, [
+            'vesselName' => $vessel, 'voyage' => 'V.'.substr($bl, -3), 'blNumber' => $bl, 'blDate' => $time->toDateString(),
+        ]));
+
+        // FOB SELESAI (45 hari lalu), syarat 30/70: proforma, pembayaran diterima dengan biaya bank, on board, diterima.
+        $done = $this->at($now->copy()->subDays(45)->setTime(10, 0), fn () => $this->place([['resiprene-35', 1000]], 'Shipment to Port Klang, 40 bags per pallet.', null, null, null, 'fob', $fob('tt_30_70')));
+        $this->at($done->created_at->copy()->addHours(2), fn () => app(ProformaService::class)->save($done, ['portOfDischarge' => 'Port Klang', 'notes' => '30% advance, 70% against copy of B/L.', 'validUntil' => $done->created_at->copy()->addDays(14)->toDateString()], $this->salesAdmin));
+        $proof($done, $done->created_at->copy()->addDays(1));
+        $accept($done, $done->created_at->copy()->addDays(1)->addHours(4), max(0, $done->fresh()->grandTotalInt() - 2500), 2500);
+        $this->at($done->created_at->copy()->addDays(2), fn () => $this->sm->transition($done->fresh(), Order::STATUS_PROCESSING, $this->salesAdmin));
+        $ship($done, $done->created_at->copy()->addDays(6)->setTime(16, 0), 'MV Kota Bahagia', 'BLW-PKG-2026-0918');
+        $this->at($done->created_at->copy()->addDays(10), fn () => $this->sm->transition($done->fresh(), Order::STATUS_DELIVERED, $this->buyer));
+        $this->at($done->created_at->copy()->addDays(11), fn () => $this->sm->transition($done->fresh(), Order::STATUS_COMPLETED, $this->buyer));
+
+        // FOB ON BOARD (dikirim 3 hari lalu), 100% T/T di muka.
+        $board = $this->at($now->copy()->subDays(8)->setTime(9, 30), fn () => $this->place([['resiprene-35', 400]], null, null, null, null, 'fob', $fob('tt_advance')));
+        $proof($board, $board->created_at->copy()->addHours(5));
+        $accept($board, $board->created_at->copy()->addDay(), $board->fresh()->grandTotalInt(), 0);
+        $this->at($board->created_at->copy()->addDays(2), fn () => $this->sm->transition($board->fresh(), Order::STATUS_PROCESSING, $this->salesAdmin));
+        $ship($board, $now->copy()->subDays(3)->setTime(15, 30), 'MV Sinar Belawan', 'BLW-PKG-2026-1101');
+
+        // FOB MENUNGGU VERIFIKASI (bukti T/T diunggah 6 jam lalu), syarat 30/70.
+        $review = $this->at($now->copy()->subDays(1)->setTime(10, 0), fn () => $this->place([['resiprene-35', 250]], null, null, null, null, 'fob', $fob('tt_30_70')));
+        $proof($review, $now->copy()->subHours(6));
+
+        // FOB KEDALUWARSA (tidak dibayar dalam batas waktu).
+        $expired = $this->at($now->copy()->subDays(14)->setTime(11, 0), fn () => $this->place([['resiprene-35', 200]], null, null, null, null, 'fob', $fob('tt_advance')));
+        $this->at($expired->created_at->copy()->addDays(6), fn () => $this->payments->expire($expired->fresh()));
+
+        // CIF MENUNGGU PENAWARAN (belum ada penawaran admin, 2 jam lalu) ke Ho Chi Minh City.
+        $this->at($now->copy()->subHours(2), fn () => $this->place([['resiprene-35', 300]], 'CIF Cat Lai port, please advise transit time.', null, null, null, 'cif', $cif('tt_advance', [
+            'name' => 'Cat Lai, Ho Chi Minh City', 'country' => 'Vietnam', 'countryCode' => 'VN', 'lat' => 10.7578, 'lng' => 106.7884,
+        ])));
+
+        // CIF DITAWAR BALIK customer (menunggu keputusan admin).
+        $counter = $this->at($now->copy()->subDays(3)->setTime(9, 0), fn () => $this->place([['resiprene-35', 350]], null, null, null, null, 'cif', $cif('tt_30_70', [
+            'name' => 'Laem Chabang', 'country' => 'Thailand', 'countryCode' => 'TH', 'lat' => 13.0827, 'lng' => 100.8833,
+        ])));
+        $this->at($counter->created_at->copy()->addHours(5), fn () => app(FreightQuoteService::class)->adminPropose($counter->fresh(), $this->salesAdmin, [
+            ['label' => 'Ocean freight Belawan - Laem Chabang', 'amount' => 98000],
+            ['label' => 'Insurance', 'amount' => 5000],
+        ], $now->copy()->addDays(4), null));
+        $this->at($counter->created_at->copy()->addDay(), fn () => app(FreightQuoteService::class)->customerCounter($counter->fresh(), $this->buyer, 85000, 'Our forwarder quotes USD 850 for this lane.'));
+
+        // CIF DISEPAKATI (customer menerima penawaran kemarin) → menunggu pembayaran.
+        $agreed = $this->at($now->copy()->subDays(2)->setTime(10, 0), fn () => $this->place([['resiprene-35', 300]], null, null, null, null, 'cif', $cif('tt_advance', $port)));
+        $quote = $this->at($agreed->created_at->copy()->addHours(3), fn () => app(FreightQuoteService::class)->adminPropose($agreed->fresh(), $this->salesAdmin, [
+            ['label' => 'Ocean freight Belawan - Port Klang', 'amount' => 62000],
+            ['label' => 'Insurance', 'amount' => 4000],
+        ], $now->copy()->addDays(5), null));
+        $this->at($now->copy()->subDay()->setTime(9, 0), fn () => app(FreightQuoteService::class)->customerAccept($agreed->fresh(), $this->buyer, $quote));
+
+        // CIF SELESAI (60 hari lalu): penawaran diterima, dibayar, on board, diterima, selesai.
+        $cifDone = $this->at($now->copy()->subDays(60)->setTime(10, 0), fn () => $this->place([['resiprene-35', 500]], null, null, null, null, 'cif', $cif('tt_advance', $port)));
+        $doneQuote = $this->at($cifDone->created_at->copy()->addHours(4), fn () => app(FreightQuoteService::class)->adminPropose($cifDone->fresh(), $this->salesAdmin, [
+            ['label' => 'Ocean freight Belawan - Port Klang', 'amount' => 70000],
+            ['label' => 'Port charges', 'amount' => 12000],
+            ['label' => 'Insurance', 'amount' => 5000],
+        ], $cifDone->created_at->copy()->addDays(7), null));
+        $this->at($cifDone->created_at->copy()->addDay(), fn () => app(FreightQuoteService::class)->customerAccept($cifDone->fresh(), $this->buyer, $doneQuote));
+        $proof($cifDone, $cifDone->created_at->copy()->addDays(2));
+        $accept($cifDone, $cifDone->created_at->copy()->addDays(2)->addHours(5), max(0, $cifDone->fresh()->grandTotalInt() - 3000), 3000);
+        $this->at($cifDone->created_at->copy()->addDays(3), fn () => $this->sm->transition($cifDone->fresh(), Order::STATUS_PROCESSING, $this->salesAdmin));
+        $ship($cifDone, $cifDone->created_at->copy()->addDays(8)->setTime(17, 0), 'MV Kota Bahagia', 'BLW-PKG-2026-0907');
+        $this->at($cifDone->created_at->copy()->addDays(12), fn () => $this->sm->transition($cifDone->fresh(), Order::STATUS_DELIVERED, $this->buyer));
+        $this->at($cifDone->created_at->copy()->addDays(13), fn () => $this->sm->transition($cifDone->fresh(), Order::STATUS_COMPLETED, $this->buyer));
+
+        // CIF DIBATALKAN: penawaran kedaluwarsa dan order basi dibatalkan oleh job orders:freight-expire.
+        $stale = $this->at($now->copy()->subDays(40)->setTime(10, 0), fn () => $this->place([['resiprene-35', 200]], null, null, null, null, 'cif', $cif('tt_advance', $port)));
+        $this->at($stale->created_at->copy()->addHours(6), fn () => app(FreightQuoteService::class)->adminPropose($stale->fresh(), $this->salesAdmin, [
+            ['label' => 'Ocean freight Belawan - Port Klang', 'amount' => 66000],
+        ], $stale->created_at->copy()->addDays(7), null));
+        $this->at($stale->created_at->copy()->addDays(8), fn () => app(FreightQuoteService::class)->expireQuotes());
+        $this->at($stale->created_at->copy()->addDays(31), fn () => app(FreightQuoteService::class)->cancelStale());
     }
 
     private function sitiChat(Carbon $now): void

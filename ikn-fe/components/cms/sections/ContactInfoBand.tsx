@@ -37,7 +37,13 @@ export default function ContactInfoBand({ section, map = true }: Props) {
   return (
     <>
       <section className="contact-band" id={section.key || undefined}>
-        {background && <div className="contact-band-bg" style={{ backgroundImage: `url(${background})` }} aria-hidden="true" />}
+        {background && (
+          <div
+            className="contact-band-bg"
+            style={{ backgroundImage: `url(${background})`, opacity: typeof c.bg_opacity === 'number' ? Math.min(100, Math.max(0, c.bg_opacity)) / 100 : undefined }}
+            aria-hidden="true"
+          />
+        )}
         <div className="container">
           <div className="contact-band-grid">
             {locations.map((loc, i) => {
