@@ -87,11 +87,16 @@ class CommerceConfigTest extends TestCase
             ->assertOk()->assertJsonPath('data.invoicePrefix', 'PMS/X/INV/RB')->assertJsonPath('data.invoiceSignerName', 'Budi')->assertJsonPath('data.invoiceSignerTitle', '');
         $this->actingAs($admin)->putJson('/api/v1/admin/settings', ['invoicePrefix' => 'A;DROP'])->assertStatus(422)->assertJsonStructure(['errors' => ['invoicePrefix']]);
 
-        // Titik asal ongkir berbasis jarak (ASUMSI A-76): dibulatkan 6 desimal, boleh dikosongkan, di luar rentang → 422.
-        $this->actingAs($admin)->getJson('/api/v1/admin/settings')->assertJsonPath('data.shippingOriginLat', 3.3495)->assertJsonPath('data.shippingRoadFactor', 1.3);
-        $this->actingAs($admin)->putJson('/api/v1/admin/settings', ['shippingOriginLat' => 3.12345678, 'shippingOriginLng' => '', 'shippingOriginLabel' => 'Gudang Medan'])
-            ->assertOk()->assertJsonPath('data.shippingOriginLat', 3.123457)->assertJsonPath('data.shippingOriginLng', null)->assertJsonPath('data.shippingOriginLabel', 'Gudang Medan');
-        $this->actingAs($admin)->putJson('/api/v1/admin/settings', ['shippingOriginLat' => 91, 'shippingRoadFactor' => 5])->assertStatus(422)->assertJsonStructure(['errors' => ['shippingOriginLat', 'shippingRoadFactor']]);
+        // Faktor jalan ongkir berbasis jarak (ASUMSI A-76) tetap di settings; titik asal dan titik ambil pindah ke
+        // /admin/factory-locations (ASUMSI A-90), jadi kunci lama tidak ada lagi dan diabaikan bila dikirim.
+        $settings = $this->actingAs($admin)->getJson('/api/v1/admin/settings')->assertJsonPath('data.shippingRoadFactor', 1.3)->json('data');
+        foreach (['shippingOriginLabel', 'shippingOriginLat', 'shippingOriginLng', 'pickupLabel', 'pickupAddress', 'pickupLat', 'pickupLng'] as $removed) {
+            $this->assertArrayNotHasKey($removed, $settings);
+        }
+        $updated = $this->actingAs($admin)->putJson('/api/v1/admin/settings', ['shippingRoadFactor' => 1.45, 'shippingOriginLat' => 3.1])
+            ->assertOk()->assertJsonPath('data.shippingRoadFactor', 1.45)->json('data');
+        $this->assertArrayNotHasKey('shippingOriginLat', $updated);
+        $this->actingAs($admin)->putJson('/api/v1/admin/settings', ['shippingRoadFactor' => 5])->assertStatus(422)->assertJsonStructure(['errors' => ['shippingRoadFactor']]);
         $this->assertArrayNotHasKey('commerce', $this->getJson('/api/v1/content/settings')->assertOk()->json('data')); // tidak bocor ke settings publik
     }
 
@@ -129,21 +134,6 @@ class CommerceConfigTest extends TestCase
         $this->actingAs($admin)->putJson('/api/v1/admin/vouchers/'.$voucher, ['code' => 'IKN10', 'type' => 'fixed', 'value' => 150000, 'scope' => 'all'])
             ->assertOk()->assertJsonPath('data.type', 'fixed')->assertJsonPath('data.value', 150000)->assertJsonPath('data.scope', 'all');
         $this->actingAs($admin)->deleteJson('/api/v1/admin/vouchers/'.$voucher)->assertOk();
-    }
-
-    public function test_shipping_admin_manages_origin_point(): void
-    {
-        $admin = $this->adminWith(['shipping']);
-
-        $this->actingAs($admin)->getJson('/api/v1/admin/shipping-origin')->assertOk()
-            ->assertJsonPath('data.label', 'Pabrik Resiprene')->assertJsonPath('data.lat', 3.3495)->assertJsonPath('data.roadFactor', 1.3);
-        $this->actingAs($admin)->putJson('/api/v1/admin/shipping-origin', ['label' => 'Gudang Medan', 'lat' => 3.5952, 'lng' => 98.6722, 'roadFactor' => 1.4])
-            ->assertOk()->assertJsonPath('data.lng', 98.6722)->assertJsonPath('data.roadFactor', 1.4);
-        $this->actingAs($admin)->putJson('/api/v1/admin/shipping-origin', ['lat' => 3.1, 'roadFactor' => 0.5])
-            ->assertStatus(422)->assertJsonStructure(['errors' => ['lng', 'roadFactor']]);
-        $this->actingAs($admin)->putJson('/api/v1/admin/shipping-origin', ['lat' => null, 'lng' => null, 'roadFactor' => 1.3])
-            ->assertOk()->assertJsonPath('data.lat', null);
-        $this->actingAs($this->adminWith(['orders']))->getJson('/api/v1/admin/shipping-origin')->assertForbidden();
     }
 
     public function test_admin_manages_shipping_zones_rates_and_alias_methods(): void

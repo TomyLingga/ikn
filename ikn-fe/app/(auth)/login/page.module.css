@@ -282,7 +282,8 @@
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
   min-height: 50px;
   padding: 12px 16px;
@@ -301,12 +302,14 @@
 }
 
 .field input:hover,
-.field textarea:hover {
+.field textarea:hover,
+.field select:hover {
   background: color-mix(in srgb, var(--ink) 9%, var(--surface));
 }
 
 .field input:focus,
-.field textarea:focus {
+.field textarea:focus,
+.field select:focus {
   border-color: var(--primary);
   background: var(--surface);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent);

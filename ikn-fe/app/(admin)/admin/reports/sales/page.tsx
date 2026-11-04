@@ -8,13 +8,14 @@ import AdminSalesChart from '@/components/admin/AdminSalesChart';
 import CountUp from '@/components/CountUp';
 import { AdminCard, AdminPageHead, DataTable, type Column } from '@/components/admin/AdminPage';
 import { useLang } from '@/components/LanguageProvider';
-import { orderLabel, paymentLabel } from '@/lib/commerce';
+import { orderLabel, orderVariant, paymentLabel } from '@/lib/commerce';
 import { api, API_URL, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { defaultDateRange, queryString, type SalesReport, type SalesReportProduct } from '@/lib/admin';
-import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
+import { currencyLabels, defaultDateRange, queryString, type SalesByCurrency, type SalesReport, type SalesReportProduct } from '@/lib/admin';
+import { formatDate, formatDateTime, formatIDR, formatMoney } from '@/lib/format';
 import type { OrderSummary } from '@/lib/types';
 import Select from '@/components/Select';
+import Spinner from '@/components/Spinner';
 
 type FilterMode = 'year' | 'month' | 'range';
 
@@ -75,6 +76,11 @@ export default function AdminSalesReport() {
         : `${formatDate(report.period.from, lang)} – ${formatDate(report.period.to, lang)}`
     : '';
 
+  // Agregat lama (summary, byMonth, byProduct) hanya IDR; byCurrency dan orders memuat semua mata uang (Phase E6).
+  const idr = report?.currency || 'IDR';
+  const byCurrency = report?.byCurrency ?? [];
+  const totalOrders = Math.max(byCurrency.reduce((sum, row) => sum + row.orders, 0), report?.orders.length ?? 0);
+
   const maxQty = Math.max(1, ...(report?.byProduct.map((p) => p.qty) ?? [1]));
   const productColumns: Column<SalesReportProduct>[] = [
     {
@@ -117,6 +123,22 @@ export default function AdminSalesReport() {
     { key: 'revenue', label: t('Nilai penjualan', 'Sales value'), align: 'right', sortValue: (p) => p.revenue, render: (p) => <strong>{formatIDR(p.revenue)}</strong> },
   ];
 
+  const currencyColumns: Column<SalesByCurrency>[] = [
+    {
+      key: 'currency',
+      label: t('Mata uang', 'Currency'),
+      render: (row) => (
+        <span>
+          <strong className="mono">{row.currency}</strong>
+          <small className="admin-cell-sub">{currencyLabels[row.currency]?.[lang] ?? row.currency}</small>
+        </span>
+      ),
+    },
+    { key: 'orders', label: t('Order dibayar', 'Paid orders'), align: 'right', render: (row) => String(row.paidOrders) },
+    { key: 'revenue', label: t('Pendapatan', 'Revenue'), align: 'right', render: (row) => <strong>{formatMoney(row.revenue, row.currency)}</strong> },
+    { key: 'average', label: t('Rata-rata per order', 'Average per order'), align: 'right', render: (row) => formatMoney(row.averageOrder, row.currency) },
+  ];
+
   const orderColumns: Column<OrderSummary>[] = [
     {
       key: 'number',
@@ -133,10 +155,11 @@ export default function AdminSalesReport() {
     { key: 'customer', label: 'Customer', render: (o) => o.customer.company || o.customer.name },
     { key: 'paidAt', label: t('Dibayar', 'Paid at'), render: (o) => formatDateTime(o.paidAt, lang) },
     { key: 'items', label: t('Item', 'Items'), align: 'right', render: (o) => String(o.itemsCount) },
-    { key: 'total', label: 'Total', align: 'right', render: (o) => formatIDR(o.grandTotal) },
+    { key: 'currency', label: t('Mata uang', 'Currency'), render: (o) => <span className="mono">{o.currency}</span> },
+    { key: 'total', label: 'Total', align: 'right', render: (o) => formatMoney(o.grandTotal, o.currency) },
     { key: 'method', label: t('Metode', 'Method'), render: (o) => <span className="mono">{o.paymentMethod || '—'}</span> },
     { key: 'payment', label: t('Pembayaran', 'Payment'), render: (o) => <StatusBadge label={paymentLabel(o.paymentStatus)[lang]} tone={paymentLabel(o.paymentStatus).tone} small /> },
-    { key: 'status', label: 'Status', render: (o) => <StatusBadge label={orderLabel(o.status)[lang]} tone={orderLabel(o.status).tone} small /> },
+    { key: 'status', label: 'Status', render: (o) => <StatusBadge label={orderLabel(o.status, orderVariant(o))[lang]} tone={orderLabel(o.status, orderVariant(o)).tone} small /> },
   ];
 
   return (
@@ -205,46 +228,66 @@ export default function AdminSalesReport() {
       </div>
 
       {error && <p className="form-error">{error}</p>}
-      {loading && !report && <p className="admin-field-hint">{t('Memuat laporan...', 'Loading report...')}</p>}
+      {loading && !report && <Spinner block label={t('Memuat laporan...', 'Loading report...')} />}
 
       {report && (
         <div aria-busy={loading}>
-          <div className="admin-stat-grid admin-stat-grid-4">
-            <div className="admin-stat" style={{ '--i': 0 } as CSSProperties}>
-              <span>{t('Order dibayar', 'Paid orders')}</span>
-              <strong><CountUp value={report.summary.orders} /></strong>
+          <div className="admin-stat-grid rp-stats">
+            <div className="admin-stat rp-stat rp-stat-main" style={{ '--i': 0 } as CSSProperties}>
+              <span className="rp-stat-label">{t('Total penjualan', 'Total revenue')} ({idr})</span>
+              <strong><CountUp value={report.summary.revenue} format={formatIDR} /></strong>
+              <div className="rp-stat-sub">
+                <span>{t('Periode', 'Period')}: {periodLabel}</span>
+                <span>
+                  {t(`${report.summary.orders} order dibayar`, `${report.summary.orders} paid orders`)}
+                </span>
+              </div>
             </div>
-            <div className="admin-stat" style={{ '--i': 1 } as CSSProperties}>
-              <span>{t('Total penjualan', 'Total revenue')}</span>
-              <strong><CountUp value={report.summary.revenue} format={formatIDR} delay={70} /></strong>
+            <div className="admin-stat rp-stat" style={{ '--i': 1 } as CSSProperties}>
+              <span className="rp-stat-label">{t('Order dibayar', 'Paid orders')}</span>
+              <strong><CountUp value={report.summary.orders} delay={70} /></strong>
+              <div className="rp-stat-sub">{t(`order ${idr}`, `${idr} orders`)}</div>
             </div>
-            <div className="admin-stat" style={{ '--i': 2 } as CSSProperties}>
-              <span>{t('Rata-rata per order', 'Average per order')}</span>
+            <div className="admin-stat rp-stat" style={{ '--i': 2 } as CSSProperties}>
+              <span className="rp-stat-label">{t('Rata-rata per order', 'Average per order')}</span>
               <strong><CountUp value={report.summary.avgOrder} format={formatIDR} delay={140} /></strong>
+              <div className="rp-stat-sub">{t('total penjualan ÷ order dibayar', 'revenue ÷ paid orders')}</div>
             </div>
-            <div className="admin-stat" style={{ '--i': 3 } as CSSProperties}>
-              <span>{t('Unit terjual', 'Units sold')}</span>
+            <div className="admin-stat rp-stat" style={{ '--i': 3 } as CSSProperties}>
+              <span className="rp-stat-label">{t('Unit terjual', 'Units sold')}</span>
               <strong><CountUp value={report.summary.items} delay={210} /></strong>
+              <div className="rp-stat-sub">{t(`dari order ${idr}`, `from ${idr} orders`)}</div>
             </div>
           </div>
 
-          <div className="admin-breakdown">
-            <span>
-              Subtotal <b><CountUp value={report.summary.subtotal} format={formatIDR} /></b>
-            </span>
-            <span>
-              {t('Diskon', 'Discount')} <b><CountUp value={report.summary.discount} format={(n) => `−${formatIDR(n)}`} /></b>
-            </span>
-            <span>
-              {t('Ongkir', 'Shipping')} <b><CountUp value={report.summary.shipping} format={formatIDR} /></b>
-            </span>
-            <span>
-              {t('Biaya', 'Fees')} <b><CountUp value={report.summary.fees} format={formatIDR} /></b>
-            </span>
-            <span>
-              {t('PPN', 'VAT')} <b><CountUp value={report.summary.tax} format={formatIDR} /></b>
-            </span>
+          <div className="rp-breakdown" role="list" aria-label={t('Rincian penjualan', 'Revenue breakdown')}>
+            {([
+              ['Subtotal', 'Subtotal', report.summary.subtotal, ''],
+              ['Diskon', 'Discount', report.summary.discount, 'is-minus'],
+              ['Ongkir', 'Shipping', report.summary.shipping, ''],
+              ['Biaya', 'Fees', report.summary.fees, ''],
+              ['PPN', 'VAT', report.summary.tax, ''],
+            ] as const).map(([idLabel, enLabel, value, tone], i) => (
+              <div key={idLabel} role="listitem" className={`rp-break ${tone}`} style={{ '--i': i + 4 } as CSSProperties}>
+                <span>{t(idLabel, enLabel)}</span>
+                <b><CountUp value={value} format={(n) => (tone ? `−${formatIDR(n)}` : formatIDR(n))} delay={280 + i * 50} /></b>
+              </div>
+            ))}
           </div>
+
+          {byCurrency.length > 0 && (
+            <div style={{ marginBottom: 22 }}>
+              <AdminCard
+                title={t('Penjualan per mata uang', 'Sales by currency')}
+                desc={t(
+                  'Order dibayar pada periode ini dikelompokkan per mata uang; angka dalam mata uang baris itu, tanpa konversi kurs. Kartu dan grafik di atas hanya menghitung IDR.',
+                  'Paid orders in this period grouped by currency; amounts are in that row\'s currency with no exchange-rate conversion. The cards and chart above count IDR only.',
+                )}
+              >
+                <DataTable columns={currencyColumns} rows={byCurrency} rowKey="currency" pagination={false} />
+              </AdminCard>
+            </div>
+          )}
 
           <div style={{ marginBottom: 22 }}>
             <AdminSalesChart
@@ -254,16 +297,16 @@ export default function AdminSalesReport() {
               onYearChange={mode === 'range' ? undefined : (y) => setYear(y)}
               loading={loading}
               eyebrow={t('Tren penjualan', 'Sales trend')}
-              title={`${t('Penjualan per bulan', 'Sales per month')} · ${periodLabel}`}
+              title={`${t('Penjualan per bulan', 'Sales per month')} (${idr}) · ${periodLabel}`}
             />
           </div>
 
           <div style={{ marginBottom: 22 }}>
             <AdminCard
-              title={t('Produk terlaris', 'Top products')}
+              title={`${t('Produk terlaris', 'Top products')} (${idr})`}
               desc={t(
-                'Awalnya diurutkan dari nilai penjualan tertinggi (setelah diskon). Klik judul kolom Order, Terjual, atau Nilai penjualan untuk mengubah urutan.',
-                'Initially sorted by highest sales value (after discounts). Click the Orders, Qty sold, or Sales value heading to change the order.',
+                'Hanya order IDR. Awalnya diurutkan dari nilai penjualan tertinggi (setelah diskon). Klik judul kolom Order, Terjual, atau Nilai penjualan untuk mengubah urutan.',
+                'IDR orders only. Initially sorted by highest sales value (after discounts). Click the Orders, Qty sold, or Sales value heading to change the order.',
               )}
             >
               <DataTable columns={productColumns} rows={report.byProduct} rowKey="productId" defaultSort={{ key: 'revenue', dir: 'desc' }} empty={t('Belum ada produk terjual pada periode ini.', 'No products sold in this period.')} />
@@ -271,8 +314,12 @@ export default function AdminSalesReport() {
           </div>
 
           <AdminCard
-            title={`${t('Daftar order', 'Order list')} (${report.summary.orders})`}
-            desc={report.orders.length < report.summary.orders ? t(`Menampilkan ${report.orders.length} order terbaru; unduh CSV untuk daftar lengkap.`, `Showing the latest ${report.orders.length} orders; download the CSV for the full list.`) : undefined}
+            title={`${t('Daftar order', 'Order list')} (${totalOrders})`}
+            desc={
+              report.orders.length < totalOrders
+                ? t(`Semua mata uang. Menampilkan ${report.orders.length} order terbaru; unduh CSV untuk daftar lengkap.`, `All currencies. Showing the latest ${report.orders.length} orders; download the CSV for the full list.`)
+                : t('Semua mata uang; nilai ditulis dalam mata uang masing-masing order.', 'All currencies; amounts are shown in each order\'s own currency.')
+            }
             action={{ label: t('Unduh CSV', 'Download CSV'), icon: 'arrowDown', onClick: downloadCsv }}
           >
             <DataTable columns={orderColumns} rows={report.orders} rowKey="number" empty={t('Belum ada order dibayar pada periode ini.', 'No paid orders in this period.')} />
@@ -280,7 +327,10 @@ export default function AdminSalesReport() {
 
           <p className="admin-field-hint" style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Icon name="compass" size={15} />
-            {t('CSV berisi satu baris per order (nomor, invoice, tanggal bayar, customer, subtotal, diskon, ongkir, biaya, PPN, kode unik, total, metode).', 'The CSV has one row per order (number, invoice, paid date, customer, subtotal, discount, shipping, fees, VAT, unique code, total, method).')}
+            {t(
+              'CSV berisi satu baris per order semua mata uang (nomor, invoice, tanggal bayar, customer, mata uang, subtotal, diskon, ongkir, biaya, PPN, kode unik, total, metode); angka dalam satuan terkecil mata uang baris itu (rupiah untuk IDR, sen untuk USD), tanpa konversi kurs.',
+              'The CSV has one row per order in every currency (number, invoice, paid date, customer, currency, subtotal, discount, shipping, fees, VAT, unique code, total, method); amounts are in the minor unit of that row\'s currency (rupiah for IDR, cents for USD), with no exchange-rate conversion.',
+            )}
           </p>
         </div>
       )}

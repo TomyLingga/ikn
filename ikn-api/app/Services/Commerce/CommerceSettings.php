@@ -26,11 +26,16 @@ class CommerceSettings
         'invoice_signer_name' => ['string', 0, 120],
         'invoice_signer_title' => ['string', 0, 120],
         'invoice_cc' => ['string', 0, 120],
-        // Ongkir berbasis jarak (ASUMSI A-76): titik asal + faktor jalan.
-        'shipping_origin_label' => ['string', 0, 120],
-        'shipping_origin_lat' => ['coord', -90, 90],
-        'shipping_origin_lng' => ['coord', -180, 180],
+        // Ongkir berbasis jarak (ASUMSI A-76): faktor jalan. Titik asal dan titik ambil Loco kini tabel factory_locations
+        // (ASUMSI A-90); kunci lama shipping_origin_* / pickup_* dihapus migrasi 2026_11_04_000010.
         'shipping_road_factor' => ['float', 1, 3],
+        // Ekspor (ASUMSI A-86): pajak untuk term ber-tax_profile export (bawaan 0) dan batas bayar order USD (jam).
+        'export_tax_rate' => ['float', 0, 100],
+        'export_payment_due_hours' => ['int', 1, 720],
+        // Penawaran ongkir CIF (ASUMSI A-89): masa berlaku bawaan penawaran admin (hari) dan batas tunggu order
+        // awaiting_freight tanpa kesepakatan sebelum dibatalkan otomatis (hari).
+        'freight_quote_valid_days' => ['int', 1, 90],
+        'freight_quote_max_days' => ['int', 1, 365],
     ];
 
     /** Nama kunci di JSON (camelCase) ↔ kunci setting (snake_case). */
@@ -45,10 +50,11 @@ class CommerceSettings
         'invoiceSignerName' => 'invoice_signer_name',
         'invoiceSignerTitle' => 'invoice_signer_title',
         'invoiceCc' => 'invoice_cc',
-        'shippingOriginLabel' => 'shipping_origin_label',
-        'shippingOriginLat' => 'shipping_origin_lat',
-        'shippingOriginLng' => 'shipping_origin_lng',
         'shippingRoadFactor' => 'shipping_road_factor',
+        'exportTaxRate' => 'export_tax_rate',
+        'exportPaymentDueHours' => 'export_payment_due_hours',
+        'freightQuoteValidDays' => 'freight_quote_valid_days',
+        'freightQuoteMaxDays' => 'freight_quote_max_days',
     ];
 
     /** @var array<string, mixed>|null cache per request */

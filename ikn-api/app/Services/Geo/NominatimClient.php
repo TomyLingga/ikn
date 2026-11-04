@@ -11,9 +11,14 @@ use Illuminate\Support\Facades\Http;
 
 // Proxy Nominatim (OSM): cache 7/30 hari, maksimum 1 request/detik ke upstream (kebijakan Nominatim),
 // User-Agent jelas dari config ikn.nominatim. Hasil dinormalisasi ke bentuk kontrak bagian 5.
+// scope id (bawaan) membatasi countrycodes=id (alamat customer); scope world tanpa batas negara (pelabuhan tujuan CIF, A-89).
 class NominatimClient
 {
     public const UPSTREAM_MIN_INTERVAL_SECONDS = 1.0;
+
+    public const SCOPE_ID = 'id';
+    public const SCOPE_WORLD = 'world';
+    public const SCOPES = [self::SCOPE_ID, self::SCOPE_WORLD];
 
     private const CACHE_PREFIX = 'geo:';
 
@@ -22,13 +27,15 @@ class NominatimClient
     private const LAST_CALL_KEY = 'geo:nominatim:last';
 
     /** @return array<int, array<string, mixed>> */
-    public function search(string $query): array
+    public function search(string $query, string $scope = self::SCOPE_ID): array
     {
         $query = trim($query);
-        $key = self::CACHE_PREFIX.'search:'.sha1(mb_strtolower($query));
+        $scope = in_array($scope, self::SCOPES, true) ? $scope : self::SCOPE_ID;
+        // Cache lama (tanpa scope) tetap berlaku untuk scope id agar hasil yang sudah tersimpan tidak dibuang.
+        $key = self::CACHE_PREFIX.'search:'.($scope === self::SCOPE_ID ? '' : $scope.':').sha1(mb_strtolower($query));
         $ttl = now()->addDays((int) config('ikn.nominatim.search_cache_days', 7));
 
-        return Cache::remember($key, $ttl, fn () => $this->fetch('search', ['q' => $query]));
+        return Cache::remember($key, $ttl, fn () => $this->fetch('search', ['q' => $query], $scope));
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -41,12 +48,15 @@ class NominatimClient
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function fetch(string $endpoint, array $params): array
+    private function fetch(string $endpoint, array $params, string $scope = self::SCOPE_ID): array
     {
         $this->throttleUpstream();
 
         $url = rtrim((string) config('ikn.nominatim.base_url'), '/').'/'.$endpoint;
-        $query = $params + ['format' => 'jsonv2', 'countrycodes' => 'id', 'limit' => 5, 'addressdetails' => 1];
+        $query = $params + ['format' => 'jsonv2', 'limit' => 5, 'addressdetails' => 1];
+        if ($scope === self::SCOPE_ID) {
+            $query['countrycodes'] = 'id';
+        }
 
         try {
             $response = Http::withHeaders([
@@ -82,15 +92,23 @@ class NominatimClient
         return $items;
     }
 
-    /** Bentuk kontrak: { displayName, lat, lng, address { road, village, district, city, state, postcode } }. */
+    /**
+     * Bentuk kontrak: { displayName, lat, lng, country, countryCode, class, type, address { road, village, district, city, state, postcode } }.
+     * country/countryCode (ISO alpha-2 huruf besar) dan class/type OSM (mis. natural/bay, place/city) membantu pemilih pelabuhan tujuan.
+     */
     private function normalize(array $item): array
     {
         $address = is_array($item['address'] ?? null) ? $item['address'] : [];
+        $countryCode = isset($address['country_code']) && is_string($address['country_code']) ? strtoupper(trim($address['country_code'])) : null;
 
         return [
             'displayName' => (string) ($item['display_name'] ?? ''),
             'lat' => (float) $item['lat'],
             'lng' => (float) $item['lon'],
+            'country' => $this->first($address, ['country']),
+            'countryCode' => $countryCode !== null && preg_match('/^[A-Z]{2}$/', $countryCode) ? $countryCode : null,
+            'class' => isset($item['class']) && is_string($item['class']) ? $item['class'] : (isset($item['category']) && is_string($item['category']) ? $item['category'] : null),
+            'type' => isset($item['type']) && is_string($item['type']) ? $item['type'] : null,
             'address' => [
                 'road' => $this->first($address, ['road', 'pedestrian', 'footway', 'residential']),
                 'village' => $this->first($address, ['village', 'neighbourhood', 'hamlet', 'quarter', 'suburb']),

@@ -11,7 +11,7 @@ import { stockLabels } from '@/lib/commerce';
 import { api, apiPaged, errorMessage } from '@/lib/api';
 import { tr, type PagedMeta } from '@/lib/cms';
 import { queryString, type AdminProduct } from '@/lib/admin';
-import { formatIDR } from '@/lib/format';
+import { formatIDR, formatMoney } from '@/lib/format';
 import type { Category } from '@/lib/types';
 import ProductForm from './ProductForm';
 import StockPanel from './StockPanel';
@@ -135,7 +135,21 @@ export default function ProductManager() {
         </span>
       ),
     },
-    { key: 'category', label: t('Kategori', 'Category'), render: (product) => (product.category ? tr(product.category.name, lang) : '—') },
+    {
+      key: 'category',
+      label: t('Kategori', 'Category'),
+      render: (product) => (
+        <span>
+          {product.category ? tr(product.category.name, lang) : '—'}
+          {product.factoryLocation && (
+            <small className="admin-cell-sub">
+              {tr(product.factoryLocation.name, lang)}
+              {product.factoryLocationId == null ? ` (${t('bawaan', 'default')})` : ''}
+            </small>
+          )}
+        </span>
+      ),
+    },
     {
       key: 'price',
       label: t('Harga', 'Price'),
@@ -155,6 +169,9 @@ export default function ProductManager() {
                 {formatIDR(product.price)}
                 <small className="admin-cell-sub">/{product.unit}</small>
               </>
+            )}
+            {product.priceUsdSet && product.priceUsd !== null && (
+              <small className="admin-cell-sub">{formatMoney(product.priceUsd, 'USD')} · FOB</small>
             )}
           </span>
         ) : (

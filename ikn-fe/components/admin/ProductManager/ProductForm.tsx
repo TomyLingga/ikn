@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Icon from '@/components/Icon';
+import Spinner from '@/components/Spinner';
 import AdminModal from '@/components/admin/AdminModal';
 import { I18nInput, ListField, MediaPicker, firstError, mediaId, mediaSummary, type FieldErrors, type MediaValue } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
@@ -13,9 +14,11 @@ import {
   listToLines,
   numberOrNull,
   toDateTimeLocal,
+  type AdminFactoryLocation,
   type AdminProduct,
   type ProductPayload,
 } from '@/lib/admin';
+import { fromMinorInput, isExponentInput, toMinorInput } from '@/lib/format';
 import type { Category, PriceMode } from '@/lib/types';
 import Select from '@/components/Select';
 
@@ -35,6 +38,8 @@ interface ProductFormState {
   priceMode: PriceMode;
   price: string;
   promoPrice: string;
+  /** Harga USD per satuan sebagai teks desimal ("12.50"); dikonversi ke sen di payload. */
+  priceUsd: string;
   promoStartsAt: string;
   promoEndsAt: string;
   unit: string;
@@ -51,6 +56,8 @@ interface ProductFormState {
   images: MediaValue[];
   /** Id media foto yang dipilih sebagai thumbnail; null = foto pertama. */
   thumbnailId: number | null;
+  /** Id lokasi pabrik sebagai teks; '' = pabrik bawaan. */
+  factoryLocationId: string;
 }
 
 const isVideo = (value: MediaValue): boolean => (mediaSummary(value)?.mime || '').startsWith('video/');
@@ -70,6 +77,7 @@ const emptyForm = (categoryId: string): ProductFormState => ({
   priceMode: 'fixed',
   price: '',
   promoPrice: '',
+  priceUsd: '',
   promoStartsAt: '',
   promoEndsAt: '',
   unit: 'kg',
@@ -83,6 +91,7 @@ const emptyForm = (categoryId: string): ProductFormState => ({
   isPublished: false,
   images: [],
   thumbnailId: null,
+  factoryLocationId: '',
 });
 
 function formFromProduct(product: AdminProduct): ProductFormState {
@@ -101,6 +110,7 @@ function formFromProduct(product: AdminProduct): ProductFormState {
     priceMode: product.priceMode,
     price: product.price === null ? '' : String(product.price),
     promoPrice: product.promoPrice === null ? '' : String(product.promoPrice),
+    priceUsd: fromMinorInput(product.priceUsd, 'USD'),
     promoStartsAt: toDateTimeLocal(product.promoStartsAt),
     promoEndsAt: toDateTimeLocal(product.promoEndsAt),
     unit: product.unit,
@@ -114,6 +124,7 @@ function formFromProduct(product: AdminProduct): ProductFormState {
     isPublished: product.isPublished,
     images: product.images.map((image) => image.media ?? { id: image.mediaId }),
     thumbnailId: product.images.find((image) => image.isThumbnail)?.mediaId ?? null,
+    factoryLocationId: product.factoryLocationId == null ? '' : String(product.factoryLocationId),
   };
 }
 
@@ -142,6 +153,8 @@ function toPayload(form: ProductFormState, editing: AdminProduct | null): Produc
     priceMode: form.priceMode,
     price: fixed ? numberOrNull(form.price) : null,
     promoPrice: fixed ? numberOrNull(form.promoPrice) : null,
+    // Harga USD dalam sen (ASUMSI A-86); kosong = null (produk tidak dijual ke pasar ekspor).
+    priceUsd: fixed ? toMinorInput(form.priceUsd, 'USD') : null,
     promoStartsAt: fixed ? fromDateTimeLocal(form.promoStartsAt) : null,
     promoEndsAt: fixed ? fromDateTimeLocal(form.promoEndsAt) : null,
     unit: form.unit.trim() || 'pcs',
@@ -156,6 +169,8 @@ function toPayload(form: ProductFormState, editing: AdminProduct | null): Produc
     images: form.images.map(mediaId).filter((id): id is number => id !== null),
     // Thumbnail hanya sah bila masih ada di daftar dan berupa foto; selain itu server memakai foto pertama.
     thumbnailMediaId: form.images.some((item) => mediaId(item) === form.thumbnailId && !isVideo(item)) ? form.thumbnailId : null,
+    // Kosong = pabrik bawaan (ASUMSI A-90).
+    factoryLocationId: form.factoryLocationId ? Number(form.factoryLocationId) : null,
   };
 }
 
@@ -174,19 +189,55 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
   const [errors, setErrors] = useState<FieldErrors>({});
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  // Lokasi pabrik (ASUMSI A-90): null = sedang dimuat; gagal (mis. tanpa modul shipping) = field tidak dikirim.
+  const [factories, setFactories] = useState<AdminFactoryLocation[] | null>(null);
+  const [factoriesFailed, setFactoriesFailed] = useState(false);
+  const defaultFactory = factories?.find((factory) => factory.isDefault) ?? factories?.[0] ?? null;
+
+  useEffect(() => {
+    let alive = true;
+    api<AdminFactoryLocation[]>('/admin/factory-locations')
+      .then((rows) => alive && setFactories(rows))
+      .catch(() => {
+        if (!alive) return;
+        setFactories([]);
+        setFactoriesFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function update<K extends keyof ProductFormState>(key: K, value: ProductFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  /** Harga USD diisi tapi tidak bisa dipakai: eksponen, bukan angka, atau 0/negatif (kosong = tidak dijual ke ekspor). */
+  function priceUsdError(): string | null {
+    const raw = form.priceUsd.trim();
+    if (form.priceMode !== 'fixed' || raw === '') return null;
+    if (isExponentInput(raw)) return t('Tulis harga tanpa notasi eksponen, mis. 12.50.', 'Write the price without exponent notation, e.g. 12.50.');
+    const minor = toMinorInput(raw, 'USD');
+    if (minor == null) return t('Harga USD tidak valid. Contoh: 12.50.', 'Invalid USD price. Example: 12.50.');
+    if (minor <= 0) return t('Harga USD harus lebih dari 0 atau kosongkan.', 'The USD price must be above 0, or leave it empty.');
+    return null;
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
+    const usdError = priceUsdError();
+    if (usdError) {
+      setError('');
+      setErrors({ priceUsd: [usdError] });
+      return;
+    }
     setSaving(true);
     setError('');
     setErrors({});
     try {
       const body = toPayload(form, product);
+      if (factoriesFailed) delete body.factoryLocationId;
       const saved = product
         ? await api<AdminProduct>(`/admin/products/${product.id}`, { method: 'PUT', body })
         : await api<AdminProduct>('/admin/products', { method: 'POST', body });
@@ -323,6 +374,22 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
         </div>
 
         {form.priceMode === 'fixed' && (
+          <div className="admin-form-row">
+            <label>
+              <span className="field-label">{t('Harga USD (FOB Belawan)', 'USD price (FOB Belawan)')}</span>
+              <div className="admin-input-suffix">
+                <input type="number" min={0} step={0.01} inputMode="decimal" value={form.priceUsd} onChange={(e) => update('priceUsd', e.target.value)} placeholder={t('kosong = tidak dijual ke pasar ekspor', 'empty = not sold to the export market')} />
+                <span>USD</span>
+              </div>
+              <small className="admin-field-hint">
+                {t('Per satuan, dua desimal (mis. 12.50). Hanya dilihat customer ekspor yang login; trucking ke Belawan dan biaya pelabuhan sudah termasuk. Tanpa promo.', 'Per unit, two decimals (e.g. 12.50). Shown only to logged-in export customers; trucking to Belawan and port charges are included. No promo.')}
+              </small>
+              {firstError(errors, 'priceUsd') && <small className="cms-field-error">{firstError(errors, 'priceUsd')}</small>}
+            </label>
+          </div>
+        )}
+
+        {form.priceMode === 'fixed' && (
           <div className="admin-form-row admin-form-row-3">
             <label>
               <span className="field-label">{t('Harga promo (Rp)', 'Promo price (Rp)')}</span>
@@ -341,6 +408,33 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
             </label>
           </div>
         )}
+
+        <div className="admin-form-row">
+          <label>
+            <span className="field-label">{t('Pabrik asal', 'Source factory')}</span>
+            {factories === null ? (
+              <Spinner size={16} label={t('Memuat pabrik...', 'Loading factories...')} />
+            ) : (
+              <Select value={form.factoryLocationId} onChange={(e) => update('factoryLocationId', e.target.value)} disabled={factories.length === 0}>
+                <option value="">
+                  {defaultFactory ? t(`Bawaan (${tr(defaultFactory.name, lang)})`, `Default (${tr(defaultFactory.name, lang)})`) : t('Bawaan', 'Default')}
+                </option>
+                {factories.map((factory) => (
+                  <option key={factory.id} value={String(factory.id)}>
+                    {tr(factory.name, lang)}
+                    {factory.allowsPickup ? '' : ` (${t('tanpa Loco', 'no Loco')})`}
+                  </option>
+                ))}
+              </Select>
+            )}
+            <small className="admin-field-hint">
+              {factoriesFailed
+                ? t('Daftar pabrik tidak bisa dimuat (butuh akses modul Ongkir); pabrik produk tidak diubah.', 'Factory list unavailable (needs Shipping module access); the product factory is left unchanged.')
+                : t('Titik asal ongkir per km (Franco) dan titik ambil Loco untuk produk ini.', 'Per-km shipping origin (Franco) and Loco pickup point for this product.')}
+            </small>
+            {firstError(errors, 'factoryLocationId') && <small className="cms-field-error">{firstError(errors, 'factoryLocationId')}</small>}
+          </label>
+        </div>
 
         <div className="admin-form-row admin-form-row-3">
           <label>

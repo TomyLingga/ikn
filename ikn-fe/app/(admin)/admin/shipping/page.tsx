@@ -5,9 +5,11 @@ import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
+import AdminTabs from '@/components/admin/AdminTabs';
+import DeliveryTerms from '@/components/admin/DeliveryTerms';
+import FactoryLocations from '@/components/admin/FactoryLocations';
 import { AdminPageHead, RowActions } from '@/components/admin/AdminPage';
 import { I18nInput, firstError, type FieldErrors } from '@/components/admin/cms';
-import GeoPicker from '@/components/admin/cms/GeoPicker';
 import RegionPicker, { useRegionNames } from '@/components/admin/RegionPicker';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
@@ -17,7 +19,7 @@ import {
   previewShippingAmount,
   regionLevelLabels,
   shippingRateTypeLabels,
-  type ShippingOrigin,
+  type RoadFactorData,
   type ShippingRateRow,
   type ShippingRateType,
   type ShippingZoneRow,
@@ -50,6 +52,8 @@ interface RateForm {
 }
 
 type Modal = { type: 'zone'; zone: ShippingZoneRow | null } | { type: 'rate'; zone: ShippingZoneRow; rate: ShippingRateRow | null } | null;
+// Tab halaman: zona & tarif (ongkir), lokasi pabrik (titik asal + titik ambil, ASUMSI A-90), cara serah terima (ASUMSI A-85).
+type ShippingTab = 'zones' | 'factories' | 'terms';
 
 const emptyZone = (): ZoneForm => ({ name: emptyI18n(), priority: '10', isActive: true, isDefault: false, regions: [] });
 const zoneFormFrom = (z: ShippingZoneRow): ZoneForm => ({ name: { ...z.name }, priority: String(z.priority), isActive: z.isActive, isDefault: z.isDefault, regions: [...z.regions] });
@@ -103,6 +107,7 @@ export default function AdminShipping() {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
+  const [tab, setTab] = useState<ShippingTab>('zones');
   const [zones, setZones] = useState<ShippingZoneRow[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -115,9 +120,9 @@ export default function AdminShipping() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [origin, setOrigin] = useState<ShippingOrigin | null>(null);
-  const [originOpen, setOriginOpen] = useState(false);
-  const [originErrors, setOriginErrors] = useState<FieldErrors>({});
+  const [roadFactor, setRoadFactor] = useState<string | null>(null);
+  const [roadErrors, setRoadErrors] = useState<FieldErrors>({});
+  const [roadSaving, setRoadSaving] = useState(false);
   const [preview, setPreview] = useState({ km: '100', kg: '50', m3: '0.25' });
 
   const refresh = useCallback(async () => {
@@ -135,25 +140,26 @@ export default function AdminShipping() {
 
   useEffect(() => {
     void refresh();
-    api<ShippingOrigin>('/admin/shipping-origin')
-      .then(setOrigin)
-      .catch(() => setOrigin(null));
+    api<RoadFactorData>('/admin/shipping/road-factor')
+      .then((data) => setRoadFactor(String(data.roadFactor)))
+      .catch(() => setRoadFactor(null));
   }, [refresh]);
 
-  async function saveOrigin(event: FormEvent<HTMLFormElement>) {
+  // Faktor jalan (GET/PUT /admin/shipping/road-factor); titik asal per km kini per pabrik di tab Lokasi pabrik (ASUMSI A-90).
+  async function saveRoadFactor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!origin || saving) return;
-    setSaving(true);
-    setOriginErrors({});
+    if (roadFactor === null || roadSaving) return;
+    setRoadSaving(true);
+    setRoadErrors({});
     try {
-      setOrigin(await api<ShippingOrigin>('/admin/shipping-origin', { method: 'PUT', body: origin }));
-      setNotice(t('Titik asal pengiriman disimpan.', 'Shipping origin saved.'));
-      setOriginOpen(false);
+      const saved = await api<RoadFactorData>('/admin/shipping/road-factor', { method: 'PUT', body: { roadFactor: Number(roadFactor) } });
+      setRoadFactor(String(saved.roadFactor));
+      setNotice(t('Faktor jalan disimpan.', 'Road factor saved.'));
     } catch (err) {
-      if (err instanceof ApiError && err.status === 422) setOriginErrors(err.errors);
+      if (err instanceof ApiError && err.status === 422) setRoadErrors(err.errors);
       else setError(errorMessage(err));
     } finally {
-      setSaving(false);
+      setRoadSaving(false);
     }
   }
 
@@ -327,73 +333,91 @@ export default function AdminShipping() {
     minAmount: Number(rateForm.minAmount) || 0,
   };
   const previewResult = previewShippingAmount(rateNumbers, { km: Number(preview.km) || 0, kg: Number(preview.kg) || 0, m3: Number(preview.m3) || 0 });
-  const originSet = origin !== null && origin.lat !== null && origin.lng !== null;
 
   return (
     <div>
       <AdminPageHead
         title={t('Ongkos Kirim', 'Shipping Rates')}
-        desc={t(
-          'Zona wilayah menentukan tarif yang ditawarkan; tarif "Dihitung" memakai tiga parameter: jarak (km dari titik asal ke titik peta alamat), berat (kg), dan volume (m³) pesanan.',
-          'Region zones decide which rates are offered; "Calculated" rates use three parameters: distance (km from the origin to the address map pin), weight (kg), and volume (m³) of the order.',
-        )}
-        action={{ label: t('Tambah zona', 'Add zone'), icon: 'plus', onClick: () => openZone(null) }}
+        desc={
+          tab === 'terms'
+            ? t(
+                'Cara serah terima yang bisa dipilih customer saat checkout (Loco ambil di pabrik, Franco diantar ke alamat, FOB/CIF ekspor).',
+                'Delivery terms customers choose at checkout (Loco factory pickup, Franco door delivery, FOB/CIF export).',
+              )
+            : tab === 'factories'
+              ? t(
+                  'Pabrik asal produk: titik asal ongkir per km (Franco) dan titik ambil Loco. Keranjang dari dua pabrik dihitung per pabrik lalu dijumlahkan.',
+                  'Product factories: per-km shipping origin (Franco) and Loco pickup point. Carts from two factories are priced per factory and summed.',
+                )
+              : t(
+                  'Zona wilayah menentukan tarif yang ditawarkan; tarif "Dihitung" memakai tiga parameter: jarak (km dari pabrik asal produk ke titik peta alamat), berat (kg), dan volume (m³) pesanan.',
+                  'Region zones decide which rates are offered; "Calculated" rates use three parameters: distance (km from the product factory to the address map pin), weight (kg), and volume (m³) of the order.',
+                )
+        }
+        action={tab === 'zones' ? { label: t('Tambah zona', 'Add zone'), icon: 'plus', onClick: () => openZone(null) } : undefined}
       />
 
-      {notice && (
+      <AdminTabs<ShippingTab>
+        tabs={[
+          { key: 'zones', label: t('Zona & tarif', 'Zones & rates'), icon: 'truck' },
+          { key: 'factories', label: t('Lokasi pabrik', 'Factory locations'), icon: 'pin' },
+          { key: 'terms', label: t('Serah terima', 'Delivery terms'), icon: 'factory' },
+        ]}
+        value={tab}
+        onChange={setTab}
+        label={t('Bagian ongkir', 'Shipping sections')}
+      />
+
+      {tab === 'terms' && <DeliveryTerms />}
+      {tab === 'factories' && <FactoryLocations />}
+
+      {tab === 'zones' && notice && (
         <div className="admin-toast" role="status">
           {notice}
         </div>
       )}
-      {error && <p className="form-error">{error}</p>}
+      {tab === 'zones' && error && <p className="form-error">{error}</p>}
 
-      {origin && (
+      {tab === 'zones' && (
         <div className="admin-card ship-origin">
           <div className="ship-origin-head">
             <span className="ship-origin-icon">
               <Icon name="pin" size={18} />
             </span>
             <div>
-              <strong>{t('Titik asal pengiriman', 'Shipping origin')}</strong>
+              <strong>{t('Jarak dari pabrik asal', 'Distance from the product factory')}</strong>
               <small>
-                {originSet
-                  ? `${origin.label || t('Tanpa nama', 'Unnamed')} · ${origin.lat?.toFixed(5)}, ${origin.lng?.toFixed(5)} · ${t('faktor jalan', 'road factor')} ×${origin.roadFactor}`
-                  : t('Belum diatur — tarif per km tidak ditawarkan sampai titik asal diisi.', 'Not set — per-km rates are not offered until an origin is set.')}
+                {t(
+                  'Jarak tarif per km dihitung dari pabrik asal tiap produk ke titik peta alamat. Titik pabrik diatur di tab Lokasi pabrik.',
+                  'Per-km distance runs from each product’s factory to the address map pin. Factory pins are set in the Factory locations tab.',
+                )}
               </small>
             </div>
-            <button type="button" className="btn btn-line btn-sm" onClick={() => setOriginOpen((v) => !v)}>
-              {originOpen ? t('Tutup', 'Close') : t('Ubah titik asal', 'Edit origin')}
+            <button type="button" className="btn btn-line btn-sm" onClick={() => setTab('factories')}>
+              {t('Atur lokasi pabrik', 'Manage factories')}
             </button>
           </div>
-          {originOpen && (
-            <form className="admin-form ship-origin-form" onSubmit={(e) => void saveOrigin(e)}>
-              <div className="admin-form-row">
-                <label>
-                  <span className="field-label">{t('Nama lokasi', 'Location name')}</span>
-                  <input value={origin.label} maxLength={120} onChange={(e) => setOrigin({ ...origin, label: e.target.value })} placeholder={t('mis. Pabrik Resiprene', 'e.g. Resiprene plant')} />
-                </label>
-                <label>
-                  <span className="field-label">{t('Faktor jalan', 'Road factor')}</span>
-                  <input type="number" min={1} max={3} step={0.05} value={origin.roadFactor} onChange={(e) => setOrigin({ ...origin, roadFactor: Number(e.target.value) })} />
-                  <small className="admin-field-hint">
-                    {t('Jarak jalan ≈ jarak garis lurus × faktor ini (1,3 cocok untuk jalan darat Sumatra).', 'Road distance ≈ straight-line distance × this factor (1.3 suits overland roads).')}
-                  </small>
-                  {firstError(originErrors, 'roadFactor') && <small className="cms-field-error">{firstError(originErrors, 'roadFactor')}</small>}
-                </label>
-              </div>
-              <GeoPicker value={{ lat: origin.lat, lng: origin.lng }} onChange={(geo) => setOrigin({ ...origin, lat: geo.lat, lng: geo.lng })} />
-              {(firstError(originErrors, 'lat') || firstError(originErrors, 'lng')) && <small className="cms-field-error">{firstError(originErrors, 'lat') || firstError(originErrors, 'lng')}</small>}
-              <div className="admin-modal-actions">
-                <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>
-                  {saving ? t('Menyimpan...', 'Saving...') : t('Simpan titik asal', 'Save origin')}
-                </button>
-              </div>
-            </form>
-          )}
+          <form className="admin-form ship-origin-form ship-road-form" onSubmit={(e) => void saveRoadFactor(e)}>
+            <label>
+              <span className="field-label">{t('Faktor jalan', 'Road factor')}</span>
+              {roadFactor === null ? (
+                <Spinner size={16} label={t('Memuat faktor jalan...', 'Loading road factor...')} />
+              ) : (
+                <input type="number" min={1} max={3} step={0.05} value={roadFactor} required onChange={(e) => setRoadFactor(e.target.value)} />
+              )}
+              <small className="admin-field-hint">
+                {t('Jarak jalan ≈ jarak garis lurus × faktor ini (1,3 cocok untuk jalan darat Sumatra).', 'Road distance ≈ straight-line distance × this factor (1.3 suits overland roads).')}
+              </small>
+              {firstError(roadErrors, 'roadFactor') && <small className="cms-field-error">{firstError(roadErrors, 'roadFactor')}</small>}
+            </label>
+            <button type="submit" className="btn btn-solid btn-sm" disabled={roadSaving || roadFactor === null}>
+              {roadSaving ? t('Menyimpan...', 'Saving...') : t('Simpan faktor jalan', 'Save road factor')}
+            </button>
+          </form>
         </div>
       )}
 
-      {loading ? (
+      {tab !== 'zones' ? null : loading ? (
         <p className="admin-field-hint"><Spinner size={18} label={t('Memuat zona...', 'Loading zones...')} /></p>
       ) : zones.length === 0 ? (
         <div className="admin-empty">{t('Belum ada zona ongkir. Tambahkan zona (mis. "Jawa", "Sumatera Utara", "Indonesia lainnya").', 'No shipping zones yet. Add zones (e.g. "Java", "North Sumatra", "Rest of Indonesia").')}</div>
@@ -591,7 +615,7 @@ export default function AdminShipping() {
               <label>
                 <span className="field-label">{t('Ongkir minimum (Rp)', 'Minimum charge (Rp)')}</span>
                 <input type="number" min={0} step={1} value={rateForm.minAmount} onChange={(e) => setRateForm({ ...rateForm, minAmount: e.target.value })} />
-                <small className="admin-field-hint">{t('Hasil hitung di bawah ini dinaikkan ke minimum.', 'Calculated amounts below this are raised to the minimum.')}</small>
+                <small className="admin-field-hint">{t('Hasil hitung di bawah ini dinaikkan ke minimum (berlaku per pabrik asal).', 'Calculated amounts below this are raised to the minimum (per factory).')}</small>
               </label>
             </div>
             {rateForm.type === 'calculated' && (
@@ -601,7 +625,7 @@ export default function AdminShipping() {
                   <label>
                     <span className="field-label">{t('Per km jarak (Rp)', 'Per km of distance (Rp)')}</span>
                     <input type="number" min={0} step={1} value={rateForm.perKmAmount} onChange={(e) => setRateForm({ ...rateForm, perKmAmount: e.target.value })} />
-                    <small className="admin-field-hint">{t('Dari titik asal ke titik peta alamat, dibulatkan ke atas per km. 0 = jarak tidak dihitung.', 'From the origin to the address pin, rounded up per km. 0 = distance ignored.')}</small>
+                    <small className="admin-field-hint">{t('Dari pabrik asal produk ke titik peta alamat, dibulatkan ke atas per km. 0 = jarak tidak dihitung.', 'From the product factory to the address pin, rounded up per km. 0 = distance ignored.')}</small>
                     {firstError(formErrors, 'perKmAmount') && <small className="cms-field-error">{firstError(formErrors, 'perKmAmount')}</small>}
                   </label>
                   <label>

@@ -30,6 +30,7 @@ class OrderItemResource extends JsonResource
             'image' => $snapshot['image'] ?? null,
             'categoryId' => $snapshot['categoryId'] ?? null,
             'qty' => $item->qty,
+            'currency' => $item->currencyCode(),
             'unitPrice' => $item->unitPriceInt(),
             'discountAmount' => $item->discountAmountInt(),
             'taxAmount' => $item->taxAmountInt(),

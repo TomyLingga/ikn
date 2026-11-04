@@ -52,8 +52,19 @@ Route::prefix('admin')
             Route::post('shipping-zones/{shippingZone}/rates', [Admin\ShippingRateController::class, 'store']);
             Route::put('shipping-rates/{shippingRate}', [Admin\ShippingRateController::class, 'update']);
             Route::delete('shipping-rates/{shippingRate}', [Admin\ShippingRateController::class, 'destroy']);
-            Route::get('shipping-origin', [Admin\ShippingOriginController::class, 'show']);
-            Route::put('shipping-origin', [Admin\ShippingOriginController::class, 'update']);
+            // Lokasi pabrik: titik asal ongkir per km + titik ambil Loco (kontrak 11.8, ASUMSI A-90).
+            Route::get('factory-locations', [Admin\FactoryLocationController::class, 'index']);
+            Route::post('factory-locations', [Admin\FactoryLocationController::class, 'store']);
+            Route::put('factory-locations/{factoryLocation}', [Admin\FactoryLocationController::class, 'update']);
+            Route::delete('factory-locations/{factoryLocation}', [Admin\FactoryLocationController::class, 'destroy']);
+            // Faktor jalan ongkir per km (setting commerce shipping_road_factor, ASUMSI A-76/A-90).
+            Route::get('shipping/road-factor', [Admin\ShippingRoadFactorController::class, 'show']);
+            Route::put('shipping/road-factor', [Admin\ShippingRoadFactorController::class, 'update']);
+            // Cara serah terima (kontrak 11.8, ASUMSI A-85).
+            Route::get('delivery-terms', [Admin\DeliveryTermController::class, 'index']);
+            Route::post('delivery-terms', [Admin\DeliveryTermController::class, 'store']);
+            Route::put('delivery-terms/{deliveryTerm}', [Admin\DeliveryTermController::class, 'update']);
+            Route::delete('delivery-terms/{deliveryTerm}', [Admin\DeliveryTermController::class, 'destroy']);
         });
 
         Route::middleware('module:vouchers')->group(function () {
@@ -65,6 +76,11 @@ Route::prefix('admin')
             Route::post('payment-methods', [Admin\PaymentMethodController::class, 'store']);
             Route::get('payment-methods/{paymentMethod}', [Admin\PaymentMethodController::class, 'show']);
             Route::put('payment-methods/{paymentMethod}', [Admin\PaymentMethodController::class, 'update']);
+            // Syarat pembayaran ekspor (kontrak 11.10, ASUMSI A-87).
+            Route::get('payment-terms', [Admin\PaymentTermController::class, 'index']);
+            Route::post('payment-terms', [Admin\PaymentTermController::class, 'store']);
+            Route::put('payment-terms/{paymentTerm}', [Admin\PaymentTermController::class, 'update']);
+            Route::delete('payment-terms/{paymentTerm}', [Admin\PaymentTermController::class, 'destroy']);
         });
 
         Route::middleware('module:settings')->group(function () {

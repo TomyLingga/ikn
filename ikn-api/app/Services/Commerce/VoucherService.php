@@ -24,15 +24,21 @@ class VoucherService
     public const REASON_MIN_SUBTOTAL = 'min_subtotal';
     public const REASON_SCOPE = 'scope';
     public const REASON_NOT_ELIGIBLE = 'not_eligible';
+    /** Voucher hanya untuk order IDR (ASUMSI A-86); order USD ditolak sebelum kode dicari. */
+    public const REASON_CURRENCY = 'currency';
 
     /**
      * @param  Voucher|string  $code
      * @param  int[]  $categoryIds  kategori item di keranjang (untuk scope)
+     * @param  string  $currency  mata uang order; selain IDR → reason currency
      *
      * @throws ApiException 409 VOUCHER_INVALID + meta.reason
      */
-    public function validate($code, User $user, int $subtotal, array $categoryIds): Voucher
+    public function validate($code, User $user, int $subtotal, array $categoryIds, string $currency = Money::CURRENCY_IDR): Voucher
     {
+        if (! Money::isIdr($currency)) {
+            throw $this->invalid(self::REASON_CURRENCY, null, ['currency' => Money::normalizeCurrency($currency)]);
+        }
         $voucher = $code instanceof Voucher ? $code : Voucher::where('code', strtoupper(trim((string) $code)))->first();
         if (! $voucher) {
             throw $this->invalid(self::REASON_NOT_FOUND);

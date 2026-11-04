@@ -21,6 +21,11 @@ interface ListEnvelope extends Envelope<UserNotification[]> {
 function iconFor(type: string): IconName {
   if (type.startsWith('order.payment')) return 'wallet';
   if (type === 'order.shipped' || type === 'order.tracking') return 'truck';
+  // Order FOB/CIF (ASUMSI A-88): dimuat ke kapal dan revisi proforma invoice.
+  if (type === 'order.shipped_on_board') return 'globe';
+  // Penawaran ongkir CIF (ASUMSI A-89): freight_requested/quoted/quote_extended/accepted/expired/cancelled.
+  if (type.startsWith('order.freight')) return 'globe';
+  if (type === 'order.proforma_updated') return 'orders';
   if (type === 'order.delivered') return 'package';
   if (type === 'order.completed') return 'checkCircle';
   if (type === 'order.cancelled' || type === 'order.expired') return 'cancelCircle';

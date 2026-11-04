@@ -9,7 +9,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-// Customer demo (aktif + pending + rejected) beserta profil dan alamat. Idempoten.
+// Customer demo (aktif + pending + rejected + ekspor) beserta profil dan alamat. Idempoten.
 // Password semua akun demo: "password". Kode wilayah nyata dari database/data/wilayah.csv.gz.
 class CustomerSeeder extends Seeder
 {
@@ -136,6 +136,36 @@ class CustomerSeeder extends Seeder
             'note' => 'Bongkar di pintu gudang B, konfirmasi H-1',
             'is_default' => true,
         ]);
+
+        // 1e. Customer EKSPOR aktif (ASUMSI A-86): pasar export (USD), Malaysia, tanpa alamat Indonesia; memesan FOB Belawan
+        //     dalam USD dengan transfer ke rekening USD. Nama perusahaan dan alamat adalah data demo, bukan pelanggan nyata.
+        $export = User::firstOrCreate(
+            ['email' => 'buyer@rubbertrade.example'],
+            [
+                'name' => 'Ahmad Faizal',
+                'password' => $password,
+                'role' => User::ROLE_CUSTOMER,
+                'status' => User::STATUS_ACTIVE,
+                'locale' => 'en',
+                'email_verified_at' => now()->subDays(40),
+                'approved_at' => now()->subDays(39),
+                'approved_by' => $approver,
+            ]
+        );
+        CustomerProfile::updateOrCreate(
+            ['user_id' => $export->id],
+            [
+                'company' => 'Rubber Trade Sdn. Bhd.',
+                'position' => 'Procurement Manager',
+                'company_email' => 'purchasing@rubbertrade.example',
+                'company_phone' => '+60312345678',
+                'tax_id' => null,
+                'phone' => '+60123456789',
+                'market' => CustomerProfile::MARKET_EXPORT,
+                'country_code' => 'MY',
+                'company_address' => 'Lot 12, Jalan Perindustrian 3, Kawasan Perindustrian Pasir Gudang, 81700 Pasir Gudang, Johor, Malaysia',
+            ]
+        );
 
         // 1c. Customer nonaktif: pernah aktif, dinonaktifkan admin (tidak bisa login/memesan).
         $inactive = User::updateOrCreate(

@@ -1,7 +1,7 @@
 'use client';
 
 import { useLang } from '@/components/LanguageProvider';
-import { trackingSteps, orderLabel, isTerminal } from '@/lib/commerce';
+import { trackingStepsFor, orderLabel, isTerminal, type OrderLabelVariant } from '@/lib/commerce';
 import { formatDateTime } from '@/lib/format';
 import type { OrderStatusKey, TrackingUpdate } from '@/lib/types';
 import styles from './OrderTracking.module.css';
@@ -10,6 +10,9 @@ interface TrackingOrder {
   status: string;
   timeline?: { status: string; at: string; note?: string | null }[] | null;
   trackingUpdates?: TrackingUpdate[] | null;
+  /** Order CIF (ASUMSI A-89): langkah "Penawaran ongkir" ditambahkan di depan. */
+  shippingMethod?: { type?: string | null } | null;
+  destinationPort?: unknown;
 }
 
 interface OrderTrackingProps {
@@ -17,18 +20,25 @@ interface OrderTrackingProps {
   /** Admin: tampilkan tombol hapus pada catatan perjalanan (hanya selama order berstatus dikirim). */
   onRemoveUpdate?: (update: TrackingUpdate) => void;
   removeDisabled?: boolean;
+  /** Order Loco: tahap shipped/delivered berlabel "Siap diambil"/"Sudah diambil" (ASUMSI A-85). */
+  pickup?: boolean;
+  /** Order FOB/CIF: tahap shipped berlabel "Dimuat ke kapal" (ASUMSI A-88). */
+  port?: boolean;
 }
 
 // Stepper pelacakan pesanan (pending_payment → … → completed). Tahap tercapai ditandai dari
 // `timeline[]` dan posisi status saat ini; cancelled/expired ditampilkan sebagai catatan akhir.
 // Catatan perjalanan dari admin (`trackingUpdates[]`, ASUMSI A-70) tampil berurutan di bawah tahap "Dikirim".
-export default function OrderTracking({ order, onRemoveUpdate, removeDisabled = false }: OrderTrackingProps) {
+export default function OrderTracking({ order, onRemoveUpdate, removeDisabled = false, pickup = false, port = false }: OrderTrackingProps) {
   const { lang } = useLang();
+  const variant: OrderLabelVariant = pickup ? 'pickup' : port ? 'port' : undefined;
   const timeline = order.timeline || [];
   const updates = order.trackingUpdates || [];
   const doneMap = new Map(timeline.map((entry) => [entry.status, entry]));
   const status = order.status as OrderStatusKey;
   const terminal = isTerminal(status);
+  // Order CIF: langkah "Penawaran ongkir" di depan (status awaiting_freight atau pernah melewatinya).
+  const trackingSteps = trackingStepsFor(order);
   const currentIdx = terminal
     ? Math.max(...timeline.map((e) => trackingSteps.indexOf(e.status as OrderStatusKey)), -1)
     : trackingSteps.indexOf(status);
@@ -39,7 +49,7 @@ export default function OrderTracking({ order, onRemoveUpdate, removeDisabled = 
         {trackingSteps.map((step, i) => {
           const entry = doneMap.get(step);
           const reached = i <= currentIdx || !!entry;
-          const label = orderLabel(step)[lang];
+          const label = orderLabel(step, variant)[lang];
           const showUpdates = step === 'shipped' && updates.length > 0;
           return (
             <li key={step} className={`${styles.step} ${reached ? styles.done : ''} ${!terminal && i === currentIdx ? styles.current : ''}`}>
@@ -80,7 +90,7 @@ export default function OrderTracking({ order, onRemoveUpdate, removeDisabled = 
       </ol>
       {terminal && (
         <div className={styles.cancelled}>
-          {orderLabel(status)[lang]}
+          {orderLabel(status, variant)[lang]}
           {doneMap.get(status)?.at && <> · {formatDateTime(doneMap.get(status)?.at, lang)}</>}
           {doneMap.get(status)?.note && <> · {doneMap.get(status)?.note}</>}
         </div>

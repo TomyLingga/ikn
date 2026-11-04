@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Customer\DashboardController;
+use App\Http\Controllers\Api\V1\Customer\FreightQuoteController;
 use App\Http\Controllers\Api\V1\Customer\OrderController;
 use App\Http\Controllers\Api\V1\Customer\OrderPaymentController;
 use App\Http\Controllers\Api\V1\Customer\VoucherController;
@@ -31,6 +32,10 @@ Route::prefix('customer')->middleware(['auth:sanctum', 'role:customer'])->group(
     Route::get('orders/{order:number}/payments', [OrderPaymentController::class, 'index']);
     Route::post('orders/{order:number}/payments', [OrderPaymentController::class, 'store']);
     Route::post('orders/{order:number}/proof', [OrderPaymentController::class, 'proof']);
+
+    // Penawaran ongkir CIF (kontrak 11.12, ASUMSI A-89): terima penawaran admin atau ajukan harga balasan.
+    Route::post('orders/{order:number}/freight-quotes/{quote}/accept', [FreightQuoteController::class, 'accept'])->where('quote', '[0-9]+')->middleware('customer.active');
+    Route::post('orders/{order:number}/freight-quotes/counter', [FreightQuoteController::class, 'counter'])->middleware('customer.active');
 });
 
 // Webhook gateway: publik, verifikasi token per provider di driver; tanpa CSRF (bukan request stateful Sanctum).

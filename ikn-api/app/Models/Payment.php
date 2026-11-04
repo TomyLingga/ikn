@@ -81,9 +81,27 @@ class Payment extends Model
         return $this->provider === PaymentMethod::DRIVER_MANUAL;
     }
 
+    /** Mata uang payment (= order; IDR untuk baris sebelum E3). */
+    public function currencyCode(): string
+    {
+        return Money::normalizeCurrency($this->currency);
+    }
+
     public function amountInt(): int
     {
-        return Money::toInt($this->amount);
+        return Money::toMinor($this->amount, $this->currencyCode()) ?? 0;
+    }
+
+    /** Jumlah yang benar-benar diterima menurut admin saat verifikasi (null = tidak dicatat), satuan terkecil. */
+    public function receivedAmountInt(): ?int
+    {
+        return Money::toMinor($this->received_amount, $this->currencyCode());
+    }
+
+    /** Biaya bank yang dipotong pada transaksi ini (null = tidak dicatat), satuan terkecil. */
+    public function bankChargesInt(): ?int
+    {
+        return Money::toMinor($this->bank_charges, $this->currencyCode());
     }
 
     /** external_id yang dikirim ke gateway/webhook: "{order.number}-{payment.id}". */

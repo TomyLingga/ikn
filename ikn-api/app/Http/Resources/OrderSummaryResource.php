@@ -17,6 +17,8 @@ class OrderSummaryResource extends JsonResource
         $order = $this->resource;
         $active = $order->relationLoaded('payments') ? $order->activePayment() : null;
         $items = $order->relationLoaded('items') ? $order->items : collect();
+        $shipping = $order->shipping_snapshot ?? [];
+        $termCode = $order->delivery_term ?: ($shipping['term'] ?? null);
 
         return [
             'id' => $order->id,
@@ -25,6 +27,7 @@ class OrderSummaryResource extends JsonResource
             'date' => optional($order->created_at)->toApiString(),
             'status' => $order->status,
             'paymentStatus' => $order->payment_status,
+            'currency' => $order->currencyCode(),
             'customer' => [
                 'id' => $order->user_id,
                 'name' => $order->customerName(),
@@ -45,11 +48,15 @@ class OrderSummaryResource extends JsonResource
             ])->values()->all(),
             'subtotal' => $order->subtotalInt(),
             'grandTotal' => $order->grandTotalInt(),
-            'paymentMethod' => $active?->method ?? $order->latestPayment()?->method,
+            // Order awaiting_freight belum punya payment: tampilkan metode yang ditunda (pending_payment_method, A-89).
+            'paymentMethod' => $active?->method ?? $order->latestPayment()?->method ?? ($order->pending_payment_method['code'] ?? null),
+            'destinationPort' => $order->destinationPort()['name'] ?? null,
             'paymentDueAt' => optional($order->payment_due_at)->toApiString(),
             'paidAt' => optional($order->paid_at)->toApiString(),
             'courier' => $order->courier,
             'trackingNumber' => $order->tracking_number,
+            // Cara serah terima ringkas untuk label daftar (ASUMSI A-85); family dari snapshot, null untuk order lama hasil backfill.
+            'deliveryTerm' => $termCode ? ['code' => $termCode, 'family' => $shipping['family'] ?? ($order->isPickup() ? 'pickup' : null)] : null,
             // Flag aksi untuk tombol cepat di daftar "Pesanan saya" (sama artinya dengan OrderResource).
             'canCancel' => $order->canCancel(),
             'canUploadProof' => $order->relationLoaded('payments') ? $order->canUploadProof() : null,

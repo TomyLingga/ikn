@@ -4,8 +4,8 @@ import { useEffect, useLayoutEffect, useRef, type FormEvent, type KeyboardEvent 
 import Link from 'next/link';
 import Icon from '@/components/Icon';
 import { tr } from '@/lib/cms';
-import { orderLabel } from '@/lib/commerce';
-import { formatIDR } from '@/lib/format';
+import { orderLabel, orderVariant } from '@/lib/commerce';
+import { formatMoney } from '@/lib/format';
 import type { ChatContext, ChatMessage, ChatRole, Lang } from '@/lib/types';
 import styles from './Chat.module.css';
 
@@ -50,7 +50,7 @@ export function ChatContextCard({ context, lang, productHref, orderHref }: Conte
           <strong>{tr(context.name, lang)}</strong>
           {context.price != null && (
             <span>
-              {formatIDR(context.price)}
+              {formatMoney(context.price, context.currency)}
               {context.unit ? `/${context.unit}` : ''}
             </span>
           )}
@@ -68,8 +68,8 @@ export function ChatContextCard({ context, lang, productHref, orderHref }: Conte
         <small>{lang === 'en' ? 'Order' : 'Pesanan'}</small>
         <strong className="mono">{context.number}</strong>
         <span>
-          {context.status ? orderLabel(context.status)[lang] : ''}
-          {context.grandTotal != null ? ` · ${formatIDR(context.grandTotal)}` : ''}
+          {context.status ? orderLabel(context.status, orderVariant({ deliveryTerm: { family: context.family } }))[lang] : ''}
+          {context.grandTotal != null ? ` · ${formatMoney(context.grandTotal, context.currency)}` : ''}
         </span>
       </span>
     </Link>

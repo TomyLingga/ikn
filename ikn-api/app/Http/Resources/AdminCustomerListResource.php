@@ -17,6 +17,8 @@ class AdminCustomerListResource extends JsonResource
             'email' => $this->email,
             'phone' => $profile?->phone,
             'company' => $profile?->company,
+            'market' => $this->resource->market(),
+            'countryCode' => $profile?->country_code ?: \App\Models\CustomerProfile::DEFAULT_COUNTRY,
             'status' => $this->status,
             'joinedAt' => optional($this->created_at)->toApiString(),
             'approvedAt' => optional($this->approved_at)->toApiString(),

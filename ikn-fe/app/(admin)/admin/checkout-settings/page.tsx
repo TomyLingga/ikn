@@ -19,6 +19,10 @@ function settingsToForm(s: CommerceSettingsData): SettingsForm {
     priceIncludesTax: s.priceIncludesTax,
     autoCompleteDays: String(s.autoCompleteDays),
     reminderHoursBeforeDue: String(s.reminderHoursBeforeDue),
+    exportTaxRate: String(s.exportTaxRate ?? 0),
+    exportPaymentDueHours: String(s.exportPaymentDueHours ?? 120),
+    freightQuoteValidDays: String(s.freightQuoteValidDays ?? 7),
+    freightQuoteMaxDays: String(s.freightQuoteMaxDays ?? 30),
     invoicePrefix: s.invoicePrefix ?? 'PMS/X/INV/RA',
     invoiceSignerName: s.invoiceSignerName ?? '',
     invoiceSignerTitle: s.invoiceSignerTitle ?? '',
@@ -75,6 +79,10 @@ export default function AdminCheckoutSettings() {
           priceIncludesTax: settings.priceIncludesTax === true,
           autoCompleteDays: Number(settings.autoCompleteDays),
           reminderHoursBeforeDue: Number(settings.reminderHoursBeforeDue),
+          exportTaxRate: Number(settings.exportTaxRate),
+          exportPaymentDueHours: Number(settings.exportPaymentDueHours),
+          freightQuoteValidDays: Number(settings.freightQuoteValidDays),
+          freightQuoteMaxDays: Number(settings.freightQuoteMaxDays),
           invoicePrefix: String(settings.invoicePrefix).trim(),
           invoiceSignerName: String(settings.invoiceSignerName).trim(),
           invoiceSignerTitle: String(settings.invoiceSignerTitle).trim(),
@@ -149,6 +157,15 @@ export default function AdminCheckoutSettings() {
                 </span>
               </label>
               {numberField('autoCompleteDays', t('Selesai otomatis setelah diterima', 'Auto-complete after delivery'), t('Order berstatus "Diterima" ditutup otomatis setelah sekian hari bila customer tidak mengonfirmasi (0 = manual).', 'Delivered orders are closed automatically after this many days if the customer does not confirm (0 = manual).'), { min: 0, max: 90, suffix: t('hari', 'days') })}
+
+              <h3 className="admin-subtitle" style={{ marginTop: 8 }}>{t('Ekspor', 'Export')}</h3>
+              <p className="admin-field-hint">
+                {t('Berlaku untuk order customer ekspor (USD) dengan cara serah terima berprofil pajak ekspor, mis. FOB Belawan.', 'Applies to export customer (USD) orders whose delivery term uses the export tax profile, e.g. FOB Belawan.')}
+              </p>
+              {numberField('exportTaxRate', t('Tarif PPN ekspor', 'Export VAT rate'), t('Persentase pajak untuk term berprofil pajak ekspor (bawaan 0 untuk ekspor barang).', 'Tax percentage for export-profile delivery terms (default 0 for goods exports).'), { min: 0, max: 100, step: 0.01, suffix: '%' })}
+              {numberField('exportPaymentDueHours', t('Batas bayar ekspor', 'Export payment deadline'), t('Jam yang diberikan untuk transfer USD sebelum order kedaluwarsa (bawaan 120 jam karena transfer antarbank luar negeri lebih lama).', 'Hours allowed for the USD transfer before the order expires (default 120 hours because international transfers take longer).'), { min: 1, max: 720, suffix: t('jam', 'hours') })}
+              {numberField('freightQuoteValidDays', t('Masa berlaku penawaran (hari)', 'Quote validity (days)'), t('Order CIF: masa berlaku bawaan penawaran ongkir admin bila tanggal "Berlaku sampai" dikosongkan (bawaan 7 hari). Admin masih bisa memperpanjang per penawaran.', 'CIF orders: default validity of an admin freight quote when "Valid until" is left empty (default 7 days). Admins can still extend each quote.'), { min: 1, max: 90, suffix: t('hari', 'days') })}
+              {numberField('freightQuoteMaxDays', t('Batas tunggu penawaran (hari)', 'Quote waiting limit (days)'), t('Order CIF yang menunggu ongkir lebih lama dari ini tanpa penawaran yang masih berlaku dibatalkan sistem dan stoknya dilepas (bawaan 30 hari).', 'CIF orders waiting longer than this without a valid quote are cancelled by the system and the stock is released (default 30 days).'), { min: 1, max: 365, suffix: t('hari', 'days') })}
 
               <h3 className="admin-subtitle" style={{ marginTop: 8 }}>{t('Invoice', 'Invoice')}</h3>
               <p className="admin-field-hint">

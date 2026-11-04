@@ -23,8 +23,8 @@ class Product extends Model
 
     // stock_qty dan reserved_qty sengaja tidak fillable: hanya StockLedger yang menulisnya (arsitektur bagian 8).
     protected $fillable = [
-        'slug', 'code', 'category_id', 'name', 'kind', 'summary', 'highlights', 'specs', 'applications',
-        'solubility', 'aliases', 'price_mode', 'price', 'promo_price', 'promo_starts_at', 'promo_ends_at',
+        'slug', 'code', 'category_id', 'factory_location_id', 'name', 'kind', 'summary', 'highlights', 'specs', 'applications',
+        'solubility', 'aliases', 'price_mode', 'price', 'promo_price', 'price_usd', 'promo_starts_at', 'promo_ends_at',
         'unit', 'moq', 'weight_gram', 'length_cm', 'width_cm', 'height_cm', 'stock_status', 'is_taxable', 'is_published', 'rating_avg', 'review_count',
     ];
 
@@ -60,6 +60,7 @@ class Product extends Model
             if ($product->price_mode === self::PRICE_MODE_QUOTE) {
                 $product->price = null;
                 $product->promo_price = null;
+                $product->price_usd = null;
             }
 
             $product->stock_status = self::deriveStockStatus(
@@ -84,6 +85,15 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * Pabrik asal produk (ASUMSI A-90): titik asal ongkir per km dan titik ambil Loco. Null di kolom = pabrik bawaan
+     * (urutan pertama); dibaca dari daftar ber-cache per request, bukan relasi per baris.
+     */
+    public function factoryLocation(): ?FactoryLocation
+    {
+        return app(\App\Services\Commerce\FactoryLocations::class)->forProduct($this);
     }
 
     public function images()
@@ -208,6 +218,25 @@ class Product extends Model
         }
 
         return $this->promoActive() ? Money::toInt($this->promo_price) : $this->priceInt();
+    }
+
+    /** Harga USD (basis FOB Belawan, ASUMSI A-86) dalam sen; null bila belum diisi atau price_mode=quote. */
+    public function priceUsdMinor(): ?int
+    {
+        if (! $this->isFixedPrice() || $this->price_usd === null) {
+            return null;
+        }
+
+        return Money::toMinor($this->price_usd, Money::CURRENCY_USD);
+    }
+
+    /**
+     * Harga berlaku dalam satuan terkecil mata uang yang diminta: IDR = effectivePrice() (promo bila aktif),
+     * USD = price_usd dalam sen (tanpa promo). Null = tidak bisa dipesan dalam mata uang itu.
+     */
+    public function effectivePriceMinor(string $currency): ?int
+    {
+        return Money::isUsd($currency) ? $this->priceUsdMinor() : $this->effectivePrice();
     }
 
     /**

@@ -29,13 +29,18 @@ export interface AddressMapProps {
   onChange: (lat: number, lng: number) => void;
   /** Naik bila lokasi dipindah dari luar peta (hasil pencarian) agar peta ikut bergeser. */
   focusKey?: number;
+  /** Pusat dan zoom awal tanpa pin (bawaan Indonesia zoom 5; PortPicker memakai tampilan dunia). */
+  defaultCenter?: [number, number];
+  defaultZoom?: number;
+  /** Zoom minimum saat peta terbang ke titik yang dipilih dari pencarian (bawaan 15; pelabuhan memakai lebih kecil). */
+  focusZoom?: number;
 }
 
-function Recenter({ lat, lng, focusKey }: { lat: number | null; lng: number | null; focusKey?: number }) {
+function Recenter({ lat, lng, focusKey, focusZoom = 15 }: { lat: number | null; lng: number | null; focusKey?: number; focusZoom?: number }) {
   const map = useMap();
   useEffect(() => {
     if (lat == null || lng == null) return;
-    map.flyTo([lat, lng], Math.max(map.getZoom(), 15), { duration: 0.6 });
+    map.flyTo([lat, lng], Math.max(map.getZoom(), focusZoom), { duration: 0.6 });
     // Hanya saat fokus diminta (pencarian / pilih hasil), bukan setiap drag marker.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey]);
@@ -45,23 +50,25 @@ function Recenter({ lat, lng, focusKey }: { lat: number | null; lng: number | nu
 function ClickToPlace({ onChange }: { onChange: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
-      onChange(e.latlng.lat, e.latlng.lng);
+      // Di zoom dunia peta berulang ke kiri/kanan: wrap() menjaga bujur tetap -180..180.
+      const p = e.latlng.wrap();
+      onChange(p.lat, p.lng);
     },
   });
   return null;
 }
 
-export default function AddressMap({ lat, lng, onChange, focusKey }: AddressMapProps) {
+export default function AddressMap({ lat, lng, onChange, focusKey, defaultCenter = INDONESIA_CENTER, defaultZoom = 5, focusZoom = 15 }: AddressMapProps) {
   const hasPoint = lat != null && lng != null;
-  const center: [number, number] = hasPoint ? [lat as number, lng as number] : INDONESIA_CENTER;
+  const center: [number, number] = hasPoint ? [lat as number, lng as number] : defaultCenter;
 
   return (
-    <MapContainer center={center} zoom={hasPoint ? 15 : 5} scrollWheelZoom={false} className="addr-map">
+    <MapContainer center={center} zoom={hasPoint ? focusZoom : defaultZoom} scrollWheelZoom={false} className="addr-map">
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <Recenter lat={lat} lng={lng} focusKey={focusKey} />
+      <Recenter lat={lat} lng={lng} focusKey={focusKey} focusZoom={focusZoom} />
       <ClickToPlace onChange={onChange} />
       {hasPoint && (
         <Marker
@@ -70,7 +77,7 @@ export default function AddressMap({ lat, lng, onChange, focusKey }: AddressMapP
           icon={pinIcon}
           eventHandlers={{
             dragend: (e) => {
-              const p = (e.target as L.Marker).getLatLng();
+              const p = (e.target as L.Marker).getLatLng().wrap();
               onChange(p.lat, p.lng);
             },
           }}

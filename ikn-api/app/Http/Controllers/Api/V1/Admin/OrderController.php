@@ -56,15 +56,24 @@ class OrderController extends ApiController
         return $this->data(new OrderResource($order));
     }
 
-    /** processing|shipped|delivered|completed; shipped wajib kurir + resi (422). Transisi tidak sah → 409. */
+    /** processing|shipped|delivered|completed; shipped wajib kurir + resi (422), atau nama kapal + B/L untuk FOB/CIF. Transisi tidak sah → 409. */
     public function updateStatus(UpdateOrderStatusRequest $request, Order $order, OrderStateMachine $stateMachine)
     {
         $data = $request->validated();
-        $stateMachine->transition($order, $data['status'], $request->user(), [
+        $meta = [
             'note' => $data['note'] ?? null,
             'courier' => $data['courier'] ?? null,
             'trackingNumber' => $data['trackingNumber'] ?? null,
-        ]);
+        ];
+        if ($order->isPort()) {
+            $meta += [
+                'vesselName' => $data['vesselName'] ?? null,
+                'voyage' => $data['voyage'] ?? null,
+                'blNumber' => $data['blNumber'] ?? null,
+                'blDate' => $data['blDate'] ?? null,
+            ];
+        }
+        $stateMachine->transition($order, $data['status'], $request->user(), $meta);
 
         return $this->data(new OrderResource($order->fresh()));
     }

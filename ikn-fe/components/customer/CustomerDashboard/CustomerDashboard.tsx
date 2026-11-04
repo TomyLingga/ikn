@@ -9,10 +9,10 @@ import AccountStatusBanner from '@/components/customer/AccountStatusBanner';
 import OrderThumbs from '@/components/customer/OrderThumbs';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
-import { orderLabel } from '@/lib/commerce';
+import { isPickupOrder, isPortOrder, orderLabel, orderVariant } from '@/lib/commerce';
 import { api, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
+import { formatDate, formatDateTime, formatMoney } from '@/lib/format';
 import CountUp from '@/components/CountUp';
 import { isoDay, monthToDate } from '@/lib/shop';
 import type { CustomerDashboardData, IconName, OrderSummary } from '@/lib/types';
@@ -42,8 +42,14 @@ function presetRange(preset: Preset): { from: string; to: string } {
   return monthToDate();
 }
 
-// Ringkas rupiah untuk label grafik kecil: 1,2 jt / 850 rb.
-function compactIDR(value: number): string {
+// Ringkas rupiah untuk label grafik kecil: 1,2 jt / 850 rb. Nilai USD (sen) diringkas dalam dolar: 1.2k / 850.
+function compactIDR(value: number, currency: 'IDR' | 'USD' = 'IDR'): string {
+  if (currency === 'USD') {
+    const dollars = Math.round(value / 100);
+    if (dollars >= 1_000_000) return `${(dollars / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 1 })}M`;
+    if (dollars >= 1_000) return `${(dollars / 1_000).toLocaleString('en-US', { maximumFractionDigits: 1 })}k`;
+    return String(dollars);
+  }
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toLocaleString('id-ID', { maximumFractionDigits: 1 })} M`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt`;
   if (value >= 1_000) return `${Math.round(value / 1_000)} rb`;
@@ -97,6 +103,9 @@ export default function CustomerDashboard() {
   }, [customerId, range.from, range.to, rangeValid]);
 
   const stats = data || emptyData;
+  // Nilai transaksi/belanja dalam mata uang pasar customer (ASUMSI A-86); baris order memakai mata uang masing-masing.
+  const currency: 'IDR' | 'USD' = (data?.currency ?? customer?.currency) === 'USD' ? 'USD' : 'IDR';
+  const fmtMoney = (value: number) => formatMoney(value, currency);
   const monthly = useMemo(() => stats.monthly || [], [stats.monthly]);
   const monthlyMax = Math.max(1, ...monthly.map((m) => m.total));
   const monthlyTotal = monthly.reduce((sum, m) => sum + m.total, 0);
@@ -144,6 +153,8 @@ export default function CustomerDashboard() {
   function actionFor(order: OrderSummary): { label: string; href: string; primary: boolean } {
     const detail = `/dashboard/pesanan/${encodeURIComponent(order.number)}`;
     switch (order.status) {
+      case 'awaiting_freight':
+        return { label: t('Lihat penawaran ongkir', 'View freight quote'), href: `${detail}#freight`, primary: true };
       case 'pending_payment':
         return { label: t('Bayar sekarang', 'Pay now'), href: `${detail}#payment`, primary: true };
       case 'payment_review':
@@ -158,9 +169,15 @@ export default function CustomerDashboard() {
   }
 
   function actionNote(order: OrderSummary): string {
+    // Order CIF (ASUMSI A-89): belum ada payment; admin menawarkan ongkir ke pelabuhan tujuan dulu.
+    if (order.status === 'awaiting_freight') return `${t('Menunggu penawaran ongkir', 'Awaiting freight quote')}${order.destinationPort ? ` · CIF ${order.destinationPort}` : ''}`;
     if (order.status === 'pending_payment' && order.paymentDueAt) return `${t('Bayar sebelum', 'Pay before')} ${formatDateTime(order.paymentDueAt, lang)}`;
     if (order.status === 'payment_review') return t('Bukti pembayaran sedang diverifikasi admin', 'Your payment proof is being verified');
+    if (order.status === 'shipped' && isPickupOrder(order)) return t('Barang siap diambil di pabrik', 'Goods are ready for pickup at the factory');
+    // Order FOB/CIF (ASUMSI A-88): kolom resi berisi nomor B/L.
+    if (order.status === 'shipped' && isPortOrder(order)) return order.trackingNumber ? `${t('Dimuat ke kapal', 'Shipped on board')} · B/L ${order.trackingNumber}` : t('Barang dimuat ke kapal', 'Goods shipped on board');
     if (order.status === 'shipped') return order.trackingNumber ? `${order.courier || ''} ${order.trackingNumber}`.trim() : t('Pesanan dalam perjalanan', 'Your order is on its way');
+    if (order.status === 'delivered' && isPickupOrder(order)) return t('Barang sudah diambil; konfirmasi selesai bila sesuai', 'Goods picked up; confirm completion if all is in order');
     if (order.status === 'delivered') return t('Barang sudah sampai; konfirmasi selesai bila sesuai', 'Goods have arrived; confirm completion if all is in order');
     return t('Pesanan sedang kami siapkan', 'We are preparing your order');
   }
@@ -189,7 +206,7 @@ export default function CustomerDashboard() {
         <div className={styles.spend} aria-label={t('Belanja enam bulan terakhir', 'Spending in the last six months')}>
           <div className={styles.spendHead}>
             <span>{t('Belanja 6 bulan terakhir', 'Spending, last 6 months')}</span>
-            <strong><CountUp value={monthlyTotal} format={formatIDR} /></strong>
+            <strong><CountUp value={monthlyTotal} format={fmtMoney} /></strong>
           </div>
           <div className={`${styles.spendBars} ${ready ? styles.spendReady : ''}`}>
             {monthly.map((month, i) => (
@@ -197,9 +214,9 @@ export default function CustomerDashboard() {
                 key={month.ym}
                 className={styles.spendCol}
                 style={{ '--i': i } as CSSProperties}
-                title={`${lang === 'en' ? MONTHS_EN[month.monthIndex - 1] : month.month} ${month.year}: ${formatIDR(month.total)} · ${month.orders} ${t('pesanan', 'orders')}`}
+                title={`${lang === 'en' ? MONTHS_EN[month.monthIndex - 1] : month.month} ${month.year}: ${fmtMoney(month.total)} · ${month.orders} ${t('pesanan', 'orders')}`}
               >
-                <span className={styles.spendValue}>{month.total > 0 ? compactIDR(month.total) : ''}</span>
+                <span className={styles.spendValue}>{month.total > 0 ? compactIDR(month.total, currency) : ''}</span>
                 <span className={styles.spendTrack}>
                   <span className={`${styles.spendFill} ${month.total > 0 ? '' : styles.spendZero}`} style={{ '--h': `${Math.max(3, (month.total / monthlyMax) * 100)}%` } as CSSProperties} />
                 </span>
@@ -243,7 +260,7 @@ export default function CustomerDashboard() {
         {actionOrders.length > 0 && (
           <div className={styles.actionList}>
             {actionOrders.map((order) => {
-              const status = orderLabel(order.status);
+              const status = orderLabel(order.status, orderVariant(order));
               const action = actionFor(order);
               const first = order.items[0];
               return (
@@ -258,7 +275,7 @@ export default function CustomerDashboard() {
                     </div>
                     <span className={styles.actionItems}>
                       {first ? tr(first.name, lang) : ''}
-                      {order.itemsCount > 1 ? ` +${order.itemsCount - 1} ${t('produk lain', 'more')}` : ''} · {formatIDR(order.grandTotal)}
+                      {order.itemsCount > 1 ? ` +${order.itemsCount - 1} ${t('produk lain', 'more')}` : ''} · {formatMoney(order.grandTotal, order.currency)}
                     </span>
                     <small>{actionNote(order)}</small>
                   </div>
@@ -320,7 +337,7 @@ export default function CustomerDashboard() {
           </div>
           <div className={`${styles.stat} ${styles.statWide}`} style={{ '--i': 2 } as CSSProperties}>
             <span>{t('Nilai transaksi', 'Transaction value')}</span>
-            <strong><CountUp value={stats.transactionValue} format={formatIDR} delay={120} /></strong>
+            <strong><CountUp value={stats.transactionValue} format={fmtMoney} delay={120} /></strong>
             <small>{t('pembayaran terverifikasi pada periode ini', 'payments verified in this period')}</small>
           </div>
         </div>
@@ -345,7 +362,7 @@ export default function CustomerDashboard() {
           ) : (
             <ul className={styles.recentList}>
               {recent.map((order) => {
-                const status = orderLabel(order.status);
+                const status = orderLabel(order.status, orderVariant(order));
                 const first = order.items[0];
                 return (
                   <li key={order.number}>
@@ -358,7 +375,7 @@ export default function CustomerDashboard() {
                         </small>
                       </span>
                       <StatusBadge label={status[lang]} tone={status.tone} small />
-                      <span className={styles.recentTotal}>{formatIDR(order.grandTotal)}</span>
+                      <span className={styles.recentTotal}>{formatMoney(order.grandTotal, order.currency)}</span>
                       <Icon name="chevronRight" size={17} />
                     </Link>
                   </li>

@@ -22,6 +22,9 @@ return [
     'geo_upstream_error' => 'Layanan peta tidak tersedia saat ini. Coba lagi nanti.',
     'status_reason_required' => 'Alasan penolakan wajib diisi.',
     'status_updated' => 'Status customer diperbarui.',
+    'market_updated' => 'Pasar customer diperbarui.',
+    'market_open_orders' => 'Pasar tidak dapat diubah: masih ada :count order yang belum selesai.',
+    'company_locked' => 'Negara dan alamat perusahaan hanya dapat diubah selama akun menunggu persetujuan. Hubungi kami untuk mengubahnya.',
 
     'levels' => [
         'province' => 'provinsi',
@@ -43,6 +46,9 @@ return [
         'taxId' => 'NPWP',
         'companyEmail' => 'email perusahaan',
         'companyPhone' => 'telepon perusahaan',
+        'companyAddress' => 'alamat perusahaan',
+        'countryCode' => 'negara',
+        'market' => 'pasar',
         'token' => 'token',
         'label' => 'label alamat',
         'recipientName' => 'nama penerima',
@@ -59,6 +65,7 @@ return [
         'status' => 'status',
         'reason' => 'alasan',
         'q' => 'kata kunci',
+        'scope' => 'cakupan pencarian',
         'level' => 'level',
         'parent' => 'kode induk',
     ],

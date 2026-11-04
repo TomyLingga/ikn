@@ -9,13 +9,13 @@ import StatusBadge from '@/components/StatusBadge';
 import AdminSalesChart from '@/components/admin/AdminSalesChart';
 import { AdminPageHead, DataTable, type Column } from '@/components/admin/AdminPage';
 import { useLang } from '@/components/LanguageProvider';
-import { orderLabel, paymentLabel } from '@/lib/commerce';
+import { orderLabel, orderVariant, paymentLabel } from '@/lib/commerce';
 import { api, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
 import type { CSSProperties } from 'react';
-import { formatIDR, formatDate, formatDateTime } from '@/lib/format';
+import { formatIDR, formatDate, formatDateTime, formatMoney } from '@/lib/format';
 import CountUp from '@/components/CountUp';
-import type { DashboardData, DashboardMetric, DashboardWorkQueue } from '@/lib/admin';
+import type { DashboardData, DashboardExportKpis, DashboardMetric, DashboardWorkQueue } from '@/lib/admin';
 import type { IconName, Lang, OrderSummary } from '@/lib/types';
 import styles from './AdminDashboard.module.css';
 
@@ -73,7 +73,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const { kpis, period, workQueue, needsAction, recentOrders, salesChart, topProducts, lowStock, paymentDue } = data;
+  const { kpis, period, workQueue, needsAction, recentOrders, salesChart, topProducts, lowStock, paymentDue, exportKpis } = data;
   const range = (from: string, to: string) => {
     const a = formatDate(from, lang);
     const b = formatDate(to, lang);
@@ -113,7 +113,7 @@ export default function AdminDashboard() {
       ),
     },
     { key: 'date', label: t('Tanggal', 'Date'), render: (order) => formatDateTime(order.date, lang) },
-    { key: 'total', label: 'Total', align: 'right', render: (order) => formatIDR(order.grandTotal) },
+    { key: 'total', label: 'Total', align: 'right', render: (order) => formatMoney(order.grandTotal, order.currency) },
     {
       key: 'payment',
       label: t('Pembayaran', 'Payment'),
@@ -127,7 +127,7 @@ export default function AdminDashboard() {
     {
       key: 'status',
       label: 'Status',
-      render: (order) => <StatusBadge label={orderLabel(order.status)[lang]} tone={orderLabel(order.status).tone} small />,
+      render: (order) => <StatusBadge label={orderLabel(order.status, orderVariant(order))[lang]} tone={orderLabel(order.status, orderVariant(order)).tone} small />,
     },
   ];
 
@@ -167,11 +167,16 @@ export default function AdminDashboard() {
         ))}
       </section>
       <p className={styles.kpiNote}>
+        {exportKpis
+          ? t(`Nilai dalam ${data.currency || 'IDR'}; order USD (ekspor) dirangkum terpisah di blok Penjualan ekspor di bawah. `, `Values in ${data.currency || 'IDR'}; USD (export) orders are summarised separately in the Export sales block below. `)
+          : t(`Nilai dalam ${data.currency || 'IDR'}; order USD (ekspor) tidak ikut dihitung. `, `Values in ${data.currency || 'IDR'}; USD (export) orders are not included. `)}
         {t(
           `Periode ${periodText}, dibandingkan dengan rentang yang sama bulan lalu (${previousText}). Pendapatan dari order yang sudah dibayar (tanggal bayar).`,
           `Period ${periodText}, compared with the same span last month (${previousText}). Revenue counts paid orders by payment date.`,
         )}
       </p>
+
+      {exportKpis && <ExportKpiRow kpis={exportKpis} periodText={periodText} t={t} />}
 
       <WorkQueue queue={workQueue} t={t} />
 
@@ -205,11 +210,11 @@ export default function AdminDashboard() {
                         </small>
                       </span>
                       <span className={styles.rowSide}>
-                        <span className={styles.amount}>{formatIDR(order.grandTotal)}</span>
+                        <span className={styles.amount}>{formatMoney(order.grandTotal, order.currency)}</span>
                         {verify ? (
                           <StatusBadge label={t('Periksa bukti', 'Verify proof')} tone="warn" small />
                         ) : (
-                          <StatusBadge label={orderLabel(order.status)[lang]} tone={orderLabel(order.status).tone} small />
+                          <StatusBadge label={orderLabel(order.status, orderVariant(order))[lang]} tone={orderLabel(order.status, orderVariant(order)).tone} small />
                         )}
                       </span>
                     </Link>
@@ -258,7 +263,7 @@ export default function AdminDashboard() {
                         <small>{order.customer.company || order.customer.name}</small>
                       </span>
                       <span className={styles.rowSide}>
-                        <span className={styles.amount}>{formatIDR(order.grandTotal)}</span>
+                        <span className={styles.amount}>{formatMoney(order.grandTotal, order.currency)}</span>
                         <span className={`${styles.dueText} ${overdue ? styles.dueOver : ''}`}>
                           {overdue ? t('Lewat', 'Overdue') : t('Tempo', 'Due')} {relativeTime(due - now, lang)}
                         </span>
@@ -396,6 +401,46 @@ function Delta({ metric, t, lang }: { metric: DashboardMetric; t: T; lang: Lang 
   );
 }
 
+/**
+ * Blok ekspor (Phase E6, kontrak 11.1): ringkasan order USD terpisah dari KPI IDR, hanya tampil bila server mengirimnya
+ * (null = toko belum pernah menerima order USD). Tidak ada konversi kurs; kartu memakai markup dan stagger --i KPI utama.
+ */
+function ExportKpiRow({ kpis, periodText, t }: { kpis: DashboardExportKpis; periodText: string; t: T }) {
+  const formatUSD = (n: number) => formatMoney(n, kpis.currency);
+  const cards: Array<{ key: string; label: string; hint: string; icon: IconName; value: number; money?: boolean; href: string }> = [
+    { key: 'revenue', label: t('Pendapatan USD', 'USD revenue'), hint: t('dibayar pada periode ini', 'paid in this period'), icon: 'globe', value: kpis.revenue, money: true, href: '/admin/reports/sales' },
+    { key: 'paid', label: t('Order dibayar', 'Paid orders'), hint: t('pada periode ini', 'in this period'), icon: 'paymentCheck', value: kpis.paidOrders, href: '/admin/reports/sales' },
+    { key: 'created', label: t('Order dibuat', 'Orders created'), hint: t('periode ini, semua status', 'this period, any status'), icon: 'orders', value: kpis.orders, href: '/admin/orders?status=all' },
+    { key: 'freight', label: t('Menunggu penawaran ongkir', 'Awaiting freight quote'), hint: t('order CIF saat ini', 'CIF orders right now'), icon: 'truck', value: kpis.awaitingFreight, href: '/admin/orders?status=awaiting_freight' },
+    { key: 'pending', label: t('Menunggu pembayaran', 'Awaiting payment'), hint: t('order USD saat ini; daftar memuat semua mata uang', 'USD orders right now; the list shows all currencies'), icon: 'clock', value: kpis.pendingPayment, href: '/admin/orders?status=pending_payment' },
+  ];
+
+  return (
+    <section className={styles.exportBlock} aria-labelledby="export-kpi-title">
+      <div className={styles.exportHead}>
+        <div className={styles.panelTitle}>
+          <span className={styles.eyebrow}>{t('Ekspor', 'Export')}</span>
+          <h2 id="export-kpi-title">{t('Penjualan ekspor (USD)', 'Export sales (USD)')}</h2>
+        </div>
+        <span className={styles.queueSub}>{t(`Periode ${periodText}; tidak dikonversi ke rupiah.`, `Period ${periodText}; not converted to rupiah.`)}</span>
+      </div>
+      <div className={styles.exportGrid}>
+        {cards.map((card, i) => (
+          <Link key={card.key} href={card.href} className={styles.kpiCard} style={{ '--i': i + 4 } as CSSProperties}>
+            <span className={styles.kpiLabel}>
+              <Icon name={card.icon} size={18} strokeWidth={1.8} /> {card.label}
+            </span>
+            <strong className={styles.kpiValue}><CountUp value={card.value} format={card.money ? formatUSD : undefined} /></strong>
+            <span className={styles.kpiCompare}>
+              <span className={styles.kpiPrev}>{card.hint}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 interface QueueItem {
   key: keyof DashboardWorkQueue;
   label: string;
@@ -403,10 +448,13 @@ interface QueueItem {
   icon: IconName;
   href: string;
   urgent?: boolean;
+  /** Hanya tampil bila ada antrean (mis. permintaan penawaran ongkir CIF; toko tanpa ekspor tidak melihatnya). */
+  hideWhenZero?: boolean;
 }
 
 function WorkQueue({ queue, t }: { queue: DashboardWorkQueue; t: T }) {
   const items: QueueItem[] = [
+    { key: 'freightToQuote', label: t('Permintaan penawaran ongkir', 'Freight quote requests'), hint: t('Order CIF menunggu penawaran', 'CIF orders awaiting a quote'), icon: 'globe', href: '/admin/orders?status=awaiting_freight', urgent: true, hideWhenZero: true },
     { key: 'paymentsToVerify', label: t('Verifikasi pembayaran', 'Verify payments'), hint: t('Bukti transfer/QRIS', 'Transfer/QRIS proofs'), icon: 'paymentCheck', href: '/admin/payments', urgent: true },
     { key: 'ordersToProcess', label: t('Siap diproses', 'Ready to process'), hint: t('Sudah dibayar', 'Paid'), icon: 'wallet', href: '/admin/orders?status=paid', urgent: true },
     { key: 'ordersToShip', label: t('Siap dikirim', 'Ready to ship'), hint: t('Sedang diproses', 'Processing'), icon: 'package', href: '/admin/orders?status=processing' },
@@ -416,7 +464,11 @@ function WorkQueue({ queue, t }: { queue: DashboardWorkQueue; t: T }) {
     { key: 'customersToApprove', label: t('Persetujuan customer', 'Customer approval'), hint: t('Registrasi baru', 'New sign-ups'), icon: 'users', href: '/admin/customers?status=pending', urgent: true },
     { key: 'unreadChats', label: t('Chat belum dibaca', 'Unread chats'), hint: t('Live chat', 'Live chat'), icon: 'chat', href: '/admin/chat', urgent: true },
   ];
-  const visible = items.filter((item) => queue[item.key] !== null);
+  const visible = items.filter((item) => {
+    const value = queue[item.key];
+    if (value === null || value === undefined) return false;
+    return !item.hideWhenZero || value > 0;
+  });
   if (visible.length === 0) return null;
   const open = visible.reduce((sum, item) => sum + (queue[item.key] || 0), 0);
 

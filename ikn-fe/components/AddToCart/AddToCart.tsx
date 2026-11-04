@@ -9,7 +9,8 @@ import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { openCartDrawer, openChat, useShopPaths } from '@/lib/shop';
 import { tr } from '@/lib/cms';
-import { formatIDR } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
+import { priceUnavailable, productPrice } from '@/lib/commerce';
 import type { Product } from '@/lib/types';
 
 // Kontrol qty + tombol tambah keranjang di halaman detail produk.
@@ -71,6 +72,29 @@ export default function AddToCart({ product }: { product: Product }) {
     );
   }
 
+  // Customer ekspor tanpa harga USD untuk produk ini (ASUMSI A-86): tidak bisa dipesan lewat keranjang.
+  if (priceUnavailable(product)) {
+    return (
+      <div className="pd-buy">
+        <p className="pd-quote-note">
+          {t(
+            'Produk ini belum punya harga untuk pasar ekspor. Hubungi tim marketing kami untuk penawaran.',
+            'This product has no export price yet. Contact our marketing team for a quotation.',
+          )}
+        </p>
+        {shop.portal ? (
+          <button type="button" className="btn btn-solid btn-block" onClick={askSeller}>
+            <Icon name="chat" /> {t('Hubungi kami lewat chat', 'Contact us via chat')}
+          </button>
+        ) : (
+          <Link href={`/kontak?type=quote&product=${encodeURIComponent(product.slug)}`} className="btn btn-solid btn-block">
+            {t('Hubungi kami', 'Contact us')} <Icon name="arrow" />
+          </Link>
+        )}
+      </div>
+    );
+  }
+
   const sellable = isSellable(product);
   if (!sellable) {
     return (
@@ -96,6 +120,7 @@ export default function AddToCart({ product }: { product: Product }) {
 
   const maxQty = product.stockStatus === 'made_to_order' ? Number.POSITIVE_INFINITY : product.available;
   const clamp = (v: number) => Math.min(Math.max(moq, Math.floor(v) || moq), Math.max(moq, maxQty));
+  const price = productPrice(product);
 
   function handleAdd() {
     if (!add(product, clamp(qty))) return;
@@ -139,7 +164,7 @@ export default function AddToCart({ product }: { product: Product }) {
           {/* Live subtotal for the chosen quantity (before shipping, fees and tax). */}
           <p className="pd-subtotal">
             <span>{t('Subtotal', 'Subtotal')} ({clamp(qty).toLocaleString('id-ID')} {product.unit})</span>
-            <strong>{formatIDR((product.effectivePrice ?? product.price ?? 0) * clamp(qty))}</strong>
+            <strong>{formatMoney((price.amount ?? 0) * clamp(qty), price.currency)}</strong>
           </p>
           <div className="pd-buy-actions pd-buy-row">
             <button type="button" className="btn btn-line btn-block" onClick={handleAdd}>

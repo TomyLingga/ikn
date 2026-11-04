@@ -6,6 +6,7 @@ import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
 import StatusBadge from '@/components/StatusBadge';
 import AdminModal from '@/components/admin/AdminModal';
+import AcceptPaymentModal from '@/components/admin/AcceptPaymentModal';
 import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
 import AdminTabs, { type AdminTab, type AdminTabGroup } from '@/components/admin/AdminTabs';
 import { Pager } from '@/components/admin/cms';
@@ -14,9 +15,8 @@ import { paymentLabel, paymentStatus } from '@/lib/commerce';
 import { api, apiPaged, ApiError, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
 import { defaultDateRange, paymentMethodSummary, queryString, refreshAdminBadges, type AdminPayment, type CountsMeta, type PaymentMethodRow } from '@/lib/admin';
-import { formatDateTime, formatIDR } from '@/lib/format';
+import { formatDateTime, formatMoney } from '@/lib/format';
 import type { IconName, PaymentStatusKey } from '@/lib/types';
-import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
 import { FileLink } from '@/components/FileViewer';
 
@@ -68,6 +68,8 @@ export default function AdminPayments() {
   const [detail, setDetail] = useState<AdminPayment | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  // Modal terima pembayaran (jumlah diterima, biaya bank, catatan; ASUMSI A-86).
+  const [accepting, setAccepting] = useState<AdminPayment | null>(null);
   const [reason, setReason] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -119,24 +121,18 @@ export default function AdminPayments() {
     }
   }
 
-  async function accept(payment: AdminPayment) {
+  function accept(payment: AdminPayment) {
     if (busy) return;
-    if (!await confirmDialog(t(`Terima pembayaran ${payment.order?.number ?? `#${payment.id}`} sebesar ${formatIDR(payment.amount)}?`, `Accept payment ${payment.order?.number ?? `#${payment.id}`} of ${formatIDR(payment.amount)}?`))) return;
-    setBusy(true);
     setActionError('');
-    try {
-      await api(`/admin/payments/${payment.id}/accept`, { method: 'POST', body: {} });
-      setNotice(t(`Pembayaran ${payment.order?.number ?? ''} diterima; order berstatus dibayar.`, `Payment ${payment.order?.number ?? ''} accepted; order is now paid.`));
-      setDetail(null);
-      refreshAdminBadges();
-      await refresh();
-    } catch (err) {
-      const text = actionErrorText(err);
-      if (detail) setActionError(text);
-      else setError(text);
-    } finally {
-      setBusy(false);
-    }
+    setAccepting(payment);
+  }
+
+  async function accepted(payment: AdminPayment) {
+    setAccepting(null);
+    setNotice(t(`Pembayaran ${payment.order?.number ?? ''} diterima; order berstatus dibayar.`, `Payment ${payment.order?.number ?? ''} accepted; order is now paid.`));
+    setDetail(null);
+    refreshAdminBadges();
+    await refresh();
   }
 
   function startReject(payment: AdminPayment) {
@@ -243,8 +239,12 @@ export default function AdminPayments() {
       align: 'right',
       render: (p) => (
         <span>
-          <strong>{formatIDR(p.amount)}</strong>
-          {p.order && p.order.grandTotal !== p.amount && <small className="admin-cell-sub">{t('order', 'order')} {formatIDR(p.order.grandTotal)}</small>}
+          <strong>{formatMoney(p.amount, p.currency)}</strong>
+          {p.currency === 'USD' && <small className="admin-cell-sub">USD</small>}
+          {p.order && p.order.grandTotal !== p.amount && <small className="admin-cell-sub">{t('order', 'order')} {formatMoney(p.order.grandTotal, p.order.currency || p.currency)}</small>}
+          {p.status === 'paid' && p.receivedAmount != null && p.receivedAmount !== p.amount && (
+            <small className="admin-cell-sub">{t('diterima', 'received')} {formatMoney(p.receivedAmount, p.currency)}</small>
+          )}
         </span>
       ),
     },
@@ -272,7 +272,7 @@ export default function AdminPayments() {
             { label: 'Detail', onClick: () => void openDetail(p.id) },
             ...(p.status === 'awaiting_verification'
               ? [
-                  { label: t('Terima', 'Accept'), tone: 'success' as const, disabled: busy, onClick: () => void accept(p) },
+                  { label: t('Terima', 'Accept'), tone: 'success' as const, disabled: busy, onClick: () => accept(p) },
                   { label: t('Tolak', 'Reject'), tone: 'danger' as const, disabled: busy, onClick: () => startReject(p) },
                 ]
               : []),
@@ -462,25 +462,59 @@ export default function AdminPayments() {
                       <dt>{t('Rekening tujuan', 'Destination account')}</dt>
                       <dd>
                         {detail.bankAccount.bankName} <span className="mono">{detail.bankAccount.accountNumber}</span> a.n. {detail.bankAccount.accountHolder}
+                        {detail.bankAccount.currency && detail.bankAccount.currency !== 'IDR' ? ` · ${detail.bankAccount.currency}` : ''}
+                        {detail.bankAccount.swiftCode && (
+                          <>
+                            <br />
+                            <small>SWIFT <span className="mono">{detail.bankAccount.swiftCode}</span>{detail.bankAccount.correspondentBank ? ` · ${t('Bank koresponden', 'Correspondent bank')}: ${detail.bankAccount.correspondentBank}` : ''}</small>
+                          </>
+                        )}
                       </dd>
                     </div>
                   )}
                   <div>
                     <dt>{t('Jumlah tagihan', 'Amount due')}</dt>
                     <dd>
-                      <strong>{formatIDR(detail.amount)}</strong>
+                      <strong>{formatMoney(detail.amount, detail.currency)}</strong>
                       {detail.uniqueCode ? ` (${t('termasuk kode unik', 'incl. unique code')} ${detail.uniqueCode})` : ''}
                       {detail.order && (
                         <>
                           <br />
                           <small className={amountMismatch ? 'admin-warn-text' : undefined}>
-                            {t('Total order', 'Order total')}: {formatIDR(detail.order.grandTotal)}
+                            {t('Total order', 'Order total')}: {formatMoney(detail.order.grandTotal, detail.order.currency || detail.currency)}
                             {amountMismatch && ` — ${t('berbeda dari jumlah percobaan ini', 'differs from this attempt')}`}
                           </small>
                         </>
                       )}
                     </dd>
                   </div>
+                  {(detail.receivedAmount != null || detail.bankCharges != null || detail.receivedNote) && (
+                    <div>
+                      <dt>{t('Diterima', 'Received')}</dt>
+                      <dd>
+                        {detail.receivedAmount != null && (
+                          <>
+                            <strong>{formatMoney(detail.receivedAmount, detail.currency)}</strong>
+                            {detail.receivedAmount !== detail.amount && (
+                              <small className="admin-warn-text"> ({detail.receivedAmount < detail.amount ? t('kurang', 'short') : t('lebih', 'over')} {formatMoney(Math.abs(detail.amount - detail.receivedAmount), detail.currency)})</small>
+                            )}
+                          </>
+                        )}
+                        {detail.bankCharges != null && (
+                          <>
+                            <br />
+                            <small>{t('Biaya bank', 'Bank charges')}: {formatMoney(detail.bankCharges, detail.currency)}</small>
+                          </>
+                        )}
+                        {detail.receivedNote && (
+                          <>
+                            <br />
+                            <small>{detail.receivedNote}</small>
+                          </>
+                        )}
+                      </dd>
+                    </div>
+                  )}
                   <div>
                     <dt>Status</dt>
                     <dd>
@@ -569,7 +603,7 @@ export default function AdminPayments() {
                     <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={() => startReject(detail)}>
                       {t('Tolak…', 'Reject…')}
                     </button>
-                    <button type="button" className="btn btn-solid btn-sm" disabled={busy} onClick={() => void accept(detail)}>
+                    <button type="button" className="btn btn-solid btn-sm" disabled={busy} onClick={() => accept(detail)}>
                       <Icon name="check" size={14} /> {t('Terima pembayaran', 'Accept payment')}
                     </button>
                   </>
@@ -578,6 +612,10 @@ export default function AdminPayments() {
             )}
           </div>
         </AdminModal>
+      )}
+
+      {accepting && (
+        <AcceptPaymentModal payment={accepting} orderNumber={accepting.order?.number} onClose={() => setAccepting(null)} onAccepted={() => accepted(accepting)} />
       )}
     </div>
   );

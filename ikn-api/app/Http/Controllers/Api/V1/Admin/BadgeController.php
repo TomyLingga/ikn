@@ -11,12 +11,13 @@ use App\Services\Chat\ChatService;
 use Illuminate\Http\Request;
 
 // GET /admin/badges: penghitung untuk badge sidebar admin dalam satu panggilan. Nilai null = admin tidak
-// punya modulnya (badge tidak ditampilkan). orders = order sudah dibayar yang masih berjalan (dibayar, diproses,
+// punya modulnya (badge tidak ditampilkan). orders = order yang menunggu tindakan admin modul orders: permintaan
+// penawaran ongkir CIF (awaiting_freight, A-89) dan order sudah dibayar yang masih berjalan (dibayar, diproses,
 // dikirim, diterima); verifikasi pembayaran dihitung di badge payments agar tidak ganda.
 
 class BadgeController extends ApiController
 {
-    public const ORDER_WORK_STATUSES = [Order::STATUS_PAID, Order::STATUS_PROCESSING, Order::STATUS_SHIPPED, Order::STATUS_DELIVERED];
+    public const ORDER_WORK_STATUSES = [Order::STATUS_AWAITING_FREIGHT, Order::STATUS_PAID, Order::STATUS_PROCESSING, Order::STATUS_SHIPPED, Order::STATUS_DELIVERED];
 
     public function show(Request $request, ModuleAccess $access, ChatService $chat)
     {

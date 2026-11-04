@@ -2,13 +2,15 @@
 
 // Instruksi pembayaran untuk satu order: total (kode unik disorot), rekening tujuan / QRIS,
 // teks instruksi metode, dan hitung mundur batas waktu. Dipakai halaman sukses checkout dan detail order.
+// Order USD (ASUMSI A-86): angka dalam USD, hanya rekening USD beserta SWIFT/alamat bank/bank koresponden,
+// tanpa kode unik, plus catatan bahwa biaya bank di luar negeri ditanggung pembeli.
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import { activePayment } from '@/lib/commerce';
-import { formatDateTime, formatIDR } from '@/lib/format';
+import { formatDateTime, formatMoney, fromMinorInput, isUsd } from '@/lib/format';
 import type { BankAccountInfo, CommerceConfig, Order } from '@/lib/types';
 
 function useCountdown(target: string | null | undefined) {
@@ -54,23 +56,31 @@ export default function PaymentInstructions({ order, config }: { order: Order; c
   const countdown = useCountdown(order.status === 'pending_payment' ? order.paymentDueAt : null);
 
   const payment = activePayment(order);
+  const currency = payment?.currency || order.currency || 'IDR';
+  const usd = isUsd(currency);
   const methodCode = payment?.method || '';
   const methodInfo = config?.paymentMethods.find((m) => m.code === methodCode) || null;
-  const isQris = methodInfo?.type === 'qris_static' || methodCode === 'qris_static' || !!payment?.qrisImageUrl;
+  const isQris = !usd && (methodInfo?.type === 'qris_static' || methodCode === 'qris_static' || !!payment?.qrisImageUrl);
   const qrisUrl = payment?.qrisImageUrl || methodInfo?.qrisImageUrl || null;
-  const banks: BankAccountInfo[] = payment?.bankAccount ? [payment.bankAccount] : !isQris ? config?.bankAccounts || [] : [];
+  // Rekening dari payment; tanpa itu, semua rekening aktif se-mata-uang order.
+  const banks: BankAccountInfo[] = payment?.bankAccount
+    ? [payment.bankAccount]
+    : !isQris
+      ? (config?.bankAccounts || []).filter((bank) => (bank.currency || 'IDR') === currency)
+      : [];
   const instructions = tr(payment?.instructions || methodInfo?.instructions, lang);
   const amount = payment?.amount ?? order.grandTotal;
-  const uniqueCode = order.uniqueCode || 0;
-  const amountText = String(amount);
-  // formatIDR → "Rp 8.330.502": tiga digit terakhir = kode unik yang disorot.
-  const formatted = formatIDR(amount);
-  const highlightCode = uniqueCode > 0 && amount >= 1000;
+  const uniqueCode = usd ? 0 : order.uniqueCode || 0;
+  // Nilai yang disalin: rupiah bulat, atau desimal USD ("1250.00") agar cocok dengan formulir transfer.
+  const amountText = usd ? fromMinorInput(amount, currency) : String(amount);
+  // formatIDR → "Rp 8.330.502": tiga digit terakhir = kode unik yang disorot (hanya rupiah).
+  const formatted = formatMoney(amount, currency);
+  const highlightCode = !usd && uniqueCode > 0 && amount >= 1000;
 
   return (
     <div className="pay-box">
       <div className="pay-amount">
-        <span className="label">{t('Total yang harus dibayar', 'Amount due')}</span>
+        <span className="label">{t('Total yang harus dibayar', 'Amount due')}{usd ? ' (USD)' : ''}</span>
         <strong>
           {highlightCode ? (
             <>
@@ -107,14 +117,30 @@ export default function PaymentInstructions({ order, config }: { order: Order; c
           {banks.map((bank) => (
             <div key={bank.id} className="co-bank bank-card">
               <div>
-                <span className="co-bank-name">{bank.bankName}</span>
+                <span className="co-bank-name">{bank.bankName}{bank.currency && bank.currency !== 'IDR' ? ` · ${bank.currency}` : ''}</span>
                 <span className="co-bank-no">{bank.accountNumber}</span>
                 <span className="co-bank-holder">a.n. {bank.accountHolder}</span>
+                {(bank.swiftCode || bank.bankAddress || bank.correspondentBank) && (
+                  <span className="co-bank-detail">
+                    {bank.swiftCode && <>SWIFT <b className="mono">{bank.swiftCode}</b></>}
+                    {bank.bankAddress && <><br />{t('Alamat bank', 'Bank address')}: {bank.bankAddress}</>}
+                    {bank.correspondentBank && <><br />{t('Bank koresponden', 'Correspondent bank')}: {bank.correspondentBank}</>}
+                  </span>
+                )}
               </div>
               <CopyButton value={bank.accountNumber} label={t('Salin', 'Copy')} />
             </div>
           ))}
         </div>
+      )}
+
+      {usd && (
+        <p className="pay-bank-note">
+          {t(
+            'Biaya bank di luar negeri (termasuk bank koresponden) ditanggung pembeli. Jumlah yang kami terima dicatat saat verifikasi.',
+            'Bank charges abroad (including correspondent banks) are borne by the buyer. The amount we receive is recorded at verification.',
+          )}
+        </p>
       )}
 
       {instructions && <p className="pd-quote-note">{instructions}</p>}

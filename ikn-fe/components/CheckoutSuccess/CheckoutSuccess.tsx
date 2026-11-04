@@ -12,7 +12,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { formatIDR } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
 import type { CommerceConfig, Order } from '@/lib/types';
 
 export default function CheckoutSuccess({ number }: { number: string }) {
@@ -60,30 +60,48 @@ export default function CheckoutSuccess({ number }: { number: string }) {
               <div className="vm-icon co-done-icon"><Icon name="check" size={40} /></div>
               <h1 className="h2">{t('Pesanan dibuat', 'Order placed')}</h1>
               <p className="co-done-num">{t('No. Pesanan', 'Order no.')}: <strong>{order.number}</strong></p>
-              <p className="pd-quote-note">
-                {t(
-                  'Stok sudah direservasi untuk Anda. Selesaikan pembayaran sebelum batas waktu, lalu unggah bukti pembayaran agar tim kami dapat memverifikasi.',
-                  'Stock has been reserved for you. Complete the payment before the deadline, then upload the payment proof so our team can verify it.',
-                )}
-              </p>
+              {order.status === 'awaiting_freight' ? (
+                // Order CIF (ASUMSI A-89): belum ada payment; admin menawarkan ongkir ke pelabuhan tujuan dulu.
+                <p className="pd-quote-note">
+                  {t(
+                    `Stok sudah direservasi untuk Anda. Tim kami menyiapkan penawaran ongkir CIF${order.destinationPort ? ` ke ${order.destinationPort.name}` : ''}; Anda akan menerima email dan notifikasi untuk menyetujui atau mengajukan harga lain. Instruksi pembayaran menyusul setelah penawaran disepakati.`,
+                    `Stock has been reserved for you. Our team is preparing the CIF freight quote${order.destinationPort ? ` to ${order.destinationPort.name}` : ''}; you will get an email and a notification to accept it or propose another price. Payment instructions follow once the quote is agreed.`,
+                  )}
+                </p>
+              ) : (
+                <>
+                  <p className="pd-quote-note">
+                    {t(
+                      'Stok sudah direservasi untuk Anda. Selesaikan pembayaran sebelum batas waktu, lalu unggah bukti pembayaran agar tim kami dapat memverifikasi.',
+                      'Stock has been reserved for you. Complete the payment before the deadline, then upload the payment proof so our team can verify it.',
+                    )}
+                  </p>
 
-              <div style={{ textAlign: 'left', margin: '24px 0' }}>
-                <PaymentInstructions order={order} config={config} />
-              </div>
+                  <div style={{ textAlign: 'left', margin: '24px 0' }}>
+                    <PaymentInstructions order={order} config={config} />
+                  </div>
+                </>
+              )}
 
               <div className="co-items" style={{ textAlign: 'left' }}>
                 {order.items.map((item) => (
                   <div key={item.productSlug} className="co-item">
                     <span className="co-item-name">{tr(item.name, lang)} <small>×{item.qty} {item.unit}</small></span>
-                    <span>{formatIDR(item.lineTotal)}</span>
+                    <span>{formatMoney(item.lineTotal, order.currency)}</span>
                   </div>
                 ))}
               </div>
 
               <div className="co-done-actions">
-                <Link href={`/dashboard/pesanan/${encodeURIComponent(order.number)}#payment`} className="btn btn-solid">
-                  {t('Unggah bukti pembayaran', 'Upload payment proof')} <Icon name="arrow" />
-                </Link>
+                {order.status === 'awaiting_freight' ? (
+                  <Link href={`/dashboard/pesanan/${encodeURIComponent(order.number)}#freight`} className="btn btn-solid">
+                    {t('Lihat pesanan', 'View order')} <Icon name="arrow" />
+                  </Link>
+                ) : (
+                  <Link href={`/dashboard/pesanan/${encodeURIComponent(order.number)}#payment`} className="btn btn-solid">
+                    {t('Unggah bukti pembayaran', 'Upload payment proof')} <Icon name="arrow" />
+                  </Link>
+                )}
                 <Link href="/dashboard/pesanan" className="btn btn-line">{t('Semua pesanan', 'All orders')}</Link>
               </div>
             </div>

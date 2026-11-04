@@ -15,7 +15,7 @@ class GeoController extends ApiController
 
     public function search(GeoSearchRequest $request)
     {
-        return $this->data($this->nominatim->search($request->input('q')));
+        return $this->data($this->nominatim->search($request->input('q'), $request->scope()));
     }
 
     public function reverse(GeoReverseRequest $request)

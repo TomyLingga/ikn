@@ -4,6 +4,7 @@ namespace Tests\Support;
 
 use App\Models\BankAccount;
 use App\Models\CustomerAddress;
+use App\Models\CustomerProfile;
 use App\Models\Media;
 use App\Models\Order;
 use App\Models\Payment;
@@ -34,13 +35,19 @@ trait CommerceFixtures
 
     protected BankAccount $bank;
 
+    /** Customer ekspor aktif (pasar export, USD) + rekening USD; diisi setUpExport(). */
+    protected User $exporter;
+
+    protected BankAccount $usdBank;
+
     /** Siapkan semua prasyarat checkout; kembalikan customer aktif. */
     protected function setUpCommerce(array $settings = []): User
     {
         Storage::fake('private');
         $this->seedRegions();
+        $this->seedDeliveryTerms();
 
-        $this->buyer = $this->customer(['email' => 'buyer@coatingsolutions.co.id', 'name' => 'Budi Santoso', 'locale' => 'id']);
+        $this->buyer =$this->customer(['email' => 'buyer@coatingsolutions.co.id', 'name' => 'Budi Santoso', 'locale' => 'id']);
         $this->buyer->profile()->create(['company' => 'Coating Solutions Co.', 'phone' => '081234567890', 'tax_id' => '01.234.567.8-901.000']);
         $this->buyerAddress = $this->buyer->addresses()->create($this->addressAttributes());
 
@@ -63,6 +70,38 @@ trait CommerceFixtures
         ], $settings));
 
         return $this->buyer;
+    }
+
+    /**
+     * Customer ekspor (ASUMSI A-86): profil market export + negara MY + alamat perusahaan, tanpa alamat Indonesia;
+     * rekening USD aktif. Baris FOB (export, included, tax_profile export) dan payment_terms sudah ada dari migrasi.
+     * Panggil setelah setUpCommerce().
+     */
+    protected function setUpExport(array $profile = []): User
+    {
+        $this->exporter = $this->customer(['email' => 'buyer@rubbertrade.example', 'name' => 'Ahmad Faizal', 'locale' => 'en']);
+        $this->exporter->profile()->create(array_merge([
+            'company' => 'Rubber Trade Sdn. Bhd.', 'phone' => '+60123456789', 'market' => CustomerProfile::MARKET_EXPORT,
+            'country_code' => 'MY', 'company_address' => 'Lot 12, Jalan Perindustrian 3, 81700 Pasir Gudang, Johor, Malaysia',
+        ], $profile));
+        $this->usdBank = BankAccount::create([
+            'bank_name' => 'Bank Mandiri', 'account_number' => '1060012345678', 'account_holder' => 'PT Industri Karet Nusantara',
+            'currency' => 'USD', 'swift_code' => 'BMRIIDJA', 'bank_address' => 'Jakarta, Indonesia', 'is_active' => true, 'sort_order' => 9,
+        ]);
+
+        return $this->exporter;
+    }
+
+    /** Body POST /customer/orders untuk order USD FOB (tanpa alamat/tarif; syarat bayar + rekening USD). */
+    protected function exportCheckoutPayload(Product $product, int $qty = 1, array $overrides = []): array
+    {
+        return array_merge([
+            'items' => [['productSlug' => $product->slug, 'qty' => $qty]],
+            'deliveryTermCode' => 'fob',
+            'paymentTermCode' => 'tt_advance',
+            'paymentMethodCode' => $this->manualTransfer->code,
+            'bankAccountId' => $this->usdBank->id,
+        ], $overrides);
     }
 
     /** Atribut alamat (kolom snake_case) dari payload kontrak jakartaAddress(). */

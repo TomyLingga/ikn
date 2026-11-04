@@ -612,3 +612,132 @@
 @media (max-width: 860px) {
   .nextCard { grid-template-columns: 1fr; padding: 14px; }
 }
+
+/* ---- Penawaran ongkir CIF (ASUMSI A-89) ---- */
+.freightCard { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+
+.freightHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--paper-2);
+  font-size: 0.9rem;
+}
+
+.freightHead strong { display: block; }
+.freightHead small { color: var(--ink-soft); }
+
+.freightLines {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.freightLines td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.freightLines td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.freightLines tfoot td {
+  border-bottom: 0;
+  padding-top: 10px;
+  font-weight: 700;
+}
+
+.freightMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}
+
+.freightNote {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--line-strong);
+  background: var(--paper-2);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.freightActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.freightActions .dangerBtn { width: auto; margin-top: 0; }
+
+.counterForm {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-2);
+}
+
+.counterForm label { display: grid; gap: 6px; font-size: 0.86rem; font-weight: 600; }
+
+.counterForm input,
+.counterForm textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+}
+
+.counterForm input:focus,
+.counterForm textarea:focus { outline: none; border-color: var(--primary); }
+
+.freightHistory {
+  margin: 18px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.freightHistory h3 { margin: 0 0 10px; font-size: 0.9rem; font-weight: 650; }
+
+.freightHistory ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.freightRound {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  font-size: 0.86rem;
+}
+
+.freightRound small { color: var(--ink-soft); }
+.freightRound strong { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .freightActions > * { flex: 1 1 100%; }
+}

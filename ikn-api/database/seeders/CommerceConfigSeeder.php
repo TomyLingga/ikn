@@ -41,6 +41,14 @@ class CommerceConfigSeeder extends Seeder
                 'bank_name' => $bank, 'account_holder' => $holder, 'is_active' => true, 'sort_order' => $i,
             ]);
         }
+
+        // Rekening USD demo untuk transfer manual ekspor (ASUMSI A-86): nomor rekening dan alamat adalah contoh,
+        // kode SWIFT adalah kode publik bank yang bersangkutan; klien mengganti lewat panel admin.
+        BankAccount::firstOrCreate(['account_number' => '1060012345678'], [
+            'bank_name' => 'Bank Mandiri', 'account_holder' => 'PT Industri Karet Nusantara', 'currency' => 'USD',
+            'swift_code' => 'BMRIIDJA', 'bank_address' => 'Jl. Jend. Gatot Subroto Kav. 36-38, Jakarta 12190, Indonesia',
+            'correspondent_bank' => null, 'is_active' => true, 'sort_order' => 3,
+        ]);
     }
 
     private function fees(): void
@@ -50,10 +58,16 @@ class CommerceConfigSeeder extends Seeder
         }
 
         // Biaya tambahan hanya untuk customer tertentu (ASUMSI A-67): dikenakan ke PT Mitra Kimia Industri saja.
+        // Tetap IDR karena contohnya adalah fee khusus satu customer lokal (demo sasaran per customer), bukan fee ekspor.
         $second = User::where('email', 'purchasing@mitrakimia.co.id')->first();
         if ($second && ! Fee::where('name->id', 'Biaya penanganan dokumen ekspor')->exists()) {
-            $fee = Fee::create(['name' => ['id' => 'Biaya penanganan dokumen ekspor', 'en' => 'Export document handling fee'], 'type' => Fee::TYPE_OTHER, 'amount' => 25000, 'is_active' => true, 'sort_order' => 1, 'audience' => Fee::AUDIENCE_CUSTOMERS]);
+            $fee = Fee::create(['name' => ['id' => 'Biaya penanganan dokumen ekspor', 'en' => 'Export document handling fee'], 'type' => Fee::TYPE_OTHER, 'amount' => 25000, 'currency' => 'IDR', 'is_active' => true, 'sort_order' => 1, 'audience' => Fee::AUDIENCE_CUSTOMERS]);
             $fee->customers()->syncWithoutDetaching([$second->id]);
+        }
+
+        // Fee bermata uang USD (ASUMSI A-86): hanya dikenakan ke order USD (customer ekspor); nominal demo USD 25,00.
+        if (! Fee::where('name->id', 'Biaya dokumen ekspor')->exists()) {
+            Fee::create(['name' => ['id' => 'Biaya dokumen ekspor', 'en' => 'Export documentation fee'], 'type' => Fee::TYPE_OTHER, 'amount' => '25.00', 'currency' => 'USD', 'is_active' => true, 'sort_order' => 3]);
         }
 
         // Biaya tambahan NONAKTIF (contoh biaya musiman yang sedang dimatikan).

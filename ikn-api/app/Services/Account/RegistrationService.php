@@ -3,18 +3,21 @@
 namespace App\Services\Account;
 
 use App\Mail\Account\VerifyEmail;
+use App\Models\CustomerProfile;
 use App\Models\User;
+use App\Support\Countries;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
 // Registrasi customer: user pending + profil, lalu email verifikasi (URL bertanda tangan 60 menit, ASUMSI A-25).
+// Negara dan alamat perusahaan dicatat untuk admin (ASUMSI A-86); pasar selalu local sampai admin mengubahnya.
 class RegistrationService
 {
     public const VERIFY_TTL_MINUTES = 60;
 
-    /** @param  array{name:string,email:string,password:string,phone?:?string,company?:?string,position?:?string,taxId?:?string}  $data */
+    /** @param  array{name:string,email:string,password:string,phone?:?string,company?:?string,position?:?string,taxId?:?string,countryCode?:?string,companyAddress?:?string}  $data */
     public function register(array $data, string $locale): User
     {
         $user = DB::transaction(function () use ($data, $locale) {
@@ -28,11 +31,15 @@ class RegistrationService
                 'email_verified_at' => null,
             ]);
 
+            $country = Countries::normalize($data['countryCode'] ?? null);
             $user->profile()->create([
                 'company' => $data['company'] ?? null,
                 'position' => $data['position'] ?? null,
                 'tax_id' => $data['taxId'] ?? null,
                 'phone' => $data['phone'] ?? null,
+                'market' => CustomerProfile::MARKET_LOCAL,
+                'country_code' => Countries::has($country) ? $country : CustomerProfile::DEFAULT_COUNTRY,
+                'company_address' => isset($data['companyAddress']) && trim((string) $data['companyAddress']) !== '' ? trim((string) $data['companyAddress']) : null,
             ]);
 
             return $user;

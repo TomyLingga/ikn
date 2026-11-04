@@ -9,6 +9,10 @@ tags:
     description: Proxy geocoding Nominatim (auth:sanctum, 60/menit per IP, upstream 1/detik)
   - name: admin-customers
     description: Admin customers (modul customers)
+  - name: countries
+    description: Daftar negara ISO 3166-1 alpha-2 (publik)
+  - name: countries
+    description: Daftar negara ISO 3166-1 alpha-2 (publik)
 
 paths:
   # ---------------------------------------------------------------- auth (registrasi, verifikasi, reset)
@@ -84,6 +88,36 @@ paths:
         '200': { $ref: '#/components/responses/OkWithMessage' }
         '422': { description: 'VALIDATION_ERROR; token tidak valid → errors.token', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  # ---------------------------------------------------------------- countries (publik, ASUMSI A-86)
+  /countries:
+    get:
+      tags: [countries]
+      summary: Negara ISO 3166-1 alpha-2 + nama {id,en} untuk form daftar/profil; Indonesia pertama, sisanya urut kode (config/countries.php)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Country' } }
+
+  # ---------------------------------------------------------------- countries (publik, ASUMSI A-86)
+  /countries:
+    get:
+      tags: [countries]
+      summary: Negara ISO 3166-1 alpha-2 + nama {id,en} untuk form daftar/profil; Indonesia pertama, sisanya urut kode (config/countries.php)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Country' } }
+
   # ---------------------------------------------------------------- regions (publik)
   /regions:
     get:
@@ -124,10 +158,11 @@ paths:
   /geo/search:
     get:
       tags: [geo]
-      summary: Geocoding teks (Nominatim search, countrycodes=id, limit 5, cache 7 hari).
+      summary: 'Geocoding teks (Nominatim search, limit 5, cache 7 hari per scope). scope id (bawaan) = countrycodes=id untuk alamat customer; world = tanpa batas negara untuk pelabuhan tujuan CIF (ASUMSI A-89).'
       security: [{ cookieAuth: [] }]
       parameters:
-        - { name: q, in: query, required: true, schema: { type: string, minLength: 3 } }
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: scope, in: query, required: false, schema: { type: string, enum: [id, world], default: id } }
       responses:
         '200': { $ref: '#/components/responses/GeoResults' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
@@ -179,7 +214,11 @@ paths:
   /customer/profile/company:
     put:
       tags: [customer]
-      summary: Ubah company, companyEmail, companyPhone, taxId
+      summary: Ubah company, companyEmail, companyPhone, taxId, companyAddress, countryCode
+      description: |
+        `countryCode` dan `companyAddress` (ASUMSI A-86) hanya bisa diubah selagi akun `pending`; setelah itu nilai yang
+        berbeda ditolak 422 (`errors.countryCode` / `errors.companyAddress`), nilai yang sama diabaikan. `market` tidak pernah
+        bisa diubah customer (admin lewat 11.9).
       security: [{ cookieAuth: [] }]
       requestBody:
         required: true
@@ -192,6 +231,8 @@ paths:
                 companyEmail: { type: string, nullable: true, format: email }
                 companyPhone: { type: string, nullable: true, maxLength: 40 }
                 taxId: { type: string, nullable: true, maxLength: 40 }
+                companyAddress: { type: string, nullable: true, maxLength: 500 }
+                countryCode: { type: string, nullable: true, minLength: 2, maxLength: 2, example: MY, description: 'ISO 3166-1 alpha-2 (lihat GET /countries), dinormalkan uppercase' }
       responses:
         '200': { $ref: '#/components/responses/CustomerProfile' }
         '422': { $ref: '#/components/responses/ValidationError' }
@@ -284,6 +325,7 @@ paths:
       security: [{ cookieAuth: [] }]
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [pending, active, rejected, inactive] } }
+        - { name: market, in: query, schema: { type: string, enum: [local, export] }, description: 'pasar (ASUMSI A-86); local juga memuat customer tanpa baris profil' }
         - { name: q, in: query, schema: { type: string }, description: ILIKE nama/email/perusahaan/telepon }
         - { name: page, in: query, schema: { type: integer, default: 1 } }
         - { name: perPage, in: query, schema: { type: integer, default: 20, maximum: 100 } }
@@ -311,7 +353,7 @@ paths:
   /admin/customers/{customer}/status:
     put:
       tags: [admin-customers]
-      summary: 'Ubah status: active (approve, email), rejected (reason wajib, email), inactive (tanpa email). Tidak boleh ke pending.'
+      summary: 'Ubah status: active (approve, email; boleh sekaligus mengunci market), rejected (reason wajib, email), inactive (tanpa email). Tidak boleh ke pending.'
       security: [{ cookieAuth: [] }]
       parameters:
         - { name: customer, in: path, required: true, schema: { type: integer } }
@@ -323,6 +365,28 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AdminCustomer' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'CUSTOMER_HAS_OPEN_ORDERS (meta.openOrders) bila market dikirim berbeda padahal masih ada order berjalan', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/customers/{customer}/market:
+    put:
+      tags: [admin-customers]
+      summary: 'Ubah pasar customer local|export (kontrak 11.9, ASUMSI A-86). Ditolak bila masih ada order yang belum completed/cancelled/expired.'
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: customer, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [market]
+              properties:
+                market: { type: string, enum: [local, export] }
+      responses:
+        '200': { $ref: '#/components/responses/AdminCustomer' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'CUSTOMER_HAS_OPEN_ORDERS (meta.openOrders = jumlah order berjalan)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '422': { $ref: '#/components/responses/ValidationError' }
 
 components:
@@ -393,6 +457,13 @@ components:
         company: { type: string, nullable: true, maxLength: 160 }
         position: { type: string, nullable: true, maxLength: 120 }
         taxId: { type: string, nullable: true, maxLength: 40 }
+        countryCode: { type: string, nullable: true, minLength: 2, maxLength: 2, example: MY, description: 'ISO 3166-1 alpha-2 (GET /countries); kosong = ID. Pasar tetap local sampai admin menguncinya (ASUMSI A-86)' }
+        companyAddress: { type: string, nullable: true, maxLength: 500, description: alamat perusahaan untuk dokumen ekspor }
+    Country:
+      type: object
+      properties:
+        code: { type: string, example: ID, description: ISO 3166-1 alpha-2 }
+        name: { $ref: '#/components/schemas/I18n' }
     RegisteredCustomer:
       type: object
       properties:
@@ -418,6 +489,9 @@ components:
         companyPhone: { type: string, nullable: true }
         taxId: { type: string, nullable: true }
         phone: { type: string, nullable: true }
+        market: { type: string, enum: [local, export], description: 'pasar yang dikunci admin (ASUMSI A-86)' }
+        countryCode: { type: string, example: ID }
+        companyAddress: { type: string, nullable: true }
     RegionNames:
       type: object
       properties:
@@ -445,6 +519,10 @@ components:
         displayName: { type: string }
         lat: { type: number }
         lng: { type: number }
+        country: { type: string, nullable: true, example: Malaysia }
+        countryCode: { type: string, nullable: true, example: MY, description: 'ISO 3166-1 alpha-2 huruf besar dari address.country_code; null bila upstream tidak mengirimnya' }
+        class: { type: string, nullable: true, example: place, description: 'kelas OSM (place, natural, man_made, ...) untuk membedakan kota/pelabuhan/teluk di pemilih pelabuhan tujuan' }
+        type: { type: string, nullable: true, example: town, description: 'tipe OSM (town, bay, harbour, ...)' }
         address:
           type: object
           properties:
@@ -516,6 +594,10 @@ components:
         companyEmail: { type: string, nullable: true }
         companyPhone: { type: string, nullable: true }
         taxId: { type: string, nullable: true }
+        market: { type: string, enum: [local, export], description: 'pasar yang dikunci admin (ASUMSI A-86); tidak bisa diubah customer' }
+        currency: { type: string, enum: [IDR, USD], description: 'mata uang harga/order customer ini (export = USD)' }
+        countryCode: { type: string, example: ID, description: 'ISO 3166-1 alpha-2; hanya bisa diubah selagi pending' }
+        companyAddress: { type: string, nullable: true, description: 'hanya bisa diubah selagi pending' }
         addresses: { type: array, items: { $ref: '#/components/schemas/CustomerAddress' } }
         createdAt: { type: string, nullable: true }
     AdminCustomerSummary:
@@ -526,6 +608,8 @@ components:
         email: { type: string }
         phone: { type: string, nullable: true }
         company: { type: string, nullable: true }
+        market: { type: string, enum: [local, export], description: 'ASUMSI A-86' }
+        countryCode: { type: string, example: ID }
         status: { type: string, enum: [pending, active, rejected, inactive] }
         joinedAt: { type: string, nullable: true }
         approvedAt: { type: string, nullable: true }
@@ -543,6 +627,9 @@ components:
             companyEmail: { type: string, nullable: true }
             companyPhone: { type: string, nullable: true }
             taxId: { type: string, nullable: true }
+            currency: { type: string, enum: [IDR, USD] }
+            companyAddress: { type: string, nullable: true }
+            openOrdersCount: { type: integer, description: 'order yang belum completed/cancelled/expired; > 0 = pasar tidak bisa diubah' }
             approvedBy:
               type: object
               nullable: true
@@ -550,7 +637,7 @@ components:
                 id: { type: integer }
                 name: { type: string }
             addresses: { type: array, items: { $ref: '#/components/schemas/CustomerAddress' } }
-            orders: { type: array, items: { type: object }, description: 'Ringkasan order terbaru (diisi phase order; sementara [])' }
+            orders: { type: array, items: { type: object, properties: { number: { type: string }, invoiceNumber: { type: string, nullable: true }, date: { type: string }, status: { type: string }, paymentStatus: { type: string, nullable: true }, itemsCount: { type: integer }, currency: { type: string, enum: [IDR, USD] }, grandTotal: { type: integer, description: 'satuan terkecil currency' }, paidAt: { type: string, nullable: true }, deliveryTerm: { type: object, nullable: true, description: 'cara serah terima ringkas (A-85); null untuk order lama', properties: { code: { type: string }, family: { type: string, nullable: true, enum: [pickup, door, port] } } } } }, description: '10 order terbaru' }
             ordersCount: { type: integer }
     CustomerStatusInput:
       type: object
@@ -558,3 +645,5 @@ components:
       properties:
         status: { type: string, enum: [active, rejected, inactive] }
         reason: { type: string, nullable: true, maxLength: 1000, description: wajib bila rejected }
+        market: { type: string, nullable: true, enum: [local, export], description: 'hanya dipakai saat status active (approve): mengunci pasar (ASUMSI A-86); 409 CUSTOMER_HAS_OPEN_ORDERS bila berubah padahal ada order berjalan' }
+        market: { type: string, nullable: true, enum: [local, export], description: 'hanya dipakai saat status active (approve): mengunci pasar (ASUMSI A-86); 409 CUSTOMER_HAS_OPEN_ORDERS bila berubah padahal ada order berjalan' }

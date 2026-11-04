@@ -2,6 +2,7 @@ import Breadcrumb from '@/components/Breadcrumb';
 import CatalogBrowser, { parseCatalogQuery } from '@/components/CatalogBrowser';
 import EmptyState from '@/components/EmptyState';
 import { fetchCategories, fetchProducts } from '@/lib/server-data';
+import { sessionForward } from '@/lib/server-session';
 import { buildMetadata } from '@/lib/seo';
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
 export default async function CategoryPage({ params, searchParams }: { params: { slug: string }; searchParams: SearchParams }) {
   const query = parseCatalogQuery(searchParams, params.slug);
-  const [categories, products] = await Promise.all([fetchCategories(), fetchProducts(query)]);
+  const [categories, products] = await Promise.all([fetchCategories(), fetchProducts(query, { forward: sessionForward() })]);
   const category = categories.find((c) => c.slug === params.slug) || null;
 
   if (!category) {

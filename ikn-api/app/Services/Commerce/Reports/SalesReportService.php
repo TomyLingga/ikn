@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * Laporan penjualan (kontrak 11.1, ASUMSI A-24): agregasi on-the-fly dari orders.paid_at, status ≥ paid
  * (cancelled/expired tidak dihitung). Rentang inklusif di zona aplikasi; CSV untuk unduhan.
+ * Agregat lama (summary, byMonth, byProduct) hanya order IDR (ASUMSI A-86); `byCurrency` memberi total per
+ * mata uang dengan filter yang sama (Phase E6). Daftar order dan CSV memuat semua mata uang, tiap baris
+ * membawa `currency` dan angkanya dalam satuan terkecil mata uang itu.
  */
 class SalesReportService
 {
@@ -22,6 +25,7 @@ class SalesReportService
     public function build(array $period): array
     {
         $query = $this->query($period);
+        $allCurrencies = $this->query($period, null);
 
         $summaryRow = (clone $query)->select(
             DB::raw('COUNT(*) AS orders'),
@@ -86,9 +90,10 @@ class SalesReportService
                 ];
             })->values()->all();
 
-        $list = (clone $query)->with(OrderSummaryResource::eager())->orderByDesc('paid_at')->orderByDesc('id')->limit(self::MAX_ORDERS)->get();
+        $list = (clone $allCurrencies)->with(OrderSummaryResource::eager())->orderByDesc('paid_at')->orderByDesc('id')->limit(self::MAX_ORDERS)->get();
 
         return [
+            'currency' => Money::CURRENCY_IDR,
             'period' => [
                 'from' => $period['from']->toApiString(),
                 'to' => $period['to']->toApiString(),
@@ -96,19 +101,58 @@ class SalesReportService
                 'month' => $period['month'],
             ],
             'summary' => $summary,
+            'byCurrency' => $this->byCurrency($allCurrencies),
             'byMonth' => $byMonth,
             'byProduct' => $byProduct,
             'orders' => OrderSummaryResource::collection($list)->resolve(),
         ];
     }
 
-    /** CSV (UTF-8, header baris pertama) untuk unduhan: satu baris per order paid dalam rentang. */
+    /**
+     * Total per mata uang dengan filter paid_at/status yang sama (Phase E6): hanya mata uang yang punya order
+     * dalam rentang, urut sesuai Money::CURRENCIES (IDR dulu). `revenue`/`averageOrder` dalam satuan terkecil
+     * mata uang baris itu; `paidOrders` = `orders` (laporan ini hanya menghitung order yang dibayar, sama
+     * seperti summary.orders/paidCount).
+     *
+     * @return array<int, array{currency: string, orders: int, revenue: int, paidOrders: int, averageOrder: int}>
+     */
+    private function byCurrency(Builder $query): array
+    {
+        $rows = (clone $query)
+            ->select('currency', DB::raw('COUNT(*) AS orders'), DB::raw('COALESCE(SUM(grand_total), 0) AS revenue'))
+            ->groupBy('currency')->toBase()->get()
+            ->keyBy(fn ($row) => Money::normalizeCurrency($row->currency));
+
+        $out = [];
+        foreach (Money::CURRENCIES as $currency) {
+            $row = $rows->get($currency);
+            if ($row === null || (int) $row->orders === 0) {
+                continue;
+            }
+            $orders = (int) $row->orders;
+            $revenue = (int) Money::toMinor($row->revenue, $currency);
+            $out[] = [
+                'currency' => $currency,
+                'orders' => $orders,
+                'revenue' => $revenue,
+                'paidOrders' => $orders,
+                'averageOrder' => intdiv($revenue, $orders),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * CSV (UTF-8, header baris pertama) untuk unduhan: satu baris per order paid dalam rentang, semua mata uang;
+     * kolom uang dalam satuan terkecil mata uang di kolom `currency` (IDR rupiah, USD sen).
+     */
     public function csv(array $period): string
     {
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['number', 'invoiceNumber', 'paidAt', 'status', 'customer', 'company', 'email', 'items', 'subtotal', 'discount', 'shipping', 'fee', 'tax', 'uniqueCode', 'grandTotal', 'paymentMethod']);
+        fputcsv($handle, ['number', 'invoiceNumber', 'paidAt', 'status', 'customer', 'company', 'email', 'currency', 'items', 'subtotal', 'discount', 'shipping', 'fee', 'tax', 'uniqueCode', 'grandTotal', 'paymentMethod']);
 
-        $orders = $this->query($period)->with(['items', 'payments'])->orderBy('paid_at')->orderBy('id')->cursor();
+        $orders = $this->query($period, null)->with(['items', 'payments'])->orderBy('paid_at')->orderBy('id')->cursor();
         foreach ($orders as $order) {
             fputcsv($handle, [
                 $order->number,
@@ -118,6 +162,7 @@ class SalesReportService
                 $order->customerName(),
                 $order->customerCompany(),
                 $order->customerEmail(),
+                $order->currencyCode(),
                 (int) $order->items->sum('qty'),
                 $order->subtotalInt(),
                 $order->discountTotalInt(),
@@ -142,8 +187,11 @@ class SalesReportService
         return sprintf('sales-report-%s-%s.csv', $period['from']->format('Ymd'), $period['to']->format('Ymd'));
     }
 
-    private function query(array $period): Builder
+    /** Order dibayar dalam rentang; $currency null = semua mata uang (daftar, CSV, byCurrency). */
+    private function query(array $period, ?string $currency = Money::CURRENCY_IDR): Builder
     {
-        return Order::revenue()->whereBetween('paid_at', [$period['from'], $period['to']]);
+        $query = Order::revenue()->whereBetween('paid_at', [$period['from'], $period['to']]);
+
+        return $currency === null ? $query : $query->inCurrency($currency);
     }
 }

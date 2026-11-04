@@ -4,6 +4,7 @@ namespace App\Services\Commerce;
 
 use App\Exceptions\ApiException;
 use App\Models\Order;
+use App\Models\OrderFreightQuote;
 use App\Models\OrderItem;
 use App\Models\OrderStatusHistory;
 use App\Models\Payment;
@@ -11,6 +12,8 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\Stock\StockLedger;
+use App\Support\Money;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -21,6 +24,9 @@ use InvalidArgumentException;
  *
  * | Dari → Ke                                | Efek samping                                                        |
  * | ∅ → pending_payment                      | histori awal, email customer + admin (stok/voucher direserve CheckoutService) |
+ * | ∅ → awaiting_freight (CIF, A-89)         | histori awal, email customer "menunggu penawaran ongkir" + email admin (stok direserve, belum ada payment) |
+ * | awaiting_freight → pending_payment       | penawaran ongkir disetujui (FreightQuoteService: shipping_total, payment, payment_due_at), email instruksi bayar |
+ * | awaiting_freight → cancelled             | release stok, penawaran terbuka → rejected; customer/admin/scheduler batas tunggu   |
  * | pending_payment → payment_review         | email admin (payment sudah awaiting_verification oleh PaymentService) |
  * | payment_review → paid                    | commit stok + voucher, paid_at, invoice_number, email customer       |
  * | payment_review → pending_payment         | (payment rejected oleh PaymentService) email customer dengan alasan  |
@@ -28,11 +34,14 @@ use InvalidArgumentException;
  * | pending_payment/payment_review → cancelled | release stok + voucher, payment aktif cancelled, email             |
  * | paid/processing → cancelled              | adjust +qty (key order:{id}:cancel-return:{product}), email (refund manual) |
  * | paid → processing → shipped → delivered → completed | histori; shipped wajib kurir + resi; email shipped/delivered/completed |
+ * | (order Loco, ASUMSI A-85)                | shipped tanpa kurir/resi = "siap diambil", delivered = "sudah diambil"      |
+ * | (order FOB/CIF, ASUMSI A-88)             | shipped wajib nama kapal + nomor B/L (shipment_details, tracking_number = B/L) |
  */
 class OrderStateMachine
 {
     public const TRANSITIONS = [
-        '' => [Order::STATUS_PENDING_PAYMENT],
+        '' => [Order::STATUS_AWAITING_FREIGHT, Order::STATUS_PENDING_PAYMENT],
+        Order::STATUS_AWAITING_FREIGHT => [Order::STATUS_PENDING_PAYMENT, Order::STATUS_CANCELLED],
         Order::STATUS_PENDING_PAYMENT => [Order::STATUS_PAYMENT_REVIEW, Order::STATUS_EXPIRED, Order::STATUS_CANCELLED],
         Order::STATUS_PAYMENT_REVIEW => [Order::STATUS_PAID, Order::STATUS_PENDING_PAYMENT, Order::STATUS_CANCELLED],
         Order::STATUS_PAID => [Order::STATUS_PROCESSING, Order::STATUS_CANCELLED],
@@ -59,10 +68,10 @@ class OrderStateMachine
     }
 
     /**
-     * @param  array  $meta  courier, trackingNumber, reason, paymentId, note, actorType (user|system|webhook), source
+     * @param  array  $meta  courier, trackingNumber, vesselName, voyage, blNumber, blDate, reason, paymentId, quoteId, freightTotal, acceptedBy, note, actorType (user|system|webhook), source
      *
      * @throws ApiException 409 INVALID_TRANSITION meta {from,to}
-     * @throws ValidationException shipped tanpa kurir/resi
+     * @throws ValidationException shipped tanpa kurir/resi (order darat) atau tanpa nama kapal/B/L (order FOB/CIF)
      */
     public function transition(Order $order, string $to, ?User $actor = null, array $meta = []): Order
     {
@@ -97,10 +106,19 @@ class OrderStateMachine
             $wasPaid = false;
 
             switch ($to) {
+                case Order::STATUS_AWAITING_FREIGHT:
+                    // CIF (ASUMSI A-89): stok sudah direserve CheckoutService; payment dibuat saat penawaran diterima.
+                    $note = $note ?? __('commerce.note.freight_requested', ['port' => $locked->destinationPort()['name'] ?? '-'], $locale);
+                    break;
+
                 case Order::STATUS_PENDING_PAYMENT:
-                    $note = $note ?? ($isInitial
-                        ? __('commerce.note.placed', [], $locale)
-                        : __('commerce.note.rejected', ['reason' => $meta['reason'] ?? '-'], $locale));
+                    if ($isInitial) {
+                        $note = $note ?? __('commerce.note.placed', [], $locale);
+                    } elseif ($from === Order::STATUS_AWAITING_FREIGHT) {
+                        $note = $note ?? __('commerce.note.freight_accepted', ['total' => Money::format((int) ($meta['freightTotal'] ?? $locked->shippingTotalInt()), $locked->currencyCode())], $locale);
+                    } else {
+                        $note = $note ?? __('commerce.note.rejected', ['reason' => $meta['reason'] ?? '-'], $locale);
+                    }
                     break;
 
                 case Order::STATUS_PAYMENT_REVIEW:
@@ -143,6 +161,14 @@ class OrderStateMachine
                     } else {
                         $this->releaseReservations($locked, $actor);
                     }
+                    if ($from === Order::STATUS_AWAITING_FREIGHT) {
+                        // Penawaran ongkir yang masih terbuka ditutup bersama order (ASUMSI A-89).
+                        OrderFreightQuote::where('order_id', $locked->id)->where('status', OrderFreightQuote::STATUS_PROPOSED)->update([
+                            'status' => OrderFreightQuote::STATUS_REJECTED,
+                            'responded_at' => $now->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                            'updated_at' => $now->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                        ]);
+                    }
                     $this->closeActivePayments($locked, Payment::STATUS_CANCELLED);
                     $locked->cancelled_at = $now;
                     $locked->cancel_reason = $meta['reason'] ?? null;
@@ -156,6 +182,38 @@ class OrderStateMachine
                     break;
 
                 case Order::STATUS_SHIPPED:
+                    // Data kapal hanya dicatat untuk order FOB/CIF; untuk Loco/darat diabaikan.
+                    unset($historyMeta['vesselName'], $historyMeta['voyage'], $historyMeta['blNumber'], $historyMeta['blDate']);
+                    if ($locked->isPickup()) {
+                        // Loco: barang siap diambil di pabrik; tidak ada kurir maupun resi.
+                        $locked->courier = null;
+                        $locked->tracking_number = null;
+                        $locked->shipped_at = $now;
+                        unset($historyMeta['courier'], $historyMeta['trackingNumber']);
+                        $note = $note ?? __('commerce.note.ready_for_pickup', ['label' => $locked->pickupLabel($locale)], $locale);
+                        break;
+                    }
+                    if ($locked->isPort()) {
+                        // FOB/CIF (ASUMSI A-88): dimuat ke kapal; nama kapal + nomor B/L menggantikan kurir + resi.
+                        $details = is_array($locked->shipment_details) ? $locked->shipment_details : [];
+                        $vessel = trim((string) ($meta['vesselName'] ?? $details['vessel'] ?? ''));
+                        $bl = trim((string) ($meta['blNumber'] ?? $details['blNumber'] ?? ''));
+                        if ($vessel === '' || $bl === '') {
+                            throw ValidationException::withMessages([
+                                $vessel === '' ? 'vesselName' : 'blNumber' => [__('commerce.vessel_required')],
+                            ]);
+                        }
+                        $voyage = trim((string) ($meta['voyage'] ?? $details['voyage'] ?? ''));
+                        $blDate = ! empty($meta['blDate']) ? Carbon::parse($meta['blDate'], config('app.timezone'))->startOfDay() : null;
+                        $locked->shipment_details = ['vessel' => $vessel, 'voyage' => $voyage !== '' ? $voyage : null, 'blNumber' => $bl, 'blDate' => $blDate?->toDateString()];
+                        $locked->courier = null;
+                        $locked->tracking_number = $bl; // kolom daftar yang sudah ada menampilkan nomor B/L
+                        $locked->shipped_at = $blDate ? $blDate->copy()->setTimeFrom($now) : $now;
+                        unset($historyMeta['courier'], $historyMeta['trackingNumber']);
+                        $historyMeta = array_filter(['vesselName' => $vessel, 'voyage' => $voyage, 'blNumber' => $bl, 'blDate' => $blDate?->toDateString()], fn ($v) => $v !== null && $v !== '') + $historyMeta;
+                        $note = $note ?? __('commerce.note.shipped_on_board', ['vessel' => $vessel, 'bl' => $bl], $locale);
+                        break;
+                    }
                     $courier = trim((string) ($meta['courier'] ?? $locked->courier ?? ''));
                     $tracking = trim((string) ($meta['trackingNumber'] ?? $locked->tracking_number ?? ''));
                     if ($courier === '' || $tracking === '') {
@@ -173,7 +231,7 @@ class OrderStateMachine
 
                 case Order::STATUS_DELIVERED:
                     $locked->delivered_at = $now;
-                    $note = $note ?? __('commerce.note.delivered', [], $locale);
+                    $note = $note ?? __('commerce.note.'.($locked->isPickup() ? 'picked_up' : 'delivered'), [], $locale);
                     break;
 
                 case Order::STATUS_COMPLETED:
@@ -202,14 +260,14 @@ class OrderStateMachine
                 $this->audit->log(null, 'order.'.$to.' ['.$actorType.']', $locked, ['status' => $from], ['status' => $to] + $historyMeta);
             }
 
-            return ['order' => $locked, 'from' => $from, 'wasPaid' => $wasPaid, 'meta' => $meta];
+            return ['order' => $locked, 'from' => $from, 'wasPaid' => $wasPaid, 'meta' => $meta, 'actorType' => $actorType];
         });
 
         /** @var Order $result */
         $result = $context['order'];
         $result->unsetRelation('histories');
         $result->unsetRelation('items');
-        $this->notify($result, $context['from'], $to, $context['meta'], $context['wasPaid']);
+        $this->notify($result, $context['from'], $to, $context['meta'], $context['wasPaid'], $context['actorType']);
 
         // Sinkronkan instance pemanggil agar controller/service melihat status terbaru.
         $order->setRawAttributes($result->getAttributes(), true);
@@ -222,12 +280,18 @@ class OrderStateMachine
         return $order;
     }
 
-    private function notify(Order $order, ?string $from, string $to, array $meta, bool $wasPaid): void
+    private function notify(Order $order, ?string $from, string $to, array $meta, bool $wasPaid, string $actorType = OrderStatusHistory::ACTOR_USER): void
     {
         switch ($to) {
+            case Order::STATUS_AWAITING_FREIGHT:
+                $this->notifier->freightRequested($order);
+                break;
             case Order::STATUS_PENDING_PAYMENT:
                 if ($from === null) {
                     $this->notifier->orderPlaced($order);
+                } elseif ($from === Order::STATUS_AWAITING_FREIGHT) {
+                    $quote = isset($meta['quoteId']) ? OrderFreightQuote::find($meta['quoteId']) : $order->freightQuotes()->where('status', OrderFreightQuote::STATUS_ACCEPTED)->first();
+                    $this->notifier->freightAccepted($order, $quote, (string) ($meta['acceptedBy'] ?? OrderFreightQuote::BY_CUSTOMER));
                 } elseif (isset($meta['paymentId']) && ($payment = Payment::find($meta['paymentId']))) {
                     $this->notifier->paymentRejected($order, $payment, (string) ($meta['reason'] ?? ''));
                 }
@@ -245,7 +309,8 @@ class OrderStateMachine
                 $this->notifier->orderExpired($order);
                 break;
             case Order::STATUS_CANCELLED:
-                $this->notifier->orderCancelled($order, $meta['reason'] ?? null, $wasPaid);
+                // Batal otomatis karena batas tunggu penawaran ongkir terlewati memakai teks notifikasi tersendiri (A-89).
+                $this->notifier->orderCancelled($order, $meta['reason'] ?? null, $wasPaid, $from === Order::STATUS_AWAITING_FREIGHT && $actorType === OrderStatusHistory::ACTOR_SYSTEM);
                 break;
             case Order::STATUS_SHIPPED:
                 $this->notifier->orderShipped($order);

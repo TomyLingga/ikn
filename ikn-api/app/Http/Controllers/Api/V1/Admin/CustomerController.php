@@ -4,21 +4,25 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Exceptions\ApiException;
 use App\Http\Controllers\Api\V1\ApiController;
+use App\Http\Requests\Admin\UpdateCustomerMarketRequest;
 use App\Http\Requests\Admin\UpdateCustomerStatusRequest;
 use App\Http\Resources\AdminCustomerListResource;
 use App\Http\Resources\AdminCustomerResource;
+use App\Models\CustomerProfile;
 use App\Models\User;
+use App\Services\Account\CustomerMarketService;
 use App\Services\Account\CustomerStatusService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-// Admin customers (kontrak 11.4), modul `customers`. Aksi tulis dicatat middleware audit.
+// Admin customers (kontrak 11.4, 11.9), modul `customers`. Aksi tulis dicatat middleware audit.
 class CustomerController extends ApiController
 {
     public function index(Request $request)
     {
         $request->validate([
             'status' => ['nullable', 'string', Rule::in(User::STATUSES)],
+            'market' => ['nullable', 'string', Rule::in(CustomerProfile::MARKETS)],
             'q' => ['nullable', 'string', 'max:120'],
         ]);
 
@@ -26,6 +30,16 @@ class CustomerController extends ApiController
 
         if ($status = $request->query('status')) {
             $query->where('status', $status);
+        }
+
+        // Pasar (ASUMSI A-86): customer tanpa baris profil dihitung lokal.
+        if ($market = $request->query('market')) {
+            $query->where(function ($w) use ($market) {
+                $w->whereHas('profile', fn ($p) => $p->where('market', $market));
+                if ($market === CustomerProfile::MARKET_LOCAL) {
+                    $w->orWhereDoesntHave('profile');
+                }
+            });
         }
 
         if ($q = trim((string) $request->query('q'))) {
@@ -51,10 +65,19 @@ class CustomerController extends ApiController
             $this->assertCustomer($customer),
             $request->input('status'),
             $request->input('reason'),
-            $request->user()
+            $request->user(),
+            $request->input('market')
         );
 
         return $this->data(new AdminCustomerResource($customer->fresh()), 200, ['message' => __('account.status_updated')]);
+    }
+
+    /** Ubah pasar customer (ASUMSI A-86); 409 CUSTOMER_HAS_OPEN_ORDERS bila masih ada order berjalan. */
+    public function updateMarket(UpdateCustomerMarketRequest $request, User $customer, CustomerMarketService $markets)
+    {
+        $customer = $markets->change($this->assertCustomer($customer), $request->input('market'));
+
+        return $this->data(new AdminCustomerResource($customer->fresh()), 200, ['message' => __('account.market_updated')]);
     }
 
     private function assertCustomer(User $user): User

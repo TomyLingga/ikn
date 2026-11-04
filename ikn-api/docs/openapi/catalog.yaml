@@ -7,7 +7,7 @@ tags:
   - name: admin-catalog
     description: Admin kategori, produk, gambar, ulasan, stok
   - name: admin-commerce-config
-    description: Admin rekening bank, fee, zona/tarif ongkir, voucher, metode bayar, settings commerce
+    description: Admin rekening bank, fee, zona/tarif ongkir, cara serah terima + titik ambil Loco, voucher, metode bayar, settings commerce
 
 paths:
   # ---------------------------------------------------------------- katalog publik (kontrak 6)
@@ -24,7 +24,7 @@ paths:
       parameters:
         - { name: q, in: query, schema: { type: string }, description: 'ILIKE pada name id/en, code, slug, aliases' }
         - { name: category, in: query, schema: { type: string }, description: slug (atau id) kategori }
-        - { name: sort, in: query, schema: { type: string, enum: [name, price, newest] }, description: 'default: urutan id' }
+        - { name: sort, in: query, schema: { type: string, enum: [name, price, newest] }, description: 'default: urutan id; price = rupiah, atau price_usd untuk customer ekspor yang login (ASUMSI A-86)' }
         - { name: page, in: query, schema: { type: integer, default: 1 } }
         - { name: perPage, in: query, schema: { type: integer, default: 20, maximum: 100 } }
       responses:
@@ -61,7 +61,11 @@ paths:
   /commerce/config:
     get:
       tags: [catalog]
-      summary: Metode bayar aktif (tanpa config), rekening aktif, fee aktif, settings commerce yang publik
+      summary: Metode bayar aktif (tanpa config), rekening aktif (+ mata uang), fee aktif se-mata-uang, settings commerce yang publik, cara serah terima + syarat bayar aktif pasar pengunjung, titik ambil Loco
+      description: |
+        Bagian yang bergantung pasar (ASUMSI A-86) mengikuti pengunjung: customer ekspor yang login mendapat `market = export`,
+        `currency = USD`, `deliveryTerms` ekspor (FOB, CIF), `paymentTerms` ekspor, dan `fees` USD. Tamu, admin, dan customer lokal
+        mendapat pasar lokal (IDR). `bankAccounts` selalu semua rekening aktif beserta `currency`; FE menyaring sesuai mata uang order.
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/CommerceConfig' } } } } } }
   /payment-methods:
@@ -78,10 +82,22 @@ paths:
       security: [{ cookieAuth: [] }]
       summary: Validasi item dan hitung total tanpa membuat order (customer login; belum harus disetujui)
       description: |
-        Body sama dengan POST /customer/orders. Tanpa `addressId`: `shipping = null`, `availableShippingRates = []`.
-        Dengan `addressId` (alamat milik user): `availableShippingRates[]` dihitung untuk berat keranjang dan
-        `shipping` terisi bila `shippingRateId` termasuk daftar itu. `uniqueCode` bersifat sementara (1–999) bila
-        metode `manual_transfer` dan setting `uniqueCodeEnabled`; nilai final ditetapkan saat checkout.
+        Body sama dengan POST /customer/orders. `deliveryTermCode` memilih cara serah terima (ASUMSI A-85); kosong =
+        term aktif pertama pasar lokal (sortOrder). Term `pricingMode = zone` (Franco): tanpa `addressId` → `shipping = null`,
+        `availableShippingRates = []`; dengan `addressId` (alamat milik user) `availableShippingRates[]` dihitung untuk berat
+        keranjang dan `shipping` terisi bila `shippingRateId` termasuk daftar itu. Dua pabrik atau lebih (ASUMSI A-90): item
+        dikelompokkan per pabrik asal (`items[].factory`); tiap tarif dihitung per pabrik (base, minAmount, berat, volume, jarak
+        dari pabrik itu) lalu dijumlah, rinciannya di `origins[]`; `freeAbove` dibandingkan dengan subtotal − diskon seluruh order.
+        Term Loco: `pickupPoints[]` = satu titik ambil per pabrik asal; bila ada item dari pabrik `allowsPickup = false` → 422
+        `deliveryTermCode`. Term tanpa ongkir (Loco `none`, FOB `included`):
+        `shipping` = baris sintetis `{ type: pickup|included, amount: 0, rateId: null }`, `availableShippingRates = []`, alamat
+        dan `shippingRateId` diabaikan tanpa warning. Term CIF (`quoted`, ASUMSI A-89): `shipping.type = quoted`, `amount` 0, dan
+        `warnings` berisi `freight_quote_pending` (ongkir ditawarkan admin setelah order dibuat). `uniqueCode` bersifat sementara (1–999) bila metode `manual_transfer`
+        dan setting `uniqueCodeEnabled`; nilai final ditetapkan saat checkout.
+        Mata uang (ASUMSI A-86) mengikuti pasar customer: customer ekspor mendapat `currency = USD`, harga dari `price_usd` (sen),
+        pajak dari `exportTaxRate` bila term ber-`taxProfile` export, fee hanya yang USD, tanpa kode unik dan voucher
+        (409 VOUCHER_INVALID reason `currency`), metode bayar hanya `manual_transfer`. `paymentTermCode` (ASUMSI A-87) opsional di quote;
+        bila dikirim harus aktif dan sesuai pasar.
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/QuoteRequest' } } }
@@ -90,9 +106,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
-          description: INSUFFICIENT_STOCK (meta.items[] { productSlug, requested, available }) atau VOUCHER_INVALID (meta.reason in not_found|inactive|expired|not_started|quota|per_user_limit|min_subtotal|scope)
+          description: INSUFFICIENT_STOCK (meta.items[] { productSlug, requested, available }) atau VOUCHER_INVALID (meta.reason in not_found|inactive|expired|not_started|quota|per_user_limit|min_subtotal|scope|not_eligible|currency)
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
-        '422': { description: 'VALIDATION_ERROR: produk tidak ada/unpublished/price_mode=quote (items.N.productSlug), qty < moq (items.N.qty), shippingRateId tidak berlaku, paymentMethodCode tidak aktif, addressId bukan milik user', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { description: 'VALIDATION_ERROR: produk tidak ada/unpublished/price_mode=quote/tanpa harga dalam mata uang customer (items.N.productSlug), qty < moq (items.N.qty), shippingRateId tidak berlaku, paymentMethodCode tidak aktif atau bukan manual_transfer untuk order USD, addressId bukan milik user, deliveryTermCode tidak ada/nonaktif/beda pasar atau tidak ada term aktif sama sekali, paymentTermCode tidak ada/nonaktif/beda pasar', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   # ---------------------------------------------------------------- admin katalog (kontrak 11.3)
   /admin/categories:
@@ -391,33 +407,103 @@ paths:
       parameters: [{ name: shippingRate, in: path, required: true, schema: { type: integer } }]
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
-  /admin/shipping-origin:
+  # ---------------------------------------------------------------- lokasi pabrik (kontrak 11.8, ASUMSI A-90)
+  /admin/factory-locations:
     get:
       tags: [admin-commerce-config]
-      summary: Titik asal pengiriman untuk tarif per km (modul shipping, ASUMSI A-76)
+      summary: Semua lokasi pabrik (urut sortOrder; pertama = bawaan) + productsCount (modul shipping, ASUMSI A-90)
+      description: |
+        Pabrik = titik asal ongkir per km (Franco: keranjang dipecah per pabrik asal item, lihat ShippingRateQuote.origins) dan
+        titik ambil Loco (allowsPickup). Menggantikan /admin/shipping-origin dan /admin/pickup-location (dihapus). Faktor jalan
+        tetap setting `shipping_road_factor`: /admin/shipping/road-factor (modul shipping) atau /admin/settings `shippingRoadFactor`.
       security: [{ cookieAuth: [] }]
       responses:
-        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingOrigin' } } } } } }
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminFactoryLocation' } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-commerce-config]
+      summary: Tambah lokasi pabrik (kode slug unik, dinormalkan lowercase; tidak bisa diubah setelahnya)
+      security: [{ cookieAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FactoryLocationInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminFactoryLocation' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/factory-locations/{factoryLocation}:
+    put:
+      tags: [admin-commerce-config]
+      summary: Ubah lokasi pabrik (penggantian penuh; kode boleh dikirim bila sama, kode lain → 422 code; lat/lng tidak dikirim = dikosongkan)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: factoryLocation, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FactoryLocationInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminFactoryLocation' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [admin-commerce-config]
+      summary: Hapus lokasi pabrik; ditolak bila masih dipakai produk (products.factory_location_id) atau tinggal satu baris
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: factoryLocation, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'FACTORY_LOCATION_IN_USE (dipakai produk, atau baris terakhir)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /admin/shipping/road-factor:
+    get:
+      tags: [admin-commerce-config]
+      summary: Faktor jalan ongkir per km (modul shipping; setting commerce shipping_road_factor, sama dengan /admin/settings shippingRoadFactor)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingRoadFactor' } } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
     put:
       tags: [admin-commerce-config]
-      summary: Ubah titik asal + faktor jalan (lat/lng null = belum diatur → tarif per km tidak ditawarkan)
+      summary: Ubah faktor jalan (jarak jalan ≈ garis lurus pabrik → alamat × faktor, ASUMSI A-76/A-90)
       security: [{ cookieAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [roadFactor]
-              properties:
-                label: { type: string, maxLength: 120, nullable: true }
-                lat: { type: number, minimum: -90, maximum: 90, nullable: true, description: wajib bersama lng }
-                lng: { type: number, minimum: -180, maximum: 180, nullable: true, description: wajib bersama lat }
-                roadFactor: { type: number, minimum: 1, maximum: 3, example: 1.3 }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ShippingRoadFactor' } } } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingOrigin' } } } } } }
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ShippingRoadFactor' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  # ---------------------------------------------------------------- cara serah terima (kontrak 11.8, ASUMSI A-85)
+  /admin/delivery-terms:
+    get:
+      tags: [admin-commerce-config]
+      summary: Semua cara serah terima (aktif + nonaktif, urut sortOrder) + ordersCount (modul shipping)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminDeliveryTerm' } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-commerce-config]
+      summary: Tambah cara serah terima (kode slug unik, dinormalkan lowercase; tidak bisa diubah setelahnya)
+      security: [{ cookieAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DeliveryTermInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminDeliveryTerm' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/delivery-terms/{deliveryTerm}:
+    put:
+      tags: [admin-commerce-config]
+      summary: Ubah cara serah terima (kode boleh dikirim bila sama; kode lain → 422 code)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: deliveryTerm, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DeliveryTermInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminDeliveryTerm' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [admin-commerce-config]
+      summary: Hapus cara serah terima; ditolak bila sudah dipakai order (nonaktifkan saja lewat isActive)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: deliveryTerm, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: DELIVERY_TERM_IN_USE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /admin/shipping-methods:
     get:
       tags: [admin-commerce-config]
@@ -496,6 +582,44 @@ paths:
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/PaymentMethod' } } } } } }
         '422': { $ref: '#/components/responses/ValidationError' }
+  # ---------------------------------------------------------------- syarat pembayaran ekspor (kontrak 11.10, ASUMSI A-87)
+  /admin/payment-terms:
+    get:
+      tags: [admin-commerce-config]
+      summary: Semua syarat pembayaran (aktif + nonaktif, urut sortOrder) + ordersCount (modul payment_methods)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminPaymentTerm' } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-commerce-config]
+      summary: Tambah syarat pembayaran (kode slug unik, dinormalkan lowercase; tidak bisa diubah setelahnya)
+      security: [{ cookieAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentTermInput' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminPaymentTerm' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/payment-terms/{paymentTerm}:
+    put:
+      tags: [admin-commerce-config]
+      summary: Ubah syarat pembayaran (kode boleh dikirim bila sama; kode lain → 422 code)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: paymentTerm, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentTermInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminPaymentTerm' } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [admin-commerce-config]
+      summary: Hapus syarat pembayaran; ditolak bila sudah dipakai order (nonaktifkan saja lewat isActive)
+      security: [{ cookieAuth: [] }]
+      parameters: [{ name: paymentTerm, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: PAYMENT_TERM_IN_USE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /admin/settings:
     get:
       tags: [admin-commerce-config]
@@ -555,7 +679,10 @@ components:
         isThumbnail: { type: boolean, description: foto yang dipilih admin sebagai thumbnail }
     Product:
       type: object
-      description: Bentuk publik (kontrak bagian 6). Uang integer rupiah.
+      description: |
+        Bentuk publik (kontrak bagian 6). Uang integer satuan terkecil `currency` (ASUMSI A-86): pengunjung umum dan customer
+        lokal mendapat `currency = IDR` + `price/promoPrice/promoEndsAt/effectivePrice` (rupiah); customer ekspor yang login mendapat
+        `currency = USD` + `priceUsd` (sen, basis FOB Belawan, tanpa promo) dan field rupiah TIDAK dikirim. Tamu tidak pernah melihat USD.
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -563,11 +690,14 @@ components:
         name: { $ref: '#/components/schemas/I18n' }
         category: { type: object, nullable: true, properties: { slug: { type: string }, name: { $ref: '#/components/schemas/I18n' } } }
         kind: { type: string, nullable: true }
+        factory: { allOf: [{ $ref: '#/components/schemas/FactoryBrief' }], nullable: true, description: 'pabrik asal (ASUMSI A-90); produk tanpa pabrik = pabrik bawaan' }
         priceMode: { type: string, enum: [fixed, quote] }
-        price: { type: integer, nullable: true, description: null untuk quote }
-        promoPrice: { type: integer, nullable: true, description: hanya terisi bila promo sedang aktif }
+        currency: { type: string, enum: [IDR, USD], description: 'mata uang field harga di objek ini (mengikuti pengunjung)' }
+        price: { type: integer, nullable: true, description: 'rupiah; null untuk quote; tidak dikirim untuk customer ekspor' }
+        promoPrice: { type: integer, nullable: true, description: 'hanya terisi bila promo sedang aktif; tidak dikirim untuk customer ekspor' }
         promoEndsAt: { type: string, format: date-time, nullable: true }
-        effectivePrice: { type: integer, nullable: true, description: promoPrice bila aktif, selain itu price }
+        effectivePrice: { type: integer, nullable: true, description: 'promoPrice bila aktif, selain itu price; tidak dikirim untuk customer ekspor' }
+        priceUsd: { type: integer, nullable: true, description: 'SEN (1250 = USD 12,50), basis FOB Belawan; hanya dikirim ke customer ekspor yang login; null = produk belum bisa dipesan dalam USD' }
         unit: { type: string }
         moq: { type: integer }
         weightGram: { type: integer }
@@ -601,6 +731,11 @@ components:
           properties:
             categoryId: { type: integer }
             category: { type: object, properties: { id: { type: integer }, slug: { type: string }, name: { $ref: '#/components/schemas/I18n' } } }
+            factoryLocationId: { type: integer, nullable: true, description: 'nilai tersimpan; null = ikut pabrik bawaan (ASUMSI A-90)' }
+            factoryLocation: { type: object, nullable: true, description: 'pabrik efektif (null di kolom = pabrik bawaan)', properties: { id: { type: integer }, code: { type: string }, name: { $ref: '#/components/schemas/I18n' } } }
+            currency: { type: string, enum: [IDR], description: 'bentuk admin selalu rupiah + priceUsd terpisah' }
+            priceUsd: { type: integer, nullable: true, description: 'SEN (1250 = USD 12,50), basis FOB Belawan; null bila belum diisi atau quote' }
+            priceUsdSet: { type: boolean, description: 'true bila harga USD terisi (produk bisa dipesan customer ekspor)' }
             promoPrice: { type: integer, nullable: true, description: nilai tersimpan (tanpa memandang periode) }
             promoStartsAt: { type: string, format: date-time, nullable: true }
             promoEndsAt: { type: string, format: date-time, nullable: true }
@@ -626,6 +761,7 @@ components:
         slug: { type: string, maxLength: 160, description: dibuat dari name.id bila kosong }
         code: { type: string, maxLength: 64 }
         categoryId: { type: integer }
+        factoryLocationId: { type: integer, nullable: true, description: 'id dari /admin/factory-locations (ASUMSI A-90); null = pabrik bawaan; tidak dikirim saat PUT = tetap' }
         name: { $ref: '#/components/schemas/I18n' }
         kind: { type: string, maxLength: 120 }
         summary: { $ref: '#/components/schemas/I18n' }
@@ -637,6 +773,7 @@ components:
         priceMode: { type: string, enum: [fixed, quote] }
         price: { type: integer, minimum: 0, description: wajib bila priceMode=fixed; diabaikan untuk quote }
         promoPrice: { type: integer, minimum: 0, nullable: true }
+        priceUsd: { type: integer, minimum: 0, nullable: true, description: 'harga USD per satuan dalam SEN (1250 = USD 12,50), basis FOB Belawan (ASUMSI A-86); tidak dikirim = tetap, null = dikosongkan, diabaikan untuk quote' }
         promoStartsAt: { type: string, format: date-time, nullable: true }
         promoEndsAt: { type: string, format: date-time, nullable: true }
         unit: { type: string, maxLength: 32, default: pcs }
@@ -700,8 +837,10 @@ components:
               productSlug: { type: string }
               productId: { type: integer, description: alternatif productSlug }
               qty: { type: integer, minimum: 1 }
-        addressId: { type: integer, nullable: true }
-        shippingRateId: { type: integer, nullable: true }
+        deliveryTermCode: { type: string, nullable: true, maxLength: 32, example: loco, description: 'kode cara serah terima aktif pasar customer; kosong = term aktif pertama (sortOrder)' }
+        paymentTermCode: { type: string, nullable: true, maxLength: 32, example: tt_advance, description: 'syarat pembayaran aktif pasar customer (ASUMSI A-87); opsional di quote' }
+        addressId: { type: integer, nullable: true, description: 'dipakai hanya untuk term pricingMode zone' }
+        shippingRateId: { type: integer, nullable: true, description: 'dipakai hanya untuk term pricingMode zone' }
         paymentMethodCode: { type: string, nullable: true, example: manual_transfer }
         bankAccountId: { type: integer, nullable: true, description: diterima, tidak dipakai quote }
         voucherCode: { type: string, nullable: true }
@@ -718,51 +857,61 @@ components:
         categoryId: { type: integer }
         qty: { type: integer }
         moq: { type: integer }
-        unitPrice: { type: integer, description: harga berlaku (promo bila aktif) }
+        unitPrice: { type: integer, description: 'harga berlaku dalam satuan terkecil currency (IDR: promo bila aktif; USD: price_usd dalam sen)' }
         basePrice: { type: integer }
-        promoApplied: { type: boolean }
+        promoApplied: { type: boolean, description: selalu false untuk USD }
         lineTotal: { type: integer }
         discountAmount: { type: integer, description: alokasi proporsional diskon voucher }
         taxAmount: { type: integer }
         isTaxable: { type: boolean }
         weightGram: { type: integer, description: berat × qty }
         available: { type: integer }
+        factory: { allOf: [{ $ref: '#/components/schemas/FactoryBrief' }], nullable: true, description: 'pabrik asal item (ASUMSI A-90)' }
     ShippingRateQuote:
       type: object
+      description: 'Tarif zona terpilih (type flat|calculated), baris sintetis term tanpa ongkir (type pickup|included: rateId/zoneId null, amount 0, label = nama term, breakdown null), atau CIF (type quoted, ASUMSI A-89: amount 0 sementara, destinationPort bila dikirim checkout; ongkir final dari penawaran admin)'
       properties:
-        rateId: { type: integer }
-        zoneId: { type: integer }
+        rateId: { type: integer, nullable: true }
+        zoneId: { type: integer, nullable: true }
         label: { $ref: '#/components/schemas/I18n' }
         eta: { $ref: '#/components/schemas/I18n', nullable: true }
         amount: { type: integer }
-        type: { type: string, enum: [flat, calculated] }
-        available: { type: boolean, description: 'false = tarif per km tanpa titik peta alamat/asal (tidak ikut availableShippingRates)' }
-        distanceKm: { type: integer, nullable: true, description: 'jarak jalan perkiraan (km, dibulatkan ke atas) = haversine titik asal → titik peta alamat × faktor jalan; null bila tarif tidak memakai jarak' }
+        type: { type: string, enum: [flat, calculated, pickup, included, quoted] }
+        destinationPort: { type: object, nullable: true, description: 'hanya type quoted: { name, country, countryCode, lat, lng } dari checkout; null di /cart/quote' }
+        available: { type: boolean, description: 'false = tarif per km tanpa titik peta alamat atau pabrik asal (tidak ikut availableShippingRates)' }
+        distanceKm: { type: integer, nullable: true, description: 'jarak jalan perkiraan (km, dibulatkan ke atas) = haversine pabrik asal → titik peta alamat × faktor jalan; keranjang multi pabrik = jarak terjauh; null bila tarif tidak memakai jarak' }
         weightGram: { type: integer }
         volumeCm3: { type: integer }
-        breakdown: { $ref: '#/components/schemas/ShippingBreakdown' }
+        breakdown: { $ref: '#/components/schemas/ShippingBreakdown', description: 'tarif zona: jumlah bagian semua origins (minimumApplied = ada origin yang kena minimum); null untuk baris sintetis' }
+        origins: { type: array, items: { $ref: '#/components/schemas/ShippingOrigin' }, description: 'hanya tarif zona (ASUMSI A-90): satu baris per pabrik asal, urut daftar pabrik; amount = Σ origins.amount' }
     QuoteResult:
       type: object
+      description: 'Semua uang integer satuan terkecil `currency` (IDR rupiah bulat, USD sen; ASUMSI A-86)'
       properties:
+        currency: { type: string, enum: [IDR, USD], description: 'dari pasar customer: export = USD' }
         items: { type: array, items: { $ref: '#/components/schemas/QuoteItem' } }
         subtotal: { type: integer }
         discountTotal: { type: integer }
         voucher: { type: object, nullable: true, properties: { id: { type: integer }, code: { type: string }, type: { type: string, enum: [percent, fixed] }, value: { type: number } } }
+        deliveryTerm: { allOf: [{ $ref: '#/components/schemas/DeliveryTerm' }], nullable: true, description: 'cara serah terima yang dipakai quote (ASUMSI A-85)' }
+        paymentTerm: { allOf: [{ $ref: '#/components/schemas/PaymentTerm' }], nullable: true, description: 'syarat pembayaran yang dikirim (ASUMSI A-87); null bila tidak dikirim' }
         shipping: { $ref: '#/components/schemas/ShippingRateQuote', nullable: true }
         availableShippingRates: { type: array, items: { $ref: '#/components/schemas/ShippingRateQuote' } }
         shippingTotal: { type: integer }
-        fees: { type: array, items: { type: object, properties: { id: { type: integer }, name: { $ref: '#/components/schemas/I18n' }, type: { type: string }, amount: { type: integer } } } }
+        fees: { type: array, items: { type: object, properties: { id: { type: integer }, name: { $ref: '#/components/schemas/I18n' }, type: { type: string }, amount: { type: integer }, currency: { type: string, enum: [IDR, USD] } } }, description: 'hanya fee se-mata-uang dengan order' }
         feeTotal: { type: integer }
-        taxRate: { type: number, example: 11 }
+        taxRate: { type: number, example: 11, description: 'taxRate (domestic) atau exportTaxRate bila term ber-taxProfile export (ASUMSI A-86)' }
         priceIncludesTax: { type: boolean }
         taxTotal: { type: integer, description: informasi bila inklusif; ditambahkan ke grandTotal bila eksklusif }
         paymentMethodCode: { type: string, nullable: true }
-        uniqueCodeRequired: { type: boolean, description: manual_transfer + setting uniqueCodeEnabled }
+        uniqueCodeRequired: { type: boolean, description: 'manual_transfer + setting uniqueCodeEnabled; selalu false untuk USD' }
         uniqueCode: { type: integer, description: 'sementara 1–999 (0 bila tidak berlaku); final ditetapkan saat checkout' }
         grandTotal: { type: integer, description: subtotal − diskon + ongkir + fee + (pajak bila eksklusif) + uniqueCode }
         weightGram: { type: integer }
         volumeCm3: { type: integer, description: 'Σ dimensi produk × qty (cm³); 0 bila dimensi produk kosong' }
-        warnings: { type: array, items: { type: string, enum: [no_shipping_rate, shipping_rate_ignored_without_address, distance_unavailable, shipping_origin_unset] } }
+        pickupPoints: { type: array, items: { $ref: '#/components/schemas/PickupPoint' }, description: 'term Loco (ASUMSI A-90): satu titik ambil per pabrik asal item; [] untuk term lain' }
+        warningMeta: { type: object, description: 'rincian warning; {} bila tidak ada', properties: { factory_location_unset: { type: object, properties: { factoryCodes: { type: array, items: { type: string }, example: [sei-bamban] } } } } }
+        warnings: { type: array, items: { type: string, enum: [no_shipping_rate, shipping_rate_ignored_without_address, distance_unavailable, factory_location_unset, freight_quote_pending] }, description: 'distance_unavailable = tarif per km disembunyikan karena alamat belum punya titik peta; factory_location_unset (ASUMSI A-90, menggantikan shipping_origin_unset) = pabrik asal item belum punya koordinat (kode di warningMeta); freight_quote_pending = term CIF (pricingMode quoted, ASUMSI A-89): ongkir ditawarkan admin setelah order dibuat, grandTotal sementara tanpa ongkir' }
     PaymentMethodPublic:
       type: object
       properties:
@@ -777,22 +926,35 @@ components:
     CommerceConfig:
       type: object
       properties:
-        paymentMethods: { type: array, items: { $ref: '#/components/schemas/PaymentMethodPublic' } }
-        bankAccounts: { type: array, items: { type: object, properties: { id: { type: integer }, bankName: { type: string }, accountNumber: { type: string }, accountHolder: { type: string }, isActive: { type: boolean } } } }
-        fees: { type: array, items: { $ref: '#/components/schemas/Fee' } }
-        paymentDueHours: { type: integer }
-        taxRate: { type: number }
+        market: { type: string, enum: [local, export], description: 'pasar pengunjung (customer ekspor login = export; tamu/admin/lokal = local), ASUMSI A-86' }
+        currency: { type: string, enum: [IDR, USD], description: 'mata uang pengunjung: export = USD' }
+        paymentMethods: { type: array, items: { $ref: '#/components/schemas/PaymentMethodPublic' }, description: 'order USD hanya boleh memakai type manual_transfer (FE menyaring)' }
+        bankAccounts: { type: array, items: { type: object, properties: { id: { type: integer }, bankName: { type: string }, accountNumber: { type: string }, accountHolder: { type: string }, currency: { type: string, enum: [IDR, USD] }, swiftCode: { type: string, nullable: true }, bankAddress: { type: string, nullable: true }, correspondentBank: { type: string, nullable: true }, isActive: { type: boolean } } }, description: 'semua rekening aktif; FE menyaring sesuai currency order' }
+        fees: { type: array, items: { $ref: '#/components/schemas/Fee' }, description: 'fee untuk semua customer se-mata-uang dengan pengunjung' }
+        paymentDueHours: { type: integer, description: order IDR }
+        exportPaymentDueHours: { type: integer, description: 'order USD (setting exportPaymentDueHours, ASUMSI A-86)' }
+        taxRate: { type: number, description: 'term ber-taxProfile domestic' }
+        exportTaxRate: { type: number, description: 'term ber-taxProfile export (FOB/CIF), bawaan 0' }
         priceIncludesTax: { type: boolean }
-        uniqueCodeEnabled: { type: boolean }
+        uniqueCodeEnabled: { type: boolean, description: 'hanya order IDR' }
         autoCompleteDays: { type: integer }
+        deliveryTerms: { type: array, items: { $ref: '#/components/schemas/DeliveryTerm' }, description: 'cara serah terima aktif pasar pengunjung, urut sortOrder (ASUMSI A-85, A-86)' }
+        paymentTerms: { type: array, items: { $ref: '#/components/schemas/PaymentTerm' }, description: 'syarat pembayaran aktif pasar pengunjung (ASUMSI A-87); bawaan hanya untuk ekspor, jadi [] untuk tamu/lokal' }
+        factories: { type: array, items: { $ref: '#/components/schemas/FactoryLocation' }, description: 'semua lokasi pabrik urut sortOrder (ASUMSI A-90); titik ambil Loco = pabrik asal item yang allowsPickup' }
+        pickup: { allOf: [{ $ref: '#/components/schemas/PickupLocation' }], nullable: true, description: 'pabrik bawaan (urutan pertama) dalam bentuk lama, label = nama dalam bahasa request; gunakan factories[] untuk data baru' }
         invoice: { type: object, description: 'teks cetakan invoice (penanda tangan, tembusan) untuk halaman cetak', properties: { signerName: { type: string }, signerTitle: { type: string }, cc: { type: string } } }
     BankAccount:
       type: object
+      description: 'Rekening USD (ASUMSI A-86) membawa SWIFT, alamat bank, bank koresponden untuk instruksi bayar dan invoice ekspor'
       properties:
         id: { type: integer }
         bankName: { type: string }
         accountNumber: { type: string }
         accountHolder: { type: string }
+        currency: { type: string, enum: [IDR, USD] }
+        swiftCode: { type: string, nullable: true, example: BMRIIDJA }
+        bankAddress: { type: string, nullable: true }
+        correspondentBank: { type: string, nullable: true }
         isActive: { type: boolean }
         sortOrder: { type: integer }
         createdAt: { type: string, format: date-time }
@@ -804,6 +966,10 @@ components:
         bankName: { type: string, maxLength: 120 }
         accountNumber: { type: string, maxLength: 64 }
         accountHolder: { type: string, maxLength: 160 }
+        currency: { type: string, enum: [IDR, USD], default: IDR, description: 'tidak dikirim saat PUT = tetap' }
+        swiftCode: { type: string, nullable: true, maxLength: 16, pattern: '^[A-Z0-9]{8}([A-Z0-9]{3})?$', description: 'dinormalkan uppercase tanpa spasi; tidak dikirim saat PUT = tetap, kosong = dihapus' }
+        bankAddress: { type: string, nullable: true, maxLength: 255 }
+        correspondentBank: { type: string, nullable: true, maxLength: 160 }
         isActive: { type: boolean, default: true }
         sortOrder: { type: integer }
     Fee:
@@ -812,7 +978,8 @@ components:
         id: { type: integer }
         name: { $ref: '#/components/schemas/I18n' }
         type: { type: string, enum: [admin, other] }
-        amount: { type: integer }
+        currency: { type: string, enum: [IDR, USD], description: 'fee hanya dikenakan ke order se-mata-uang (ASUMSI A-86)' }
+        amount: { type: integer, description: 'satuan terkecil currency (IDR rupiah, USD sen)' }
         isActive: { type: boolean }
         sortOrder: { type: integer }
         audience: { type: string, enum: [all, customers], description: 'all = setiap order; customers = hanya order customer di `customers` (bentuk admin saja)' }
@@ -825,7 +992,8 @@ components:
       properties:
         name: { $ref: '#/components/schemas/I18n' }
         type: { type: string, enum: [admin, other], default: other }
-        amount: { type: integer, minimum: 0 }
+        currency: { type: string, enum: [IDR, USD], default: IDR, description: 'tidak dikirim saat PUT = tetap' }
+        amount: { type: integer, minimum: 0, description: 'satuan terkecil currency (USD dalam sen)' }
         isActive: { type: boolean, default: true }
         sortOrder: { type: integer }
         audience: { type: string, enum: [all, customers], default: all, description: 'tidak dikirim saat PUT = sasaran tidak diubah' }
@@ -881,11 +1049,145 @@ components:
         updatedAt: { type: string, format: date-time }
     ShippingOrigin:
       type: object
+      description: 'Rincian ongkir satu pabrik asal (ASUMSI A-90): ShippingRate::breakdown dengan berat/volume item pabrik itu dan jarak dari pabrik itu; base dan minAmount berlaku per pabrik, freeAbove terhadap subtotal seluruh order'
       properties:
-        label: { type: string, example: Pabrik Resiprene }
-        lat: { type: number, nullable: true, example: 3.3495 }
-        lng: { type: number, nullable: true, example: 99.0862 }
-        roadFactor: { type: number, example: 1.3 }
+        factory: { allOf: [{ $ref: '#/components/schemas/FactoryBrief' }], nullable: true }
+        weightGram: { type: integer }
+        volumeCm3: { type: integer }
+        distanceKm: { type: integer, nullable: true, description: 'null bila tarif tidak memakai jarak' }
+        amount: { type: integer }
+        breakdown: { $ref: '#/components/schemas/ShippingBreakdown' }
+    ShippingRoadFactor:
+      type: object
+      required: [roadFactor]
+      properties:
+        roadFactor: { type: number, minimum: 1, maximum: 3, example: 1.3, description: 'dibulatkan 2 desimal' }
+    FactoryBrief:
+      type: object
+      properties:
+        code: { type: string, example: sei-bamban }
+        name: { $ref: '#/components/schemas/I18n' }
+    FactoryLocation:
+      type: object
+      description: 'Lokasi pabrik, bentuk publik (GET /commerce/config factories[], ASUMSI A-90)'
+      properties:
+        code: { type: string, example: tanjung-morawa }
+        name: { $ref: '#/components/schemas/I18n' }
+        address: { type: string, example: 'Jl. Medan - Tanjung Morawa Km 9,5, Medan 20148, Sumatera Utara, Indonesia' }
+        lat: { type: number, nullable: true, example: 3.5387 }
+        lng: { type: number, nullable: true, example: 98.7467 }
+        allowsPickup: { type: boolean, description: 'false = keranjang berisi item pabrik ini tidak bisa Loco (422 deliveryTermCode)' }
+    AdminFactoryLocation:
+      allOf:
+        - { $ref: '#/components/schemas/FactoryLocation' }
+        - type: object
+          properties:
+            id: { type: integer }
+            sortOrder: { type: integer }
+            isDefault: { type: boolean, description: 'urutan pertama = pabrik untuk produk tanpa factoryLocationId' }
+            productsCount: { type: integer, description: 'produk (tidak terhapus) yang menunjuk pabrik ini' }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    FactoryLocationInput:
+      type: object
+      required: [name, address]
+      properties:
+        code: { type: string, maxLength: 32, pattern: '^[a-z0-9][a-z0-9-]*$', description: 'wajib saat POST (dinormalkan lowercase); PUT hanya boleh sama' }
+        name: { $ref: '#/components/schemas/I18n' }
+        address: { type: string, maxLength: 255 }
+        lat: { type: number, minimum: -90, maximum: 90, nullable: true, description: 'wajib bersama lng; dibulatkan 6 desimal; null = tanpa pin (tarif per km tidak ditawarkan untuk item pabrik ini)' }
+        lng: { type: number, minimum: -180, maximum: 180, nullable: true, description: wajib bersama lat }
+        allowsPickup: { type: boolean, default: true }
+        sortOrder: { type: integer, description: 'kosong saat POST = di akhir daftar' }
+    PickupLocation:
+      type: object
+      description: 'Titik ambil bentuk lama { label, address, lat, lng } (GET /commerce/config pickup = pabrik bawaan, Order.pickup = titik pertama)'
+      properties:
+        label: { type: string, example: Pabrik Tanjung Morawa }
+        address: { type: string, example: 'Jl. Medan - Tanjung Morawa Km 9,5, Medan 20148, Sumatera Utara, Indonesia' }
+        lat: { type: number, nullable: true, example: 3.5387 }
+        lng: { type: number, nullable: true, example: 98.7467 }
+    PickupPoint:
+      type: object
+      description: 'Titik ambil Loco per pabrik asal (ASUMSI A-90); dibekukan di shippingAddress.points[] saat checkout'
+      properties:
+        code: { type: string, nullable: true, description: 'kode pabrik; null untuk order sebelum A-90' }
+        name: { allOf: [{ $ref: '#/components/schemas/I18n' }], nullable: true }
+        label: { type: string, nullable: true, description: 'nama pabrik dalam bahasa customer saat checkout' }
+        address: { type: string, nullable: true }
+        lat: { type: number, nullable: true }
+        lng: { type: number, nullable: true }
+        items: { type: array, items: { type: string }, description: 'productSlug item yang diambil di titik ini' }
+    DeliveryTerm:
+      type: object
+      description: 'Cara serah terima, bentuk publik (GET /commerce/config, QuoteResult.deliveryTerm). family pickup = Loco (tanpa alamat, ongkir 0, shipped/delivered berarti siap diambil/sudah diambil); door = diantar; port = FOB/CIF ekspor'
+      properties:
+        code: { type: string, example: loco }
+        name: { $ref: '#/components/schemas/I18n' }
+        description: { $ref: '#/components/schemas/I18n', nullable: true }
+        family: { type: string, enum: [pickup, door, port] }
+        market: { type: string, enum: [local, export] }
+        pricingMode: { type: string, enum: [none, zone, included, quoted], description: 'none = tanpa ongkir; zone = tarif zona (addressId + shippingRateId wajib); included = termasuk harga; quoted = penawaran admin per order (CIF, ASUMSI A-89: checkout wajib destinationPort, order awaiting_freight sampai penawaran disepakati)' }
+        taxProfile: { type: string, enum: [domestic, export], description: 'pajak mengikuti term (ASUMSI A-86): domestic = setting taxRate, export = setting exportTaxRate' }
+        insuranceIncluded: { type: boolean }
+        loadingPort: { type: string, nullable: true, example: Belawan }
+        requiresDestinationPort: { type: boolean }
+    AdminDeliveryTerm:
+      allOf:
+        - { $ref: '#/components/schemas/DeliveryTerm' }
+        - type: object
+          properties:
+            id: { type: integer }
+            isActive: { type: boolean }
+            sortOrder: { type: integer }
+            ordersCount: { type: integer, description: 'jumlah order yang memakai kode ini (hanya di daftar)' }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    DeliveryTermInput:
+      type: object
+      required: [code, name, family, market, pricingMode]
+      properties:
+        code: { type: string, maxLength: 32, pattern: '^[a-z0-9][a-z0-9_-]*$', example: loco, description: 'wajib saat membuat (trim + lowercase sebelum validasi), unik; saat mengubah boleh dikirim bila sama dengan yang ada' }
+        name: { $ref: '#/components/schemas/I18n', description: 'id wajib, en diisi dari id bila kosong' }
+        description: { $ref: '#/components/schemas/I18n', nullable: true }
+        family: { type: string, enum: [pickup, door, port] }
+        market: { type: string, enum: [local, export] }
+        pricingMode: { type: string, enum: [none, zone, included, quoted] }
+        taxProfile: { type: string, enum: [domestic, export], description: 'kosong = export untuk market export, domestic untuk local' }
+        insuranceIncluded: { type: boolean, default: false }
+        requiresDestinationPort: { type: boolean, default: false }
+        loadingPort: { type: string, maxLength: 120, nullable: true }
+        isActive: { type: boolean, default: true }
+        sortOrder: { type: integer, minimum: -1000, maximum: 1000, default: 0 }
+    PaymentTerm:
+      type: object
+      description: 'Syarat pembayaran, bentuk publik (GET /commerce/config, QuoteResult.paymentTerm; ASUMSI A-87). Informasi untuk dokumen; aplikasi tetap menerima satu pembayaran sebesar grand total'
+      properties:
+        code: { type: string, example: tt_advance }
+        name: { $ref: '#/components/schemas/I18n' }
+        description: { $ref: '#/components/schemas/I18n', nullable: true }
+        market: { type: string, enum: [local, export] }
+    AdminPaymentTerm:
+      allOf:
+        - { $ref: '#/components/schemas/PaymentTerm' }
+        - type: object
+          properties:
+            id: { type: integer }
+            isActive: { type: boolean }
+            sortOrder: { type: integer }
+            ordersCount: { type: integer, description: 'jumlah order yang memakai kode ini (hanya di daftar)' }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    PaymentTermInput:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, maxLength: 32, pattern: '^[a-z0-9][a-z0-9_-]*$', example: tt_advance, description: 'wajib saat membuat (trim + lowercase), unik; saat mengubah boleh dikirim bila sama' }
+        name: { $ref: '#/components/schemas/I18n', description: 'id wajib, en diisi dari id bila kosong' }
+        description: { $ref: '#/components/schemas/I18n', nullable: true }
+        market: { type: string, enum: [local, export], default: export }
+        isActive: { type: boolean, default: true }
+        sortOrder: { type: integer, minimum: -1000, maximum: 1000, default: 0 }
     ShippingBreakdown:
       type: object
       properties:
@@ -1008,7 +1310,8 @@ components:
         invoiceSignerName: { type: string, maxLength: 120, example: Amalia Nasution }
         invoiceSignerTitle: { type: string, maxLength: 120, example: SEVP Operation }
         invoiceCc: { type: string, maxLength: 120, example: 'ATU, File', description: 'tembusan, dipisah koma' }
-        shippingOriginLabel: { type: string, maxLength: 120 }
-        shippingOriginLat: { type: number, nullable: true, description: 'sama dengan /admin/shipping-origin' }
-        shippingOriginLng: { type: number, nullable: true }
-        shippingRoadFactor: { type: number, minimum: 1, maximum: 3 }
+        shippingRoadFactor: { type: number, minimum: 1, maximum: 3, description: 'jarak jalan ≈ garis lurus × faktor (A-76). Titik asal ongkir dan titik ambil Loco = /admin/factory-locations (A-90); kunci lama shippingOrigin*/pickup* dihapus' }
+        exportTaxRate: { type: number, minimum: 0, maximum: 100, example: 0, description: 'pajak term ber-taxProfile export (FOB/CIF), ASUMSI A-86' }
+        exportPaymentDueHours: { type: integer, minimum: 1, maximum: 720, example: 120, description: 'batas bayar order USD (jam)' }
+        freightQuoteValidDays: { type: integer, minimum: 1, maximum: 90, example: 7, description: 'masa berlaku bawaan penawaran ongkir CIF bila admin tidak mengisi validUntil (hari), ASUMSI A-89' }
+        freightQuoteMaxDays: { type: integer, minimum: 1, maximum: 365, example: 30, description: 'batas tunggu order awaiting_freight tanpa penawaran yang masih berlaku sebelum dibatalkan otomatis oleh orders:freight-expire (hari)' }

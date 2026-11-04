@@ -22,6 +22,9 @@ return [
     'geo_upstream_error' => 'The map service is currently unavailable. Please try again later.',
     'status_reason_required' => 'A rejection reason is required.',
     'status_updated' => 'Customer status updated.',
+    'market_updated' => 'Customer market updated.',
+    'market_open_orders' => 'The market cannot be changed: :count order(s) are still open.',
+    'company_locked' => 'Country and company address can only be changed while the account awaits approval. Contact us to change them.',
 
     'levels' => [
         'province' => 'province',
@@ -42,6 +45,9 @@ return [
         'taxId' => 'tax ID',
         'companyEmail' => 'company email',
         'companyPhone' => 'company phone',
+        'companyAddress' => 'company address',
+        'countryCode' => 'country',
+        'market' => 'market',
         'token' => 'token',
         'label' => 'address label',
         'recipientName' => 'recipient name',
@@ -58,6 +64,7 @@ return [
         'status' => 'status',
         'reason' => 'reason',
         'q' => 'keyword',
+        'scope' => 'search scope',
         'level' => 'level',
         'parent' => 'parent code',
     ],

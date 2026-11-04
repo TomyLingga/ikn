@@ -23,7 +23,8 @@ class OrderStateMachineTest extends TestCase
     public function test_transition_table_matches_architecture(): void
     {
         $expected = [
-            null => ['pending_payment'],
+            null => ['awaiting_freight', 'pending_payment'],
+            'awaiting_freight' => ['pending_payment', 'cancelled'], // CIF (ASUMSI A-89)
             'pending_payment' => ['payment_review', 'expired', 'cancelled'],
             'payment_review' => ['paid', 'pending_payment', 'cancelled'],
             'paid' => ['processing', 'cancelled'],
@@ -45,6 +46,9 @@ class OrderStateMachineTest extends TestCase
             }
         }
         $this->assertTrue(OrderStateMachine::canTransition(null, 'pending_payment'));
+        $this->assertTrue(OrderStateMachine::canTransition(null, 'awaiting_freight'));
+        $this->assertFalse(OrderStateMachine::canTransition('awaiting_freight', 'expired'));
+        $this->assertFalse(OrderStateMachine::canTransition('pending_payment', 'awaiting_freight'));
         $this->assertFalse(OrderStateMachine::canTransition(null, 'paid'));
     }
 
@@ -102,6 +106,42 @@ class OrderStateMachineTest extends TestCase
         $this->assertSame(['courier' => 'JNE', 'trackingNumber' => 'JNE-1'], $history->meta);
         $this->assertSame(OrderStatusHistory::ACTOR_USER, $history->actor_type);
         $this->assertSame($admin->id, $history->actor_id);
+    }
+
+    /** Loco (ASUMSI A-85): shipped tanpa kurir/resi = siap diambil, delivered = sudah diambil; Franco tetap wajib kurir. */
+    public function test_pickup_order_ships_without_courier_and_records_pickup_notes(): void
+    {
+        $this->setUpCommerce();
+        $product = $this->makeProduct([], 10);
+        $admin = $this->superAdmin();
+        $sm = app(OrderStateMachine::class);
+
+        $pickup = $this->payOrder($this->placeOrder($product, 1, ['deliveryTermCode' => 'loco', 'addressId' => null, 'shippingRateId' => null]));
+        $this->assertTrue($pickup->isPickup());
+        $sm->transition($pickup, Order::STATUS_PROCESSING, $admin);
+        $sm->transition($pickup, Order::STATUS_SHIPPED, $admin, ['courier' => 'JNE']); // kurir yang terkirim diabaikan
+        $pickup->refresh();
+        $this->assertSame('shipped', $pickup->status);
+        $this->assertNull($pickup->courier);
+        $this->assertNull($pickup->tracking_number);
+        $this->assertNotNull($pickup->shipped_at);
+        $this->assertFalse($pickup->canAddTracking());
+        $history = $pickup->histories()->where('to_status', 'shipped')->first();
+        $this->assertSame('Pesanan siap diambil di Pabrik Tanjung Morawa.', $history->note);
+        $this->assertNull($history->meta);
+
+        $sm->transition($pickup, Order::STATUS_DELIVERED, $this->buyer);
+        $this->assertSame('Pesanan sudah diambil.', $pickup->histories()->where('to_status', 'delivered')->value('note'));
+
+        $franco = $this->payOrder($this->placeOrder($product, 1));
+        $sm->transition($franco, Order::STATUS_PROCESSING, $admin);
+        try {
+            $sm->transition($franco, Order::STATUS_SHIPPED, $admin);
+            $this->fail('expected validation error');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('courier', $e->errors());
+        }
+        $this->assertSame('processing', $franco->fresh()->status);
     }
 
     public function test_payment_status_always_mirrors_latest_payment(): void

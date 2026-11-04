@@ -186,7 +186,7 @@ paths:
                   data:
                     type: object
                     properties:
-                      orders: { type: integer, nullable: true, description: 'order sudah dibayar yang masih berjalan: paid, processing, shipped, delivered (modul orders); payment_review dihitung di payments' }
+                      orders: { type: integer, nullable: true, description: 'order yang menunggu tindakan admin modul orders: awaiting_freight (permintaan penawaran ongkir CIF, ASUMSI A-89) + paid, processing, shipped, delivered; payment_review dihitung di payments' }
                       payments: { type: integer, nullable: true, description: pembayaran awaiting_verification (modul payments) }
                       customers: { type: integer, nullable: true, description: customer berstatus pending (modul customers) }
                       chat: { type: integer, nullable: true, description: percakapan dengan pesan customer belum dibaca (modul chat) }
@@ -335,7 +335,7 @@ components:
         context:
           type: object
           nullable: true
-          description: 'snapshot rujukan: { type: product, slug, code, name, image, price, unit } atau { type: order, number, status, grandTotal }'
+          description: 'snapshot rujukan: { type: product, slug, code, name, image, price (satuan terkecil currency), currency, unit } atau { type: order, number, status, grandTotal (satuan terkecil currency), currency, family (pickup|door|port, null untuk order lama) }; snapshot lama bisa tanpa currency/family (anggap IDR)'
         senderName: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
     CustomerChatConversation:

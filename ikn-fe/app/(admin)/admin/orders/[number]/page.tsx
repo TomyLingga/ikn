@@ -8,22 +8,70 @@ import OrderTracking from '@/components/OrderTracking';
 import EmptyState from '@/components/EmptyState';
 import SessionLoader from '@/components/SessionLoader';
 import AdminModal from '@/components/admin/AdminModal';
+import AcceptPaymentModal from '@/components/admin/AcceptPaymentModal';
 import { AdminCard } from '@/components/admin/AdminPage';
 import { useLang } from '@/components/LanguageProvider';
-import { orderLabel, paymentLabel, shipmentMetricsText, shippingBreakdownText } from '@/lib/commerce';
+import {
+  DEFAULT_FREIGHT_LINE_LABELS,
+  deliveryAddress,
+  destinationPortText,
+  freightLineLabel,
+  freightQuoteLabel,
+  isPickupOrder,
+  isPortAddress,
+  isPortOrder,
+  isQuotedFreightOrder,
+  orderLabel,
+  orderVariant,
+  paymentLabel,
+  shipmentMetricsText,
+  shippingBreakdownText,
+  hasMultipleOrigins,
+  joinNames,
+  orderPickupPoints,
+  pickupItemNames,
+  pickupPointName,
+  shippingOriginText,
+} from '@/lib/commerce';
 import { api, apiUpload, ApiError, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { adminCancellableStatuses, dueEditableStatuses, fromDateTimeLocal, paymentMethodSummary, refreshAdminBadges } from '@/lib/admin';
-import { formatDateTime, formatIDR } from '@/lib/format';
-import type { Order, OrderAttachment, Payment, TrackingUpdate } from '@/lib/types';
+import { adminCancellableStatuses, dueEditableStatuses, fromDateTimeLocal, isoDate, paymentMethodSummary, refreshAdminBadges, type CommerceSettingsData } from '@/lib/admin';
+import { currencyStep, formatDate, formatDateTime, formatMoney, toMinorInput } from '@/lib/format';
+import type { FreightQuote, Order, OrderAttachment, Payment, ProformaPayload, TrackingUpdate } from '@/lib/types';
 import styles from './page.module.css';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
 import { FileLink } from '@/components/FileViewer';
 
-type Modal = { type: 'cancel' } | { type: 'ship' } | { type: 'due' } | { type: 'reject'; payment: Payment } | { type: 'note'; status: 'processing' | 'delivered' | 'completed' } | null;
+type Modal =
+  | { type: 'cancel' }
+  | { type: 'ship' }
+  | { type: 'due' }
+  | { type: 'reject'; payment: Payment }
+  | { type: 'accept'; payment: Payment }
+  | { type: 'note'; status: 'processing' | 'delivered' | 'completed' }
+  | { type: 'proforma' }
+  | { type: 'freight' }
+  | { type: 'freightExtend'; quote: FreightQuote }
+  | null;
 
 const EXTEND_OPTIONS = [6, 12, 24, 48, 72, 168];
+
+/** Baris editor penawaran ongkir (nominal desimal mata uang order; dikonversi ke satuan terkecil saat kirim). */
+type FreightLineForm = { label: string; amount: string };
+const FREIGHT_LINE_SUGGESTIONS = [...DEFAULT_FREIGHT_LINE_LABELS, 'THC', 'Documentation', 'Handling'];
+const FREIGHT_MAX_LINES = 10;
+const DEFAULT_FREIGHT_VALID_DAYS = 7;
+
+/** Keterangan lampiran yang sering dipakai (klik mengisi kolom keterangan): dokumen ekspor untuk order FOB/CIF, dokumen lokal untuk lainnya. */
+const ATTACHMENT_CHIPS_EXPORT = ['Packing List', 'Bill of Lading', 'Certificate of Origin', 'COA', 'Delivery Order', 'SPPB', 'Faktur Pajak'];
+const ATTACHMENT_CHIPS_LOCAL = ['Faktur Pajak', 'Surat Jalan', 'Delivery Order', 'SPPB', 'COA'];
+
+/** Isian formulir proforma (string kosong = null saat dikirim; PUT mengganti seluruh isi, kontrak 11.11). */
+type ProformaForm = Record<keyof ProformaPayload, string>;
+const EMPTY_PROFORMA: ProformaForm = { vesselName: '', voyage: '', etd: '', eta: '', portOfLoading: '', portOfDischarge: '', paymentTerms: '', notes: '', validUntil: '' };
+const PROFORMA_FIELDS = Object.keys(EMPTY_PROFORMA) as (keyof ProformaPayload)[];
+const todayIso = () => new Date().toISOString().slice(0, 10);
 
 /** Pesan aksi: 409 INVALID_TRANSITION menyertakan meta.from/to; 422 pesan field pertama. */
 function actionErrorText(err: unknown, lang: 'id' | 'en'): string {
@@ -64,6 +112,50 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
   const [dueMode, setDueMode] = useState<'hours' | 'date'>('hours');
   const [extendHours, setExtendHours] = useState('24');
   const [dueAt, setDueAt] = useState('');
+  // Order FOB/CIF (ASUMSI A-88): modal "Tandai dimuat ke kapal" (kapal + B/L menggantikan kurir/resi) dan proforma invoice.
+  const [vesselName, setVesselName] = useState('');
+  const [voyage, setVoyage] = useState('');
+  const [blNumber, setBlNumber] = useState('');
+  const [blDate, setBlDate] = useState('');
+  const [pf, setPf] = useState<ProformaForm>(EMPTY_PROFORMA);
+  const [pfErrors, setPfErrors] = useState<Partial<Record<keyof ProformaPayload, string>>>({});
+  // Penawaran ongkir CIF (ASUMSI A-89): editor baris + masa berlaku + catatan; `freightValidDays` dari pengaturan commerce.
+  const [fqLines, setFqLines] = useState<FreightLineForm[]>([]);
+  const [fqValidUntil, setFqValidUntil] = useState('');
+  const [fqNote, setFqNote] = useState('');
+  const [fqErrors, setFqErrors] = useState<Record<string, string>>({});
+  const [freightValidDays, setFreightValidDays] = useState<number | null>(null);
+  // Order Loco (ASUMSI A-85): tanpa kurir/resi, label "Siap diambil"/"Sudah diambil", tanpa catatan perjalanan.
+  const pickup = isPickupOrder(order);
+  // Order FOB/CIF (ASUMSI A-86/A-88): serah terima di pelabuhan muat, snapshot alamat = identitas perusahaan pembeli, angka USD,
+  // shipped = dimuat ke kapal. `variant` memilih teks status (Loco / port / diantar).
+  const port = isPortOrder(order);
+  const variant = orderVariant(order);
+  // Kartu proforma hanya untuk order ekspor (term port atau mata uang USD); server sendiri mengizinkan order mana pun yang tidak batal.
+  const showProforma = port || order?.currency === 'USD';
+  // Order CIF (ASUMSI A-89): kartu penawaran ongkir; baris ongkir disepakati menggantikan satu baris Ongkir di ringkasan.
+  const quoted = isQuotedFreightOrder(order);
+  const activeQuote = order?.activeFreightQuote ?? null;
+  const agreedLines = order?.shippingMethod?.lines ?? [];
+  const awaitingFreight = order?.status === 'awaiting_freight';
+  const formatIDR = (value: number | null | undefined) => formatMoney(value, order?.currency);
+  const fqTotal = fqLines.reduce((sum, line) => sum + (toMinorInput(line.amount, order?.currency) ?? 0), 0);
+
+  // Masa berlaku bawaan penawaran dari pengaturan commerce; admin tanpa modul settings memakai bawaan 7 hari.
+  useEffect(() => {
+    if (!awaitingFreight || freightValidDays !== null) return;
+    let active = true;
+    api<CommerceSettingsData>('/admin/settings')
+      .then((settings) => {
+        if (active) setFreightValidDays(settings.freightQuoteValidDays ?? DEFAULT_FREIGHT_VALID_DAYS);
+      })
+      .catch(() => {
+        if (active) setFreightValidDays(DEFAULT_FREIGHT_VALID_DAYS);
+      });
+    return () => {
+      active = false;
+    };
+  }, [awaitingFreight, freightValidDays]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -87,12 +179,78 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     setReason('');
     setCourier(order?.courier || '');
     setTrackingNumber(order?.trackingNumber || '');
+    // Kapal/voyage diawali dari data kapal order atau dari proforma terakhir agar admin tidak mengetik ulang.
+    setVesselName(order?.shipmentDetails?.vessel || order?.proforma?.vesselName || '');
+    setVoyage(order?.shipmentDetails?.voyage || order?.proforma?.voyage || '');
+    setBlNumber(order?.shipmentDetails?.blNumber || '');
+    setBlDate(order?.shipmentDetails?.blDate || '');
     setNote('');
     setDueMode('hours');
     setExtendHours('24');
     setDueAt('');
     setActionError('');
     setModal(next);
+  }
+
+  // Proforma invoice (ASUMSI A-88): formulir diisi dari proforma terakhir; untuk proforma pertama, pelabuhan muat dan syarat
+  // pembayaran diawali dari term dan snapshot order (sama dengan bawaan server untuk field kosong).
+  function openProforma() {
+    if (!order) return;
+    const current = order.proforma;
+    const snapshot = isPortAddress(order.shippingAddress) ? order.shippingAddress : null;
+    setPf({
+      vesselName: current?.vesselName || '',
+      voyage: current?.voyage || '',
+      etd: current?.etd || '',
+      eta: current?.eta || '',
+      portOfLoading: current?.portOfLoading || snapshot?.loadingPort || order.deliveryTerm?.loadingPort || '',
+      portOfDischarge: current?.portOfDischarge || order.destinationPort?.name || '',
+      paymentTerms: current?.paymentTerms || tr(order.paymentTerm?.description, 'en') || tr(order.paymentTerm?.name, 'en') || '',
+      notes: current?.notes || '',
+      validUntil: current?.validUntil || '',
+    });
+    setPfErrors({});
+    openModal({ type: 'proforma' });
+  }
+
+  const setPfField = (key: keyof ProformaPayload) => (event: { target: { value: string } }) => {
+    const value = event.target.value;
+    setPf((prev) => ({ ...prev, [key]: value }));
+    setPfErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  };
+
+  async function submitProforma(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !order) return;
+    // Semua field dikirim (kosong = null): PUT mengganti seluruh isi proforma, field yang tidak dikirim menjadi null.
+    const body = PROFORMA_FIELDS.reduce((acc, key) => ({ ...acc, [key]: pf[key].trim() || null }), {} as ProformaPayload);
+    const wasExisting = !!order.proforma;
+    setBusy(true);
+    setActionError('');
+    setActionOk('');
+    setPfErrors({});
+    try {
+      await api(`${orderPath}/proforma`, { method: 'PUT', body });
+      await refresh();
+      setModal(null);
+      setActionOk(
+        wasExisting
+          ? t('Proforma disimpan sebagai revisi baru; customer menerima email dan notifikasi.', 'Proforma saved as a new revision; the customer has been emailed and notified.')
+          : t('Proforma invoice dibuat; customer menerima email dan notifikasi.', 'Proforma invoice created; the customer has been emailed and notified.'),
+      );
+    } catch (err) {
+      // 422: pesan per field di bawah isian; 409 PROFORMA_NOT_ALLOWED (order batal/kedaluwarsa) dan galat lain di atas tombol.
+      if (err instanceof ApiError && err.status === 422 && err.errors) {
+        const next: Partial<Record<keyof ProformaPayload, string>> = {};
+        for (const [key, messages] of Object.entries(err.errors)) {
+          if (PROFORMA_FIELDS.includes(key as keyof ProformaPayload) && messages[0]) next[key as keyof ProformaPayload] = messages[0];
+        }
+        setPfErrors(next);
+      }
+      setActionError(actionErrorText(err, lang));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function run(action: () => Promise<unknown>, okMessage: string) {
@@ -108,15 +266,121 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
       setModal(null);
     } catch (err) {
       setActionError(actionErrorText(err, lang));
+      // 409 (status/penawaran sudah berubah di tempat lain): muat ulang order agar tombol dan angka sesuai keadaan terbaru.
+      if (err instanceof ApiError && err.status === 409) {
+        refreshAdminBadges();
+        await refresh();
+      }
     } finally {
       setBusy(false);
     }
   }
 
+  // ---- Penawaran ongkir CIF (ASUMSI A-89) ----
+  const plusDays = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return isoDate(d);
+  };
+
+  function openFreightModal() {
+    setFqLines(DEFAULT_FREIGHT_LINE_LABELS.map((label) => ({ label, amount: '' })));
+    setFqValidUntil(plusDays(freightValidDays ?? DEFAULT_FREIGHT_VALID_DAYS));
+    setFqNote('');
+    setFqErrors({});
+    openModal({ type: 'freight' });
+  }
+
+  function openExtendModal(quote: FreightQuote) {
+    setFqValidUntil(plusDays(freightValidDays ?? DEFAULT_FREIGHT_VALID_DAYS));
+    setFqErrors({});
+    openModal({ type: 'freightExtend', quote });
+  }
+
+  const setFqLine = (index: number, patch: Partial<FreightLineForm>) => {
+    setFqLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+    setFqErrors((prev) => {
+      const next = { ...prev };
+      delete next[`lines.${index}.label`];
+      delete next[`lines.${index}.amount`];
+      delete next.total;
+      return next;
+    });
+  };
+
+  async function submitFreight(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !order) return;
+    const lines = fqLines.map((line) => ({ label: line.label.trim(), amount: toMinorInput(line.amount, order.currency) }));
+    const errors: Record<string, string> = {};
+    lines.forEach((line, i) => {
+      if (!line.label) errors[`lines.${i}.label`] = t('Keterangan wajib diisi.', 'Description is required.');
+      if (line.amount == null || line.amount < 0) errors[`lines.${i}.amount`] = t('Isi nominal 0 atau lebih.', 'Enter an amount of 0 or more.');
+    });
+    if (lines.length === 0) errors.total = t('Isi minimal satu baris.', 'Add at least one line.');
+    else if (fqTotal <= 0) errors.total = t('Total penawaran harus lebih dari 0.', 'The quote total must be above 0.');
+    if (Object.keys(errors).length > 0) {
+      setFqErrors(errors);
+      return;
+    }
+    setBusy(true);
+    setActionError('');
+    setActionOk('');
+    setFqErrors({});
+    try {
+      await api(`${orderPath}/freight-quotes`, {
+        method: 'POST',
+        body: { lines: lines.map((line) => ({ label: line.label, amount: line.amount as number })), validUntil: fqValidUntil || undefined, note: fqNote.trim() || undefined },
+      });
+      refreshAdminBadges();
+      await refresh();
+      setModal(null);
+      setActionOk(t('Penawaran ongkir dikirim; customer menerima email dan notifikasi.', 'Freight quote sent; the customer has been emailed and notified.'));
+    } catch (err) {
+      // 422: pesan per field (lines.N.label/amount, validUntil, note) di bawah isian; 409 FREIGHT_QUOTE_NOT_ALLOWED di atas tombol.
+      if (err instanceof ApiError && err.status === 422 && err.errors) {
+        const next: Record<string, string> = {};
+        for (const [key, messages] of Object.entries(err.errors)) if (messages[0]) next[key] = messages[0];
+        setFqErrors(next);
+      }
+      setActionError(actionErrorText(err, lang));
+      if (err instanceof ApiError && err.status === 409) {
+        refreshAdminBadges();
+        await refresh();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function submitExtend(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (modal?.type !== 'freightExtend') return;
+    if (!fqValidUntil) {
+      setFqErrors({ validUntil: t('Tanggal wajib diisi.', 'Date is required.') });
+      return;
+    }
+    void run(
+      () => api(`${orderPath}/freight-quotes/${modal.quote.id}/extend`, { method: 'PUT', body: { validUntil: fqValidUntil } }),
+      t('Masa berlaku penawaran diperpanjang; customer diberi tahu.', 'Quote validity extended; the customer has been notified.'),
+    );
+  }
+
+  async function acceptCounter(quote: FreightQuote) {
+    const ok = await confirmDialog(
+      t(
+        `Terima harga balasan customer ${formatIDR(quote.total)}? Total order dihitung ulang, payment dan batas bayar dibuat, dan order menjadi Menunggu Pembayaran.`,
+        `Accept the customer counter price of ${formatIDR(quote.total)}? The order total is recalculated, a payment and deadline are created, and the order moves to Awaiting Payment.`,
+      ),
+    );
+    if (!ok) return;
+    void run(() => api(`${orderPath}/freight-quotes/${quote.id}/accept`, { method: 'POST' }), t('Harga balasan diterima; order menunggu pembayaran.', 'Counter price accepted; the order is awaiting payment.'));
+  }
+
   function changeStatus(status: 'processing' | 'shipped' | 'delivered' | 'completed', extra: Record<string, string | null> = {}) {
     void run(
       () => api(`${orderPath}/status`, { method: 'POST', body: { status, ...extra } }),
-      t(`Status order diubah menjadi ${orderLabel(status).id}.`, `Order status changed to ${orderLabel(status).en}.`),
+      t(`Status order diubah menjadi ${orderLabel(status, variant).id}.`, `Order status changed to ${orderLabel(status, variant).en}.`),
     );
   }
 
@@ -145,7 +409,14 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     setActionError('');
     setActionOk('');
     try {
-      await api(`${orderPath}/status`, { method: 'POST', body: { status: 'shipped', courier: courier.trim(), trackingNumber: trackingNumber.trim(), note: note.trim() || null } });
+      // Loco: tanpa kurir dan resi (server tidak mewajibkannya untuk order pickup). FOB/CIF: nama kapal + nomor B/L wajib,
+      // voyage dan tanggal B/L opsional; server mengisi trackingNumber dengan nomor B/L (kontrak 11.11).
+      const shipping: Record<string, string | null> = pickup
+        ? {}
+        : port
+          ? { vesselName: vesselName.trim(), voyage: voyage.trim() || null, blNumber: blNumber.trim(), blDate: blDate || null }
+          : { courier: courier.trim(), trackingNumber: trackingNumber.trim() };
+      await api(`${orderPath}/status`, { method: 'POST', body: { status: 'shipped', ...shipping, note: note.trim() || null } });
     } catch (err) {
       setActionError(actionErrorText(err, lang));
       setBusy(false);
@@ -166,18 +437,23 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     setModal(null);
     setBusy(false);
     const uploaded = files.length - failed.length;
+    const marked = pickup
+      ? t('Order ditandai siap diambil', 'Order marked as ready for pickup')
+      : port
+        ? t('Order ditandai dimuat ke kapal', 'Order marked as shipped on board')
+        : t('Order ditandai dikirim', 'Order marked as shipped');
     if (failed.length > 0) {
       setActionError(
         t(
-          `Order ditandai dikirim, tetapi ${failed.length} lampiran gagal diunggah: ${failed.join('; ')}. Unggah ulang lewat kartu Lampiran.`,
-          `Order marked as shipped, but ${failed.length} attachment(s) failed: ${failed.join('; ')}. Re-upload from the Attachments card.`,
+          `${marked}, tetapi ${failed.length} lampiran gagal diunggah: ${failed.join('; ')}. Unggah ulang lewat kartu Lampiran.`,
+          `${marked}, but ${failed.length} attachment(s) failed: ${failed.join('; ')}. Re-upload from the Attachments card.`,
         ),
       );
     }
     setActionOk(
       uploaded > 0
-        ? t(`Order ditandai dikirim; ${uploaded} lampiran diunggah dan customer diberi tahu.`, `Order marked as shipped; ${uploaded} attachment(s) uploaded and the customer notified.`)
-        : t('Order ditandai dikirim.', 'Order marked as shipped.'),
+        ? t(`${marked}; ${uploaded} lampiran diunggah dan customer diberi tahu.`, `${marked}; ${uploaded} attachment(s) uploaded and the customer notified.`)
+        : `${marked}.`,
     );
   }
 
@@ -247,9 +523,16 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     void run(() => api(`${orderPath}/due`, { method: 'PUT', body }), t('Batas waktu pembayaran diperbarui.', 'Payment deadline updated.'));
   }
 
-  async function acceptPayment(payment: Payment) {
-    if (!await confirmDialog(t(`Terima pembayaran #${payment.id} sebesar ${formatIDR(payment.amount)}?`, `Accept payment #${payment.id} of ${formatIDR(payment.amount)}?`))) return;
-    void run(() => api(`/admin/payments/${payment.id}/accept`, { method: 'POST', body: {} }), t('Pembayaran diterima; order berstatus dibayar.', 'Payment accepted; order is now paid.'));
+  function acceptPayment(payment: Payment) {
+    openModal({ type: 'accept', payment });
+  }
+
+  async function paymentAccepted() {
+    setModal(null);
+    setActionError('');
+    refreshAdminBadges();
+    await refresh();
+    setActionOk(t('Pembayaran diterima; order berstatus dibayar.', 'Payment accepted; order is now paid.'));
   }
 
   function submitReject(event: FormEvent<HTMLFormElement>) {
@@ -291,9 +574,14 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     );
   }
 
-  const status = orderLabel(order.status);
+  const status = orderLabel(order.status, variant);
   const payStatus = paymentLabel(order.paymentStatus);
-  const addr = order.shippingAddress;
+  // Snapshot alamat order Loco = titik ambil (tanpa kode wilayah); blok alamat customer hanya untuk order diantar.
+  const addr = deliveryAddress(order.shippingAddress);
+  const portAddr = isPortAddress(order.shippingAddress) ? order.shippingAddress : null;
+  // Loco beberapa pabrik (ASUMSI A-90): semua titik ambil + gabungan nama untuk teks modal.
+  const pickupPoints = orderPickupPoints(order);
+  const pickupLabel = joinNames(pickupPoints.map((point) => pickupPointName(point, lang)), lang);
   const canCancel = adminCancellableStatuses.includes(order.status);
   const canEditDue = dueEditableStatuses.includes(order.status);
   const awaitingPayments = order.payments.filter((p) => p.status === 'awaiting_verification');
@@ -334,9 +622,13 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         <div className={styles.badges}>
           <StatusBadge label={status[lang]} tone={status.tone} />
           <StatusBadge label={payStatus[lang]} tone={payStatus.tone} />
-          <a href={`/print/invoice/${encodeURIComponent(order.number)}`} target="_blank" rel="noopener" className="btn btn-line btn-sm">
-            <Icon name="arrowDown" size={15} /> {t('Cetak invoice', 'Print invoice')}
-          </a>
+          {/* Order CIF yang menunggu ongkir belum punya total final: invoice disembunyikan sampai penawaran disepakati.
+              Order USD baru punya dokumen cetak setelah dibayar (commercial invoice) atau setelah proforma dibuat. */}
+          {!awaitingFreight && (order.currency !== 'USD' || !!order.paidAt || !!order.proforma) && (
+            <a href={`/print/invoice/${encodeURIComponent(order.number)}`} target="_blank" rel="noopener" className="btn btn-line btn-sm">
+              <Icon name="arrowDown" size={15} /> {t('Cetak invoice', 'Print invoice')}
+            </a>
+          )}
         </div>
       </div>
 
@@ -397,23 +689,40 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
               <span>−{formatIDR(order.discountTotal)}</span>
             </div>
           )}
-          <div className={styles.summaryRow}>
-            <span>
-              {t('Ongkir', 'Shipping')}
-              {order.shippingMethod && (
-                <small>
-                  {' '}
-                  · {tr(order.shippingMethod.label, lang)}
-                  {order.shippingMethod.eta ? ` (${tr(order.shippingMethod.eta, lang)})` : ''}
-                  {shipmentMetricsText(order.shippingMethod) ? ` · ${shipmentMetricsText(order.shippingMethod)}` : ''}
-                  {order.shippingMethod.breakdown && order.shippingMethod.type !== 'flat' && !order.shippingMethod.breakdown.free && (
-                    <span className="admin-cell-sub">{shippingBreakdownText(order.shippingMethod.breakdown, lang)}</span>
-                  )}
-                </small>
-              )}
-            </span>
-            <span>{formatIDR(order.shippingTotal)}</span>
-          </div>
+          {agreedLines.length > 0 ? (
+            // Ongkir CIF yang disepakati (ASUMSI A-89): baris Freight / Port charges / Insurance menggantikan satu baris Ongkir.
+            agreedLines.map((line, i) => (
+              <div key={`line-${i}`} className={styles.summaryRow}>
+                <span>{freightLineLabel(line.label, lang)}</span>
+                <span>{formatIDR(line.amount)}</span>
+              </div>
+            ))
+          ) : (
+            <div className={styles.summaryRow}>
+              <span>
+                {t('Ongkir', 'Shipping')}
+                {order.shippingMethod && (
+                  <small>
+                    {' '}
+                    · {tr(order.shippingMethod.label, lang)}
+                    {order.shippingMethod.eta ? ` (${tr(order.shippingMethod.eta, lang)})` : ''}
+                    {shipmentMetricsText(order.shippingMethod) ? ` · ${shipmentMetricsText(order.shippingMethod)}` : ''}
+                    {order.shippingMethod.breakdown && order.shippingMethod.type !== 'flat' && !order.shippingMethod.breakdown.free && !hasMultipleOrigins(order.shippingMethod) && (
+                      <span className="admin-cell-sub">{shippingBreakdownText(order.shippingMethod.breakdown, lang)}</span>
+                    )}
+                    {hasMultipleOrigins(order.shippingMethod) &&
+                      order.shippingMethod.origins?.map((origin, index) => (
+                        <span key={origin.factory?.code || index} className="admin-cell-sub">
+                          {shippingOriginText(origin, lang)}
+                          {origin.breakdown && !origin.breakdown.free && order.shippingMethod?.type !== 'flat' ? ` (${shippingBreakdownText(origin.breakdown, lang)})` : ''}
+                        </span>
+                      ))}
+                  </small>
+                )}
+              </span>
+              <span>{awaitingFreight ? t('Menunggu penawaran', 'To be quoted') : formatIDR(order.shippingTotal)}</span>
+            </div>
+          )}
           {(order.fees ?? []).map((fee) => (
             <div key={fee.id} className={styles.summaryRow}>
               <span>{tr(fee.name, lang)}</span>
@@ -439,9 +748,15 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
             </div>
           )}
           <div className={`${styles.summaryRow} ${styles.total}`}>
-            <span>Total</span>
+            <span>Total{order.currency === 'USD' ? ' (USD)' : ''}{awaitingFreight ? ` (${t('sementara, tanpa ongkir', 'provisional, before freight')})` : ''}</span>
             <span>{formatIDR(order.grandTotal)}</span>
           </div>
+          {order.paymentTerm && (
+            <div className={`${styles.summaryRow} ${styles.summaryMuted}`}>
+              <span>{t('Syarat pembayaran', 'Payment terms')}</span>
+              <span>{tr(order.paymentTerm.name, lang)}</span>
+            </div>
+          )}
           {order.note && (
             <p className={styles.note}>
               <strong>{t('Catatan customer', 'Customer note')}:</strong> {order.note}
@@ -473,6 +788,13 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                 NPWP: <span className="mono">{order.customer.taxId}</span>
               </>
             )}
+            {order.customer.market && (
+              <>
+                <br />
+                {t('Pasar', 'Market')}: {order.customer.market === 'export' ? t('Ekspor', 'Export') : t('Lokal', 'Local')} ({order.currency})
+                {order.customer.countryCode ? ` · ${order.customer.countryCode}` : ''}
+              </>
+            )}
             <br />
             <Link href={`/admin/customers?q=${encodeURIComponent(order.customer.email)}`} className="link">
               {t('Lihat profil customer', 'View customer profile')}
@@ -483,34 +805,136 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
             </Link>
           </p>
           <hr className={styles.divider} />
-          <p className={styles.address}>
-            <strong>
-              {addr.label ? `${addr.label} · ` : ''}
-              {addr.recipientName}
-            </strong>
-            <br />
-            {addr.phone}
-            <br />
-            {addr.addressLine}
-            <br />
-            {[addr.region?.village, addr.region?.district, addr.region?.regency, addr.region?.province].filter(Boolean).join(', ')}
-            {addr.postalCode ? ` ${addr.postalCode}` : ''}
-            {addr.note && (
-              <>
-                <br />
-                <em>{addr.note}</em>
-              </>
-            )}
-            {addr.lat != null && addr.lng != null && (
-              <>
-                <br />
-                <a className="link" href={`https://www.openstreetmap.org/?mlat=${addr.lat}&mlon=${addr.lng}#map=17/${addr.lat}/${addr.lng}`} target="_blank" rel="noopener noreferrer">
-                  {t('Lihat di peta', 'View on map')} ({addr.lat}, {addr.lng})
-                </a>
-              </>
-            )}
-          </p>
-          {(order.courier || order.trackingNumber) && (
+          {port ? (
+            <p className={styles.address}>
+              <strong>
+                {t('Serah terima', 'Delivery')}: {tr(order.deliveryTerm?.name ?? portAddr?.label, lang) || `FOB ${portAddr?.loadingPort || order.deliveryTerm?.loadingPort || ''}`}
+              </strong>
+              <br />
+              {t('Pelabuhan muat', 'Loading port')}: {portAddr?.loadingPort || order.deliveryTerm?.loadingPort || '—'}
+              <br />
+              <br />
+              <strong>{portAddr?.companyName || order.customer.company || order.customer.name}</strong>
+              <br />
+              {portAddr?.companyAddress || order.customer.companyAddress || t('Alamat perusahaan belum diisi customer.', 'Company address not filled in by the customer.')}
+              {(portAddr?.countryCode || order.customer.countryCode) ? ` · ${portAddr?.countryCode || order.customer.countryCode}` : ''}
+              <br />
+              {portAddr?.recipientName || order.customer.pic || order.customer.name}
+              {(portAddr?.phone || order.customer.phone) ? ` · ${portAddr?.phone || order.customer.phone}` : ''}
+              {order.destinationPort && (
+                <>
+                  <br />
+                  {t('Pelabuhan tujuan', 'Destination port')}: {[order.destinationPort.name, order.destinationPort.country].filter(Boolean).join(', ')}
+                </>
+              )}
+              {order.shipmentDetails && (
+                <>
+                  <br />
+                  <br />
+                  <strong>{t('Dimuat ke kapal', 'Shipped on board')}</strong>
+                  <br />
+                  {t('Kapal', 'Vessel')}: {order.shipmentDetails.vessel || '—'}
+                  {order.shipmentDetails.voyage ? ` · Voyage ${order.shipmentDetails.voyage}` : ''}
+                  <br />
+                  {t('No. B/L', 'B/L no.')}: <strong className="mono">{order.shipmentDetails.blNumber || '—'}</strong>
+                  {order.shipmentDetails.blDate ? ` · ${t('Tanggal B/L', 'B/L date')} ${formatDate(order.shipmentDetails.blDate, lang)}` : ''}
+                </>
+              )}
+              {order.shippedAt && (
+                <>
+                  <br />
+                  <small>
+                    {t('Dimuat', 'Shipped on board')} {formatDateTime(order.shippedAt, lang)}
+                    {order.deliveredAt ? ` · ${t('diterima', 'delivered')} ${formatDateTime(order.deliveredAt, lang)}` : ''}
+                  </small>
+                </>
+              )}
+            </p>
+          ) : pickup ? (
+            <p className={styles.address}>
+              {pickupPoints.length === 0 && (
+                <>
+                  <strong>{t('Loco: ambil di pabrik', 'Loco: pickup at the factory')}</strong>
+                  <br />
+                  {t('Alamat titik ambil belum diatur.', 'Pickup address not set.')}
+                </>
+              )}
+              {pickupPoints.map((point, index) => {
+                const names = pickupItemNames(point, order.items, lang);
+                return (
+                  <span key={point.code || `point-${index}`} style={{ display: 'block', marginBottom: index < pickupPoints.length - 1 ? 10 : 0 }}>
+                    <strong>
+                      {t('Loco: ambil di', 'Loco: pickup at')} {pickupPointName(point, lang) || t('pabrik', 'the factory')}
+                    </strong>
+                    <br />
+                    {point.address || t('Alamat titik ambil belum diatur.', 'Pickup address not set.')}
+                    {point.lat != null && point.lng != null && (
+                      <>
+                        <br />
+                        <a className="link" href={`https://www.openstreetmap.org/?mlat=${point.lat}&mlon=${point.lng}#map=17/${point.lat}/${point.lng}`} target="_blank" rel="noopener noreferrer">
+                          {t('Lihat di peta', 'View on map')} ({point.lat}, {point.lng})
+                        </a>
+                      </>
+                    )}
+                    {names.length > 0 && (
+                      <>
+                        <br />
+                        <small>
+                          {t('Diambil di sini', 'Collected here')}: {names.join(', ')}
+                        </small>
+                      </>
+                    )}
+                  </span>
+                );
+              })}
+              {order.shippedAt && (
+                <>
+                  <br />
+                  <small>
+                    {t('Siap diambil', 'Ready for pickup')} {formatDateTime(order.shippedAt, lang)}
+                    {order.deliveredAt ? ` · ${t('diambil', 'picked up')} ${formatDateTime(order.deliveredAt, lang)}` : ''}
+                  </small>
+                </>
+              )}
+            </p>
+          ) : (
+            <p className={styles.address}>
+              <strong>
+                {addr?.label ? `${addr.label} · ` : ''}
+                {addr?.recipientName}
+              </strong>
+              <br />
+              {addr?.phone}
+              <br />
+              {addr?.addressLine}
+              <br />
+              {[addr?.region?.village, addr?.region?.district, addr?.region?.regency, addr?.region?.province].filter(Boolean).join(', ')}
+              {addr?.postalCode ? ` ${addr.postalCode}` : ''}
+              {addr?.note && (
+                <>
+                  <br />
+                  <em>{addr.note}</em>
+                </>
+              )}
+              {addr && addr.lat != null && addr.lng != null && (
+                <>
+                  <br />
+                  <a className="link" href={`https://www.openstreetmap.org/?mlat=${addr.lat}&mlon=${addr.lng}#map=17/${addr.lat}/${addr.lng}`} target="_blank" rel="noopener noreferrer">
+                    {t('Lihat di peta', 'View on map')} ({addr.lat}, {addr.lng})
+                  </a>
+                </>
+              )}
+              {order.deliveryTerm?.name && (
+                <>
+                  <br />
+                  <small>
+                    {t('Serah terima', 'Delivery term')}: {tr(order.deliveryTerm.name, lang)}
+                  </small>
+                </>
+              )}
+            </p>
+          )}
+          {!pickup && !port && (order.courier || order.trackingNumber) && (
             <p className={styles.trackingNumber}>
               {t('Kurir', 'Courier')}: <strong>{order.courier || '—'}</strong> · {t('No. resi', 'Tracking No.')}:{' '}
               <strong className="mono">{order.trackingNumber || '—'}</strong>
@@ -545,15 +969,24 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                   </div>
                   <div className={styles.paymentMeta}>
                     <span>
-                      {t('Jumlah', 'Amount')}: <b>{formatIDR(payment.amount)}</b>
+                      {t('Jumlah', 'Amount')}: <b>{formatMoney(payment.amount, payment.currency || order.currency)}</b>
                       {payment.uniqueCode ? ` (${t('kode unik', 'unique code')} ${payment.uniqueCode})` : ''}
                     </span>
+                    {(payment.receivedAmount != null || payment.bankCharges != null || payment.receivedNote) && (
+                      <span>
+                        {t('Diterima', 'Received')}:{' '}
+                        {payment.receivedAmount != null && <b>{formatMoney(payment.receivedAmount, payment.currency || order.currency)}</b>}
+                        {payment.bankCharges != null ? ` · ${t('biaya bank', 'bank charges')} ${formatMoney(payment.bankCharges, payment.currency || order.currency)}` : ''}
+                        {payment.receivedNote ? ` · ${payment.receivedNote}` : ''}
+                      </span>
+                    )}
                     <span>
                       {t('Dibuat', 'Created')}: {formatDateTime(payment.createdAt, lang)}
                     </span>
                     {payment.bankAccount && (
                       <span>
                         {t('Rekening', 'Account')}: {payment.bankAccount.bankName} {payment.bankAccount.accountNumber}
+                        {payment.bankAccount.currency && payment.bankAccount.currency !== 'IDR' ? ` (${payment.bankAccount.currency}${payment.bankAccount.swiftCode ? `, SWIFT ${payment.bankAccount.swiftCode}` : ''})` : ''}
                       </span>
                     )}
                     {payment.expiresAt && payment.status === 'pending' && (
@@ -621,10 +1054,16 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
               {t('Customer belum mengunggah bukti pembayaran.', 'The customer has not uploaded a payment proof yet.')}
             </p>
           )}
+          {awaitingFreight && (
+            <p className="admin-field-hint" style={{ marginTop: 12 }}>
+              {t('Order CIF: payment, batas bayar, dan instruksi pembayaran dibuat otomatis setelah penawaran ongkir disepakati.', 'CIF order: the payment, deadline, and payment instructions are created automatically once the freight quote is agreed.')}
+              {order.pendingPaymentMethod?.code ? ` ${t('Metode yang dipilih customer', 'Method chosen by the customer')}: ${order.pendingPaymentMethod.code}.` : ''}
+            </p>
+          )}
         </AdminCard>
 
         <AdminCard title={t('Lacak & aksi order', 'Tracking & order actions')}>
-          <OrderTracking order={order} onRemoveUpdate={order.canAddTracking ? removeTracking : undefined} removeDisabled={busy} />
+          <OrderTracking order={order} onRemoveUpdate={order.canAddTracking ? removeTracking : undefined} removeDisabled={busy} pickup={pickup} port={port} />
 
           {order.canAddTracking && (
             <form className={styles.trackForm} onSubmit={submitTracking}>
@@ -660,12 +1099,13 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
             )}
             {order.status === 'processing' && (
               <button type="button" className="btn btn-solid btn-sm" disabled={busy} onClick={() => openModal({ type: 'ship' })}>
-                <Icon name="truck" size={14} /> {t('Tandai dikirim…', 'Mark as shipped…')}
+                <Icon name={pickup ? 'factory' : port ? 'globe' : 'truck'} size={14} />{' '}
+                {pickup ? t('Tandai siap diambil…', 'Mark as ready for pickup…') : port ? t('Tandai dimuat ke kapal…', 'Mark as shipped on board…') : t('Tandai dikirim…', 'Mark as shipped…')}
               </button>
             )}
             {order.status === 'shipped' && (
               <button type="button" className="btn btn-solid btn-sm" disabled={busy} onClick={() => openModal({ type: 'note', status: 'delivered' })}>
-                <Icon name="package" size={14} /> {t('Tandai diterima', 'Mark as delivered')}
+                <Icon name={pickup ? 'check' : 'package'} size={14} /> {pickup ? t('Tandai sudah diambil', 'Mark as picked up') : t('Tandai diterima', 'Mark as delivered')}
               </button>
             )}
             {order.status === 'delivered' && (
@@ -712,8 +1152,8 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                     <tr key={entry.id ?? index}>
                       <td className="mono">{formatDateTime(entry.at, lang)}</td>
                       <td>
-                        {entry.fromStatus ? `${orderLabel(entry.fromStatus)[lang]} → ` : ''}
-                        <strong>{orderLabel(entry.status)[lang]}</strong>
+                        {entry.fromStatus ? `${orderLabel(entry.fromStatus, variant)[lang]} → ` : ''}
+                        <strong>{orderLabel(entry.status, variant)[lang]}</strong>
                       </td>
                       <td>{entry.actor?.name || (entry.actorType ? `${entry.actorType}` : t('Sistem', 'System'))}</td>
                       <td>{entry.note || '—'}</td>
@@ -726,11 +1166,230 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         </AdminCard>
       </div>
 
+      {quoted && (
+        <div style={{ marginTop: 20 }}>
+          <AdminCard
+            title={t('Penawaran ongkir', 'Freight quote')}
+            desc={t(
+              'Order CIF: ongkos kapal, biaya pelabuhan, dan asuransi sampai pelabuhan tujuan ditawarkan per order. Customer menyetujui atau mengajukan harga balasan; setelah disepakati total order dihitung ulang dan instruksi pembayaran dibuat.',
+              'CIF order: ocean freight, port charges, and insurance to the destination port are quoted per order. The customer accepts or counters; once agreed the order total is recalculated and payment instructions are issued.',
+            )}
+          >
+            <div className="fq-port">
+              <span>
+                <small>{t('Pelabuhan muat', 'Loading port')}</small>
+                <strong>{portAddr?.loadingPort || order.deliveryTerm?.loadingPort || '—'}</strong>
+              </span>
+              <span>
+                <small>{t('Pelabuhan tujuan', 'Destination port')}</small>
+                <strong>{destinationPortText(order.destinationPort) || '—'}</strong>
+                {order.destinationPort?.lat != null && order.destinationPort?.lng != null && (
+                  <a
+                    className="link"
+                    href={`https://www.openstreetmap.org/?mlat=${order.destinationPort.lat}&mlon=${order.destinationPort.lng}#map=11/${order.destinationPort.lat}/${order.destinationPort.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {t('Lihat di peta', 'View on map')}
+                  </a>
+                )}
+              </span>
+              <span>
+                <small>{t('Putaran', 'Rounds')}</small>
+                <strong>{(order.freightQuotes || []).length}</strong>
+              </span>
+            </div>
+
+            {agreedLines.length > 0 && !awaitingFreight && (
+              <>
+                <p className="admin-field-hint">{t('Ongkir yang disepakati dan sudah masuk total order:', 'Agreed freight, already included in the order total:')}</p>
+                <table className="fq-lines">
+                  <tbody>
+                    {agreedLines.map((line, i) => (
+                      <tr key={`agreed-${i}`}>
+                        <td>{freightLineLabel(line.label, lang)}</td>
+                        <td>{formatIDR(line.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td>{t('Total ongkir', 'Freight total')}</td>
+                      <td>{formatIDR(order.shippingTotal)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </>
+            )}
+
+            {activeQuote ? (
+              <>
+                <p className="admin-field-hint">
+                  {activeQuote.proposedBy === 'admin'
+                    ? t(`Penawaran admin putaran ${activeQuote.round} menunggu tanggapan customer.`, `Admin quote round ${activeQuote.round} is awaiting the customer response.`)
+                    : t(`Harga balasan customer (putaran ${activeQuote.round}): terima, atau kirim penawaran baru.`, `Customer counter price (round ${activeQuote.round}): accept it, or send a new quote.`)}
+                </p>
+                <table className="fq-lines">
+                  <tbody>
+                    {activeQuote.lines.map((line, i) => (
+                      <tr key={`${activeQuote.id}-${i}`}>
+                        <td>{freightLineLabel(line.label, lang)}</td>
+                        <td>{formatIDR(line.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td>Total{order.currency === 'USD' ? ' (USD)' : ''}</td>
+                      <td>{formatIDR(activeQuote.total)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+                <p className="fq-meta">
+                  <span>
+                    {t('Diajukan', 'Proposed')} {formatDateTime(activeQuote.createdAt, lang)}
+                    {activeQuote.createdBy ? ` · ${activeQuote.createdBy.name}` : ''}
+                  </span>
+                  {activeQuote.validUntil && (
+                    <span>
+                      {t('Berlaku sampai', 'Valid until')} {formatDateTime(activeQuote.validUntil, lang)}
+                    </span>
+                  )}
+                  {activeQuote.expired && <StatusBadge label={t('Kedaluwarsa', 'Expired')} tone="bad" small />}
+                </p>
+                {activeQuote.note && <p className="fq-note">{activeQuote.note}</p>}
+              </>
+            ) : awaitingFreight ? (
+              <p className="admin-field-hint">{t('Belum ada penawaran yang terbuka. Beri penawaran agar customer bisa menyetujui atau mengajukan harga lain.', 'No open quote yet. Send a quote so the customer can accept it or counter.')}</p>
+            ) : null}
+
+            {order.canQuoteFreight && (
+              <div className={styles.actionGroup}>
+                {activeQuote?.proposedBy === 'customer' && !activeQuote.expired && (
+                  <button type="button" className="btn btn-solid btn-sm" disabled={busy} onClick={() => void acceptCounter(activeQuote)}>
+                    <Icon name="check" size={14} /> {t('Terima balasan customer', 'Accept customer counter')}
+                  </button>
+                )}
+                <button type="button" className={`btn ${activeQuote?.proposedBy === 'customer' ? 'btn-line' : 'btn-solid'} btn-sm`} disabled={busy} onClick={openFreightModal}>
+                  <Icon name="plus" size={14} /> {activeQuote ? t('Beri penawaran baru…', 'Send a new quote…') : t('Beri penawaran…', 'Send a quote…')}
+                </button>
+                {activeQuote?.proposedBy === 'admin' && activeQuote.expired && (
+                  <button type="button" className="btn btn-line btn-sm" disabled={busy} onClick={() => openExtendModal(activeQuote)}>
+                    <Icon name="clock" size={14} /> {t('Perpanjang masa berlaku…', 'Extend validity…')}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {(order.freightQuotes || []).length > 0 && (
+              <div className="fq-history">
+                <h3>{t('Riwayat putaran', 'Round history')}</h3>
+                <div className="admin-table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{t('Putaran', 'Round')}</th>
+                        <th>{t('Oleh', 'By')}</th>
+                        <th className="num">Total</th>
+                        <th>{t('Berlaku sampai', 'Valid until')}</th>
+                        <th>Status</th>
+                        <th>{t('Tanggal', 'Date')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(order.freightQuotes || []).map((q) => {
+                        const ql = freightQuoteLabel(q);
+                        return (
+                          <tr key={q.id}>
+                            <td className="mono">#{q.round}</td>
+                            <td>{q.proposedBy === 'admin' ? q.createdBy?.name || 'Admin' : 'Customer'}</td>
+                            <td className="num">{formatIDR(q.total)}</td>
+                            <td>{q.validUntil ? formatDateTime(q.validUntil, lang) : '—'}</td>
+                            <td>
+                              <StatusBadge label={ql[lang]} tone={ql.tone} small />
+                            </td>
+                            <td className="mono">{formatDateTime(q.createdAt, lang)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </AdminCard>
+        </div>
+      )}
+
+      {showProforma && (
+        <div style={{ marginTop: 20 }}>
+          <AdminCard
+            title={t('Proforma invoice', 'Proforma invoice')}
+            desc={t(
+              `Dokumen penawaran untuk customer ekspor dengan nomor tetap PI/${order.number}. Setiap simpan menjadi revisi baru dan customer menerima email serta notifikasi.`,
+              `Quotation document for the export customer with the fixed number PI/${order.number}. Every save becomes a new revision and the customer is emailed and notified.`,
+            )}
+          >
+            {order.proforma ? (
+              <div className="pf-summary">
+                <div className="pf-head">
+                  <strong className="mono">{order.proforma.label}</strong>
+                  <StatusBadge label={`${t('Revisi', 'Revision')} ${order.proforma.revision}`} tone="info" small />
+                </div>
+                <dl className="pf-meta">
+                  <dt>{t('Diterbitkan', 'Issued')}</dt>
+                  <dd>{formatDateTime(order.proforma.issuedAt, lang)}</dd>
+                  <dt>{t('Diperbarui', 'Updated')}</dt>
+                  <dd>
+                    {formatDateTime(order.proforma.updatedAt, lang)}
+                    {order.proforma.updatedBy ? ` · ${order.proforma.updatedBy.name}` : ''}
+                  </dd>
+                  <dt>{t('Kapal / voyage', 'Vessel / voyage')}</dt>
+                  <dd>{order.proforma.vesselName ? `${order.proforma.vesselName}${order.proforma.voyage ? ` / ${order.proforma.voyage}` : ''}` : '—'}</dd>
+                  <dt>ETD / ETA</dt>
+                  <dd>
+                    {order.proforma.etd ? formatDate(order.proforma.etd, lang) : '—'} / {order.proforma.eta ? formatDate(order.proforma.eta, lang) : '—'}
+                  </dd>
+                  <dt>{t('Pelabuhan muat / bongkar', 'Port of loading / discharge')}</dt>
+                  <dd>
+                    {order.proforma.portOfLoading || '—'} / {order.proforma.portOfDischarge || '—'}
+                  </dd>
+                  <dt>{t('Syarat pembayaran', 'Payment terms')}</dt>
+                  <dd>{order.proforma.paymentTerms || '—'}</dd>
+                  <dt>{t('Berlaku sampai', 'Valid until')}</dt>
+                  <dd>{order.proforma.validUntil ? formatDate(order.proforma.validUntil, lang) : '—'}</dd>
+                </dl>
+              </div>
+            ) : (
+              <p className="admin-field-hint">
+                {t('Belum ada proforma untuk order ini. Buat proforma agar customer menerima dokumen penawaran dengan rincian kapal, pelabuhan, dan syarat pembayaran.', 'No proforma for this order yet. Create one so the customer receives the quotation document with vessel, port, and payment term details.')}
+              </p>
+            )}
+            <div className={styles.actionGroup}>
+              {order.canEditProforma && (
+                <button type="button" className="btn btn-solid btn-sm" disabled={busy} onClick={openProforma}>
+                  <Icon name={order.proforma ? 'gear' : 'plus'} size={14} /> {order.proforma ? t('Perbarui proforma…', 'Update proforma…') : t('Buat proforma…', 'Create proforma…')}
+                </button>
+              )}
+              {order.proforma && (
+                <a href={`/print/proforma/${encodeURIComponent(order.number)}`} target="_blank" rel="noopener" className="btn btn-line btn-sm">
+                  <Icon name="arrowDown" size={15} /> {t('Cetak proforma', 'Print proforma')}
+                </a>
+              )}
+            </div>
+          </AdminCard>
+        </div>
+      )}
+
       {(order.canAttach || (order.attachments || []).length > 0) && (
         <div style={{ marginTop: 20 }}>
           <AdminCard
             title={t('Lampiran untuk customer', 'Attachments for the customer')}
-            desc={t('Faktur pajak, surat jalan, atau dokumen lain. Berkas privat: hanya admin dan customer pemilik order yang bisa membukanya.', 'Tax invoice, delivery note, or other documents. Private files: only admins and the order owner can open them.')}
+            desc={
+              port
+                ? t('Packing list, B/L, certificate of origin, COA, atau dokumen ekspor lain. Berkas privat: hanya admin dan customer pemilik order yang bisa membukanya.', 'Packing list, B/L, certificate of origin, COA, or other export documents. Private files: only admins and the order owner can open them.')
+                : t('Faktur pajak, surat jalan, atau dokumen lain. Berkas privat: hanya admin dan customer pemilik order yang bisa membukanya.', 'Tax invoice, delivery note, or other documents. Private files: only admins and the order owner can open them.')
+            }
           >
             {(order.attachments || []).length === 0 ? (
               <p className="admin-field-hint">{t('Belum ada lampiran.', 'No attachments yet.')}</p>
@@ -762,6 +1421,13 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
             )}
             {order.canAttach && (
               <form className={styles.attachForm} onSubmit={submitAttachment}>
+                <div className="admin-region-chips pf-chips" aria-label={t('Keterangan cepat', 'Quick labels')}>
+                  {(port ? ATTACHMENT_CHIPS_EXPORT : ATTACHMENT_CHIPS_LOCAL).map((chip) => (
+                    <button key={chip} type="button" className={`admin-chip admin-chip-static pf-chip ${attachLabel === chip ? 'is-active' : ''}`} onClick={() => setAttachLabel(chip)}>
+                      {chip}
+                    </button>
+                  ))}
+                </div>
                 <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" onChange={(e) => setAttachFile(e.target.files?.[0] || null)} />
                 <input value={attachLabel} maxLength={120} onChange={(e) => setAttachLabel(e.target.value)} placeholder={t('Keterangan, mis. Faktur Pajak 010.000-26.00000001', 'Label, e.g. Tax Invoice 010.000-26.00000001')} />
                 <button type="submit" className="btn btn-solid btn-sm" disabled={busy || !attachFile}>
@@ -800,16 +1466,60 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
       )}
 
       {modal?.type === 'ship' && (
-        <AdminModal title={t('Tandai dikirim', 'Mark as shipped')} onClose={() => setModal(null)} small>
+        <AdminModal
+          title={pickup ? t('Tandai siap diambil', 'Mark as ready for pickup') : port ? t('Tandai dimuat ke kapal', 'Mark as shipped on board') : t('Tandai dikirim', 'Mark as shipped')}
+          onClose={() => setModal(null)}
+          small
+        >
           <form className="admin-form" onSubmit={(e) => void submitShip(e)}>
-            <label>
-              <span className="field-label">{t('Kurir / ekspedisi', 'Courier')} *</span>
-              <input value={courier} onChange={(e) => setCourier(e.target.value)} placeholder={t('Contoh: JNE Trucking', 'e.g. JNE Trucking')} required />
-            </label>
-            <label>
-              <span className="field-label">{t('Nomor resi', 'Tracking number')} *</span>
-              <input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="JNE-000123" required />
-            </label>
+            {pickup ? (
+              <p className="admin-field-hint">
+                {t(
+                  `Customer diberi tahu bahwa barang siap diambil di ${pickupLabel || 'pabrik'}. Tanpa kurir dan nomor resi; lampirkan DO/SPPB bila ada.`,
+                  `The customer is notified that the goods are ready for pickup at ${pickupLabel || 'the factory'}. No courier or tracking number; attach the DO/SPPB if available.`,
+                )}
+              </p>
+            ) : port ? (
+              <>
+                <p className="admin-field-hint">
+                  {t(
+                    'Order FOB/CIF: catat nama kapal dan nomor B/L (bukan kurir dan resi). Nomor B/L mengisi kolom resi, customer menerima email dan notifikasi "dimuat ke kapal". Lampirkan packing list dan B/L bila sudah ada.',
+                    'FOB/CIF order: record the vessel name and B/L number (instead of courier and tracking). The B/L number fills the tracking column and the customer receives a "shipped on board" email and notification. Attach the packing list and B/L if available.',
+                  )}
+                </p>
+                <div className="admin-form-row">
+                  <label>
+                    <span className="field-label">{t('Nama kapal', 'Vessel name')} *</span>
+                    <input value={vesselName} maxLength={120} onChange={(e) => setVesselName(e.target.value)} placeholder={t('Contoh: MV Meratus Medan', 'e.g. MV Meratus Medan')} required />
+                  </label>
+                  <label>
+                    <span className="field-label">Voyage</span>
+                    <input value={voyage} maxLength={60} onChange={(e) => setVoyage(e.target.value)} placeholder="V.012" />
+                  </label>
+                </div>
+                <div className="admin-form-row">
+                  <label>
+                    <span className="field-label">{t('Nomor B/L', 'B/L number')} *</span>
+                    <input value={blNumber} maxLength={60} onChange={(e) => setBlNumber(e.target.value)} placeholder="MDN-2026-00123" required />
+                  </label>
+                  <label>
+                    <span className="field-label">{t('Tanggal B/L', 'B/L date')}</span>
+                    <input type="date" value={blDate} max={todayIso()} onChange={(e) => setBlDate(e.target.value)} />
+                  </label>
+                </div>
+              </>
+            ) : (
+              <>
+                <label>
+                  <span className="field-label">{t('Kurir / ekspedisi', 'Courier')} *</span>
+                  <input value={courier} onChange={(e) => setCourier(e.target.value)} placeholder={t('Contoh: JNE Trucking', 'e.g. JNE Trucking')} required />
+                </label>
+                <label>
+                  <span className="field-label">{t('Nomor resi', 'Tracking number')} *</span>
+                  <input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="JNE-000123" required />
+                </label>
+              </>
+            )}
             <label>
               <span className="field-label">{t('Catatan (opsional)', 'Note (optional)')}</span>
               <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
@@ -837,7 +1547,91 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                 {t('Batal', 'Cancel')}
               </button>
               <button type="submit" className="btn btn-solid btn-sm" disabled={busy}>
-                {busy ? t('Menyimpan...', 'Saving...') : t('Simpan & tandai dikirim', 'Save & mark shipped')}
+                {busy
+                  ? t('Menyimpan...', 'Saving...')
+                  : pickup
+                    ? t('Tandai siap diambil', 'Mark as ready for pickup')
+                    : port
+                      ? t('Tandai dimuat ke kapal', 'Mark as shipped on board')
+                      : t('Simpan & tandai dikirim', 'Save & mark shipped')}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
+      {modal?.type === 'proforma' && (
+        <AdminModal title={order.proforma ? t('Perbarui proforma invoice', 'Update proforma invoice') : t('Buat proforma invoice', 'Create proforma invoice')} onClose={() => setModal(null)}>
+          <form className="admin-form" onSubmit={(e) => void submitProforma(e)}>
+            <p className="admin-field-hint">
+              {order.proforma
+                ? t(
+                    `Disimpan sebagai ${order.proforma.number} Rev.${order.proforma.revision + 1}; nomor tidak berubah. Customer menerima email dan notifikasi revisi.`,
+                    `Saved as ${order.proforma.number} Rev.${order.proforma.revision + 1}; the number stays the same. The customer is emailed and notified about the revision.`,
+                  )
+                : t(
+                    `Nomor PI/${order.number} tetap untuk semua revisi. Field yang kosong diisi bawaan server dari term serah terima dan syarat pembayaran order.`,
+                    `The number PI/${order.number} stays the same for every revision. Empty fields get server defaults from the delivery term and the order's payment terms.`,
+                  )}
+            </p>
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">{t('Nama kapal', 'Vessel name')}</span>
+                <input value={pf.vesselName} maxLength={120} onChange={setPfField('vesselName')} placeholder={t('Contoh: MV Meratus Medan', 'e.g. MV Meratus Medan')} />
+                {pfErrors.vesselName && <small className="admin-form-error">{pfErrors.vesselName}</small>}
+              </label>
+              <label>
+                <span className="field-label">Voyage</span>
+                <input value={pf.voyage} maxLength={60} onChange={setPfField('voyage')} placeholder="V.012" />
+                {pfErrors.voyage && <small className="admin-form-error">{pfErrors.voyage}</small>}
+              </label>
+            </div>
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">ETD</span>
+                <input type="date" value={pf.etd} onChange={setPfField('etd')} />
+                {pfErrors.etd && <small className="admin-form-error">{pfErrors.etd}</small>}
+              </label>
+              <label>
+                <span className="field-label">ETA</span>
+                <input type="date" value={pf.eta} onChange={setPfField('eta')} />
+                {pfErrors.eta && <small className="admin-form-error">{pfErrors.eta}</small>}
+              </label>
+            </div>
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">{t('Pelabuhan muat', 'Port of loading')}</span>
+                <input value={pf.portOfLoading} maxLength={120} onChange={setPfField('portOfLoading')} placeholder="Belawan" />
+                {pfErrors.portOfLoading && <small className="admin-form-error">{pfErrors.portOfLoading}</small>}
+              </label>
+              <label>
+                <span className="field-label">{t('Pelabuhan bongkar', 'Port of discharge')}</span>
+                <input value={pf.portOfDischarge} maxLength={120} onChange={setPfField('portOfDischarge')} placeholder={t('Contoh: Port Klang', 'e.g. Port Klang')} />
+                {pfErrors.portOfDischarge && <small className="admin-form-error">{pfErrors.portOfDischarge}</small>}
+              </label>
+            </div>
+            <label>
+              <span className="field-label">{t('Syarat pembayaran', 'Payment terms')}</span>
+              <textarea rows={2} maxLength={1000} value={pf.paymentTerms} onChange={setPfField('paymentTerms')} placeholder={t('Contoh: 100% T/T in advance', 'e.g. 100% T/T in advance')} />
+              {pfErrors.paymentTerms && <small className="admin-form-error">{pfErrors.paymentTerms}</small>}
+            </label>
+            <label>
+              <span className="field-label">{t('Catatan', 'Notes')}</span>
+              <textarea rows={3} maxLength={2000} value={pf.notes} onChange={setPfField('notes')} placeholder={t('Dicetak di bagian Notes proforma (opsional).', 'Printed in the Notes section of the proforma (optional).')} />
+              {pfErrors.notes && <small className="admin-form-error">{pfErrors.notes}</small>}
+            </label>
+            <label>
+              <span className="field-label">{t('Berlaku sampai', 'Valid until')}</span>
+              <input type="date" value={pf.validUntil} onChange={setPfField('validUntil')} />
+              {pfErrors.validUntil && <small className="admin-form-error">{pfErrors.validUntil}</small>}
+            </label>
+            {actionError && <p className="admin-form-error">{actionError}</p>}
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setModal(null)}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={busy}>
+                {busy ? t('Menyimpan...', 'Saving...') : order.proforma ? t('Simpan revisi baru', 'Save new revision') : t('Buat proforma', 'Create proforma')}
               </button>
             </div>
           </form>
@@ -845,11 +1639,11 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
       )}
 
       {modal?.type === 'note' && (
-        <AdminModal title={`${t('Ubah status', 'Change status')}: ${orderLabel(modal.status)[lang]}`} onClose={() => setModal(null)} small>
+        <AdminModal title={`${t('Ubah status', 'Change status')}: ${orderLabel(modal.status, variant)[lang]}`} onClose={() => setModal(null)} small>
           <form className="admin-form" onSubmit={submitNote}>
             <p className="admin-field-hint">
               {modal.status === 'processing' && t('Order dibayar akan masuk tahap diproses/dikemas.', 'The paid order moves to processing/packing.')}
-              {modal.status === 'delivered' && t('Tandai bahwa kiriman sudah diterima customer.', 'Mark that the shipment has been received by the customer.')}
+              {modal.status === 'delivered' && (pickup ? t('Tandai bahwa barang sudah diambil customer di pabrik.', 'Mark that the customer has picked up the goods at the factory.') : t('Tandai bahwa kiriman sudah diterima customer.', 'Mark that the shipment has been received by the customer.'))}
               {modal.status === 'completed' && t('Order ditutup sebagai selesai.', 'The order is closed as completed.')}
             </p>
             <label>
@@ -923,7 +1717,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         <AdminModal title={t('Tolak bukti pembayaran', 'Reject payment proof')} onClose={() => setModal(null)} small>
           <form className="admin-form" onSubmit={submitReject}>
             <p className="admin-field-hint">
-              {t('Pembayaran', 'Payment')} #{modal.payment.id} · {formatIDR(modal.payment.amount)} · {paymentMethodSummary(modal.payment, lang)}.{' '}
+              {t('Pembayaran', 'Payment')} #{modal.payment.id} · {formatMoney(modal.payment.amount, modal.payment.currency || order.currency)} · {paymentMethodSummary(modal.payment, lang)}.{' '}
               {t('Order kembali ke "Menunggu Pembayaran" dan customer diminta mengunggah ulang.', 'The order returns to "Awaiting Payment" and the customer is asked to upload again.')}
             </p>
             <label>
@@ -937,6 +1731,117 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
               </button>
               <button type="submit" className="btn btn-danger btn-sm" disabled={busy}>
                 {busy ? t('Memproses...', 'Processing...') : t('Tolak bukti', 'Reject proof')}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
+      {modal?.type === 'accept' && (
+        <AcceptPaymentModal payment={modal.payment} orderNumber={order.number} onClose={() => setModal(null)} onAccepted={paymentAccepted} />
+      )}
+
+      {modal?.type === 'freight' && (
+        <AdminModal title={activeQuote ? t('Beri penawaran ongkir baru', 'Send a new freight quote') : t('Beri penawaran ongkir', 'Send freight quote')} onClose={() => setModal(null)}>
+          <form className="admin-form" onSubmit={(e) => void submitFreight(e)}>
+            <p className="admin-field-hint">
+              {t(
+                `Rincian ongkos sampai ${destinationPortText(order.destinationPort) || 'pelabuhan tujuan'} dalam ${order.currency}. Customer menerima email dan notifikasi, lalu menyetujui atau mengajukan harga lain.`,
+                `Cost breakdown to ${destinationPortText(order.destinationPort) || 'the destination port'} in ${order.currency}. The customer is emailed and notified, then accepts or counters.`,
+              )}
+              {activeQuote ? ` ${t('Penawaran atau balasan yang masih terbuka diganti oleh penawaran ini.', 'The open quote or counter is superseded by this one.')}` : ''}
+            </p>
+            <div className="fq-editor">
+              {fqLines.map((line, i) => (
+                <div key={i} className="fq-editor-row">
+                  <label>
+                    <span className="field-label">{t('Keterangan biaya', 'Charge description')}</span>
+                    <input value={line.label} maxLength={80} list="fq-label-suggestions" onChange={(e) => setFqLine(i, { label: e.target.value })} placeholder={DEFAULT_FREIGHT_LINE_LABELS[i] || 'THC'} />
+                    {fqErrors[`lines.${i}.label`] && <small className="admin-form-error">{fqErrors[`lines.${i}.label`]}</small>}
+                  </label>
+                  <label>
+                    <span className="field-label">{t('Jumlah', 'Line amount')} ({order.currency})</span>
+                    <input type="number" inputMode="decimal" min={0} step={currencyStep(order.currency)} value={line.amount} onChange={(e) => setFqLine(i, { amount: e.target.value })} placeholder={order.currency === 'USD' ? '0.00' : '0'} className="mono" />
+                    {fqErrors[`lines.${i}.amount`] && <small className="admin-form-error">{fqErrors[`lines.${i}.amount`]}</small>}
+                  </label>
+                  <button
+                    type="button"
+                    className="row-act fq-remove"
+                    disabled={fqLines.length <= 1}
+                    onClick={() => setFqLines((prev) => prev.filter((_, idx) => idx !== i))}
+                    aria-label={t('Hapus baris', 'Remove line')}
+                    title={t('Hapus baris', 'Remove line')}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <datalist id="fq-label-suggestions">
+                {FREIGHT_LINE_SUGGESTIONS.map((label) => (
+                  <option key={label} value={label} />
+                ))}
+              </datalist>
+              <div>
+                <button type="button" className="btn btn-line btn-sm" disabled={fqLines.length >= FREIGHT_MAX_LINES} onClick={() => setFqLines((prev) => [...prev, { label: '', amount: '' }])}>
+                  <Icon name="plus" size={14} /> {t('Tambah baris', 'Add line')}
+                </button>
+              </div>
+              <div className="fq-editor-total">
+                <span>
+                  Total <small>({fqLines.length} {t('baris', fqLines.length === 1 ? 'line' : 'lines')})</small>
+                </span>
+                <span className="mono">{formatIDR(fqTotal)}</span>
+              </div>
+              {(fqErrors.total || fqErrors.lines) && <small className="admin-form-error">{fqErrors.total || fqErrors.lines}</small>}
+            </div>
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">{t('Berlaku sampai', 'Valid until')}</span>
+                <input type="date" min={todayIso()} value={fqValidUntil} onChange={(e) => setFqValidUntil(e.target.value)} />
+                <small className="admin-field-hint">
+                  {t(`Sampai akhir hari itu. Kosong = hari ini + ${freightValidDays ?? DEFAULT_FREIGHT_VALID_DAYS} hari (pengaturan checkout).`, `Until the end of that day. Empty = today + ${freightValidDays ?? DEFAULT_FREIGHT_VALID_DAYS} days (checkout settings).`)}
+                </small>
+                {fqErrors.validUntil && <small className="admin-form-error">{fqErrors.validUntil}</small>}
+              </label>
+            </div>
+            <label>
+              <span className="field-label">{t('Catatan', 'Notes')}</span>
+              <textarea rows={3} maxLength={1000} value={fqNote} onChange={(e) => setFqNote(e.target.value)} placeholder={t('Tampil di kartu penawaran customer, mis. pelayaran, jenis kontainer, perkiraan transit (opsional).', 'Shown on the customer quote card, e.g. carrier, container type, transit estimate (optional).')} />
+              {fqErrors.note && <small className="admin-form-error">{fqErrors.note}</small>}
+            </label>
+            {actionError && <p className="admin-form-error">{actionError}</p>}
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setModal(null)}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={busy}>
+                {busy ? t('Mengirim...', 'Sending...') : t('Kirim penawaran', 'Send quote')}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
+      {modal?.type === 'freightExtend' && (
+        <AdminModal title={t('Perpanjang masa berlaku penawaran', 'Extend quote validity')} onClose={() => setModal(null)} small>
+          <form className="admin-form" onSubmit={submitExtend}>
+            <p className="admin-field-hint">
+              {t('Putaran', 'Round')} {modal.quote.round} · {formatIDR(modal.quote.total)}
+              {modal.quote.validUntil ? ` · ${t('berlaku sampai', 'valid until')} ${formatDateTime(modal.quote.validUntil, lang)}` : ''}.{' '}
+              {t('Penawaran kembali bisa disetujui customer sampai tanggal baru; customer menerima email dan notifikasi.', 'The customer can accept the quote again until the new date and is emailed and notified.')}
+            </p>
+            <label>
+              <span className="field-label">{t('Berlaku sampai', 'Valid until')}</span>
+              <input type="date" min={todayIso()} value={fqValidUntil} onChange={(e) => setFqValidUntil(e.target.value)} required />
+              {fqErrors.validUntil && <small className="admin-form-error">{fqErrors.validUntil}</small>}
+            </label>
+            {actionError && <p className="admin-form-error">{actionError}</p>}
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setModal(null)}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={busy}>
+                {busy ? t('Menyimpan...', 'Saving...') : t('Perpanjang', 'Extend')}
               </button>
             </div>
           </form>

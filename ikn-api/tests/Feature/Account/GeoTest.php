@@ -46,7 +46,9 @@ class GeoTest extends TestCase
             ->assertJsonPath('data.0.address.district', 'Cakung')
             ->assertJsonPath('data.0.address.city', 'Jakarta Timur')
             ->assertJsonPath('data.0.address.state', 'Daerah Khusus Ibukota Jakarta')
-            ->assertJsonPath('data.0.address.postcode', '13910');
+            ->assertJsonPath('data.0.address.postcode', '13910')
+            ->assertJsonPath('data.0.country', 'Indonesia')
+            ->assertJsonPath('data.0.countryCode', null);
 
         // Query sama (beda huruf besar/spasi) → dari cache, upstream tetap dipanggil sekali.
         $this->actingAs($user)->getJson('/api/v1/geo/search?q=cakung')->assertOk();
@@ -62,6 +64,45 @@ class GeoTest extends TestCase
                 && str_contains($request->url(), 'limit=5')
                 && str_contains($request->url(), 'addressdetails=1');
         });
+    }
+
+    /** scope=world (pelabuhan tujuan CIF, ASUMSI A-89): tanpa countrycodes=id, cache terpisah dari scope id, hasil membawa negara dan kelas OSM. */
+    public function test_search_scope_world_drops_country_filter_and_returns_country_fields(): void
+    {
+        Http::fake(['*' => Http::response([$this->nominatimItem([
+            'display_name' => 'Port Klang, Klang, Selangor, Malaysia',
+            'lat' => '2.9997000',
+            'lon' => '101.3929000',
+            'class' => 'place',
+            'type' => 'town',
+            'address' => ['town' => 'Port Klang', 'county' => 'Klang', 'state' => 'Selangor', 'country' => 'Malaysia', 'country_code' => 'my'],
+        ])], 200)]);
+        $user = $this->customer();
+
+        $this->actingAs($user)->getJson('/api/v1/geo/search?q=port+klang&scope=world')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.displayName', 'Port Klang, Klang, Selangor, Malaysia')
+            ->assertJsonPath('data.0.lat', 2.9997)
+            ->assertJsonPath('data.0.lng', 101.3929)
+            ->assertJsonPath('data.0.country', 'Malaysia')
+            ->assertJsonPath('data.0.countryCode', 'MY')
+            ->assertJsonPath('data.0.class', 'place')
+            ->assertJsonPath('data.0.type', 'town')
+            ->assertJsonPath('data.0.address.city', 'Klang')
+            ->assertJsonPath('data.0.address.state', 'Selangor');
+
+        Http::assertSent(fn (Request $request) => str_contains(urldecode($request->url()), 'q=port klang')
+            && ! str_contains($request->url(), 'countrycodes')
+            && str_contains($request->url(), 'addressdetails=1'));
+
+        // scope id (bawaan) untuk kata kunci yang sama adalah entri cache lain: upstream dipanggil lagi, kali ini dengan countrycodes=id.
+        $this->actingAs($user)->getJson('/api/v1/geo/search?q=port+klang')->assertOk();
+        $this->actingAs($user)->getJson('/api/v1/geo/search?q=port+klang&scope=id')->assertOk();
+        Http::assertSentCount(2);
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'countrycodes=id'));
+
+        $this->actingAs($user)->getJson('/api/v1/geo/search?q=port+klang&scope=mars')->assertStatus(422)->assertJsonValidationErrors(['scope']);
     }
 
     public function test_reverse_returns_single_result_or_empty_list(): void

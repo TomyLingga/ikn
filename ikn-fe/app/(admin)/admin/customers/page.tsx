@@ -9,16 +9,20 @@ import AdminModal from '@/components/admin/AdminModal';
 import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/admin/AdminPage';
 import AdminTabs, { type AdminTab } from '@/components/admin/AdminTabs';
 import { Pager } from '@/components/admin/cms';
+import Select from '@/components/Select';
 import { useLang } from '@/components/LanguageProvider';
-import { accountStatusLabels, orderLabel, paymentLabel } from '@/lib/commerce';
+import { accountStatusLabels, orderLabel, orderVariant, paymentLabel } from '@/lib/commerce';
 import { api, apiPaged, ApiError, errorMessage } from '@/lib/api';
-import { queryString, refreshAdminBadges, type AdminCustomerDetail, type AdminCustomerOrder, type AdminCustomerRow, type CountsMeta } from '@/lib/admin';
+import { customerMarketLabels, marketForCountry, queryString, refreshAdminBadges, type AdminCustomerDetail, type AdminCustomerOrder, type AdminCustomerRow, type CountsMeta } from '@/lib/admin';
+import { countryName, useCountries } from '@/lib/countries';
 import { formatAddressLines } from '@/components/customer/CustomerAddresses';
-import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
-import type { AccountStatus, IconName } from '@/lib/types';
+import { formatDate, formatDateTime, formatMoney } from '@/lib/format';
+import type { AccountStatus, CustomerMarket, IconName } from '@/lib/types';
 
 type StatusTab = AccountStatus | ''; // '' = semua status
 type Action = { status: 'active' | 'rejected' | 'inactive'; customer: AdminCustomerRow | AdminCustomerDetail } | null;
+// Modal "Ubah pasar" (PUT /admin/customers/{id}/market; 409 CUSTOMER_HAS_OPEN_ORDERS bila ada order berjalan, ASUMSI A-86).
+type MarketAction = { customer: AdminCustomerRow | AdminCustomerDetail } | null;
 
 const TABS: StatusTab[] = ['pending', 'active', 'rejected', 'inactive', ''];
 const DEFAULT_STATUS: StatusTab = 'pending';
@@ -48,6 +52,8 @@ function AdminCustomers() {
   // → cari di semua status; selain itu pendaftaran yang menunggu persetujuan (pekerjaan admin yang paling mendesak).
   const initialStatus = params.get('status') as StatusTab | null;
   const [tab, setTab] = useState<StatusTab>(initialStatus && TABS.includes(initialStatus) ? initialStatus : params.get('q') ? '' : DEFAULT_STATUS);
+  const [market, setMarket] = useState<'' | CustomerMarket>((params.get('market') as CustomerMarket | null) === 'export' || params.get('market') === 'local' ? (params.get('market') as CustomerMarket) : '');
+  const { countries } = useCountries();
   const [search, setSearch] = useState(params.get('q') || '');
   const [q, setQ] = useState(params.get('q') || '');
   const [page, setPage] = useState(1);
@@ -59,6 +65,10 @@ function AdminCustomers() {
   const [detail, setDetail] = useState<AdminCustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [action, setAction] = useState<Action>(null);
+  // Pasar yang dikunci saat menyetujui akun (bawaan dari negara: ID = lokal, lainnya = ekspor).
+  const [approveMarket, setApproveMarket] = useState<CustomerMarket>('local');
+  const [marketAction, setMarketAction] = useState<MarketAction>(null);
+  const [newMarket, setNewMarket] = useState<CustomerMarket>('local');
   const [reason, setReason] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -67,7 +77,7 @@ function AdminCustomers() {
     setLoading(true);
     setError('');
     try {
-      const result = await apiPaged<AdminCustomerRow>(`/admin/customers${queryString({ status: tab, q, page, perPage: PER_PAGE })}`);
+      const result = await apiPaged<AdminCustomerRow>(`/admin/customers${queryString({ status: tab, market, q, page, perPage: PER_PAGE })}`);
       setRows(result.items);
       setMeta(result.meta as CountsMeta);
     } catch (err) {
@@ -75,7 +85,7 @@ function AdminCustomers() {
     } finally {
       setLoading(false);
     }
-  }, [tab, q, page]);
+  }, [tab, market, q, page]);
 
   useEffect(() => {
     void refresh();
@@ -102,7 +112,33 @@ function AdminCustomers() {
   function startAction(next: Action) {
     setReason('');
     setActionError('');
+    if (next) setApproveMarket(next.customer.market || marketForCountry(next.customer.countryCode));
     setAction(next);
+  }
+
+  function startMarket(customer: AdminCustomerRow | AdminCustomerDetail) {
+    setActionError('');
+    setNewMarket(customer.market === 'export' ? 'local' : 'export');
+    setMarketAction({ customer });
+  }
+
+  async function submitMarket(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!marketAction || busy) return;
+    setBusy(true);
+    setActionError('');
+    try {
+      const updated = await api<AdminCustomerDetail>(`/admin/customers/${marketAction.customer.id}/market`, { method: 'PUT', body: { market: newMarket } });
+      setNotice(t(`Pasar customer diubah menjadi ${customerMarketLabels[newMarket].id}.`, `Customer market changed to ${customerMarketLabels[newMarket].en}.`));
+      setMarketAction(null);
+      if (detail?.id === updated.id) setDetail(updated);
+      await refresh();
+    } catch (err) {
+      // 409 CUSTOMER_HAS_OPEN_ORDERS: pesan server menjelaskan order yang masih berjalan.
+      setActionError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submitAction(event: FormEvent<HTMLFormElement>) {
@@ -117,7 +153,7 @@ function AdminCustomers() {
     try {
       const updated = await api<AdminCustomerDetail>(`/admin/customers/${action.customer.id}/status`, {
         method: 'PUT',
-        body: { status: action.status, reason: reason.trim() || null },
+        body: { status: action.status, reason: reason.trim() || null, ...(action.status === 'active' ? { market: approveMarket } : {}) },
       });
       const labels: Record<string, [string, string]> = {
         active: ['Akun customer disetujui/diaktifkan; email pemberitahuan dikirim.', 'Customer account approved/activated; notification email sent.'],
@@ -167,8 +203,11 @@ function AdminCustomers() {
     if (c.status === 'inactive') {
       list.push({ label: t('Aktifkan', 'Activate'), tone: 'success', disabled: busy, onClick: () => startAction({ status: 'active', customer: c }) });
     }
+    list.push({ label: t('Ubah pasar', 'Change market'), disabled: busy, onClick: () => startMarket(c) });
     return list;
   };
+
+  const marketBadge = (m: CustomerMarket) => <StatusBadge label={customerMarketLabels[m]?.[lang] || m} tone={m === 'export' ? 'info' : 'ok'} small />;
 
   const columns: Column<AdminCustomerRow>[] = [
     {
@@ -201,6 +240,8 @@ function AdminCustomers() {
         </span>
       ),
     },
+    { key: 'market', label: t('Pasar', 'Market'), render: (c) => marketBadge(c.market) },
+    { key: 'country', label: t('Negara', 'Country'), render: (c) => countryName(c.countryCode, lang, countries) },
     { key: 'addresses', label: t('Alamat', 'Addresses'), align: 'right', render: (c) => String(c.addressesCount) },
     {
       key: 'status',
@@ -231,9 +272,16 @@ function AdminCustomers() {
     },
     { key: 'date', label: t('Tanggal', 'Date'), render: (o) => formatDateTime(o.date, lang) },
     { key: 'items', label: t('Item', 'Items'), align: 'right', render: (o) => String(o.itemsCount) },
-    { key: 'total', label: 'Total', align: 'right', render: (o) => formatIDR(o.grandTotal) },
+    { key: 'total', label: 'Total', align: 'right', render: (o) => formatMoney(o.grandTotal, o.currency) },
     { key: 'payment', label: t('Pembayaran', 'Payment'), render: (o) => <StatusBadge label={paymentLabel(o.paymentStatus)[lang]} tone={paymentLabel(o.paymentStatus).tone} small /> },
-    { key: 'status', label: 'Status', render: (o) => <StatusBadge label={orderLabel(o.status)[lang]} tone={orderLabel(o.status).tone} small /> },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (o) => {
+        const label = orderLabel(o.status, orderVariant(o));
+        return <StatusBadge label={label[lang]} tone={label.tone} small />;
+      },
+    },
   ];
 
   const actionTitle = (a: NonNullable<Action>) =>
@@ -277,6 +325,20 @@ function AdminCustomers() {
         <button type="submit" className="btn btn-line btn-sm">
           {t('Cari', 'Search')}
         </button>
+        <label className="admin-filter">
+          <span>{t('Pasar', 'Market')}</span>
+          <Select
+            value={market}
+            onChange={(e) => {
+              setMarket(e.target.value as '' | CustomerMarket);
+              setPage(1);
+            }}
+          >
+            <option value="">{t('Semua pasar', 'All markets')}</option>
+            <option value="local">{customerMarketLabels.local[lang]}</option>
+            <option value="export">{customerMarketLabels.export[lang]}</option>
+          </Select>
+        </label>
         <span className="admin-result-count">
           {meta.total} {t('customer', 'customers')}
         </span>
@@ -324,6 +386,26 @@ function AdminCustomers() {
                   <div>
                     <dt>NPWP</dt>
                     <dd className="mono">{detail.taxId || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('Pasar', 'Market')}</dt>
+                    <dd>
+                      {marketBadge(detail.market)} <span className="mono">{detail.currency}</span>
+                      <br />
+                      <small>
+                        {detail.openOrdersCount > 0
+                          ? t(`${detail.openOrdersCount} order berjalan; pasar belum bisa diubah.`, `${detail.openOrdersCount} open order(s); the market cannot be changed yet.`)
+                          : t('Tidak ada order berjalan.', 'No open orders.')}
+                      </small>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t('Negara', 'Country')}</dt>
+                    <dd>{countryName(detail.countryCode, lang, countries)} <span className="mono">({detail.countryCode})</span></dd>
+                  </div>
+                  <div>
+                    <dt>{t('Alamat perusahaan', 'Company address')}</dt>
+                    <dd>{detail.companyAddress || '—'}</dd>
                   </div>
                   <div>
                     <dt>Status</dt>
@@ -413,6 +495,19 @@ function AdminCustomers() {
               {action.status === 'rejected' && t('Customer menerima email penolakan berisi alasan di bawah. Akun bisa disetujui belakangan.', 'The customer receives a rejection email with the reason below. The account can still be approved later.')}
               {action.status === 'inactive' && t('Customer tidak dapat login maupun checkout sampai diaktifkan kembali. Order yang sudah ada tidak berubah.', 'The customer cannot log in or check out until reactivated. Existing orders are unaffected.')}
             </p>
+            {action.status === 'active' && (
+              <label>
+                <span className="field-label">{t('Pasar', 'Market')}</span>
+                <Select value={approveMarket} onChange={(e) => setApproveMarket(e.target.value as CustomerMarket)}>
+                  <option value="local">{customerMarketLabels.local[lang]} · IDR</option>
+                  <option value="export">{customerMarketLabels.export[lang]} · USD</option>
+                </Select>
+                <small className="admin-field-hint">
+                  {t('Negara pendaftaran', 'Registered country')}: {countryName(action.customer.countryCode, lang, countries)}.{' '}
+                  {t('Pasar menentukan mata uang, harga, dan cara serah terima yang dilihat customer; bisa diubah lagi selama tidak ada order berjalan.', 'The market sets the currency, prices and delivery terms the customer sees; it can be changed later while there are no open orders.')}
+                </small>
+              </label>
+            )}
             {action.status === 'rejected' ? (
               <label>
                 <span className="field-label">{t('Alasan penolakan', 'Rejection reason')} *</span>
@@ -435,6 +530,41 @@ function AdminCustomers() {
               </button>
               <button type="submit" className={`btn btn-sm ${action.status === 'active' ? 'btn-solid' : 'btn-danger'}`} disabled={busy}>
                 {busy ? t('Memproses...', 'Processing...') : actionTitle(action)}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
+      {marketAction && (
+        <AdminModal title={t('Ubah pasar customer', 'Change customer market')} onClose={() => setMarketAction(null)} small>
+          <form className="admin-form" onSubmit={(e) => void submitMarket(e)}>
+            <p className="admin-field-hint">
+              <strong>{marketAction.customer.company || marketAction.customer.name}</strong> · <span className="mono">{marketAction.customer.email}</span>
+              <br />
+              {t('Pasar saat ini', 'Current market')}: {customerMarketLabels[marketAction.customer.market]?.[lang] || marketAction.customer.market}
+            </p>
+            <label>
+              <span className="field-label">{t('Pasar', 'Market')}</span>
+              <Select value={newMarket} onChange={(e) => setNewMarket(e.target.value as CustomerMarket)}>
+                <option value="local">{customerMarketLabels.local[lang]} · IDR</option>
+                <option value="export">{customerMarketLabels.export[lang]} · USD</option>
+              </Select>
+              <small className="admin-field-hint">
+                {t('Ditolak bila customer masih punya order yang belum selesai; keranjang customer disesuaikan ke mata uang baru saat login berikutnya.', 'Rejected while the customer still has unfinished orders; the customer cart switches to the new currency on their next visit.')}
+              </small>
+            </label>
+            {actionError && (
+              <p className="admin-form-error" role="alert">
+                {actionError}
+              </p>
+            )}
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setMarketAction(null)}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={busy || newMarket === marketAction.customer.market}>
+                {busy ? t('Memproses...', 'Processing...') : t('Simpan pasar', 'Save market')}
               </button>
             </div>
           </form>

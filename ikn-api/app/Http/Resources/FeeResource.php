@@ -14,6 +14,7 @@ class FeeResource extends JsonResource
             'id' => $fee->id,
             'name' => $fee->name,
             'type' => $fee->type,
+            'currency' => $fee->currencyCode(),
             'amount' => $fee->amountInt(),
             'isActive' => $fee->is_active,
             'sortOrder' => $fee->sort_order,

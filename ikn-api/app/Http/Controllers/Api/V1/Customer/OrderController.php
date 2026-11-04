@@ -88,11 +88,11 @@ class OrderController extends ApiController
         return $this->data(new OrderResource($this->own($request, $order)));
     }
 
-    /** Hanya pending_payment; selain itu 409 INVALID_TRANSITION (state machine). */
+    /** Hanya awaiting_freight (CIF, A-89) atau pending_payment; selain itu 409 INVALID_TRANSITION (state machine). */
     public function cancel(CancelOrderRequest $request, Order $order, OrderStateMachine $stateMachine)
     {
         $order = $this->own($request, $order);
-        if ($order->status !== Order::STATUS_PENDING_PAYMENT) {
+        if (! $order->canCancel()) {
             throw ApiException::conflict('INVALID_TRANSITION', __('commerce.invalid_transition', ['from' => $order->status, 'to' => Order::STATUS_CANCELLED]), [
                 'from' => $order->status,
                 'to' => Order::STATUS_CANCELLED,

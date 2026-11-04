@@ -2,20 +2,36 @@
 
 namespace App\Services\Commerce;
 
+use App\Models\DeliveryTerm;
 use App\Models\PaymentMethod;
+use App\Models\PaymentTerm;
 use App\Models\Product;
 use App\Models\Voucher;
+use App\Support\Money;
 
 /**
- * Hasil OrderCalculator::quote() (kontrak internal BE-2 → BE-3). Semua uang integer rupiah.
+ * Hasil OrderCalculator::quote() (kontrak internal BE-2 → BE-3). Semua uang integer satuan terkecil `currency`
+ * (IDR rupiah bulat, USD sen; ASUMSI A-86).
  *
- * items[]: { product: Product, qty, unitPrice, basePrice, promoApplied, lineTotal, discountAmount, taxAmount, weightGram, volumeCm3 }
- * shipping: { rateId, zoneId, label{id,en}, eta{id,en}|null, amount, type, available, distanceKm, weightGram, volumeCm3, breakdown } | null
+ * items[]: { product: Product, qty, unitPrice, basePrice, promoApplied, lineTotal, discountAmount, taxAmount, weightGram, volumeCm3, factory: ?FactoryLocation }
+ * shipping: { rateId, zoneId, label{id,en}, eta{id,en}|null, amount, type, available, distanceKm, weightGram, volumeCm3, breakdown, origins[]?, destinationPort? } | null
+ *   origins[] (tarif zona, ASUMSI A-90): { factory {code, name}, weightGram, volumeCm3, distanceKm, amount, breakdown } per pabrik asal
+ *   type: flat|calculated (tarif zona), pickup|included (baris sintetis term tanpa ongkir, rateId/zoneId null), atau
+ *   quoted (CIF, ASUMSI A-89: amount 0 sementara + warning freight_quote_pending; ongkir final dari penawaran admin)
  */
 final class QuoteResult
 {
+    /** Mata uang semua angka di hasil ini: dari pasar customer (export = USD). */
+    public string $currency = Money::CURRENCY_IDR;
+
     /** @var array<int, array> */
     public array $items = [];
+
+    /** Cara serah terima yang dipakai (ASUMSI A-85); null bila pemanggil memakai jalur zona lama. */
+    public ?DeliveryTerm $deliveryTerm = null;
+
+    /** Syarat pembayaran yang dipilih (ASUMSI A-87); null bila tidak dikirim/pasar lokal. */
+    public ?PaymentTerm $paymentTerm = null;
 
     public int $subtotal = 0;
 
@@ -60,6 +76,20 @@ final class QuoteResult
     /** @var string[] */
     public array $warnings = [];
 
+    /**
+     * Rincian warning (ASUMSI A-90): mis. factory_location_unset => { factoryCodes: string[] }.
+     *
+     * @var array<string, array>
+     */
+    public array $warningMeta = [];
+
+    /**
+     * Titik ambil Loco per pabrik asal item (ASUMSI A-90); kosong untuk term lain.
+     *
+     * @var array<int, array{code:string, name:array, label:string, address:string, lat:?float, lng:?float, items:string[]}>
+     */
+    public array $pickupPoints = [];
+
     /** Total tanpa kode unik (dasar bagi BE-3 untuk menambahkan kode unik final). */
     public function grandTotalBeforeUniqueCode(): int
     {
@@ -86,10 +116,13 @@ final class QuoteResult
     public function toArray(): array
     {
         return [
+            'currency' => $this->currency,
             'items' => array_map(fn (array $item) => self::itemToArray($item), $this->items),
             'subtotal' => $this->subtotal,
             'discountTotal' => $this->discountTotal,
             'voucher' => $this->voucher ? $this->voucher->toSummary() : null,
+            'deliveryTerm' => $this->deliveryTerm?->toPublicArray(),
+            'paymentTerm' => $this->paymentTerm?->toPublicArray(),
             'shipping' => $this->shipping,
             'availableShippingRates' => $this->availableShippingRates,
             'shippingTotal' => $this->shippingTotal,
@@ -105,6 +138,8 @@ final class QuoteResult
             'weightGram' => $this->weightGram,
             'volumeCm3' => $this->volumeCm3,
             'warnings' => $this->warnings,
+            'warningMeta' => (object) $this->warningMeta,
+            'pickupPoints' => $this->pickupPoints,
         ];
     }
 
@@ -132,6 +167,8 @@ final class QuoteResult
             'isTaxable' => (bool) $product->is_taxable,
             'weightGram' => $item['weightGram'],
             'available' => $product->available,
+            // Pabrik asal (ASUMSI A-90): { code, name } atau null bila belum ada pabrik sama sekali.
+            'factory' => isset($item['factory']) ? $item['factory']->toBrief() : null,
         ];
     }
 }

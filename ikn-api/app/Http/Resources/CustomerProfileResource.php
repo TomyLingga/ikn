@@ -31,6 +31,11 @@ class CustomerProfileResource extends JsonResource
             'companyEmail' => $profile?->company_email,
             'companyPhone' => $profile?->company_phone,
             'taxId' => $profile?->tax_id,
+            // Pasar dikunci admin (ASUMSI A-86); negara + alamat perusahaan hanya bisa diubah customer selagi pending.
+            'market' => $this->resource->market(),
+            'currency' => $this->resource->currency(),
+            'countryCode' => $profile?->country_code ?: \App\Models\CustomerProfile::DEFAULT_COUNTRY,
+            'companyAddress' => $profile?->company_address,
             'addresses' => CustomerAddressResource::collection($this->addresses),
             'createdAt' => optional($this->created_at)->toApiString(),
         ];

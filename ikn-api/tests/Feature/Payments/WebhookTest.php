@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\PaymentWebhookLog;
+use App\Services\Commerce\CheckoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -79,6 +80,31 @@ class WebhookTest extends TestCase
         $this->assertSame('succeeded', $logs[0]->event);
         $this->assertSame('***', $logs[0]->headers['x-callback-token']);
         $this->assertSame('SUCCEEDED', $logs[0]->payload['status']);
+    }
+
+    public function test_webhook_referring_a_usd_payment_is_ignored_without_touching_the_order(): void
+    {
+        Mail::fake();
+        $this->setUpCommerce();
+        $this->setUpExport();
+        config(['ikn.gateways.xendit.callback_token' => self::TOKEN]);
+        $product = $this->makeProduct(['price' => 185000, 'price_usd' => '12.50'], 1000);
+        $order = app(CheckoutService::class)->place($this->exporter, $this->exportCheckoutPayload($product, 100));
+        $payment = $order->payments()->first();
+        $this->assertSame('USD', $payment->currencyCode());
+        // Payment USD selalu transfer manual; simulasikan webhook gateway yang merujuk baris itu (external_id ditebak).
+        $payment->forceFill(['provider' => PaymentMethod::DRIVER_XENDIT])->save();
+
+        $this->postJson('/api/v1/payments/webhook/xendit', $this->payload($order, $payment), ['x-callback-token' => self::TOKEN])
+            ->assertOk()->assertJsonPath('data.result', 'ignored')->assertJsonPath('data.paymentId', $payment->id);
+
+        $this->assertSame('pending_payment', $order->fresh()->status);
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+        $this->assertSame(1, $order->histories()->count());
+        $log = PaymentWebhookLog::latest('id')->firstOrFail();
+        $this->assertSame('ignored', $log->result);
+        $this->assertStringContainsString('currency USD', (string) $log->note);
+        Mail::assertNotQueued(PaymentAccepted::class);
     }
 
     public function test_invalid_signature_returns_401_and_is_logged_without_effect(): void

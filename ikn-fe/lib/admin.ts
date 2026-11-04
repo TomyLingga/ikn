@@ -7,12 +7,20 @@ import type { I18n, MediaSummary, PagedMeta } from '@/lib/cms';
 import type {
   AccountStatus,
   BankAccountInfo,
+  Currency,
   CustomerAddress,
+  CustomerMarket,
+  DeliveryTerm,
+  DeliveryTermFamily,
+  DeliveryTermMarket,
+  DeliveryTermPricingMode,
+  DeliveryTermTaxProfile,
   OrderStatusKey,
   OrderSummary,
   Payment,
   PaymentMethodType,
   PaymentStatusKey,
+  FactoryLocation,
   Product,
   RegionLevel,
   StatusLabel,
@@ -27,11 +35,19 @@ export interface AdminPaymentOrder {
   status: OrderStatusKey;
   paymentStatus: PaymentStatusKey;
   customer: { id: number; name: string; company: string | null; pic: string; email: string };
+  currency: Currency;
   grandTotal: number;
   uniqueCode: number;
   paymentDueAt: string | null;
   paidAt: string | null;
   date: string;
+}
+
+/** Body opsional POST /admin/payments/{id}/accept (satuan terkecil mata uang payment; informasi saja, ASUMSI A-86). */
+export interface AcceptPaymentPayload {
+  receivedAmount?: number | null;
+  bankCharges?: number | null;
+  receivedNote?: string | null;
 }
 
 /** AdminPaymentResource: PaymentResource + proofUrl (/api/v1/files/{id}) + order ringkas. */
@@ -74,6 +90,8 @@ export interface DashboardMetric {
 
 /** Work queue counters; null = the admin lacks that module (same rule as GET /admin/badges). */
 export interface DashboardWorkQueue {
+  /** Order CIF yang menunggu penawaran ongkir dari admin (ASUMSI A-89); undefined pada server lama. */
+  freightToQuote?: number | null;
   paymentsToVerify: number | null;
   ordersToProcess: number | null;
   ordersToShip: number | null;
@@ -112,7 +130,23 @@ export interface DashboardLowStockItem {
   isPublished: boolean;
 }
 
+/**
+ * Blok ekspor dashboard (Phase E6, kontrak 11.1): ringkasan order USD terpisah dari KPI IDR. `revenue` dalam sen
+ * (order dibayar pada `period.from..to`), `orders` = order USD dibuat pada periode itu apa pun statusnya,
+ * `awaitingFreight`/`pendingPayment` = jumlah saat ini. Null bila belum pernah ada order USD.
+ */
+export interface DashboardExportKpis {
+  currency: Currency;
+  revenue: number;
+  paidOrders: number;
+  orders: number;
+  awaitingFreight: number;
+  pendingPayment: number;
+}
+
 export interface DashboardData {
+  /** Semua angka uang `stats`/`kpis`/`salesChart`/`topProducts` hanya order IDR (ASUMSI A-86); USD ada di `exportKpis`. */
+  currency?: Currency;
   stats: DashboardStats;
   recentOrders: OrderSummary[];
   needsAction: OrderSummary[];
@@ -130,6 +164,7 @@ export interface DashboardData {
   topProducts: DashboardTopProduct[];
   lowStock: { total: number; rule: { min: number; moqFactor: number }; items: DashboardLowStockItem[] };
   paymentDue: { overdue: number; dueSoon: number; windowHours: number; items: OrderSummary[] };
+  exportKpis: DashboardExportKpis | null;
 }
 
 // ---- Laporan penjualan (GET /admin/reports/sales) ----
@@ -155,12 +190,52 @@ export interface SalesReportProduct {
   revenue: number;
 }
 
+/**
+ * Total per mata uang (Phase E6): filter paid_at/status sama dengan `summary`, hanya mata uang yang punya order
+ * dibayar dalam rentang (IDR dulu, lalu USD). `revenue`/`averageOrder` dalam satuan terkecil mata uang baris;
+ * `paidOrders` = `orders`.
+ */
+export interface SalesByCurrency {
+  currency: Currency;
+  orders: number;
+  revenue: number;
+  paidOrders: number;
+  averageOrder: number;
+}
+
 export interface SalesReport {
+  /** `summary`/`byMonth`/`byProduct` hanya order IDR (ASUMSI A-86); `byCurrency` dan `orders` memuat semua mata uang. */
+  currency?: Currency;
   period: { from: string; to: string; year: number; month: number | null };
   summary: SalesReportSummary;
+  /** Kosong bila tidak ada order dibayar pada rentang. */
+  byCurrency: SalesByCurrency[];
   byMonth: SalesChartPoint[];
   byProduct: SalesReportProduct[];
+  /** Order dibayar semua mata uang (maks 1000); tiap baris membawa `currency`. */
   orders: OrderSummary[];
+}
+
+// ---- Kurs JISDOR (GET/POST /admin/exchange-rates, kontrak 11.7, ASUMSI A-84) ----
+export type ExchangeRateSource = 'jisdor' | 'manual';
+
+/** Satu kurs harian: rupiah bulat per 1 USD. */
+export interface ExchangeRatePoint {
+  date: string;
+  rate: number;
+  source: ExchangeRateSource;
+}
+
+export interface ExchangeRateSummary {
+  latest: (ExchangeRatePoint & { fetchedAt: string | null }) | null;
+  average: number | null;
+  max: number | null;
+  min: number | null;
+  series: ExchangeRatePoint[];
+  fetchedAt: string | null;
+  /** Hari kerja (Senin-Jumat) sejak kurs terakhir; `stale` = lebih dari 3. */
+  staleDays: number;
+  stale: boolean;
 }
 
 // ---- Produk admin (AdminProductResource) ----
@@ -179,16 +254,27 @@ export interface AdminProductImage {
 export interface AdminProduct extends Omit<Product, 'images' | 'category'> {
   categoryId: number;
   category: { id: number; slug: string; name: I18n } | null;
+  /** Admin selalu melihat harga rupiah (currency IDR) + harga USD mentah. */
+  currency: 'IDR';
+  price: number | null;
   /** Nilai mentah (bukan hanya saat promo aktif). */
   promoPrice: number | null;
   promoStartsAt: string | null;
   promoEndsAt: string | null;
   promoActive: boolean;
+  effectivePrice: number | null;
+  /** Harga USD per satuan dalam sen (1250 = USD 12,50), basis FOB Belawan; null = belum dijual ke pasar ekspor. */
+  priceUsd: number | null;
+  /** true bila harga USD terisi dan mode harga tetap. */
+  priceUsdSet: boolean;
   reserved: number;
   isPublished: boolean;
   images: AdminProductImage[];
   /** Foto yang menjadi thumbnail (pilihan admin, atau foto pertama); null bila belum ada foto. */
   thumbnailMediaId?: number | null;
+  /** Pabrik asal tersimpan (null = pabrik bawaan) dan pabrik efektif (ASUMSI A-90). */
+  factoryLocationId?: number | null;
+  factoryLocation?: { id: number; code: string; name: I18n } | null;
   createdAt: string | null;
   updatedAt: string | null;
   deletedAt: string | null;
@@ -212,6 +298,8 @@ export interface ProductPayload {
   promoPrice: number | null;
   promoStartsAt: string | null;
   promoEndsAt: string | null;
+  /** Harga USD dalam sen; null = hapus harga USD (produk tidak bisa dipesan customer ekspor). */
+  priceUsd: number | null;
   unit: string;
   moq: number;
   weightGram: number;
@@ -225,6 +313,8 @@ export interface ProductPayload {
   images: number[];
   /** Foto di dalam `images` yang menjadi thumbnail; null = foto pertama. */
   thumbnailMediaId: number | null;
+  /** Pabrik asal; null = pabrik bawaan (urutan pertama di Lokasi pabrik). Tidak dikirim = tetap. */
+  factoryLocationId?: number | null;
 }
 
 export type StockMovementType = 'in' | 'adjust' | 'reserve' | 'release' | 'commit';
@@ -259,6 +349,9 @@ export interface AdminCustomerRow {
   email: string;
   phone: string | null;
   company: string | null;
+  /** Pasar (local/export) dikunci admin saat approve; negara dari pendaftaran (ASUMSI A-86). */
+  market: CustomerMarket;
+  countryCode: string;
   status: AccountStatus;
   joinedAt: string | null;
   approvedAt: string | null;
@@ -275,8 +368,11 @@ export interface AdminCustomerOrder {
   status: OrderStatusKey;
   paymentStatus: PaymentStatusKey;
   itemsCount: number;
+  currency: Currency;
   grandTotal: number;
   paidAt: string | null;
+  /** Cara serah terima ringkas (A-85) untuk label status varian Loco/pelabuhan; null untuk order lama. */
+  deliveryTerm?: { code: string; family: string | null } | null;
 }
 
 export interface AdminCustomerDetail extends AdminCustomerRow {
@@ -285,6 +381,10 @@ export interface AdminCustomerDetail extends AdminCustomerRow {
   companyEmail: string | null;
   companyPhone: string | null;
   taxId: string | null;
+  currency: Currency;
+  companyAddress: string | null;
+  /** Order yang belum berstatus akhir; pasar hanya bisa diubah bila 0 (409 CUSTOMER_HAS_OPEN_ORDERS). */
+  openOrdersCount: number;
   approvedBy: { id: number; name: string } | null;
   addresses: CustomerAddress[];
   orders: AdminCustomerOrder[];
@@ -314,6 +414,8 @@ export interface FeeRow {
   id: number;
   name: I18n;
   type: FeeType;
+  /** Satuan terkecil `currency`; biaya hanya masuk ke order se-mata-uang (ASUMSI A-86). */
+  currency: Currency;
   amount: number;
   isActive: boolean;
   sortOrder: number;
@@ -328,6 +430,12 @@ export interface CommerceSettingsData {
   priceIncludesTax: boolean;
   autoCompleteDays: number;
   reminderHoursBeforeDue: number;
+  /** Ekspor (ASUMSI A-86): tarif PPN untuk term berprofil pajak ekspor (bawaan 0) dan batas bayar order USD (jam). */
+  exportTaxRate: number;
+  exportPaymentDueHours: number;
+  /** Penawaran ongkir CIF (ASUMSI A-89): masa berlaku bawaan penawaran admin (hari, 1..90) dan batas tunggu order tanpa penawaran berlaku (hari, 1..365). */
+  freightQuoteValidDays?: number;
+  freightQuoteMaxDays?: number;
   /** Nomor invoice: {invoicePrefix}/{urut per bulan}/{bulan Romawi}/{tahun}. */
   invoicePrefix: string;
   invoiceSignerName: string;
@@ -338,10 +446,31 @@ export interface CommerceSettingsData {
 /** flat = tarif tetap; calculated = dasar + jarak (km) + berat (kg) + volume (m³), ASUMSI A-76. */
 export type ShippingRateType = 'flat' | 'calculated';
 
-export interface ShippingOrigin {
-  label: string;
+// ---- Lokasi pabrik (GET/POST /admin/factory-locations, PUT/DELETE /admin/factory-locations/{id}; kontrak 11.8, ASUMSI A-90) ----
+export interface AdminFactoryLocation extends FactoryLocation {
+  id: number;
+  sortOrder: number;
+  /** Urutan pertama = pabrik untuk produk tanpa pabrik asal. */
+  isDefault: boolean;
+  /** Produk yang menunjuk pabrik ini; hapus ditolak 409 FACTORY_LOCATION_IN_USE bila > 0 atau tinggal satu baris. */
+  productsCount: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** Body FactoryLocationRequest: PUT = penggantian penuh (lat/lng selalu dikirim); `code` hanya saat membuat. */
+export interface FactoryLocationPayload {
+  code?: string;
+  name: I18n;
+  address: string;
   lat: number | null;
   lng: number | null;
+  allowsPickup: boolean;
+  sortOrder?: number | null;
+}
+
+/** GET/PUT /admin/shipping/road-factor: jarak jalan = jarak garis lurus × faktor (1..3). */
+export interface RoadFactorData {
   roadFactor: number;
 }
 
@@ -388,6 +517,58 @@ export interface ShippingZoneRow {
   priority: number;
   regions: ZoneRegionRef[];
   rates: ShippingRateRow[];
+}
+
+// ---- Cara serah terima (GET/POST /admin/delivery-terms, PUT/DELETE /admin/delivery-terms/{id}; kontrak 11.8, ASUMSI A-85) ----
+export interface AdminDeliveryTerm extends DeliveryTerm {
+  id: number;
+  isActive: boolean;
+  sortOrder: number;
+  /** Jumlah order yang memakai term ini; hapus ditolak 409 bila > 0. */
+  ordersCount?: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** Body DeliveryTermRequest: `code` hanya saat membuat (tidak bisa diubah). */
+export interface DeliveryTermPayload {
+  code?: string;
+  name: I18n;
+  description: I18n;
+  family: DeliveryTermFamily;
+  market: DeliveryTermMarket;
+  pricingMode: DeliveryTermPricingMode;
+  taxProfile: DeliveryTermTaxProfile;
+  insuranceIncluded: boolean;
+  loadingPort: string | null;
+  requiresDestinationPort: boolean;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+// ---- Syarat pembayaran (GET/POST /admin/payment-terms, PUT/DELETE /admin/payment-terms/{id}; kontrak 11.10, ASUMSI A-87) ----
+export interface PaymentTermRow {
+  id: number;
+  code: string;
+  name: I18n;
+  description: I18n | null;
+  market: DeliveryTermMarket;
+  isActive: boolean;
+  sortOrder: number;
+  /** Jumlah order yang membekukan syarat ini; hapus ditolak 409 PAYMENT_TERM_IN_USE bila > 0. */
+  ordersCount?: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** Body PaymentTermRequest: `code` hanya saat membuat (tidak bisa diubah). */
+export interface PaymentTermPayload {
+  code?: string;
+  name: I18n;
+  description: I18n;
+  market: DeliveryTermMarket;
+  isActive: boolean;
+  sortOrder: number;
 }
 
 export type VoucherType = 'percent' | 'fixed';
@@ -469,6 +650,11 @@ export const stockMovementLabels: Record<StockMovementType, StatusLabel> = {
   commit: { id: 'Terjual (keluar)', en: 'Committed (out)', tone: 'bad' },
 };
 
+export const exchangeRateSourceLabels: Record<ExchangeRateSource, StatusLabel> = {
+  jisdor: { id: 'JISDOR', en: 'JISDOR', tone: 'info' },
+  manual: { id: 'Manual', en: 'Manual', tone: 'warn' },
+};
+
 export const feeTypeLabels: Record<FeeType, { id: string; en: string }> = {
   admin: { id: 'Biaya admin', en: 'Admin fee' },
   other: { id: 'Biaya lain', en: 'Other fee' },
@@ -477,6 +663,42 @@ export const feeTypeLabels: Record<FeeType, { id: string; en: string }> = {
 export const shippingRateTypeLabels: Record<ShippingRateType, { id: string; en: string }> = {
   flat: { id: 'Tarif tetap', en: 'Flat rate' },
   calculated: { id: 'Dihitung (jarak, berat, volume)', en: 'Calculated (distance, weight, volume)' },
+};
+
+export const deliveryFamilyLabels: Record<DeliveryTermFamily, { id: string; en: string }> = {
+  pickup: { id: 'Ambil di pabrik', en: 'Pickup at factory' },
+  door: { id: 'Diantar ke alamat', en: 'Delivered to address' },
+  port: { id: 'Serah di pelabuhan', en: 'Handed over at port' },
+};
+
+export const deliveryMarketLabels: Record<DeliveryTermMarket, { id: string; en: string }> = {
+  local: { id: 'Lokal', en: 'Local' },
+  export: { id: 'Ekspor', en: 'Export' },
+};
+
+/** Pasar customer memakai kata yang sama dengan pasar term. */
+export const customerMarketLabels: Record<CustomerMarket, { id: string; en: string }> = deliveryMarketLabels;
+
+export const currencyLabels: Record<Currency, { id: string; en: string }> = {
+  IDR: { id: 'IDR (Rupiah)', en: 'IDR (Rupiah)' },
+  USD: { id: 'USD (Dolar AS)', en: 'USD (US Dollar)' },
+};
+
+export const taxProfileLabels: Record<DeliveryTermTaxProfile, { id: string; en: string }> = {
+  domestic: { id: 'Domestik (tarif PPN)', en: 'Domestic (VAT rate)' },
+  export: { id: 'Ekspor (tarif PPN ekspor)', en: 'Export (export VAT rate)' },
+};
+
+/** Pasar bawaan untuk modal Setujui: Indonesia = lokal, negara lain = ekspor (admin tetap bisa mengubah). */
+export function marketForCountry(countryCode: string | null | undefined): CustomerMarket {
+  return (countryCode || 'ID').toUpperCase() === 'ID' ? 'local' : 'export';
+}
+
+export const deliveryPricingLabels: Record<DeliveryTermPricingMode, { id: string; en: string }> = {
+  none: { id: 'Tanpa biaya', en: 'No charge' },
+  zone: { id: 'Tarif zona', en: 'Zone rate' },
+  included: { id: 'Termasuk harga', en: 'Included in price' },
+  quoted: { id: 'Penawaran admin', en: 'Quoted by admin' },
 };
 
 export const voucherTypeLabels: Record<VoucherType, { id: string; en: string }> = {
@@ -511,7 +733,7 @@ export const regionLevelLabels: Record<RegionLevel, { id: string; en: string }> 
 };
 
 /** Status order yang masih boleh dibatalkan admin (server tetap memvalidasi lewat state machine). */
-export const adminCancellableStatuses: OrderStatusKey[] = ['pending_payment', 'payment_review', 'paid', 'processing'];
+export const adminCancellableStatuses: OrderStatusKey[] = ['awaiting_freight', 'pending_payment', 'payment_review', 'paid', 'processing'];
 
 /** Status order yang batas waktunya masih bisa diperpanjang. */
 export const dueEditableStatuses: OrderStatusKey[] = ['pending_payment', 'payment_review'];

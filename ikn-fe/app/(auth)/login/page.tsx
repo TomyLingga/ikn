@@ -13,6 +13,8 @@ import AuthVisual from '@/components/auth/AuthVisual';
 import PasswordChecklist from '@/components/PasswordChecklist';
 import { confirmError, emailError, isEmail, isPhone, isStrongPassword, passwordError, phoneError, validationText } from '@/lib/validation';
 import PhoneInput from '@/components/PhoneInput';
+import Select from '@/components/Select';
+import { DEFAULT_COUNTRY, useCountries } from '@/lib/countries';
 import styles from './page.module.css';
 
 type AuthMode = 'login' | 'registration';
@@ -36,6 +38,8 @@ function AuthCard() {
   const [remember, setRemember] = useState(true);
   // Nilai terkontrol untuk validasi langsung (format email, nomor HP, kekuatan & konfirmasi kata sandi).
   const [values, setValues] = useState({ loginEmail: '', email: '', phone: '', password: '', confirm: '' });
+  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY);
+  const { countries } = useCountries();
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const setValue = (key: keyof typeof values) => (event: { target: { value: string } }) => setValues((v) => ({ ...v, [key]: event.target.value }));
   const touch = (key: string) => () => setTouched((t) => ({ ...t, [key]: true }));
@@ -177,6 +181,8 @@ function AuthCard() {
         company: value('company') || undefined,
         position: value('position') || undefined,
         taxId: value('taxId') || undefined,
+        // Negara perusahaan (ASUMSI A-86): admin menentukan pasar lokal/ekspor dari sini saat menyetujui akun.
+        countryCode: countryCode || DEFAULT_COUNTRY,
       });
       setRegistered(email);
     } catch (err) {
@@ -383,6 +389,17 @@ function AuthCard() {
                   {fieldError('position')}
                 </label>
               </div>
+              <label className={styles.field}>
+                <span>{t('Negara', 'Country')}</span>
+                <Select name="countryCode" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} searchPlaceholder={t('Cari negara', 'Search country')}>
+                  {(countries.length > 0 ? countries : [{ code: DEFAULT_COUNTRY, name: { id: 'Indonesia', en: 'Indonesia' } }]).map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name[lang] || c.name.id}
+                    </option>
+                  ))}
+                </Select>
+                {fieldError('countryCode')}
+              </label>
               <div className={styles.twoCol}>
                 <label className={styles.field}>
                   <span>{t('Nomor telepon', 'Phone number')}</span>

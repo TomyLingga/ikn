@@ -8,16 +8,17 @@ import { useCart } from '@/components/CartProvider';
 import { useLang } from '@/components/LanguageProvider';
 import Icon from '@/components/Icon';
 import { tr } from '@/lib/cms';
-import { formatIDR } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
 import { CART_OPEN_EVENT, shopPaths } from '@/lib/shop';
 import styles from './CustomerCart.module.css';
 
 const paths = shopPaths(true);
 
 // Laci keranjang di topbar portal customer. Tautan produk dan checkout tetap di dalam portal.
+// Harga ditampilkan dalam mata uang item (IDR/USD mengikuti pasar customer, ASUMSI A-86).
 export default function CustomerCart() {
   const [isOpen, setIsOpen] = useState(false);
-  const { items, count, subtotal, remove, updateQty, ready } = useCart();
+  const { items, count, subtotal, remove, updateQty, ready, currency, notice, dismissNotice } = useCart();
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
 
@@ -84,6 +85,12 @@ export default function CustomerCart() {
                 </div>
               ) : (
                 <div className={styles.list}>
+                  {notice && (
+                    <p className="cart-notice" role="status">
+                      <span>{notice}</span>
+                      <button type="button" onClick={dismissNotice}>{t('Tutup', 'Dismiss')}</button>
+                    </p>
+                  )}
                   {items.map((item) => {
                     const name = tr(item.name, lang);
                     return (
@@ -99,7 +106,7 @@ export default function CustomerCart() {
                           <Link href={paths.product(item.slug)} className={styles.name} onClick={() => setIsOpen(false)}>
                             {name}
                           </Link>
-                          <div className={styles.price}>{formatIDR(item.unitPrice || 0)}/{item.unit}</div>
+                          <div className={styles.price}>{formatMoney(item.unitPrice ?? 0, item.currency)}/{item.unit}</div>
                           <div className={styles.actions}>
                             <div className={styles.qtyCtl}>
                               <button type="button" onClick={() => updateQty(item.slug, item.qty - 1)} disabled={item.qty <= item.moq} aria-label={t('Kurangi', 'Decrease')}>-</button>
@@ -122,7 +129,7 @@ export default function CustomerCart() {
               <div className={styles.footer}>
                 <div className={styles.subtotal}>
                   <span>{t('Estimasi subtotal', 'Estimated subtotal')}</span>
-                  <strong>{formatIDR(subtotal)}</strong>
+                  <strong>{formatMoney(subtotal, currency)}</strong>
                 </div>
                 <Link href={paths.checkout} className="btn btn-solid btn-full" onClick={() => setIsOpen(false)}>
                   {t('Checkout', 'Checkout')} <Icon name="arrow" />

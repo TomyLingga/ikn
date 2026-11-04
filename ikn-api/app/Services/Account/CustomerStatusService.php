@@ -10,15 +10,16 @@ use Illuminate\Support\Facades\Mail;
 
 // Transisi status customer oleh admin (kontrak 11.4). Semua transisi diizinkan kecuali kembali ke pending
 // (dibatasi Form Request). Email hanya untuk approve (masuk active dari pending/rejected) dan reject.
+// Saat menyetujui, admin boleh sekaligus mengunci pasar (ASUMSI A-86) lewat CustomerMarketService.
 class CustomerStatusService
 {
     public const TARGET_STATUSES = [User::STATUS_ACTIVE, User::STATUS_REJECTED, User::STATUS_INACTIVE];
 
-    public function __construct(private InAppNotifier $inApp)
+    public function __construct(private InAppNotifier $inApp, private CustomerMarketService $markets)
     {
     }
 
-    public function transition(User $customer, string $status, ?string $reason, User $admin): User
+    public function transition(User $customer, string $status, ?string $reason, User $admin, ?string $market = null): User
     {
         $from = $customer->status;
 
@@ -28,6 +29,10 @@ class CustomerStatusService
                 if ($from !== User::STATUS_ACTIVE) {
                     $customer->approved_at = now();
                     $customer->approved_by = $admin->id;
+                }
+                if ($market !== null) {
+                    // 409 CUSTOMER_HAS_OPEN_ORDERS bila pasar berubah padahal masih ada order berjalan (sebelum status disimpan).
+                    $this->markets->change($customer, $market);
                 }
                 break;
             case User::STATUS_REJECTED:

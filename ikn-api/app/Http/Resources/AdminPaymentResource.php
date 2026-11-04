@@ -32,6 +32,7 @@ class AdminPaymentResource extends JsonResource
                     'pic' => $order->customerPic(),
                     'email' => $order->customerEmail(),
                 ],
+                'currency' => $order->currencyCode(),
                 'grandTotal' => $order->grandTotalInt(),
                 'uniqueCode' => (int) $order->unique_code,
                 'paymentDueAt' => optional($order->payment_due_at)->toApiString(),

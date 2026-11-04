@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Auth\RegistrationController;
 use App\Http\Controllers\Api\V1\Customer\AddressController;
 use App\Http\Controllers\Api\V1\Customer\ProfileController;
 use App\Http\Controllers\Api\V1\GeoController;
+use App\Http\Controllers\Api\V1\PublicSite\CountryController;
 use App\Http\Controllers\Api\V1\PublicSite\RegionController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +32,8 @@ Route::prefix('auth')->group(function () {
 // ---- Wilayah (publik) ----
 Route::get('regions', [RegionController::class, 'index']);
 Route::get('regions/search', [RegionController::class, 'search']);
+// Negara ISO 3166-1 alpha-2 untuk form daftar/profil (ASUMSI A-86).
+Route::get('countries', [CountryController::class, 'index']);
 
 // ---- Geo proxy Nominatim (login apa pun) ----
 Route::prefix('geo')->middleware(['auth:sanctum', 'throttle:geo'])->group(function () {
@@ -60,5 +63,7 @@ Route::prefix('admin')
             Route::get('customers', [AdminCustomerController::class, 'index']);
             Route::get('customers/{customer}', [AdminCustomerController::class, 'show']);
             Route::put('customers/{customer}/status', [AdminCustomerController::class, 'updateStatus']);
+            // Pasar customer local|export (kontrak 11.9, ASUMSI A-86); 409 bila masih ada order berjalan.
+            Route::put('customers/{customer}/market', [AdminCustomerController::class, 'updateMarket']);
         });
     });

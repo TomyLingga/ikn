@@ -57,6 +57,8 @@ class ProductRequest extends FormRequest
             'slug' => ['nullable', 'string', 'max:160', Rule::unique('products', 'slug')->ignore($product?->id)],
             'code' => ['required', 'string', 'max:64', Rule::unique('products', 'code')->ignore($product?->id)],
             'categoryId' => ['required', 'integer', 'exists:categories,id'],
+            // Pabrik asal (ASUMSI A-90): null = pabrik bawaan (urutan pertama); tidak dikirim = nilai lama.
+            'factoryLocationId' => ['nullable', 'integer', 'exists:factory_locations,id'],
             'kind' => ['nullable', 'string', 'max:120'],
             'specs' => ['nullable', 'array', 'max:60'],
             'specs.*' => ['array', 'size:2'],
@@ -69,6 +71,8 @@ class ProductRequest extends FormRequest
             'priceMode' => ['required', Rule::in(Product::PRICE_MODES)],
             'price' => ['nullable', 'integer', 'min:0', 'max:9999999999999', 'required_if:priceMode,'.Product::PRICE_MODE_FIXED],
             'promoPrice' => ['nullable', 'integer', 'min:0', 'max:9999999999999'],
+            // Harga USD per satuan dalam SEN (1250 = USD 12,50), basis FOB Belawan (ASUMSI A-86); null = belum dijual ekspor.
+            'priceUsd' => ['nullable', 'integer', 'min:0', 'max:999999999999'],
             'promoStartsAt' => ['nullable', 'date'],
             'promoEndsAt' => ['nullable', 'date', 'after_or_equal:promoStartsAt'],
             'unit' => ['nullable', 'string', 'max:32'],

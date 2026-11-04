@@ -6,6 +6,7 @@ use App\Exceptions\ApiException;
 use App\Models\BankAccount;
 use App\Models\ChatMessage;
 use App\Models\CustomerAddress;
+use App\Models\DeliveryTerm;
 use App\Models\Media;
 use App\Models\Order;
 use App\Models\PaymentMethod;
@@ -15,9 +16,11 @@ use App\Models\User;
 use App\Models\UserNotification;
 use App\Services\Chat\ChatService;
 use App\Services\Commerce\CheckoutService;
+use App\Services\Commerce\FreightQuoteService;
 use App\Services\Commerce\OrderCalculator;
 use App\Services\Commerce\OrderNotifier;
 use App\Services\Commerce\OrderStateMachine;
+use App\Services\Commerce\ProformaService;
 use App\Services\Media\MediaService;
 use App\Services\Payment\PaymentService;
 use Illuminate\Database\Seeder;
@@ -60,7 +63,7 @@ class CommerceDemoSeeder extends Seeder
     // Konteks customer aktif untuk place(); diganti lewat as().
     private User $buyer;
 
-    private CustomerAddress $address;
+    private ?CustomerAddress $address = null;
 
     private CheckoutService $checkout;
 
@@ -97,6 +100,12 @@ class CommerceDemoSeeder extends Seeder
         // Email demo tidak perlu dikirim/di-log saat seeding (notifikasi dalam aplikasi tetap dibuat).
         Mail::fake();
 
+        // Order demo berkurir dibuat seolah Franco masih aktif (riwayat sebelum klien beralih ke Loco, ASUMSI A-85);
+        // status aktif baris Franco dikembalikan setelah selesai.
+        $franco = DeliveryTerm::where('code', 'franco')->first();
+        $francoWasActive = (bool) $franco?->is_active;
+        $franco?->update(['is_active' => true]);
+
         $now = now();
         try {
             $this->as($budi);
@@ -110,6 +119,13 @@ class CommerceDemoSeeder extends Seeder
                 $this->sitiChat($now);
             }
 
+            // Customer ekspor (ASUMSI A-86): satu order USD FOB Belawan menunggu transfer ke rekening USD.
+            $export = User::where('email', 'buyer@rubbertrade.example')->where('status', User::STATUS_ACTIVE)->first();
+            if ($export && $export->isExport() && BankAccount::active()->forCurrency('USD')->exists()) {
+                $this->as($export);
+                $this->exportOrders($now);
+            }
+
             $this->as($budi);
             $this->budiChat($now);
             $this->guestChat($now);
@@ -118,6 +134,7 @@ class CommerceDemoSeeder extends Seeder
             UserNotification::where('created_at', '<', $now->copy()->subDays(3))->whereNull('read_at')->update(['read_at' => $now]);
         } finally {
             Carbon::setTestNow();
+            $franco?->update(['is_active' => $francoWasActive]);
         }
     }
 
@@ -208,6 +225,13 @@ class CommerceDemoSeeder extends Seeder
         // Dibayar, belum diproses (2 hari lalu).
         $this->paidOrder($now->copy()->subDays(2)->setTime(16, 45), [['packing-pintu-rebusan', 1]]);
 
+        // Loco (ASUMSI A-85): diambil sendiri di pabrik, tanpa ongkir; kini SIAP DIAMBIL (shipped tanpa kurir/resi).
+        if (DeliveryTerm::active()->where('code', 'loco')->exists()) {
+            $pickup = $this->paidOrder($now->copy()->subDays(5)->setTime(9, 20), [['sarung-egrek', 25], ['sepatu-boots', 10]], ['term' => 'loco', 'note' => 'Diambil dengan mobil boks perusahaan.']);
+            $this->at($pickup->created_at->copy()->addDay()->setTime(8, 45), fn () => $this->sm->transition($pickup, Order::STATUS_PROCESSING, $this->salesAdmin));
+            $this->at($pickup->created_at->copy()->addDays(2)->setTime(13, 30), fn () => $this->sm->transition($pickup, Order::STATUS_SHIPPED, $this->salesAdmin));
+        }
+
         // Menunggu verifikasi (bukti transfer diunggah 20 jam lalu).
         $review = $this->at($now->copy()->subHours(20), fn () => $this->place([['resiprene-35', 25]], 'Mohon sertakan CoA per batch.'));
         $this->at($review->created_at->copy()->addMinutes(35), fn () => $this->payments->attachProof($review, $review->activePayment(), $this->proofMedia('bukti-transfer.pdf'), $this->buyer));
@@ -252,6 +276,35 @@ class CommerceDemoSeeder extends Seeder
         $this->at($processing->created_at->copy()->addHours(4), fn () => $this->sm->transition($processing, Order::STATUS_PROCESSING, $this->salesAdmin));
         // Menunggu pembayaran (1 jam lalu).
         $this->at($now->copy()->subHour(), fn () => $this->place([['rubber-ring', 300]], 'Please include the certificate of analysis.'));
+    }
+
+    // ------------------------------------------------------------------ customer ekspor (USD, FOB Belawan)
+
+    private function exportOrders(Carbon $now): void
+    {
+        $usdBank = BankAccount::active()->forCurrency('USD')->orderBy('sort_order')->orderBy('id')->first();
+        // Menunggu pembayaran (2 jam lalu): 500 kg Resiprene 35 FOB Belawan, syarat 100% T/T di muka.
+        $order = $this->at($now->copy()->subHours(2), fn () => $this->place([['resiprene-35', 500]], 'Please quote the earliest vessel from Belawan to Port Klang.', null, null, null, 'fob', [
+            'paymentTermCode' => 'tt_advance', 'bankAccountId' => $usdBank?->id,
+        ]));
+        // Proforma revisi 1 (ASUMSI A-88) oleh admin penjualan: pelabuhan muat dan syarat bayar dari order, kapal menyusul.
+        $this->at($now->copy()->subHours(2)->addMinutes(30), fn () => app(ProformaService::class)->save($order, [
+            'portOfDischarge' => 'Port Klang',
+            'notes' => 'Vessel and schedule to be confirmed after payment is received.',
+            'validUntil' => $now->copy()->addDays(14)->toDateString(),
+        ], $this->salesAdmin));
+
+        // CIF (ASUMSI A-89): 300 kg Resiprene 35 ke Port Klang menunggu penawaran ongkir (kemarin); admin penjualan sudah
+        // mengirim penawaran putaran 1 (ongkos kapal, biaya pelabuhan, asuransi; USD sen) yang berlaku 7 hari.
+        $cif = $this->at($now->copy()->subDay(), fn () => $this->place([['resiprene-35', 300]], 'CIF Port Klang, please include marine insurance.', null, null, null, 'cif', [
+            'paymentTermCode' => 'tt_advance', 'bankAccountId' => $usdBank?->id,
+            'destinationPort' => ['name' => 'Port Klang', 'country' => 'Malaysia', 'countryCode' => 'MY', 'lat' => 2.9997, 'lng' => 101.3929],
+        ]));
+        $this->at($now->copy()->subDay()->addHours(3), fn () => app(FreightQuoteService::class)->adminPropose($cif, $this->salesAdmin, [
+            ['label' => 'Ocean freight Belawan - Port Klang', 'amount' => 65000],
+            ['label' => 'Port charges', 'amount' => 12000],
+            ['label' => 'Insurance', 'amount' => 4500],
+        ], $now->copy()->addDays(7), 'Rate valid for shipment within two weeks after payment.'));
     }
 
     private function sitiChat(Carbon $now): void
@@ -305,11 +358,11 @@ class CommerceDemoSeeder extends Seeder
 
     // ------------------------------------------------------------------ helper
 
-    /** Ganti konteks customer (dan alamat) untuk place() berikutnya. */
+    /** Ganti konteks customer (dan alamat) untuk place() berikutnya; customer ekspor boleh tanpa alamat (FOB tidak memakainya). */
     private function as(User $customer, ?CustomerAddress $address = null): void
     {
         $this->buyer = $customer;
-        $this->address = $address ?? $customer->addresses()->orderByDesc('is_default')->orderBy('id')->firstOrFail();
+        $this->address = $address ?? $customer->addresses()->orderByDesc('is_default')->orderBy('id')->first();
     }
 
     private function trackingNote(Order $order, Carbon $time, string $note): void
@@ -350,48 +403,58 @@ class CommerceDemoSeeder extends Seeder
     /**
      * @param  array<int, array{0:string,1:int}>  $lines  [slug, qty]; qty 0 dilewati
      * @param  string|null  $rateName  nama tarif (ID), mis. "Ekspres"; null = tarif pertama yang tersedia
+     * @param  string  $term  kode cara serah terima; "franco" = diantar (alamat + tarif zona), "loco" = ambil di pabrik, "fob"/"cif" = ekspor
+     * @param  array  $extra  field payload tambahan (mis. paymentTermCode, bankAccountId USD untuk order ekspor, destinationPort untuk CIF)
      */
-    private function place(array $lines, ?string $note = null, ?string $voucher = null, ?string $rateName = null, ?PaymentMethod $method = null): Order
+    private function place(array $lines, ?string $note = null, ?string $voucher = null, ?string $rateName = null, ?PaymentMethod $method = null, string $term = 'franco', array $extra = []): Order
     {
         $items = array_values(array_map(fn ($line) => ['productSlug' => $line[0], 'qty' => $line[1]], array_filter($lines, fn ($line) => $line[1] > 0)));
-        $quote = $this->calculator->quote($this->buyer, $items, $this->address);
-        $rates = $quote->availableShippingRates;
-        $rate = $rateName ? collect($rates)->first(function ($r) use ($rateName) {
-            $name = $r['name'] ?? null;
+        $rateId = null;
+        if ($term === 'franco') {
+            if (! $this->address) {
+                throw new \RuntimeException('CommerceDemoSeeder: '.$this->buyer->email.' has no address for a Franco order');
+            }
+            $quote = $this->calculator->quote($this->buyer, $items, $this->address);
+            $rates = $quote->availableShippingRates;
+            $rate = $rateName ? collect($rates)->first(function ($r) use ($rateName) {
+                $name = $r['name'] ?? null;
 
-            return (is_array($name) ? ($name['id'] ?? null) : $name) === $rateName;
-        }) : null;
-        $rateId = $rate['rateId'] ?? ($rates[0]['rateId'] ?? null);
-        if (! $rateId) {
-            throw new \RuntimeException('CommerceDemoSeeder: no shipping rate for the demo address of '.$this->buyer->email);
+                return (is_array($name) ? ($name['id'] ?? null) : $name) === $rateName;
+            }) : null;
+            $rateId = $rate['rateId'] ?? ($rates[0]['rateId'] ?? null);
+            if (! $rateId) {
+                throw new \RuntimeException('CommerceDemoSeeder: no shipping rate for the demo address of '.$this->buyer->email);
+            }
         }
         $method ??= $this->transfer;
 
-        return $this->checkout->place($this->buyer, [
+        return $this->checkout->place($this->buyer, array_merge([
             'items' => $items,
-            'addressId' => $this->address->id,
+            'deliveryTermCode' => $term,
+            'addressId' => $term === 'franco' ? $this->address->id : null,
             'shippingRateId' => $rateId,
             'paymentMethodCode' => $method->code,
             'bankAccountId' => $method->code === 'manual_transfer' ? $this->bank?->id : null,
             'voucherCode' => $voucher,
             'note' => $note,
-        ], self::KEY_PREFIX.(++$this->sequence));
+        ], $extra), self::KEY_PREFIX.(++$this->sequence));
     }
 
-    /** @param  array{voucher?:string,rate?:string,note?:string,address?:CustomerAddress}  $opts */
+    /** @param  array{voucher?:string,rate?:string,note?:string,address?:CustomerAddress,term?:string}  $opts */
     private function paidOrder(Carbon $placedAt, array $lines, array $opts = []): Order
     {
         $previousAddress = $this->address;
         if (! empty($opts['address'])) {
             $this->address = $opts['address'];
         }
+        $term = $opts['term'] ?? 'franco';
         try {
-            $order = $this->at($placedAt, function () use ($lines, $opts) {
+            $order = $this->at($placedAt, function () use ($lines, $opts, $term) {
                 try {
-                    return $this->place($lines, $opts['note'] ?? null, $opts['voucher'] ?? null, $opts['rate'] ?? null);
+                    return $this->place($lines, $opts['note'] ?? null, $opts['voucher'] ?? null, $opts['rate'] ?? null, null, $term);
                 } catch (ApiException | ValidationException $e) {
                     // Voucher tidak berlaku pada tanggal itu → tanpa voucher.
-                    return $this->place($lines, $opts['note'] ?? null, null, $opts['rate'] ?? null);
+                    return $this->place($lines, $opts['note'] ?? null, null, $opts['rate'] ?? null, null, $term);
                 }
             });
         } finally {

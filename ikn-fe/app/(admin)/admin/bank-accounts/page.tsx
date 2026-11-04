@@ -7,24 +7,52 @@ import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/
 import { firstError, type FieldErrors } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
-import type { BankAccountRow } from '@/lib/admin';
+import { currencyLabels, type BankAccountRow } from '@/lib/admin';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import Select from '@/components/Select';
+import type { Currency } from '@/lib/types';
 
 interface BankForm {
   bankName: string;
   accountNumber: string;
   accountHolder: string;
+  /** Rekening USD (ASUMSI A-86) membawa SWIFT, alamat bank, bank koresponden untuk instruksi bayar ekspor. */
+  currency: Currency;
+  swiftCode: string;
+  bankAddress: string;
+  correspondentBank: string;
   isActive: boolean;
   sortOrder: number;
 }
 
-const emptyForm = (sortOrder: number): BankForm => ({ bankName: '', accountNumber: '', accountHolder: 'PT Industri Karet Nusantara', isActive: true, sortOrder });
+const emptyForm = (sortOrder: number): BankForm => ({
+  bankName: '',
+  accountNumber: '',
+  accountHolder: 'PT Industri Karet Nusantara',
+  currency: 'IDR',
+  swiftCode: '',
+  bankAddress: '',
+  correspondentBank: '',
+  isActive: true,
+  sortOrder,
+});
 
 function formFromRow(row: BankAccountRow): BankForm {
-  return { bankName: row.bankName, accountNumber: row.accountNumber, accountHolder: row.accountHolder, isActive: row.isActive, sortOrder: row.sortOrder };
+  return {
+    bankName: row.bankName,
+    accountNumber: row.accountNumber,
+    accountHolder: row.accountHolder,
+    currency: row.currency || 'IDR',
+    swiftCode: row.swiftCode || '',
+    bankAddress: row.bankAddress || '',
+    correspondentBank: row.correspondentBank || '',
+    isActive: row.isActive,
+    sortOrder: row.sortOrder,
+  };
 }
 
 // Rekening tujuan transfer manual: GET/POST /admin/bank-accounts, PUT/DELETE /admin/bank-accounts/{id}.
+// Rekening USD dipakai order ekspor (checkout hanya menawarkan rekening se-mata-uang order).
 export default function AdminBankAccounts() {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
@@ -67,7 +95,15 @@ export default function AdminBankAccounts() {
     setSaving(true);
     setFormError('');
     setFormErrors({});
-    const body = { ...form, bankName: form.bankName.trim(), accountNumber: form.accountNumber.trim(), accountHolder: form.accountHolder.trim() };
+    const body = {
+      ...form,
+      bankName: form.bankName.trim(),
+      accountNumber: form.accountNumber.trim(),
+      accountHolder: form.accountHolder.trim(),
+      swiftCode: form.swiftCode.trim().toUpperCase() || null,
+      bankAddress: form.bankAddress.trim() || null,
+      correspondentBank: form.correspondentBank.trim() || null,
+    };
     try {
       if (editing) {
         await api(`/admin/bank-accounts/${editing.id}`, { method: 'PUT', body });
@@ -110,7 +146,17 @@ export default function AdminBankAccounts() {
   }
 
   const columns: Column<BankAccountRow>[] = [
-    { key: 'bankName', label: 'Bank' },
+    {
+      key: 'bankName',
+      label: 'Bank',
+      render: (b) => (
+        <span>
+          <strong>{b.bankName}</strong>
+          {b.swiftCode && <small className="admin-cell-sub mono">SWIFT {b.swiftCode}</small>}
+        </span>
+      ),
+    },
+    { key: 'currency', label: t('Mata uang', 'Currency'), render: (b) => <StatusBadge label={b.currency || 'IDR'} tone={(b.currency || 'IDR') === 'USD' ? 'info' : 'ok'} small /> },
     { key: 'accountNumber', label: t('Nomor rekening', 'Account number'), render: (b) => <span className="mono">{b.accountNumber}</span> },
     { key: 'accountHolder', label: t('Atas nama', 'Account holder') },
     { key: 'sortOrder', label: t('Urutan', 'Order'), align: 'right', render: (b) => String(b.sortOrder) },
@@ -170,6 +216,34 @@ export default function AdminBankAccounts() {
               <span className="field-label">{t('Atas nama', 'Account holder')} *</span>
               <input value={form.accountHolder} onChange={(e) => setForm({ ...form, accountHolder: e.target.value })} required />
               {firstError(formErrors, 'accountHolder') && <small className="cms-field-error">{firstError(formErrors, 'accountHolder')}</small>}
+            </label>
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">{t('Mata uang', 'Currency')}</span>
+                <Select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value as Currency })}>
+                  {(Object.keys(currencyLabels) as Currency[]).map((code) => (
+                    <option key={code} value={code}>
+                      {currencyLabels[code][lang]}
+                    </option>
+                  ))}
+                </Select>
+                {firstError(formErrors, 'currency') && <small className="cms-field-error">{firstError(formErrors, 'currency')}</small>}
+              </label>
+              <label>
+                <span className="field-label">{t('Kode SWIFT', 'SWIFT code')}{form.currency === 'USD' ? ' *' : ''}</span>
+                <input value={form.swiftCode} onChange={(e) => setForm({ ...form, swiftCode: e.target.value.toUpperCase() })} maxLength={11} className="mono" placeholder="BMRIIDJA" required={form.currency === 'USD'} />
+                {firstError(formErrors, 'swiftCode') && <small className="cms-field-error">{firstError(formErrors, 'swiftCode')}</small>}
+              </label>
+            </div>
+            <label>
+              <span className="field-label">{t('Alamat bank', 'Bank address')}</span>
+              <input value={form.bankAddress} onChange={(e) => setForm({ ...form, bankAddress: e.target.value })} maxLength={255} placeholder={t('Cabang, kota, negara', 'Branch, city, country')} />
+              {firstError(formErrors, 'bankAddress') && <small className="cms-field-error">{firstError(formErrors, 'bankAddress')}</small>}
+            </label>
+            <label>
+              <span className="field-label">{t('Bank koresponden', 'Correspondent bank')}</span>
+              <input value={form.correspondentBank} onChange={(e) => setForm({ ...form, correspondentBank: e.target.value })} maxLength={160} placeholder={t('opsional, untuk transfer USD', 'optional, for USD transfers')} />
+              {firstError(formErrors, 'correspondentBank') && <small className="cms-field-error">{firstError(formErrors, 'correspondentBank')}</small>}
             </label>
             <div className="admin-form-row">
               <label>

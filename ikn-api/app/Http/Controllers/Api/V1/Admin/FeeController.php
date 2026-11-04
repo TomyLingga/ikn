@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Requests\Admin\FeeRequest;
 use App\Http\Resources\FeeResource;
 use App\Models\Fee;
+use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -64,7 +65,9 @@ class FeeController extends ApiController
         return [
             'name' => $data['name'],
             'type' => $data['type'] ?? Fee::TYPE_OTHER,
-            'amount' => (int) $data['amount'],
+            // amount diterima dalam satuan terkecil mata uang fee (IDR rupiah, USD sen; ASUMSI A-86).
+            'currency' => $currency = $data['currency'] ?? ($existing?->currencyCode() ?? Money::CURRENCY_IDR),
+            'amount' => Money::fromMinor((int) $data['amount'], $currency),
             'is_active' => (bool) ($data['isActive'] ?? true),
             'sort_order' => (int) ($data['sortOrder'] ?? 0),
             'audience' => $data['audience'] ?? ($existing->audience ?? Fee::AUDIENCE_ALL),

@@ -60,6 +60,37 @@ class ProfileController extends ApiController
             }
         }
 
+        // Negara dan alamat perusahaan menentukan pasar yang dikunci admin (ASUMSI A-86): customer hanya boleh
+        // mengubahnya selagi akun pending; setelah itu nilai yang berbeda ditolak 422 (nilai sama diabaikan).
+        $locked = ['countryCode' => 'country_code', 'companyAddress' => 'company_address'];
+        $errors = [];
+        foreach ($locked as $input => $column) {
+            if (! array_key_exists($input, $data)) {
+                continue;
+            }
+            $value = $data[$input];
+            if ($input === 'countryCode') {
+                $value = $value ?: \App\Models\CustomerProfile::DEFAULT_COUNTRY;
+            } elseif (is_string($value)) {
+                $value = trim($value) === '' ? null : trim($value);
+            }
+            $current = $user->profile->{$column};
+            if ($input === 'countryCode') {
+                $current = $current ?: \App\Models\CustomerProfile::DEFAULT_COUNTRY;
+            }
+            if ($value === $current) {
+                continue;
+            }
+            if ($user->status !== User::STATUS_PENDING) {
+                $errors[$input] = [__('account.company_locked')];
+                continue;
+            }
+            $profile[$column] = $value;
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
         if ($profile !== []) {
             $user->profile->fill($profile)->save();
         }

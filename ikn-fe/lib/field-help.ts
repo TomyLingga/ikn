@@ -40,6 +40,7 @@ const COMMON: Record<string, HelpText> = {
   'Nama lokasi': h('Nama tempat yang mudah dikenali, mis. "Kantor Pusat & Pabrik" atau "Pabrik Resiprene".', 'An easily recognised place name, e.g. "Head Office & Plant" or "Resiprene Plant".'),
   'Ringkasan': h('Ringkasan singkat 1–2 kalimat yang tampil di kartu/daftar sebelum pengunjung membuka detail.', 'A 1–2 sentence summary shown on cards/lists before the visitor opens the detail.'),
   'Satuan': h('Satuan jual atau satuan angka, mis. pcs, kg, roll, tahun, ton.', 'Sales unit or figure unit, e.g. pcs, kg, roll, years, tons.'),
+  'Negara': h('Negara perusahaan (ISO). Indonesia berarti pasar lokal (rupiah); negara lain biasanya pasar ekspor (USD). Pasar dikunci admin saat menyetujui akun.', 'Company country (ISO). Indonesia means the local market (rupiah); other countries usually the export market (USD). The admin locks the market on approval.'),
   'Alasan penolakan': h('Wajib diisi. Alasan dikirim ke pihak terkait (email/notifikasi), jadi tulis jelas dan sopan, mis. "Nominal transfer kurang Rp 50.000".', 'Required. The reason is sent to the person concerned (email/notification); write it clearly and politely.'),
 };
 
@@ -54,9 +55,16 @@ const COMMERCE: Record<string, HelpText> = {
   'Lampiran untuk customer (opsional)': h('Dokumen yang perlu diterima customer, mis. faktur pajak, surat jalan, sertifikat analisis (dokumen PDF atau gambar, maks. 10 MB per berkas). Tampil di "Dokumen dari penjual" pada detail pesanan.', 'Documents the customer should receive, e.g. tax invoice, waybill, certificate of analysis (PDF documents or images, max 10 MB each). Shown under "Documents from the seller".'),
   'Perpanjang selama': h('Tambah batas waktu bayar dari batas sekarang, dalam jam. Pengingat bayar dikirim ulang untuk batas baru.', 'Extend the payment deadline from the current one, in hours. The reminder is sent again for the new deadline.'),
   'Batas bayar baru': h('Atau tentukan tanggal dan jam batas bayar baru secara langsung (harus di masa depan).', 'Or set the new payment deadline directly (must be in the future).'),
+  // Order CIF (ASUMSI A-89): pelabuhan tujuan di checkout customer dan baris penawaran ongkir admin.
+  'Nama pelabuhan': h('Nama pelabuhan bongkar di negara pembeli, teks bebas, mis. "Port Klang" atau "Jebel Ali". Dicetak sebagai pelabuhan tujuan di proforma dan commercial invoice.', 'Discharge port in the buyer country, free text, e.g. "Port Klang" or "Jebel Ali". Printed as the destination port on the proforma and commercial invoice.'),
+  'Cari pelabuhan': h('Ketik nama pelabuhan atau kota lalu tekan Cari; pilih hasil untuk mengisi negara dan menempatkan pin di peta. Pin bisa digeser.', 'Type a port or city name and press Search; pick a result to fill the country and place the map pin. The pin can be dragged.'),
+  'Keterangan biaya': h('Nama komponen ongkir pada penawaran CIF, mis. "Ocean freight", "Port charges", "Insurance". Dicetak di commercial invoice setelah disepakati.', 'Name of a freight component in the CIF quote, e.g. "Ocean freight", "Port charges", "Insurance". Printed on the commercial invoice once agreed.'),
   'Status pembayaran': h('Saring daftar menurut status percobaan pembayaran.', 'Filter the list by payment attempt status.'),
   'Status customer': h('Saring daftar menurut status akun customer.', 'Filter the list by customer account status.'),
   'Status order': h('Saring daftar menurut status order.', 'Filter the list by order status.'),
+  'Jumlah diterima': h('Jumlah yang benar-benar masuk ke rekening (terisi otomatis sebesar tagihan; ubah bila berbeda, mis. terpotong biaya bank). Hanya catatan untuk keuangan; order tetap menjadi Dibayar.', 'The amount that actually reached the account (prefilled with the amount due; change it if different, e.g. after bank charges). Notes for finance only; the order still becomes Paid.'),
+  'Biaya bank': h('Biaya transfer yang dipotong bank pengirim/koresponden, dalam mata uang pembayaran. Opsional.', 'Transfer charges deducted by the sending or correspondent bank, in the payment currency. Optional.'),
+  'Catatan penerimaan': h('Catatan singkat untuk keuangan, mis. nomor referensi transfer atau selisih kurs. Tampil di detail pembayaran.', 'Short note for finance, e.g. transfer reference or exchange difference. Shown on the payment detail.'),
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -69,6 +77,7 @@ const CATALOG: Record<string, HelpText> = {
   'Kata kunci pencarian (alias)': h('Kata lain yang sering dipakai customer untuk mencari produk ini (dipisah koma), mis. salah eja atau nama dagang. Tidak tampil di katalog.', 'Other words customers use to search for this product (comma-separated), e.g. misspellings or trade names. Not shown in the catalog.'),
   'Mode harga': h('Harga tetap = bisa dibeli lewat keranjang. Penawaran = tanpa harga; customer menekan "Minta penawaran" dan tim penjualan menghubungi.', 'Fixed price = can be bought via the cart. Quote = no price; customers press "Request a quote" and sales follows up.'),
   'Harga (Rp, sebelum promo)': h('Harga normal per satuan dalam rupiah bulat. Termasuk/tidak termasuk PPN mengikuti Pengaturan Checkout.', 'Normal price per unit in whole rupiah. VAT inclusion follows Checkout Settings.'),
+  'Harga USD (FOB Belawan)': h('Harga per satuan dalam dolar AS dengan dua desimal (mis. 12.50), basis FOB Belawan: trucking ke pelabuhan dan biaya pelabuhan sudah termasuk. Hanya dilihat customer ekspor yang login; kosong = produk tidak bisa dipesan customer ekspor. Tidak ada promo USD.', 'Price per unit in US dollars with two decimals (e.g. 12.50), FOB Belawan basis: trucking to the port and port charges included. Shown only to logged-in export customers; empty = export customers cannot order it. No USD promo.'),
   'Harga promo (Rp)': h('Harga coret yang berlaku hanya selama periode promo. Harus lebih kecil dari harga normal. Kosong = tidak ada promo.', 'Discounted price valid only during the promo period. Must be below the normal price. Empty = no promo.'),
   'Promo mulai': h('Tanggal dan jam promo mulai berlaku. Kosong = langsung berlaku.', 'Date and time the promo starts. Empty = starts immediately.'),
   'Promo berakhir': h('Tanggal dan jam promo berakhir. Setelahnya harga kembali normal otomatis.', 'Date and time the promo ends. The price returns to normal automatically afterwards.'),
@@ -85,6 +94,7 @@ const CATALOG: Record<string, HelpText> = {
   'Kelarutan (solubility)': h('Daftar pelarut dan tingkat kelarutannya (mis. pelarut "White spirit" dengan kelarutan "Sempurna"), tampil sebagai tabel di halaman produk.', 'Solvents and how well the product dissolves in them, shown as a table on the product page.'),
   'Jenis mutasi': h('Stok masuk = menambah stok dari produksi/pembelian. Penyesuaian = koreksi hasil stock opname (boleh negatif).', 'Stock in = add stock from production/purchase. Adjustment = stock-count correction (may be negative).'),
   'Jumlah': h('Banyaknya stok yang ditambah (stok masuk) atau dikoreksi (penyesuaian, mis. -5 atau 20) dalam satuan produk.', 'Quantity added (stock in) or corrected (adjustment, e.g. -5 or 20) in the product unit.'),
+  'Pabrik asal': h('Pabrik tempat produk ini dikirim (titik asal ongkir per km) atau diambil (Loco). "Bawaan" = pabrik urutan pertama di Ongkir > Lokasi pabrik.', 'Factory this product ships from (per-km origin) or is collected at (Loco). "Default" = the first factory under Shipping > Factory locations.'),
   'Nama kategori': h('Nama kategori produk yang tampil sebagai filter di katalog.', 'Product category name shown as a catalog filter.'),
   'Gambar kategori': h('Gambar kecil yang mewakili kategori (opsional).', 'A small image representing the category (optional).'),
 };
@@ -93,7 +103,14 @@ const CATALOG: Record<string, HelpText> = {
 // Pengaturan toko: ongkir, voucher, biaya, metode bayar, rekening, checkout
 // ---------------------------------------------------------------------------------------------
 const STORE_SETTINGS: Record<string, HelpText> = {
-  'Faktor jalan': h('Pengali jarak garis lurus menjadi perkiraan jarak jalan (1–3). Bawaan 1,3; naikkan bila rute ke wilayah tertentu banyak memutar.', 'Multiplier turning straight-line distance into estimated road distance (1–3). Default 1.3; raise it for winding routes.'),
+  'Faktor jalan': h('Pengali jarak garis lurus (pabrik asal ke titik peta alamat) menjadi perkiraan jarak jalan (1–3). Berlaku untuk semua pabrik. Bawaan 1,3; naikkan bila rute ke wilayah tertentu banyak memutar.', 'Multiplier turning straight-line distance (factory to address pin) into estimated road distance (1–3). Applies to every factory. Default 1.3; raise it for winding routes.'),
+  // Lokasi pabrik (ASUMSI A-90): titik asal ongkir per km sekaligus titik ambil Loco.
+  'Kode pabrik': h('Kode teknis pabrik (huruf kecil, angka, tanda hubung), mis. tanjung-morawa. Disimpan di snapshot order dan tidak bisa diubah setelah dibuat.', 'Technical factory code (lowercase letters, digits, hyphens), e.g. tanjung-morawa. Stored in order snapshots and immutable after creation.'),
+  'Urutan pabrik': h('Urutan daftar pabrik. Pabrik urutan pertama menjadi pabrik bawaan untuk produk yang tidak memilih pabrik asal. Kosong = ditaruh di akhir.', 'Factory list order. The first factory is the default for products without a source factory. Empty = placed last.'),
+  'Nama pabrik': h('Nama yang tampil ke customer di checkout, detail pesanan, invoice, dan email "siap diambil", mis. "Pabrik Tanjung Morawa". EN kosong = memakai teks ID.', 'Name shown to customers at checkout, on order details, the invoice and the ready-for-pickup email, e.g. "Tanjung Morawa Factory". Empty EN = uses the ID text.'),
+  'Alamat pabrik': h('Alamat lengkap pabrik untuk customer yang mengambil sendiri (Loco); dicetak di kartu titik ambil dan invoice.', 'Full factory address for customers collecting goods (Loco); printed on the pickup card and invoice.'),
+  'Titik peta pabrik': h('Klik peta atau cari alamat untuk menandai pabrik. Jarak tarif per km dihitung dari titik ini; tanpa titik, tarif per km tidak ditawarkan untuk produk pabrik ini.', 'Click the map or search to pin the factory. Per-km distance starts here; without a pin, per-km rates are not offered for this factory’s products.'),
+  'Boleh diambil (Loco)': h('Centang bila customer boleh mengambil sendiri barang di pabrik ini. Bila tidak, keranjang berisi produk pabrik ini tidak bisa memakai Loco.', 'Tick if customers may collect goods at this factory. If not, carts with this factory’s products cannot use Loco.'),
   'Cakupan wilayah': h('Wilayah yang masuk zona ini (provinsi, kabupaten/kota, atau kecamatan). Wilayah paling spesifik menang bila alamat cocok dengan beberapa zona.', 'Regions in this zone (province, regency/city, or district). The most specific region wins when an address matches several zones.'),
   'Prioritas': h('Penentu bila satu alamat cocok dengan dua zona pada tingkat wilayah yang sama: angka lebih besar menang. Selama zona tidak tumpang tindih, angka ini tidak berpengaruh.', 'Tie-breaker when an address matches two zones at the same region level: the higher number wins. Irrelevant if zones do not overlap.'),
   'Nama zona': h('Nama zona untuk admin, mis. "Jawa" atau "Sumatera Utara". Tidak tampil ke customer.', 'Zone name for admins, e.g. "Java". Not shown to customers.'),
@@ -102,12 +119,16 @@ const STORE_SETTINGS: Record<string, HelpText> = {
   'Tarif dasar (Rp)': h('Biaya tetap per kiriman (muat, packing, administrasi), dikenakan sekali per pesanan.', 'Fixed cost per shipment (loading, packing, admin), charged once per order.'),
   'Tarif tetap (Rp)': h('Ongkir untuk setiap pesanan di zona ini, berapa pun jarak, berat, dan volumenya.', 'Shipping charge for every order in this zone regardless of distance, weight or volume.'),
   'Ongkir minimum (Rp)': h('Batas bawah ongkir. Bila hasil hitungan lebih kecil, yang ditagih adalah angka minimum ini.', 'Shipping floor. If the calculated amount is lower, this minimum is charged.'),
-  'Per km jarak (Rp)': h('Rupiah per kilometer dari titik asal ke titik peta alamat customer (dihitung otomatis, dibulatkan ke atas). 0 = jarak tidak dihitung.', 'Rupiah per km from the origin to the customer map pin (automatic, rounded up). 0 = distance ignored.'),
+  'Per km jarak (Rp)': h('Rupiah per kilometer dari pabrik asal produk ke titik peta alamat customer (dihitung otomatis, dibulatkan ke atas). Keranjang dari dua pabrik dihitung per pabrik lalu dijumlahkan. 0 = jarak tidak dihitung.', 'Rupiah per km from the product factory to the customer map pin (automatic, rounded up). Carts from two factories are priced per factory and summed. 0 = distance ignored.'),
   'Per kg berat (Rp)': h('Rupiah per kilogram berat total pesanan (berat produk × qty, dibulatkan ke atas). 0 = berat tidak dihitung.', 'Rupiah per kg of total order weight (rounded up). 0 = weight ignored.'),
   'Per m³ volume (Rp)': h('Rupiah per meter kubik volume kemasan pesanan (dimensi produk × qty, dibulatkan ke atas per 0,01 m³). 0 = volume tidak dihitung.', 'Rupiah per cubic metre of package volume (rounded up per 0.01 m³). 0 = volume ignored.'),
   'Gratis ongkir di atas subtotal (Rp)': h('Bila subtotal setelah diskon mencapai angka ini, ongkir layanan ini menjadi Rp 0. Kosong = tidak ada gratis ongkir.', 'When the subtotal after discount reaches this amount, this service ships for free. Empty = never free.'),
   'Estimasi sampai': h('Perkiraan lama pengiriman yang tampil ke customer, mis. "2–4 hari".', 'Delivery time estimate shown to customers, e.g. "2–4 days".'),
   'Simulasi': h('Kalkulator percobaan: isi contoh jarak, berat, dan volume untuk melihat ongkir dari tarif yang sedang diisi. Tidak disimpan dan tidak memengaruhi customer.', 'Trial calculator: enter sample distance, weight and volume to preview the charge. Not saved.'),
+  'Keluarga': h('Jenis serah terima. Ambil di pabrik = customer mengambil sendiri, tanpa alamat dan ongkir (Loco). Diantar ke alamat = dikirim ke alamat customer (Franco). Serah di pelabuhan = FOB/CIF untuk ekspor.', 'Kind of handover. Pickup at factory = the customer collects the goods, no address or shipping charge (Loco). Delivered to address = shipped to the customer (Franco). Handed over at port = FOB/CIF for export.'),
+  'Pasar': h('Lokal = ditawarkan ke customer dalam negeri (rupiah). Ekspor = hanya tampil di checkout customer berpasar ekspor (USD). Pasar customer dikunci admin saat menyetujui akun.', 'Local = offered to domestic customers (rupiah). Export = shown only at checkout for export-market customers (USD). The customer market is locked by the admin on approval.'),
+  'Cara biaya': h('Tanpa biaya = tidak ada baris ongkir (Loco). Tarif zona = ongkir dari zona dan tarif di tab Zona & tarif (Franco). Termasuk harga = ongkos sudah ada di harga produk (FOB). Penawaran admin = ongkir ditawarkan admin per order (CIF, belum tersedia di checkout).', 'No charge = no shipping line (Loco). Zone rate = shipping from the zones and rates tab (Franco). Included in price = freight is part of the product price (FOB). Quoted by admin = freight offered per order (CIF, not yet available at checkout).'),
+  'Pelabuhan muat': h('Nama pelabuhan muat untuk term ekspor, mis. Belawan. Kosongkan untuk term lokal.', 'Loading port name for export terms, e.g. Belawan. Leave empty for local terms.'),
   'Persentase (%)': h('Besar potongan dalam persen (1–100) dari subtotal produk yang tercakup voucher. Batasi dengan "Maksimum diskon" bila perlu.', 'Discount percentage (1–100) of the covered subtotal. Cap it with "Maximum discount" if needed.'),
   'Batas waktu pembayaran': h('Berapa jam customer diberi waktu membayar setelah checkout. Lewat batas ini order otomatis kedaluwarsa dan stoknya dikembalikan.', 'Hours a customer has to pay after checkout. Afterwards the order expires and stock is released.'),
   'Pengingat sebelum batas bayar': h('Email/notifikasi pengingat dikirim sekian jam sebelum batas bayar. 0 = tanpa pengingat.', 'A reminder is sent this many hours before the deadline. 0 = no reminder.'),
@@ -125,6 +146,16 @@ const STORE_SETTINGS: Record<string, HelpText> = {
   'Berlaku untuk': h('Semua customer, atau hanya customer tertentu yang dipilih. Voucher khusus tampil sebagai pilihan di checkout customer tersebut.', 'All customers, or only selected customers. Targeted vouchers appear as options at their checkout.'),
   'Nama biaya': h('Nama biaya tambahan yang tampil di ringkasan checkout dan invoice, mis. "Biaya administrasi".', 'Name of the extra fee shown in the checkout summary and invoice.'),
   'Nominal (Rp)': h('Besar biaya dalam rupiah, ditambahkan sekali per pesanan.', 'Fee amount in rupiah, added once per order.'),
+  'Nominal': h('Besar biaya dalam mata uang yang dipilih (rupiah bulat, atau USD dua desimal), ditambahkan sekali per pesanan se-mata-uang.', 'Fee amount in the chosen currency (whole rupiah, or USD with two decimals), added once per order in that currency.'),
+  'Mata uang': h('IDR untuk order customer lokal, USD untuk order customer ekspor. Biaya dan rekening hanya dipakai order yang mata uangnya sama.', 'IDR for local customer orders, USD for export customer orders. Fees and bank accounts are only used by orders in the same currency.'),
+  'Kode SWIFT': h('Kode BIC/SWIFT bank penerima (8 atau 11 huruf/angka), wajib untuk rekening USD agar pembeli luar negeri bisa mentransfer.', 'Receiving bank BIC/SWIFT code (8 or 11 characters), required for USD accounts so foreign buyers can transfer.'),
+  'Alamat bank': h('Alamat cabang bank penerima seperti tercetak di instruksi bayar dan invoice ekspor.', 'Receiving bank branch address as printed on payment instructions and export invoices.'),
+  'Bank koresponden': h('Bank perantara untuk transfer USD bila diminta bank penerima (nama dan SWIFT). Kosongkan bila tidak ada.', 'Intermediary bank for USD transfers if the receiving bank requires one (name and SWIFT). Leave empty if none.'),
+  'Profil pajak': h('Domestik = memakai Tarif PPN dari Pengaturan Checkout. Ekspor = memakai Tarif PPN ekspor (bawaan 0) untuk FOB/CIF. Pajak mengikuti cara serah terima, bukan mata uang.', 'Domestic = uses the VAT rate from Checkout Settings. Export = uses the export VAT rate (default 0) for FOB/CIF. Tax follows the delivery term, not the currency.'),
+  'Tarif PPN ekspor': h('Persentase pajak untuk cara serah terima berprofil pajak ekspor (FOB, CIF). Ekspor barang umumnya 0.', 'Tax percentage for export-profile delivery terms (FOB, CIF). Goods exports are usually 0.'),
+  'Batas bayar ekspor': h('Jam yang diberikan customer ekspor untuk transfer USD sebelum order kedaluwarsa (bawaan 120 jam). Terpisah dari batas bayar order rupiah.', 'Hours an export customer has for the USD transfer before the order expires (default 120). Separate from the rupiah payment deadline.'),
+  'Masa berlaku penawaran (hari)': h('Order CIF: masa berlaku bawaan penawaran ongkir admin bila tanggal "Berlaku sampai" dikosongkan (1 sampai 90 hari, bawaan 7). Lewat masa berlaku, customer tidak bisa menyetujui sampai admin memperpanjang atau menawar ulang.', 'CIF orders: default validity of an admin freight quote when "Valid until" is left empty (1 to 90 days, default 7). After it lapses the customer cannot accept until the admin extends or re-quotes.'),
+  'Batas tunggu penawaran (hari)': h('Order CIF yang menunggu ongkir lebih lama dari ini tanpa penawaran yang masih berlaku dibatalkan otomatis oleh sistem; stok dilepas dan customer diberi tahu (1 sampai 365 hari, bawaan 30).', 'CIF orders waiting longer than this without a valid quote are cancelled automatically; stock is released and the customer notified (1 to 365 days, default 30).'),
   'Dibebankan ke': h('Semua customer = biaya masuk ke setiap pesanan. Customer tertentu = hanya untuk customer yang dipilih.', 'All customers = added to every order. Selected customers = only for the chosen customers.'),
   'Nama bank': h('Nama bank tujuan transfer, mis. Bank BCA.', 'Destination bank name, e.g. Bank BCA.'),
   'Nomor rekening': h('Nomor rekening tujuan transfer. Tampil di instruksi bayar customer dan bisa disalin.', 'Destination account number. Shown in the customer payment instructions.'),
@@ -368,6 +399,14 @@ export const ROUTE_HELP: Record<string, Record<string, HelpText>> = {
   },
   '/admin/customers': {
     'Catatan (opsional)': h('Catatan internal yang tersimpan di riwayat akun customer.', 'Internal note stored in the account history.'),
+    'Pasar': h('Lokal = harga rupiah, serah terima lokal, bayar IDR. Ekspor = harga USD basis FOB Belawan, term FOB, syarat pembayaran, transfer ke rekening USD. Bawaan mengikuti negara pendaftaran; bisa diubah lagi selama customer tidak punya order berjalan.', 'Local = rupiah prices, local delivery terms, IDR payment. Export = USD prices (FOB Belawan), FOB terms, payment terms, transfer to a USD account. Defaults from the registered country; can be changed while the customer has no open orders.'),
+  },
+  '/admin/payment-terms': {
+    'Kode': h('Kode teknis syarat pembayaran (huruf kecil), mis. tt_advance. Disimpan di order dan tidak bisa diubah setelah dibuat.', 'Technical code of the payment term (lowercase), e.g. tt_advance. Stored on orders and immutable after creation.'),
+    'Nama': h('Nama syarat yang dipilih customer ekspor saat checkout dan dicetak di proforma/commercial invoice, mis. "100% T/T in advance".', 'Term name export customers pick at checkout, printed on the proforma/commercial invoice, e.g. "100% T/T in advance".'),
+    'Keterangan': h('Penjelasan singkat tahapan pembayaran, mis. "30% uang muka, 70% setelah salinan B/L". Informasi saja: aplikasi tetap mencatat satu pembayaran sebesar total order.', 'Short explanation of the payment stages, e.g. "30% advance, 70% against copy of B/L". Information only: the app still records one payment for the order total.'),
+    'Pasar': h('Ekspor = ditawarkan ke customer ekspor (wajib dipilih saat checkout). Lokal = opsional untuk customer lokal.', 'Export = offered to export customers (required at checkout). Local = optional for local customers.'),
+    'Urutan': h('Urutan pilihan di checkout; angka lebih kecil tampil lebih dulu dan menjadi pilihan awal.', 'Order of the options at checkout; lower numbers appear first and are preselected.'),
   },
   '/admin/payments': {
     'Alasan penolakan': h('Wajib. Dikirim ke customer (email + notifikasi) dan tampil di pesanannya, mis. "Nominal kurang Rp 50.000". Customer lalu mengunggah ulang bukti.', 'Required. Sent to the customer and shown on the order. The customer then re-uploads the proof.'),
@@ -375,8 +414,33 @@ export const ROUTE_HELP: Record<string, Record<string, HelpText>> = {
   '/admin/site-settings': {
     'Lokasi': h('Kota dan provinsi perusahaan, mis. "Medan, Sumatera Utara". Tampil di footer dan dipakai sebagai kota pada tanggal invoice.', 'Company city and province, e.g. "Medan, North Sumatra". Shown in the footer and used as the invoice city.'),
   },
+  '/admin/reports/exchange-rates': {
+    'Tanggal': h('Tanggal kurs (hari ini atau sebelumnya). Bila tanggal itu sudah punya kurs, nilainya ditimpa.', 'Rate date (today or earlier). An existing rate on that date is replaced.'),
+    'Kurs (Rp per USD)': h('Rupiah bulat untuk 1 USD, mis. 16500. Kurs manual hanya cadangan saat JISDOR belum terambil dan akan ditimpa saat JISDOR tanggal itu terbit.', 'Whole rupiah per 1 USD, e.g. 16500. A manual rate is a fallback while JISDOR is unavailable and is replaced when JISDOR publishes that date.'),
+  },
+  // Detail order (/admin/orders/{number}): modal "Tandai dimuat ke kapal" dan proforma invoice untuk order FOB/CIF (ASUMSI A-88).
+  '/admin/orders': {
+    'Nama kapal': h('Nama kapal yang memuat barang, mis. "MV Meratus Medan". Wajib saat menandai dimuat ke kapal; di proforma boleh dikosongkan bila belum pasti. Dicetak di proforma dan commercial invoice.', 'Vessel carrying the goods, e.g. "MV Meratus Medan". Required when marking shipped on board; may stay empty on the proforma if not yet known. Printed on the proforma and commercial invoice.'),
+    'Voyage': h('Nomor voyage kapal dari jadwal pelayaran, mis. V.012. Opsional.', 'Voyage number from the sailing schedule, e.g. V.012. Optional.'),
+    'Nomor B/L': h('Nomor bill of lading dari pelayaran. Wajib saat menandai dimuat ke kapal; mengisi kolom resi di daftar order dan dicetak di commercial invoice.', 'Bill of lading number from the carrier. Required when marking shipped on board; fills the tracking column and is printed on the commercial invoice.'),
+    'Tanggal B/L': h('Tanggal terbit B/L (tidak boleh di masa depan). Kosong = hari ini. Menjadi tanggal "dimuat ke kapal" pada riwayat order.', 'B/L issue date (not in the future). Empty = today. Becomes the "shipped on board" date in the order history.'),
+    'ETD': h('Perkiraan tanggal berangkat kapal dari pelabuhan muat (estimated time of departure). Opsional.', 'Estimated departure date from the port of loading. Optional.'),
+    'ETA': h('Perkiraan tanggal tiba di pelabuhan bongkar (estimated time of arrival). Opsional.', 'Estimated arrival date at the port of discharge. Optional.'),
+    'Pelabuhan muat': h('Pelabuhan tempat barang dimuat, mis. Belawan. Kosong pada proforma pertama = diisi dari cara serah terima order.', 'Port where the goods are loaded, e.g. Belawan. Empty on the first proforma = filled from the order delivery term.'),
+    'Pelabuhan bongkar': h('Pelabuhan tujuan di negara pembeli, mis. Port Klang. Kosong pada proforma pertama = diisi dari pelabuhan tujuan order bila ada.', 'Destination port in the buyer country, e.g. Port Klang. Empty on the first proforma = filled from the order destination port if any.'),
+    'Syarat pembayaran': h('Teks syarat pembayaran yang dicetak di proforma, mis. "100% T/T in advance" atau "30% advance, 70% against copy of B/L". Kosong = memakai syarat pembayaran yang dipilih customer saat checkout.', 'Payment terms text printed on the proforma, e.g. "100% T/T in advance" or "30% advance, 70% against copy of B/L". Empty = the payment terms the customer picked at checkout.'),
+    'Catatan': h('Catatan bebas untuk pembeli. Proforma: dicetak di bagian Notes (mis. masa berlaku harga atau kemasan). Penawaran ongkir: tampil di kartu penawaran customer (mis. nama pelayaran, jenis kontainer). Opsional.', 'Free note to the buyer. Proforma: printed in the Notes section (e.g. price validity or packing). Freight quote: shown on the customer quote card (e.g. carrier, container type). Optional.'),
+    'Berlaku sampai': h('Tanggal akhir masa berlaku. Proforma: dicetak sebagai "Valid until", kosong = tanpa batas tertulis. Penawaran ongkir: sampai akhir hari itu customer bisa menyetujui; kosong = hari ini + pengaturan "Masa berlaku penawaran".', 'Last valid day. Proforma: printed as "Valid until", empty = no stated limit. Freight quote: the customer can accept until the end of that day; empty = today + the "Quote validity" setting.'),
+    // Modal penawaran ongkir CIF (ASUMSI A-89).
+    'Keterangan biaya': h('Nama komponen ongkir, mis. "Ocean freight", "Port charges", "Insurance", "THC". Maksimal 10 baris; dicetak per baris di commercial invoice setelah disepakati.', 'Freight component name, e.g. "Ocean freight", "Port charges", "Insurance", "THC". Up to 10 lines; printed line by line on the commercial invoice once agreed.'),
+    'Jumlah': h('Nominal baris dalam mata uang order (USD dua desimal, mis. 1250.00). Boleh 0 untuk komponen yang digratiskan; total semua baris harus lebih dari 0.', 'Line amount in the order currency (USD with two decimals, e.g. 1250.00). May be 0 for a waived component; the total of all lines must be above 0.'),
+  },
   '/admin/shipping': {
     'Urutan tampil': h('Urutan layanan pada pilihan pengiriman di checkout.', 'Service order in the checkout shipping list.'),
+    'Kode': h('Kode teknis cara serah terima (huruf kecil), mis. loco, franco, fob_belawan. Disimpan di order dan tidak bisa diubah setelah dibuat.', 'Technical code of the delivery term (lowercase), e.g. loco, franco, fob_belawan. Stored on orders and cannot be changed after creation.'),
+    'Nama': h('Nama cara serah terima yang dipilih customer di awal checkout, mis. "Loco (ambil di pabrik)". EN kosong = memakai teks ID.', 'Delivery term name customers pick at the start of checkout, e.g. "Loco (factory pickup)". Empty EN = uses the ID text.'),
+    'Deskripsi': h('Satu kalimat penjelasan di bawah nama pada pilihan serah terima, mis. "Barang diambil sendiri di pabrik, tanpa ongkir." Opsional.', 'One-sentence note under the name in the delivery term choice, e.g. "Collected at the factory, no shipping charge." Optional.'),
+    'Urutan': h('Urutan pilihan cara serah terima di checkout; angka lebih kecil tampil lebih dulu dan menjadi pilihan awal.', 'Order of delivery terms at checkout; lower numbers appear first and become the preselected choice.'),
   },
 };
 
@@ -460,6 +524,18 @@ const EN_PAIRS: [string, string][] = [
   ['Reminder before deadline', 'Pengingat sebelum batas bayar'], ['VAT rate', 'Tarif PPN'], ['Auto-complete after delivery', 'Selesai otomatis setelah diterima'],
   ['Company name', 'Nama perusahaan'], ['Short name', 'Nama singkat'], ['Parent company', 'Induk perusahaan'], ['Established', 'Berdiri sejak'],
   ['Primary colour', 'Warna utama'], ['Location', 'Lokasi'], ['Deep colour', 'Warna gelap'], ['Accent colour', 'Warna aksen'],
+  ['Date', 'Tanggal'], ['Rate (Rp per USD)', 'Kurs (Rp per USD)'],
+  ['Family', 'Keluarga'], ['Market', 'Pasar'], ['Pricing', 'Cara biaya'], ['Loading port', 'Pelabuhan muat'],
+  ['Country', 'Negara'], ['Amount received', 'Jumlah diterima'], ['Bank charges', 'Biaya bank'], ['Receipt note', 'Catatan penerimaan'],
+  ['USD price (FOB Belawan)', 'Harga USD (FOB Belawan)'], ['Amount', 'Nominal'], ['Amount (USD)', 'Nominal (USD)'], ['Currency', 'Mata uang'],
+  ['SWIFT code', 'Kode SWIFT'], ['Bank address', 'Alamat bank'], ['Correspondent bank', 'Bank koresponden'], ['Tax profile', 'Profil pajak'],
+  ['Export VAT rate', 'Tarif PPN ekspor'], ['Export payment deadline', 'Batas bayar ekspor'], ['Description', 'Keterangan'],
+  ['Vessel name', 'Nama kapal'], ['B/L number', 'Nomor B/L'], ['B/L date', 'Tanggal B/L'], ['Port of loading', 'Pelabuhan muat'],
+  ['Port of discharge', 'Pelabuhan bongkar'], ['Payment terms', 'Syarat pembayaran'], ['Notes', 'Catatan'], ['Valid until', 'Berlaku sampai'],
+  ['Port name', 'Nama pelabuhan'], ['Search port', 'Cari pelabuhan'], ['Charge description', 'Keterangan biaya'], ['Line amount', 'Jumlah'],
+  ['Quote validity (days)', 'Masa berlaku penawaran (hari)'], ['Quote waiting limit (days)', 'Batas tunggu penawaran (hari)'],
+  ['Factory code', 'Kode pabrik'], ['Factory order', 'Urutan pabrik'], ['Factory name', 'Nama pabrik'], ['Factory address', 'Alamat pabrik'],
+  ['Factory map pin', 'Titik peta pabrik'], ['Pickup allowed (Loco)', 'Boleh diambil (Loco)'], ['Source factory', 'Pabrik asal'],
 ];
 for (const [en, id] of EN_PAIRS) EN_ALIAS[en.toLowerCase()] = id;
 

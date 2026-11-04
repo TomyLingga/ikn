@@ -3,6 +3,8 @@
 namespace Tests\Support;
 
 use App\Models\Category;
+use App\Models\DeliveryTerm;
+use App\Models\FactoryLocation;
 use App\Models\Fee;
 use App\Models\Media;
 use App\Models\PaymentMethod;
@@ -12,6 +14,7 @@ use App\Models\ShippingZone;
 use App\Models\Voucher;
 use App\Services\Commerce\CommerceSettings;
 use App\Services\Stock\StockLedger;
+use Database\Seeders\DeliveryTermSeeder;
 use Illuminate\Support\Str;
 
 // Fixture katalog untuk test BE-2 (tanpa factory agar stok hanya lewat StockLedger).
@@ -48,6 +51,23 @@ trait CatalogFixtures
         }
 
         return $product->fresh();
+    }
+
+    /**
+     * Lokasi pabrik (ASUMSI A-90). Migrasi sudah mengisi tanjung-morawa (urutan 1 = bawaan) dan sei-bamban (urutan 2);
+     * tanpa $code mengubah pabrik bawaan, dengan kode baru membuat pabrik baru.
+     */
+    protected function factoryLocation(?string $code = null, array $attributes = []): FactoryLocation
+    {
+        $factory = $code === null
+            ? FactoryLocation::orderBy('sort_order')->orderBy('id')->firstOrFail()
+            : FactoryLocation::firstOrNew(['code' => $code], [
+                'name' => ['id' => 'Pabrik '.ucfirst($code)], 'address' => 'Alamat '.$code, 'allows_pickup' => true,
+                'sort_order' => (int) FactoryLocation::max('sort_order') + 1,
+            ]);
+        $factory->fill($attributes)->save();
+
+        return $factory->fresh();
     }
 
     protected function makeMedia(string $name = 'foto.jpg', string $collection = 'products'): Media
@@ -89,9 +109,10 @@ trait CatalogFixtures
         ], $attributes));
     }
 
-    protected function makeFee(int $amount = 5000, bool $active = true): Fee
+    /** @param  int  $amount  satuan terkecil mata uang (IDR rupiah, USD sen) */
+    protected function makeFee(int $amount = 5000, bool $active = true, string $currency = 'IDR'): Fee
     {
-        return Fee::create(['name' => ['id' => 'Biaya admin'], 'type' => Fee::TYPE_ADMIN, 'amount' => $amount, 'is_active' => $active]);
+        return Fee::create(['name' => ['id' => 'Biaya admin'], 'type' => Fee::TYPE_ADMIN, 'amount' => \App\Support\Money::fromMinor($amount, $currency), 'currency' => $currency, 'is_active' => $active]);
     }
 
     protected function makePaymentMethod(string $code = 'manual_transfer', array $attributes = []): PaymentMethod
@@ -106,5 +127,44 @@ trait CatalogFixtures
     {
         app(CommerceSettings::class)->update($values);
         app(CommerceSettings::class)->forget();
+    }
+
+    /**
+     * Cara serah terima untuk test (ASUMSI A-85). Migrasi sudah mengisi baris bawaan (Loco aktif urutan 1, Franco
+     * NONAKTIF, FOB, CIF); di sini Franco (zona) dipaksa AKTIF dan urutan pertama agar quote/checkout tanpa
+     * deliveryTermCode tetap memakai jalur tarif zona seperti sebelum phase E2, Loco aktif di urutan kedua.
+     * Pakai updateOrCreate (bukan firstOrCreate) karena barisnya sudah ada.
+     */
+    protected function seedDeliveryTerms(): void
+    {
+        DeliveryTerm::updateOrCreate(['code' => 'franco'], [
+            'name' => ['id' => 'Franco (diantar ke alamat)', 'en' => 'Franco (delivered to your address)'],
+            'family' => DeliveryTerm::FAMILY_DOOR, 'market' => DeliveryTerm::MARKET_LOCAL, 'pricing_mode' => DeliveryTerm::PRICING_ZONE,
+            'is_active' => true, 'sort_order' => 1,
+        ]);
+        DeliveryTerm::updateOrCreate(['code' => 'loco'], [
+            'name' => ['id' => 'Loco (ambil di pabrik)', 'en' => 'Loco (pickup at factory)'],
+            'family' => DeliveryTerm::FAMILY_PICKUP, 'market' => DeliveryTerm::MARKET_LOCAL, 'pricing_mode' => DeliveryTerm::PRICING_NONE,
+            'is_active' => true, 'sort_order' => 2,
+        ]);
+    }
+
+    /** Kembalikan ke baris bawaan migrasi/seeder (Loco aktif urutan 1, Franco nonaktif) setelah seedDeliveryTerms(). */
+    protected function useDefaultDeliveryTerms(): void
+    {
+        foreach (DeliveryTermSeeder::rows() as $row) {
+            DeliveryTerm::updateOrCreate(['code' => $row['code']], $row);
+        }
+    }
+
+    /** Baris bawaan (fob, cif, ...) sudah ada dari migrasi, jadi kode yang sama diperbarui, bukan dibuat ulang. */
+    protected function makeDeliveryTerm(array $attributes = []): DeliveryTerm
+    {
+        $code = $attributes['code'] ?? 'term-'.Str::lower(Str::random(6));
+
+        return DeliveryTerm::updateOrCreate(['code' => $code], array_merge([
+            'code' => $code, 'name' => ['id' => ucfirst($code)], 'family' => DeliveryTerm::FAMILY_DOOR,
+            'market' => DeliveryTerm::MARKET_LOCAL, 'pricing_mode' => DeliveryTerm::PRICING_ZONE, 'is_active' => true, 'sort_order' => 0,
+        ], $attributes));
     }
 }

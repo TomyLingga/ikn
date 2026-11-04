@@ -205,8 +205,8 @@
 .co-main { min-width: 0; }
 .co-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .co-fields label { display: flex; flex-direction: column; gap: 6px; }
-.co-fields input, .co-fields textarea { border: 1px solid var(--line-strong); border-radius: 0; padding: 11px 13px; background: var(--surface); color: var(--ink); font: inherit; }
-.co-fields input:focus, .co-fields textarea:focus { outline: none; border-color: var(--green); }
+.co-fields input, .co-fields textarea, .co-fields select { border: 1px solid var(--line-strong); border-radius: 0; padding: 11px 13px; background: var(--surface); color: var(--ink); font: inherit; }
+.co-fields input:focus, .co-fields textarea:focus, .co-fields select:focus { outline: none; border-color: var(--green); }
 .co-full { grid-column: 1 / -1; }
 .co-ship { display: flex; flex-direction: column; gap: 10px; }
 .co-ship-opt { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border: 1px solid var(--line-strong); border-radius: 0; cursor: pointer; transition: border-color 0.2s var(--ease), background 0.2s var(--ease); }
@@ -476,4 +476,35 @@
   .cat-filter-list li { flex: none; }
   .cat-filter-btn { white-space: nowrap; border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 14px; }
   .cat-search { width: 100%; }
+}
+
+/* ---- Checkout & detail pesanan Loco (ASUMSI A-85): kartu titik ambil + peta kecil ---- */
+.co-pickup { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.co-pickup-card { cursor: default; }
+.co-pickup-card .co-pickup-items { display: inline-block; margin-top: 4px; color: var(--ink-soft); }
+.co-pickup + .co-pickup { margin-top: 12px; }
+.co-pickup-card > svg { flex: none; margin-top: 2px; color: var(--primary); }
+/* Peta memakai ContactMap compact (kelas .footer-map dari pages.css, yang tidak dimuat di portal): ukuran dan tautan ditulis ulang di sini. */
+.co-pickup-map .footer-map { position: relative; margin-top: 0; max-width: none; height: 220px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line-strong); background: var(--paper-2); }
+.co-pickup-map .footer-map .leaflet-container { width: 100%; height: 100%; }
+.co-pickup-map .footer-map-link { position: absolute; left: 10px; bottom: 10px; z-index: 500; padding: 6px 10px; border-radius: 6px; background: rgba(10, 22, 40, 0.85); color: #fff; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.co-pickup-map .footer-map-link:hover { background: var(--primary); }
+.co-pickup-map .contact-map-loading { min-height: 220px; height: 220px; }
+.co-term-card { cursor: default; }
+
+/* Harga USD (ASUMSI A-86): penanda basis FOB Belawan di kartu/detail produk, rincian rekening USD, pemberitahuan keranjang. */
+.price-fob { display: inline-block; margin-left: 8px; vertical-align: middle; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--primary); border: 1px solid var(--primary); padding: 1px 6px; border-radius: 999px; white-space: nowrap; }
+.pcard-price-row .price-fob, .pd-promo .price-fob { margin-left: 0; }
+.co-bank-detail { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--ink-soft); line-height: 1.45; }
+.co-bank-detail b { color: var(--ink); font-weight: 600; }
+.pay-bank-note { margin: 10px 0 0; font-size: 0.82rem; color: var(--ink-soft); }
+.cart-notice { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 14px; padding: 8px 12px; border-radius: 8px; background: var(--accent-tint, color-mix(in srgb, var(--accent) 12%, #fff)); color: var(--ink); font-size: 0.85rem; }
+.cart-notice button { border: 0; background: none; color: var(--ink-soft); cursor: pointer; font: inherit; text-decoration: underline; }
+/* ---- Checkout CIF: pelabuhan tujuan (components/customer/PortPicker, ASUMSI A-89) ---- */
+.port-picker .addr-map { height: 320px; }
+.port-picker .addr-geo-results button span { flex: 1; min-width: 0; }
+.port-result-type { color: var(--ink-soft); }
+.co-freight-note { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid var(--info, var(--primary)); background: var(--info-tint, var(--paper-2)); font-size: 0.86rem; line-height: 1.5; }
+@media (max-width: 640px) {
+  .port-picker { grid-template-columns: minmax(0, 1fr); }
 }

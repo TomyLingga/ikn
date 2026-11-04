@@ -178,7 +178,9 @@ class ChatService
                 'code' => $product->code,
                 'name' => $product->name,
                 'image' => $product->primaryImageUrl(),
-                'price' => $product->effectivePrice(),
+                // Harga dalam mata uang pasar customer (ASUMSI A-86): ekspor melihat USD (sen), lokal rupiah.
+                'price' => $product->effectivePriceMinor($customer->currency()),
+                'currency' => $customer->currency(),
                 'unit' => $product->unit,
             ];
         }
@@ -193,6 +195,9 @@ class ChatService
             'number' => $order->number,
             'status' => $order->status,
             'grandTotal' => $order->grandTotalInt(),
+            'currency' => $order->currencyCode(),
+            // Keluarga serah terima (pickup|door|port) agar label status mengikuti varian Loco/pelabuhan.
+            'family' => $order->shipping_snapshot['family'] ?? ($order->isPickup() ? 'pickup' : ($order->isPort() ? 'port' : null)),
         ];
     }
 

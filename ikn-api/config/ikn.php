@@ -78,12 +78,15 @@ return [
             'invoice_signer_name' => 'Amalia Nasution',
             'invoice_signer_title' => 'SEVP Operation',
             'invoice_cc' => 'ATU, File',
-            // Titik asal pengiriman (ASUMSI A-76): bawaan = pabrik Resiprene (CmsPageSeeder::GEO_RESIPRENE_PLANT).
-            'shipping_origin_label' => 'Pabrik Resiprene',
-            'shipping_origin_lat' => 3.3495,
-            'shipping_origin_lng' => 99.0862,
-            // Jarak jalan ≈ jarak garis lurus × faktor ini (tanpa layanan rute eksternal).
+            // Jarak jalan ≈ jarak garis lurus × faktor ini (tanpa layanan rute eksternal). Titik asal ongkir dan titik
+            // ambil Loco = tabel factory_locations (ASUMSI A-90, bawaan FactoryLocationSeeder::rows()).
             'shipping_road_factor' => 1.3,
+            // Ekspor (ASUMSI A-86): pajak term FOB/CIF (bawaan 0, PPN tidak dikenakan) dan batas bayar order USD (5 hari).
+            'export_tax_rate' => 0,
+            'export_payment_due_hours' => 120,
+            // Penawaran ongkir CIF (ASUMSI A-89): penawaran admin berlaku 7 hari; order tanpa kesepakatan 30 hari dibatalkan otomatis.
+            'freight_quote_valid_days' => 7,
+            'freight_quote_max_days' => 30,
         ],
         'order_number_prefix' => 'IKN',
     ],
@@ -103,6 +106,13 @@ return [
         'user_agent' => env('NOMINATIM_USER_AGENT', 'IKN-Web/1.0 (+http://localhost; it@example.com)'),
         'search_cache_days' => 7,
         'reverse_cache_days' => 30,
+    ],
+
+    // Web service kurs JISDOR Bank Indonesia (ASMX, XML DataSet). Server menolak koneksi tanpa User-Agent jelas (ASUMSI A-84).
+    'jisdor' => [
+        'base_url' => env('JISDOR_BASE_URL', 'https://www.bi.go.id/biwebservice/wskursbi.asmx'),
+        'user_agent' => env('JISDOR_USER_AGENT', 'IKN-Web/1.0 (+http://localhost; it@example.com)'),
+        'timeout' => 15,
     ],
 
     'wbs' => [

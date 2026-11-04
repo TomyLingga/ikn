@@ -4,6 +4,7 @@ namespace App\Services\Commerce\Reports;
 
 use App\Http\Resources\OrderSummaryResource;
 use App\Models\Order;
+use App\Models\OrderFreightQuote;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Product;
@@ -18,7 +19,8 @@ use Illuminate\Support\Facades\DB;
  * Dashboard admin (kontrak 11.1, Phase 10): statistik, order terbaru, order yang butuh tindakan,
  * grafik penjualan 12 bulan dari paid_at (order cancelled/expired tidak dihitung, ASUMSI A-24).
  * Additive v2 keys: period, kpis (month-to-date vs same span last month), workQueue (module-aware),
- * topProducts, lowStock, paymentDue.
+ * topProducts, lowStock, paymentDue. Semua angka uang di atas hanya order IDR (ASUMSI A-86); blok ekspor
+ * `exportKpis` (Phase E6) merangkum order USD secara terpisah dan null bila belum ada order USD sama sekali.
  */
 class DashboardService
 {
@@ -43,7 +45,8 @@ class DashboardService
         $todayStart = $now->copy()->startOfDay();
         $monthStart = $now->copy()->startOfMonth();
 
-        $revenueThisMonth = Order::revenue()
+        // Semua agregasi uang dashboard hanya order IDR (ASUMSI A-86); order USD dirangkum terpisah di exportKpis.
+        $revenueThisMonth = Order::revenue()->inCurrency(Money::CURRENCY_IDR)
             ->where('paid_at', '>=', $monthStart)
             ->where('paid_at', '<=', $monthStart->copy()->endOfMonth())
             ->sum('grand_total');
@@ -61,9 +64,10 @@ class DashboardService
         ];
 
         $recent = Order::with(OrderSummaryResource::eager())->orderByDesc('created_at')->orderByDesc('id')->limit(10)->get();
+        // Order yang menunggu tindakan admin; permintaan penawaran ongkir CIF (A-89) paling atas karena menahan pembayaran.
         $needsAction = Order::with(OrderSummaryResource::eager())
-            ->whereIn('status', [Order::STATUS_PAYMENT_REVIEW, Order::STATUS_PAID, Order::STATUS_PROCESSING])
-            ->orderByRaw("CASE status WHEN 'payment_review' THEN 0 WHEN 'paid' THEN 1 ELSE 2 END")
+            ->whereIn('status', [Order::STATUS_AWAITING_FREIGHT, Order::STATUS_PAYMENT_REVIEW, Order::STATUS_PAID, Order::STATUS_PROCESSING])
+            ->orderByRaw("CASE status WHEN 'awaiting_freight' THEN 0 WHEN 'payment_review' THEN 1 WHEN 'paid' THEN 2 ELSE 3 END")
             ->orderBy('created_at')->limit(10)->get();
 
         $chart = $this->salesChart($year);
@@ -74,6 +78,7 @@ class DashboardService
             'needsAction' => OrderSummaryResource::collection($needsAction)->resolve(),
             'salesChart' => $chart,
             'salesByMonth' => $chart, // alias nama lama di FE mock
+            'currency' => Money::CURRENCY_IDR, // mata uang semua angka uang di payload ini (ASUMSI A-86)
             'year' => $year,
             'period' => $this->periodPayload($now),
             'kpis' => $this->kpis($now),
@@ -81,6 +86,44 @@ class DashboardService
             'topProducts' => $this->topProducts($monthStart, $now),
             'lowStock' => $this->lowStock(),
             'paymentDue' => $this->paymentDue($now),
+            'exportKpis' => $this->exportKpis($monthStart, $now),
+        ];
+    }
+
+    /**
+     * Blok ekspor (Phase E6): ringkasan order USD, terpisah dari KPI IDR. `revenue` = USD dibayar (paid_at) dalam
+     * periode `period.from..to` dalam sen, `paidOrders` jumlahnya; `orders` = order USD dibuat (created_at) dalam
+     * periode itu apa pun statusnya; `awaitingFreight`/`pendingPayment` = jumlah saat ini. Null bila belum pernah
+     * ada order USD (toko lokal murni) agar FE menyembunyikan bloknya.
+     *
+     * @return array{currency: string, revenue: int, paidOrders: int, orders: int, awaitingFreight: int, pendingPayment: int}|null
+     */
+    private function exportKpis(Carbon $monthStart, Carbon $now): ?array
+    {
+        $usd = Money::CURRENCY_USD;
+        if (! Order::inCurrency($usd)->exists()) {
+            return null;
+        }
+
+        $paid = Order::revenue()->inCurrency($usd)
+            ->where('paid_at', '>=', $monthStart)->where('paid_at', '<=', $now)
+            ->selectRaw('COALESCE(SUM(grand_total), 0) AS total, COUNT(*) AS orders')
+            ->toBase()->first();
+        $counts = Order::inCurrency($usd)
+            ->selectRaw(
+                'COUNT(*) FILTER (WHERE created_at >= ? AND created_at <= ?) AS created, '
+                .'COUNT(*) FILTER (WHERE status = ?) AS awaiting_freight, '
+                .'COUNT(*) FILTER (WHERE status = ?) AS pending_payment',
+                [$monthStart, $now, Order::STATUS_AWAITING_FREIGHT, Order::STATUS_PENDING_PAYMENT]
+            )->toBase()->first();
+
+        return [
+            'currency' => $usd,
+            'revenue' => (int) Money::toMinor($paid->total ?? 0, $usd),
+            'paidOrders' => (int) ($paid->orders ?? 0),
+            'orders' => (int) ($counts->created ?? 0),
+            'awaitingFreight' => (int) ($counts->awaiting_freight ?? 0),
+            'pendingPayment' => (int) ($counts->pending_payment ?? 0),
         ];
     }
 
@@ -119,7 +162,7 @@ class DashboardService
     {
         [$monthStart, $prevStart, $prevEnd] = $this->periods($now);
 
-        $sales = Order::revenue()
+        $sales = Order::revenue()->inCurrency(Money::CURRENCY_IDR)
             ->where('paid_at', '>=', $prevStart)->where('paid_at', '<=', $now)
             ->selectRaw(
                 'COALESCE(SUM(grand_total) FILTER (WHERE paid_at >= ?), 0) AS cur_total, '
@@ -172,11 +215,22 @@ class DashboardService
 
         $byStatus = null;
         $overdue = null;
+        $freightToQuote = null;
         if ($allows('orders')) {
             $byStatus = Order::whereIn('status', Order::IN_PROGRESS_STATUSES)
                 ->select('status', DB::raw('COUNT(*) AS c'))->groupBy('status')->pluck('c', 'status');
             $overdue = Order::where('status', Order::STATUS_PENDING_PAYMENT)
                 ->whereNotNull('payment_due_at')->where('payment_due_at', '<', $now)->count();
+            // Permintaan penawaran ongkir CIF (A-89) yang menunggu admin: belum ada penawaran admin yang masih berlaku
+            // (order baru, balasan customer, atau penawaran yang kedaluwarsa).
+            $freightToQuote = Order::where('status', Order::STATUS_AWAITING_FREIGHT)
+                ->whereNotExists(function ($q) use ($now) {
+                    $q->selectRaw('1')->from('order_freight_quotes')
+                        ->whereColumn('order_freight_quotes.order_id', 'orders.id')
+                        ->where('order_freight_quotes.status', OrderFreightQuote::STATUS_PROPOSED)
+                        ->where('order_freight_quotes.proposed_by', OrderFreightQuote::BY_ADMIN)
+                        ->where(fn ($w) => $w->whereNull('order_freight_quotes.valid_until')->orWhere('order_freight_quotes.valid_until', '>', $now));
+                })->count();
         }
         $orders = fn (string $status) => $byStatus === null ? null : (int) ($byStatus[$status] ?? 0);
 
@@ -184,6 +238,7 @@ class DashboardService
             'paymentsToVerify' => $allows('payments')
                 ? Payment::where('status', Payment::STATUS_AWAITING_VERIFICATION)->count()
                 : null,
+            'freightToQuote' => $freightToQuote,
             'ordersToProcess' => $orders(Order::STATUS_PAID),
             'ordersToShip' => $orders(Order::STATUS_PROCESSING),
             'ordersInTransit' => $orders(Order::STATUS_SHIPPED),
@@ -203,6 +258,7 @@ class DashboardService
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->whereNotNull('orders.paid_at')
             ->whereIn('orders.status', Order::PAID_STATUSES)
+            ->where('orders.currency', Money::CURRENCY_IDR)
             ->where('orders.paid_at', '>=', $monthStart)->where('orders.paid_at', '<=', $now)
             ->groupBy('order_items.product_id')
             ->select(
@@ -310,7 +366,7 @@ class DashboardService
         $from = now()->setTimezone($tz)->setDate($year, 1, 1)->startOfDay();
         $to = $from->copy()->endOfYear();
 
-        $rows = Order::revenue()
+        $rows = Order::revenue()->inCurrency(Money::CURRENCY_IDR)
             ->whereBetween('paid_at', [$from, $to])
             ->select(DB::raw('EXTRACT(MONTH FROM paid_at)::int AS m'), DB::raw('COUNT(*) AS orders'), DB::raw('COALESCE(SUM(grand_total), 0) AS total'))
             ->groupBy('m')

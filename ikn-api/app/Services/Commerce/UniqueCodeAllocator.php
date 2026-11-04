@@ -3,9 +3,11 @@
 namespace App\Services\Commerce;
 
 use App\Models\Order;
+use App\Support\Money;
 
 /**
- * Kode unik transfer manual 1–999 (ASUMSI A-9): unik di antara order pending_payment hari ini.
+ * Kode unik transfer manual 1–999 (ASUMSI A-9): unik di antara order pending_payment hari ini. Hanya order IDR
+ * (ASUMSI A-86: transfer USD dicocokkan dari nomor order dan jumlah diterima).
  * Dipanggil di dalam transaksi setelah OrderNumberGenerator (advisory lock) sehingga checkout paralel terurut.
  */
 class UniqueCodeAllocator
@@ -14,10 +16,10 @@ class UniqueCodeAllocator
     {
     }
 
-    /** Apakah metode/setting mewajibkan kode unik. */
-    public function requiredFor(?\App\Models\PaymentMethod $method): bool
+    /** Apakah metode/setting/mata uang mewajibkan kode unik. */
+    public function requiredFor(?\App\Models\PaymentMethod $method, string $currency = Money::CURRENCY_IDR): bool
     {
-        return $method !== null && $method->isManualTransfer() && (bool) $this->settings->get('unique_code_enabled');
+        return $method !== null && Money::isIdr($currency) && $method->isManualTransfer() && (bool) $this->settings->get('unique_code_enabled');
     }
 
     /**

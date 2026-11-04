@@ -3,6 +3,7 @@
 namespace App\Mail\Commerce;
 
 use App\Models\Order;
+use App\Support\Money;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -60,10 +61,10 @@ abstract class OrderMailable extends Mailable implements ShouldQueue
         ], $extra);
     }
 
-    /** "Rp 1.234.567" */
-    public static function money(int $amount): string
+    /** "Rp 1.234.567" (IDR) atau "USD 12.50"; $amount dalam satuan terkecil mata uang (ASUMSI A-86). */
+    public static function money(int $amount, string $currency = Money::CURRENCY_IDR): string
     {
-        return 'Rp '.number_format($amount, 0, ',', '.');
+        return Money::format($amount, $currency);
     }
 
     /** "28 Sep 2026 09:24 WIB" (zona aplikasi). */

@@ -11,8 +11,8 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage, type Envelope } from '@/lib/api';
 import { tr } from '@/lib/cms';
 import type { PagedMeta } from '@/lib/cms';
-import { orderLabel } from '@/lib/commerce';
-import { formatDate, formatIDR } from '@/lib/format';
+import { isPickupOrder, isPortOrder, orderLabel, orderVariant } from '@/lib/commerce';
+import { formatDate, formatMoney } from '@/lib/format';
 import { isoDay, monthToDate, openChat, shopPaths } from '@/lib/shop';
 import OrderProgress, { orderNextStep } from '@/components/customer/OrderProgress';
 import type { IconName, OrderGroupCounts, OrderGroupKey, OrderSummary } from '@/lib/types';
@@ -187,6 +187,17 @@ export default function CustomerOrders() {
     const list: CardAction[] = [];
 
     switch (order.status) {
+      case 'awaiting_freight':
+        // Order CIF (ASUMSI A-89): penawaran ongkir admin disetujui/dibalas di detail pesanan; belum ada pembayaran.
+        list.push({ label: t('Lihat penawaran ongkir', 'View freight quote'), icon: 'globe', primary: true, href: `${detail}#freight` });
+        if (order.canCancel) {
+          list.push({
+            label: t('Batalkan', 'Cancel'),
+            icon: 'close',
+            onClick: () => void quickAction(order, '/cancel', t(`Batalkan pesanan ${order.number}?`, `Cancel order ${order.number}?`), t('Pesanan dibatalkan.', 'Order cancelled.')),
+          });
+        }
+        break;
       case 'pending_payment':
         list.push({ label: order.canUploadProof === false ? t('Lihat pembayaran', 'View payment') : t('Bayar sekarang', 'Pay now'), icon: 'wallet', primary: true, href: `${detail}#payment` });
         if (order.canCancel) {
@@ -206,16 +217,19 @@ export default function CustomerOrders() {
         break;
       case 'shipped':
         if (order.canConfirmReceived) {
+          const pickup = isPickupOrder(order);
           list.push({
-            label: t('Pesanan diterima', 'Order received'),
+            label: pickup ? t('Sudah diambil', 'Picked up') : t('Pesanan diterima', 'Order received'),
             icon: 'check',
             primary: true,
             onClick: () =>
               void quickAction(
                 order,
                 '/confirm-received',
-                t(`Konfirmasi bahwa pesanan ${order.number} sudah Anda terima?`, `Confirm that you have received order ${order.number}?`),
-                t('Terima kasih, pesanan ditandai diterima.', 'Thank you, the order is marked as received.'),
+                pickup
+                  ? t(`Konfirmasi bahwa pesanan ${order.number} sudah Anda ambil?`, `Confirm that you have picked up order ${order.number}?`)
+                  : t(`Konfirmasi bahwa pesanan ${order.number} sudah Anda terima?`, `Confirm that you have received order ${order.number}?`),
+                pickup ? t('Terima kasih, pesanan ditandai sudah diambil.', 'Thank you, the order is marked as picked up.') : t('Terima kasih, pesanan ditandai diterima.', 'Thank you, the order is marked as received.'),
               ),
           });
         }
@@ -412,12 +426,15 @@ export default function CustomerOrders() {
       ) : (
         <div className={styles.list} aria-busy={loading}>
           {orders.map((order) => {
-            const status = orderLabel(order.status);
+            const pickup = isPickupOrder(order);
+            // Order FOB/CIF (ASUMSI A-88): "Dimuat ke kapal", kolom resi berisi nomor B/L.
+            const port = isPortOrder(order);
+            const status = orderLabel(order.status, orderVariant(order));
             const detail = paths.order(order.number);
             const shown = order.items.slice(0, MAX_ITEMS);
             const rest = order.items.length - shown.length;
             const actions = actionsFor(order);
-            const next = orderNextStep(order, lang);
+            const next = orderNextStep({ ...order, pickup, port }, lang);
 
             return (
               <article key={order.number} className={styles.card}>
@@ -442,13 +459,18 @@ export default function CustomerOrders() {
                     </span>
                   </p>
                   <div className={styles.stepper}>
-                    <OrderProgress status={order.status} lang={lang} compact />
+                    <OrderProgress status={order.status} lang={lang} compact pickup={pickup} port={port} quoted={!!order.destinationPort} />
                   </div>
                 </div>
                 {(order.status === 'shipped' || order.status === 'delivered') && order.trackingNumber && (
                   <p className={styles.strip}>
-                    <Icon name="truck" size={15} /> {order.courier ? `${order.courier} · ` : ''}
-                    {t('Resi', 'Tracking no.')} <strong className="mono">{order.trackingNumber}</strong>
+                    <Icon name={port ? 'globe' : 'truck'} size={15} /> {order.courier ? `${order.courier} · ` : ''}
+                    {port ? t('No. B/L', 'B/L no.') : t('Resi', 'Tracking no.')} <strong className="mono">{order.trackingNumber}</strong>
+                  </p>
+                )}
+                {order.destinationPort && (
+                  <p className={styles.strip}>
+                    <Icon name="pin" size={15} /> {t('Pelabuhan tujuan', 'Destination port')} <strong>CIF {order.destinationPort}</strong>
                   </p>
                 )}
 
@@ -464,9 +486,9 @@ export default function CustomerOrders() {
                       </span>
                       <span className={styles.itemQty}>
                         <small>
-                          {item.qty.toLocaleString('id-ID')} {item.unit || ''} × {formatIDR(item.unitPrice)}
+                          {item.qty.toLocaleString('id-ID')} {item.unit || ''} × {formatMoney(item.unitPrice, order.currency)}
                         </small>
-                        <strong>{formatIDR(item.lineTotal)}</strong>
+                        <strong>{formatMoney(item.lineTotal, order.currency)}</strong>
                       </span>
                     </span>
                   ))}
@@ -482,7 +504,7 @@ export default function CustomerOrders() {
                     <span>
                       {order.itemsCount} {t('produk', order.itemsCount === 1 ? 'product' : 'products')} · {t('Total pesanan', 'Order total')}
                     </span>
-                    <strong>{formatIDR(order.grandTotal)}</strong>
+                    <strong>{formatMoney(order.grandTotal, order.currency)}</strong>
                   </div>
                   <div className={styles.actions}>
                     <button type="button" className={styles.ghostBtn} onClick={() => openChat({ type: 'order', number: order.number, label: order.number })}>

@@ -14,6 +14,12 @@ class CustomerAudienceTest extends TestCase
 {
     use RefreshDatabase, CatalogFixtures;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seedDeliveryTerms();
+    }
+
     private function quoteBody(string $slug, ?string $voucher = null): array
     {
         return array_filter(['items' => [['productSlug' => $slug, 'qty' => 1]], 'voucherCode' => $voucher]);

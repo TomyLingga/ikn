@@ -13,7 +13,7 @@ tags:
   - name: admin-dashboard
     description: Dashboard admin (modul dashboard)
   - name: admin-reports
-    description: Laporan penjualan (modul reports)
+    description: Laporan penjualan dan kurs JISDOR (modul reports)
   - name: admin-audit
     description: Audit log (super_admin)
 
@@ -66,7 +66,7 @@ paths:
       summary: Daftar order milik sendiri (paginated, terbaru dulu); meta.groups = jumlah per kelompok status
       parameters:
         - { name: status, in: query, schema: { $ref: '#/components/schemas/OrderStatus' } }
-        - { name: group, in: query, schema: { type: string, enum: [unpaid, processing, shipped, completed, cancelled, to_review] }, description: 'unpaid = pending_payment+payment_review; processing = paid+processing; shipped = shipped+delivered; cancelled = cancelled+expired; to_review = completed dengan produk belum diulas' }
+        - { name: group, in: query, schema: { type: string, enum: [unpaid, processing, shipped, completed, cancelled, to_review] }, description: 'unpaid = awaiting_freight+pending_payment+payment_review; processing = paid+processing; shipped = shipped+delivered; cancelled = cancelled+expired; to_review = completed dengan produk belum diulas' }
         - { name: q, in: query, schema: { type: string, maxLength: 120 }, description: 'nomor order, nomor invoice, nama atau kode produk' }
         - { name: from, in: query, schema: { type: string, format: date } }
         - { name: to, in: query, schema: { type: string, format: date } }
@@ -80,10 +80,19 @@ paths:
       security: [{ cookieAuth: [] }]
       summary: Checkout (customer aktif) — reserve stok + voucher, payment pending, email
       description: |
-        Body sama dengan POST /cart/quote tetapi `addressId`, `shippingRateId`, `paymentMethodCode` wajib.
+        Body sama dengan POST /cart/quote tetapi `paymentMethodCode` wajib. `deliveryTermCode` (ASUMSI A-85) kosong = term aktif
+        pertama pasar lokal; `addressId` + `shippingRateId` wajib hanya bila term memakai tarif zona (Franco). Term Loco: tanpa
+        alamat dan ongkir, `shippingAddress` berisi titik ambil (`type: pickup`, `points[]` per pabrik asal, ASUMSI A-90), `shippingMethod.type = pickup`,
+        `pickup` (titik pertama) dan `pickupPoints[]` terisi; item dari pabrik yang tidak melayani ambil → 422 `deliveryTermCode`.
         Dalam satu transaksi: produk dikunci `SELECT ... FOR UPDATE` urut id, dihitung ulang OrderCalculator,
-        kode unik final unik di antara order pending_payment hari ini (manual_transfer + setting), snapshot alamat/harga/ongkir.
+        kode unik final unik di antara order pending_payment hari ini (manual_transfer + setting), snapshot alamat/harga/ongkir/term.
         Header `Idempotency-Key` (opsional, ≤ 80 karakter, per user, 24 jam): kunci sama mengembalikan order yang sama dengan **200** (bukan 201).
+        Customer ekspor (ASUMSI A-86, A-87): order dalam USD (sen), term pasar ekspor (FOB `included`: tanpa alamat/ongkir, `shippingAddress`
+        bertipe `port`), `paymentTermCode` WAJIB (aktif, pasar ekspor) dan dibekukan ke `paymentTerm`, pajak dari `exportTaxRate`, tanpa kode
+        unik dan voucher, hanya `manual_transfer` ke rekening ber-`currency` USD, batas bayar `exportPaymentDueHours`.
+        Term CIF (`pricingMode quoted`, ASUMSI A-89, kontrak 11.12): `destinationPort` WAJIB; order dibuat `awaiting_freight` dengan `shippingTotal` 0,
+        `grandTotal` sementara, `uniqueCode` 0, `paymentDueAt` null, tanpa `payment`; metode + rekening dibekukan ke `pendingPaymentMethod` dan payment
+        dibuat saat penawaran ongkir disepakati. Stok direserve seperti biasa. Email + in-app `order.freight_requested`, email admin modul orders.
       parameters:
         - { name: Idempotency-Key, in: header, required: false, schema: { type: string, maxLength: 80 } }
       requestBody:
@@ -94,7 +103,7 @@ paths:
         '200': { description: Order yang sama (Idempotency-Key sudah dipakai ≤ 24 jam), content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
         '403': { description: 'ACCOUNT_NOT_APPROVED (meta.status) bila customer belum disetujui', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '409': { description: 'INSUFFICIENT_STOCK (meta.items[]) | VOUCHER_INVALID (meta.reason)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '422': { $ref: '#/components/responses/ValidationError' }
+        '422': { description: 'VALIDATION_ERROR: seperti /cart/quote; addressId/shippingRateId kosong untuk term zona; deliveryTermCode nonaktif, beda pasar, tidak ada, atau pricingMode quoted; paymentTermCode kosong (customer ekspor)/tidak ada/nonaktif/beda pasar; paymentMethodCode bukan manual_transfer untuk order USD; bankAccountId beda mata uang atau tidak ada rekening aktif se-mata-uang', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '502': { description: 'GATEWAY_ERROR (metode gateway) | 503 GATEWAY_UNAVAILABLE (secret belum diisi)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /customer/orders/{number}:
     get:
@@ -109,13 +118,43 @@ paths:
     post:
       tags: [orders]
       security: [{ cookieAuth: [] }]
-      summary: Batalkan order (hanya pending_payment) — release stok + voucher, payment aktif cancelled
+      summary: Batalkan order (hanya awaiting_freight atau pending_payment) — release stok + voucher, payment aktif cancelled, penawaran ongkir terbuka rejected
       parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
       requestBody: { required: false, content: { application/json: { schema: { type: object, properties: { reason: { type: string, maxLength: 1000 } } } } } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/InvalidTransition' }
+  /customer/orders/{number}/freight-quotes/{quote}/accept:
+    post:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: 'Terima penawaran ongkir admin (CIF, ASUMSI A-89, kontrak 11.12): awaiting_freight → pending_payment'
+      description: |
+        Hanya penawaran admin putaran terakhir berstatus `proposed` yang belum lewat `validUntil`. Dalam satu transaksi (baris order FOR UPDATE):
+        `quote.status = accepted`, `shippingTotal = total`, `shippingMethod { type quoted, amount, quoteId, round, lines[] }`, `grandTotal` dihitung ulang
+        (subtotal − diskon + ongkir + fee + pajak bila eksklusif), payment pending dibuat dari `pendingPaymentMethod` (nonaktif → transfer manual aktif pertama + rekening aktif se-mata-uang; kode unik IDR dialokasikan di sini), `paymentDueAt = sekarang +
+        exportPaymentDueHours` (USD) / `paymentDueHours`, transisi `awaiting_freight → pending_payment` (timeline.meta { quoteId, freightTotal, acceptedBy: customer }).
+        Email customer `FreightAccepted` (rincian ongkir + instruksi bayar) + in-app `order.freight_accepted`; email admin.
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }, { $ref: '#/components/parameters/FreightQuoteId' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '403': { description: 'FORBIDDEN: customer belum aktif', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: 'NOT_FOUND: order bukan milik user atau penawaran bukan milik order ini', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'FREIGHT_QUOTE_EXPIRED (meta { quoteId, validUntil }; penawaran ditandai expired sampai admin memperpanjang) | FREIGHT_QUOTE_STALE (meta { quoteId, status }: bukan putaran terakhir / sudah accepted, superseded, rejected) | FREIGHT_QUOTE_NOT_ALLOWED (order bukan awaiting_freight, atau penawaran bukan dari admin) | FREIGHT_PAYMENT_UNAVAILABLE (meta { currency, missing: paymentMethod|bankAccount }: tidak ada metode transfer manual aktif / rekening aktif se-mata-uang; penawaran tetap proposed)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /customer/orders/{number}/freight-quotes/counter:
+    post:
+      tags: [orders]
+      security: [{ cookieAuth: [] }]
+      summary: 'Ajukan harga balasan ongkir (CIF, kontrak 11.12): penawaran admin yang masih berlaku → superseded, putaran baru proposedBy customer'
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FreightCounterInput' } } } }
+      responses:
+        '200': { description: 'Order dengan putaran balasan (lines = [{ label: "Penawaran customer", amount }], validUntil null); admin diberi tahu lewat email', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '403': { description: 'FORBIDDEN: customer belum aktif', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'FREIGHT_QUOTE_EXPIRED | FREIGHT_QUOTE_NOT_ALLOWED (tidak ada penawaran admin terbuka: belum ditawar, balasan sendiri masih menunggu, atau order bukan awaiting_freight)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /customer/orders/{number}/confirm-received:
     post:
       tags: [orders]
@@ -167,7 +206,8 @@ paths:
       description: |
         Payment manual `pending` (belum ada bukti) dibatalkan dan diganti. `awaiting_verification` (order payment_review)
         atau payment gateway yang masih pending → 409 PAYMENT_ALREADY_ACTIVE. Kode unik dihitung ulang bila pindah
-        ke/dari manual_transfer; `grandTotal` order diperbarui. Lewat batas waktu → 409 ORDER_EXPIRED.
+        ke/dari manual_transfer (hanya order IDR); `grandTotal` order diperbarui. Lewat batas waktu → 409 ORDER_EXPIRED.
+        Order USD: hanya `manual_transfer` dan rekening ber-`currency` USD (422 paymentMethodCode / bankAccountId).
       parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [paymentMethodCode], properties: { paymentMethodCode: { type: string }, bankAccountId: { type: integer, nullable: true } } } } } }
       responses:
@@ -212,6 +252,7 @@ paths:
         Provider `xendit`: header `x-callback-token` harus sama dengan XENDIT_CALLBACK_TOKEN (salah → 401 WEBHOOK_SIGNATURE_INVALID, tetap dicatat).
         Payload disimpan mentah ke payment_webhook_logs. Idempoten by provider+external_id+event (`duplicate`).
         `external_id` = "{orderNumber}-{paymentId}". Nominal harus sama dengan payments.amount (selain itu `ignored`).
+        Gateway hanya untuk order IDR; webhook yang merujuk payment USD → `ignored` (ASUMSI A-86).
         Status SUCCEEDED|PAID|COMPLETED → payment paid, order pending_payment → payment_review → paid (actor webhook);
         EXPIRED → payment expired (order tetap pending_payment sampai orders:expire); FAILED → payment failed.
       parameters: [{ name: provider, in: path, required: true, schema: { type: string, enum: [xendit] } }]
@@ -251,7 +292,7 @@ paths:
     post:
       tags: [admin-orders]
       security: [{ cookieAuth: [] }]
-      summary: 'Ubah status: processing | shipped (wajib courier + trackingNumber) | delivered | completed'
+      summary: 'Ubah status: processing | shipped (wajib courier + trackingNumber; order Loco = siap diambil tanpa keduanya; order FOB/CIF = wajib vesselName + blNumber, dimuat ke kapal) | delivered (Loco = sudah diambil) | completed'
       parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OrderStatusInput' } } } }
       responses:
@@ -262,7 +303,7 @@ paths:
     post:
       tags: [admin-orders]
       security: [{ cookieAuth: [] }]
-      summary: Batalkan order (pending_payment/payment_review → release; paid/processing → adjust +stok, refund manual)
+      summary: Batalkan order (awaiting_freight/pending_payment/payment_review → release + penawaran ongkir terbuka rejected; paid/processing → adjust +stok, refund manual)
       parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, maxLength: 1000 } } } } } }
       responses:
@@ -280,12 +321,64 @@ paths:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
         '409': { $ref: '#/components/responses/InvalidTransition' }
         '422': { description: 'VALIDATION_ERROR: paymentDueAt di masa lalu / keduanya kosong', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /admin/orders/{number}/proforma:
+    put:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: 'Simpan proforma invoice (ASUMSI A-88, kontrak 11.11): simpan pertama = revisi 1 (issuedAt sekarang; bawaan untuk field kosong: portOfLoading dari pelabuhan muat term, portOfDischarge dari pelabuhan tujuan order bila ada, paymentTerms dari syarat bayar order), simpan berikutnya menaikkan revision; nomor PI/{order} tetap. Customer diberi tahu (email + in-app order.proforma_updated).'
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProformaInput' } } } }
+      responses:
+        '200': { description: 'Order lengkap dengan proforma terbaru', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: 'PROFORMA_NOT_ALLOWED: order cancelled/expired (meta.status)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /admin/orders/{number}/freight-quotes:
+    post:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: 'Penawaran ongkir CIF baru dengan rincian baris (ASUMSI A-89, kontrak 11.12): penawaran proposed sebelumnya → superseded, round = terakhir + 1'
+      description: |
+        Hanya order `awaiting_freight`. `validUntil` kosong = sekarang + setting `freightQuoteValidDays`; tanggal saja (`YYYY-MM-DD`) = akhir hari itu;
+        harus di masa depan. Customer diberi tahu (email `FreightQuoted` dengan tabel baris + masa berlaku, in-app `order.freight_quoted`). Dicatat audit.
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FreightQuoteInput' } } } }
+      responses:
+        '201': { description: 'Order dengan freightQuotes[0] = penawaran baru', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: 'FREIGHT_QUOTE_NOT_ALLOWED: order bukan awaiting_freight (meta.status)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { description: 'VALIDATION_ERROR: lines kosong/lebih dari 10/total 0, lines.N.label > 80, lines.N.amount bukan integer ≥ 0, validUntil bukan tanggal atau di masa lalu', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /admin/orders/{number}/freight-quotes/{quote}/extend:
+    put:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: 'Perpanjang masa berlaku penawaran admin (juga menghidupkan kembali yang expired → proposed); customer diberi tahu (order.freight_quote_extended)'
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }, { $ref: '#/components/parameters/FreightQuoteId' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FreightQuoteExtendInput' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: 'NOT_FOUND: penawaran bukan milik order ini', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'FREIGHT_QUOTE_NOT_ALLOWED (order bukan awaiting_freight) | FREIGHT_QUOTE_STALE (bukan penawaran admin putaran terakhir berstatus proposed/expired)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { description: 'VALIDATION_ERROR: validUntil kosong, bukan tanggal, atau di masa lalu', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /admin/orders/{number}/freight-quotes/{quote}/accept:
+    post:
+      tags: [admin-orders]
+      security: [{ cookieAuth: [] }]
+      summary: 'Terima harga balasan customer (proposedBy customer, putaran terakhir): efek sama dengan customer menerima penawaran (payment + paymentDueAt + pending_payment), timeline.meta.acceptedBy = admin'
+      parameters: [{ $ref: '#/components/parameters/OrderNumber' }, { $ref: '#/components/parameters/FreightQuoteId' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: 'NOT_FOUND: penawaran bukan milik order ini', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'FREIGHT_QUOTE_STALE (sudah ditutup / bukan putaran terakhir) | FREIGHT_QUOTE_NOT_ALLOWED (penawaran admin sendiri, atau order bukan awaiting_freight) | FREIGHT_PAYMENT_UNAVAILABLE (meta { currency, missing }: tidak ada metode transfer manual / rekening se-mata-uang yang aktif)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /admin/orders/{number}/payments/accept:
     post:
       tags: [admin-payments]
       security: [{ cookieAuth: [] }]
-      summary: Alias FE lama — accept payment awaiting_verification dari nomor order
+      summary: Alias FE lama — accept payment awaiting_verification dari nomor order (body sama dengan /admin/payments/{payment}/accept)
       parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
+      requestBody: { required: false, content: { application/json: { schema: { $ref: '#/components/schemas/AcceptPaymentInput' } } } }
       responses:
         '200': { $ref: '#/components/responses/PaymentVerified' }
         '409': { $ref: '#/components/responses/InvalidTransition' }
@@ -331,11 +424,13 @@ paths:
     post:
       tags: [admin-payments]
       security: [{ cookieAuth: [] }]
-      summary: awaiting_verification → paid; order payment_review → paid (commit stok + voucher, invoice, email)
+      summary: awaiting_verification → paid; order payment_review → paid (commit stok + voucher, invoice, email). Body opsional mencatat jumlah diterima + biaya bank (ASUMSI A-86).
       parameters: [{ name: payment, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: false, content: { application/json: { schema: { $ref: '#/components/schemas/AcceptPaymentInput' } } } }
       responses:
         '200': { $ref: '#/components/responses/PaymentVerified' }
         '409': { $ref: '#/components/responses/InvalidTransition' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /admin/payments/{payment}/reject:
     post:
       tags: [admin-payments]
@@ -353,7 +448,7 @@ paths:
     get:
       tags: [admin-dashboard]
       security: [{ cookieAuth: [] }]
-      summary: Statistik, order terbaru, order butuh tindakan, grafik penjualan 12 bulan (paid_at)
+      summary: Statistik, order terbaru, order butuh tindakan, grafik penjualan 12 bulan (paid_at); angka uang IDR saja, blok USD terpisah di exportKpis
       parameters: [{ name: year, in: query, schema: { type: integer }, description: 'default tahun berjalan' }]
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminDashboard' } } } } } }
@@ -362,7 +457,7 @@ paths:
     get:
       tags: [admin-reports]
       security: [{ cookieAuth: [] }]
-      summary: Laporan penjualan dari paid_at (status ≥ paid; cancelled/expired tidak dihitung); format=csv mengunduh
+      summary: Laporan penjualan dari paid_at (status ≥ paid; cancelled/expired tidak dihitung); agregat IDR + byCurrency per mata uang; daftar order dan format=csv memuat semua mata uang
       parameters:
         - { name: year, in: query, schema: { type: integer }, description: 'default tahun berjalan' }
         - { name: month, in: query, schema: { type: integer, minimum: 1, maximum: 12 } }
@@ -374,7 +469,35 @@ paths:
           description: OK
           content:
             application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/SalesReport' } } } }
-            text/csv: { schema: { type: string }, example: "number,invoiceNumber,paidAt,status,customer,company,email,items,subtotal,discount,shipping,fee,tax,uniqueCode,grandTotal,paymentMethod" }
+            text/csv: { schema: { type: string, description: 'satu baris per order dibayar dalam rentang, semua mata uang; kolom uang dalam satuan terkecil mata uang di kolom currency (IDR rupiah, USD sen)' }, example: "number,invoiceNumber,paidAt,status,customer,company,email,currency,items,subtotal,discount,shipping,fee,tax,uniqueCode,grandTotal,paymentMethod" }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/exchange-rates:
+    get:
+      tags: [admin-reports]
+      security: [{ cookieAuth: [] }]
+      summary: Kurs USD/IDR JISDOR untuk keuangan (ASUMSI A-84); informasi saja, tidak dipakai order/invoice/laporan
+      description: |
+        Rentang inklusif di zona aplikasi; bawaan 30 hari terakhir. `latest` = kurs hari kerja terakhir (tanggal <= hari ini),
+        `average`/`max`/`min` dari baris dalam rentang (rupiah bulat), `staleDays` = hari kerja (Senin-Jumat) sejak `latest.date`,
+        `stale` = lebih dari 3 hari kerja. Sumber `jisdor` diisi command `rates:fetch`, `manual` dari POST.
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: 'default to - 30 hari' }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 'default hari ini; >= from' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ExchangeRateSummary' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [admin-reports]
+      security: [{ cookieAuth: [] }]
+      summary: Kurs manual (cadangan bila BI tidak tersedia); menimpa baris tanggal yang sama, sumber menjadi manual
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/ExchangeRateInput' } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ExchangeRate' } } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/ValidationError' }
   /admin/audit-logs:
@@ -401,6 +524,12 @@ components:
       in: path
       required: true
       schema: { type: string, example: IKN-20260921-00043 }
+    FreightQuoteId:
+      name: quote
+      in: path
+      required: true
+      description: id penawaran ongkir (Order.freightQuotes[].id)
+      schema: { type: integer, example: 7 }
 
   responses:
     InvalidTransition:
@@ -424,13 +553,14 @@ components:
   schemas:
     OrderStatus:
       type: string
-      enum: [pending_payment, payment_review, paid, processing, shipped, delivered, completed, cancelled, expired]
+      description: 'awaiting_freight = order CIF menunggu penawaran ongkir disepakati (ASUMSI A-89, kontrak 11.12); belum ada payment maupun batas bayar'
+      enum: [awaiting_freight, pending_payment, payment_review, paid, processing, shipped, delivered, completed, cancelled, expired]
     PaymentStatus:
       type: string
       enum: [pending, awaiting_verification, paid, rejected, expired, failed, cancelled]
     CheckoutInput:
       type: object
-      required: [items, addressId, shippingRateId, paymentMethodCode]
+      required: [items, paymentMethodCode]
       properties:
         items:
           type: array
@@ -442,12 +572,22 @@ components:
               productSlug: { type: string }
               productId: { type: integer }
               qty: { type: integer, minimum: 1 }
-        addressId: { type: integer, description: 'alamat milik user (snapshot dibuat server)' }
-        shippingRateId: { type: integer, description: 'dari availableShippingRates POST /cart/quote' }
+        deliveryTermCode: { type: string, nullable: true, maxLength: 32, example: loco, description: 'cara serah terima aktif pasar customer (ASUMSI A-85, A-86); kosong = term aktif pertama pasar itu' }
+        paymentTermCode: { type: string, nullable: true, maxLength: 32, example: tt_advance, description: 'syarat pembayaran aktif pasar customer (ASUMSI A-87): WAJIB untuk customer ekspor, opsional untuk lokal; dibekukan ke Order.paymentTerm' }
+        addressId: { type: integer, nullable: true, description: 'alamat milik user (snapshot dibuat server); wajib untuk term pricingMode zone, diabaikan untuk Loco/FOB' }
+        shippingRateId: { type: integer, nullable: true, description: 'dari availableShippingRates POST /cart/quote; wajib untuk term pricingMode zone' }
         paymentMethodCode: { type: string, example: manual_transfer }
-        bankAccountId: { type: integer, nullable: true, description: 'manual_transfer: rekening aktif; default rekening aktif pertama' }
-        voucherCode: { type: string, nullable: true }
+        bankAccountId: { type: integer, nullable: true, description: 'manual_transfer: rekening aktif se-mata-uang dengan order (USD → rekening USD); default rekening aktif pertama mata uang itu' }
+        destinationPort: { allOf: [{ $ref: '#/components/schemas/DestinationPort' }], nullable: true, description: 'WAJIB (name, country, lat, lng; 422 destinationPort.*) bila term requiresDestinationPort (CIF, ASUMSI A-89); diabaikan untuk term lain. Order dibuat awaiting_freight tanpa payment' }
+        voucherCode: { type: string, nullable: true, description: 'hanya order IDR; order USD → 409 VOUCHER_INVALID reason currency' }
         note: { type: string, nullable: true, maxLength: 1000 }
+    AcceptPaymentInput:
+      type: object
+      description: 'Catatan verifikasi transfer (ASUMSI A-86), semua opsional dan informasi saja; satuan terkecil mata uang payment'
+      properties:
+        receivedAmount: { type: integer, nullable: true, minimum: 0, maximum: 9999999999999, description: 'jumlah yang benar-benar masuk ke rekening (USD dalam sen)' }
+        bankCharges: { type: integer, nullable: true, minimum: 0, maximum: 9999999999999, description: 'biaya bank yang dipotong pada transaksi ini' }
+        receivedNote: { type: string, nullable: true, maxLength: 255 }
     OrderCustomer:
       type: object
       properties:
@@ -458,6 +598,9 @@ components:
         email: { type: string }
         phone: { type: string, nullable: true }
         taxId: { type: string, nullable: true }
+        market: { type: string, enum: [local, export], nullable: true, description: 'pasar customer saat checkout (order sebelum E3 null)' }
+        countryCode: { type: string, nullable: true }
+        companyAddress: { type: string, nullable: true }
     OrderItem:
       type: object
       properties:
@@ -470,7 +613,8 @@ components:
         image: { type: string, nullable: true }
         categoryId: { type: integer, nullable: true }
         qty: { type: integer }
-        unitPrice: { type: integer, description: 'rupiah (snapshot saat checkout)' }
+        currency: { type: string, enum: [IDR, USD], description: 'sama dengan order (ASUMSI A-86)' }
+        unitPrice: { type: integer, description: 'satuan terkecil currency (snapshot saat checkout)' }
         discountAmount: { type: integer }
         taxAmount: { type: integer }
         lineTotal: { type: integer }
@@ -498,14 +642,18 @@ components:
         type: { type: string, nullable: true, enum: [manual_transfer, qris_static, qris_dynamic, virtual_account, ewallet] }
         provider: { type: string, enum: [manual, xendit] }
         externalId: { type: string, nullable: true, example: IKN-20260921-00043-51 }
-        amount: { type: integer, description: 'rupiah = grandTotal order saat payment dibuat' }
+        currency: { type: string, enum: [IDR, USD], description: 'sama dengan order (ASUMSI A-86)' }
+        amount: { type: integer, description: 'satuan terkecil currency = grandTotal order saat payment dibuat' }
+        receivedAmount: { type: integer, nullable: true, description: 'jumlah diterima yang dicatat admin saat accept (informasi)' }
+        bankCharges: { type: integer, nullable: true, description: 'biaya bank yang dicatat admin saat accept (informasi)' }
+        receivedNote: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/PaymentStatus' }
         expiresAt: { type: string, format: date-time, nullable: true }
         paidAt: { type: string, format: date-time, nullable: true }
         instructions: { $ref: '#/components/schemas/I18n' }
-        bankAccount: { type: object, nullable: true, properties: { id: { type: integer }, bankName: { type: string }, accountNumber: { type: string }, accountHolder: { type: string } } }
+        bankAccount: { type: object, nullable: true, properties: { id: { type: integer }, bankName: { type: string }, accountNumber: { type: string }, accountHolder: { type: string }, currency: { type: string, enum: [IDR, USD] }, swiftCode: { type: string, nullable: true }, bankAddress: { type: string, nullable: true }, correspondentBank: { type: string, nullable: true } } }
         qrisImageUrl: { type: string, nullable: true }
-        uniqueCode: { type: integer }
+        uniqueCode: { type: integer, description: '0 untuk order USD' }
         gateway: { type: object, nullable: true, description: 'hanya provider gateway: providerId, qrString, accountNumber, bankCode, checkoutUrl, channelCode, providerStatus' }
         proof:
           type: object
@@ -532,7 +680,8 @@ components:
         status: { $ref: '#/components/schemas/OrderStatus' }
         paymentStatus: { $ref: '#/components/schemas/PaymentStatus' }
         customer: { type: object, properties: { id: { type: integer }, name: { type: string }, company: { type: string, nullable: true }, pic: { type: string, nullable: true }, email: { type: string } } }
-        grandTotal: { type: integer }
+        currency: { type: string, enum: [IDR, USD] }
+        grandTotal: { type: integer, description: satuan terkecil currency }
         uniqueCode: { type: integer }
         paymentDueAt: { type: string, format: date-time, nullable: true }
         paidAt: { type: string, format: date-time, nullable: true }
@@ -546,7 +695,7 @@ components:
             order: { $ref: '#/components/schemas/OrderRef' }
     OrderSummary:
       type: object
-      description: Baris daftar (customer/admin/dashboard/laporan)
+      description: 'Baris daftar (customer/admin/dashboard/laporan). Uang integer satuan terkecil currency (ASUMSI A-86)'
       properties:
         id: { type: integer }
         number: { type: string }
@@ -554,16 +703,19 @@ components:
         date: { type: string, format: date-time }
         status: { $ref: '#/components/schemas/OrderStatus' }
         paymentStatus: { $ref: '#/components/schemas/PaymentStatus' }
+        currency: { type: string, enum: [IDR, USD] }
         customer: { type: object, properties: { id: { type: integer }, name: { type: string }, company: { type: string, nullable: true }, pic: { type: string, nullable: true }, email: { type: string } } }
         itemsCount: { type: integer }
         items: { type: array, items: { type: object, properties: { productSlug: { type: string }, name: { $ref: '#/components/schemas/I18n' }, code: { type: string, nullable: true }, qty: { type: integer }, unit: { type: string, nullable: true }, unitPrice: { type: integer }, lineTotal: { type: integer } } } }
         subtotal: { type: integer }
         grandTotal: { type: integer }
-        paymentMethod: { type: string, nullable: true }
-        paymentDueAt: { type: string, format: date-time, nullable: true }
+        paymentMethod: { type: string, nullable: true, description: 'metode payment aktif/terakhir; order awaiting_freight memakai pendingPaymentMethod.code' }
+        paymentDueAt: { type: string, format: date-time, nullable: true, description: 'null selama awaiting_freight' }
         paidAt: { type: string, format: date-time, nullable: true }
         courier: { type: string, nullable: true }
         trackingNumber: { type: string, nullable: true }
+        destinationPort: { type: string, nullable: true, description: 'nama pelabuhan tujuan CIF (ASUMSI A-89); null untuk term lain' }
+        deliveryTerm: { type: object, nullable: true, description: 'ringkas untuk label daftar (family pickup = "Siap diambil/Sudah diambil"); null untuk order lama tanpa term', properties: { code: { type: string, example: loco }, family: { type: string, enum: [pickup, door, port], nullable: true } } }
         canCancel: { type: boolean }
         canUploadProof: { type: boolean, nullable: true }
         canConfirmReceived: { type: boolean }
@@ -603,9 +755,101 @@ components:
         note: { type: string, maxLength: 200 }
         at: { type: string, format: date-time }
         actor: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string } } }
+    ShipmentDetails:
+      type: object
+      description: 'Data kapal/B/L order FOB/CIF saat shipped on board (ASUMSI A-88); kunci yang sama ada di timeline.meta sebagai vesselName/voyage/blNumber/blDate'
+      properties:
+        vessel: { type: string, nullable: true }
+        voyage: { type: string, nullable: true }
+        blNumber: { type: string, nullable: true }
+        blDate: { type: string, format: date, nullable: true }
+    DestinationPort:
+      type: object
+      description: 'Pelabuhan tujuan CIF (ASUMSI A-89): teks bebas + negara + pin peta, dipilih lewat GET /geo/search?scope=world; tanpa master pelabuhan'
+      required: [name, country, lat, lng]
+      properties:
+        name: { type: string, maxLength: 120, example: Port Klang }
+        country: { type: string, maxLength: 80, example: Malaysia }
+        countryCode: { type: string, nullable: true, pattern: '^[A-Z]{2}$', example: MY, description: 'ISO 3166-1 alpha-2; di-uppercase server' }
+        lat: { type: number, minimum: -90, maximum: 90, example: 2.9997, description: dibulatkan 6 desimal }
+        lng: { type: number, minimum: -180, maximum: 180, example: 101.3929 }
+    FreightQuoteLine:
+      type: object
+      required: [label, amount]
+      properties:
+        label: { type: string, maxLength: 80, example: Ocean freight Belawan - Port Klang }
+        amount: { type: integer, minimum: 0, example: 65000, description: 'satuan terkecil mata uang order (USD sen)' }
+    FreightQuoteInput:
+      type: object
+      description: 'POST /admin/orders/{number}/freight-quotes (kontrak 11.12)'
+      required: [lines]
+      properties:
+        lines: { type: array, minItems: 1, maxItems: 10, items: { $ref: '#/components/schemas/FreightQuoteLine' }, description: 'total semua baris harus > 0 (422 lines)' }
+        validUntil: { type: string, format: date-time, nullable: true, description: 'masa berlaku; YYYY-MM-DD = akhir hari itu (zona aplikasi); kosong = sekarang + setting freightQuoteValidDays; harus di masa depan' }
+        note: { type: string, nullable: true, maxLength: 1000 }
+    FreightQuoteExtendInput:
+      type: object
+      required: [validUntil]
+      properties:
+        validUntil: { type: string, format: date-time, description: 'masa berlaku baru, di masa depan; YYYY-MM-DD = akhir hari itu' }
+    FreightCounterInput:
+      type: object
+      description: 'POST /customer/orders/{number}/freight-quotes/counter'
+      required: [amount]
+      properties:
+        amount: { type: integer, minimum: 1, example: 70000, description: 'harga balasan total ongkir, satuan terkecil mata uang order' }
+        note: { type: string, nullable: true, maxLength: 500 }
+    FreightQuote:
+      type: object
+      description: 'Satu putaran penawaran ongkir CIF (ASUMSI A-89, kontrak 11.12). Uang satuan terkecil mata uang order'
+      properties:
+        id: { type: integer }
+        round: { type: integer, minimum: 1 }
+        proposedBy: { type: string, enum: [admin, customer] }
+        lines: { type: array, items: { $ref: '#/components/schemas/FreightQuoteLine' }, description: 'balasan customer selalu satu baris { label: "Penawaran customer", amount }' }
+        total: { type: integer, description: 'jumlah semua baris' }
+        note: { type: string, nullable: true }
+        validUntil: { type: string, format: date-time, nullable: true, description: 'null untuk balasan customer (tidak kedaluwarsa)' }
+        status: { type: string, enum: [proposed, accepted, rejected, superseded, expired], description: 'proposed = menunggu pihak lawan; rejected = order dibatalkan; superseded = diganti putaran berikutnya; expired = lewat validUntil' }
+        expired: { type: boolean, description: 'status expired, atau proposed yang validUntil-nya sudah lewat sebelum scheduler menandainya (tidak bisa diterima)' }
+        createdBy: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string } } }
+        createdAt: { type: string, format: date-time }
+        respondedAt: { type: string, format: date-time, nullable: true, description: 'saat accepted/rejected/superseded' }
+    ProformaInput:
+      type: object
+      description: 'PUT /admin/orders/{number}/proforma: semua field opsional (string kosong = null); field yang tidak dikirim menjadi null karena PUT mengganti seluruh isi proforma'
+      properties:
+        vesselName: { type: string, nullable: true, maxLength: 120 }
+        voyage: { type: string, nullable: true, maxLength: 60 }
+        etd: { type: string, format: date, nullable: true }
+        eta: { type: string, format: date, nullable: true }
+        portOfLoading: { type: string, nullable: true, maxLength: 120, description: 'revisi 1 kosong = pelabuhan muat term (snapshot alamat loadingPort, lalu baris delivery_terms)' }
+        portOfDischarge: { type: string, nullable: true, maxLength: 120, description: 'revisi 1 kosong = nama pelabuhan tujuan order bila kolomnya ada (Phase E5)' }
+        paymentTerms: { type: string, nullable: true, maxLength: 1000, description: 'revisi 1 kosong = keterangan/nama EN syarat pembayaran order' }
+        notes: { type: string, nullable: true, maxLength: 2000 }
+        validUntil: { type: string, format: date, nullable: true }
+    Proforma:
+      type: object
+      description: 'Data proforma invoice per order (ASUMSI A-88): nomor PI/{order} tetap, label menambah " Rev.N" untuk revisi > 1; cetakan dirender FE dari Order'
+      properties:
+        number: { type: string, example: PI/IKN-20261103-00001 }
+        label: { type: string, example: PI/IKN-20261103-00001 Rev.2 }
+        revision: { type: integer, minimum: 1 }
+        vesselName: { type: string, nullable: true }
+        voyage: { type: string, nullable: true }
+        etd: { type: string, format: date, nullable: true }
+        eta: { type: string, format: date, nullable: true }
+        portOfLoading: { type: string, nullable: true }
+        portOfDischarge: { type: string, nullable: true }
+        paymentTerms: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        validUntil: { type: string, format: date, nullable: true }
+        issuedAt: { type: string, format: date-time, description: 'saat revisi 1 dibuat; tidak berubah saat revisi' }
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: object, nullable: true, properties: { id: { type: integer }, name: { type: string } } }
     Order:
       type: object
-      description: Bentuk Order lengkap (kontrak bagian 9, superset tipe FE). Uang integer rupiah, tanggal ISO-8601 +07:00.
+      description: 'Bentuk Order lengkap (kontrak bagian 9, superset tipe FE). Uang integer satuan terkecil `currency` (IDR rupiah bulat, USD sen; ASUMSI A-86), tanggal ISO-8601 +07:00.'
       properties:
         id: { type: integer }
         number: { type: string, example: IKN-20260921-00043 }
@@ -614,6 +858,7 @@ components:
         status: { $ref: '#/components/schemas/OrderStatus' }
         paymentStatus: { $ref: '#/components/schemas/PaymentStatus' }
         locale: { type: string, enum: [id, en] }
+        currency: { type: string, enum: [IDR, USD], description: 'mata uang semua angka uang di order ini; USD hanya customer ekspor' }
         customer: { $ref: '#/components/schemas/OrderCustomer' }
         items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
         subtotal: { type: integer }
@@ -624,13 +869,26 @@ components:
         taxTotal: { type: integer }
         taxRate: { type: number }
         priceIncludesTax: { type: boolean }
-        uniqueCode: { type: integer, description: '0 bila tanpa kode unik' }
+        uniqueCode: { type: integer, description: '0 bila tanpa kode unik (selalu 0 untuk USD)' }
         grandTotal: { type: integer }
-        voucherCode: { type: string, nullable: true }
-        shippingMethod: { type: object, nullable: true, properties: { rateId: { type: integer }, zoneId: { type: integer }, label: { $ref: '#/components/schemas/I18n' }, eta: { $ref: '#/components/schemas/I18n' }, amount: { type: integer }, type: { type: string, enum: [flat, calculated, per_kg] }, weightGram: { type: integer }, volumeCm3: { type: integer }, distanceKm: { type: integer, nullable: true }, breakdown: { $ref: '#/components/schemas/ShippingBreakdown' } } }
-        shippingAddress: { type: object, description: 'CustomerAddress::toSnapshot(): label, recipientName, phone, addressLine, provinceCode…villageCode, region{province,regency,district,village}, postalCode, lat, lng, note' }
+        voucherCode: { type: string, nullable: true, description: 'selalu null untuk USD' }
+        shippingMethod: { type: object, nullable: true, description: 'snapshot ongkir; type pickup|included = baris sintetis term tanpa ongkir (rateId/zoneId null, amount 0); type quoted = CIF (ASUMSI A-89): amount 0 selama awaiting_freight, lalu total penawaran yang disepakati + lines[] + quoteId', properties: { rateId: { type: integer, nullable: true }, zoneId: { type: integer, nullable: true }, label: { $ref: '#/components/schemas/I18n' }, eta: { $ref: '#/components/schemas/I18n', nullable: true }, amount: { type: integer }, type: { type: string, enum: [flat, calculated, per_kg, pickup, included, quoted] }, weightGram: { type: integer }, volumeCm3: { type: integer }, distanceKm: { type: integer, nullable: true }, breakdown: { $ref: '#/components/schemas/ShippingBreakdown', nullable: true }, origins: { type: array, nullable: true, items: { $ref: '#/components/schemas/ShippingOrigin' }, description: 'tarif zona: rincian per pabrik asal (ASUMSI A-90); null untuk order sebelum A-90 dan term tanpa tarif zona' }, lines: { type: array, nullable: true, items: { $ref: '#/components/schemas/FreightQuoteLine' }, description: 'rincian ongkir CIF yang disepakati (Ocean freight, Port charges, Insurance, ...); null sebelum disepakati / term lain. FE mencetak baris Freight/Insurance commercial invoice dari sini' }, quoteId: { type: integer, nullable: true } } }
+        shippingAddress: { type: object, description: 'Term diantar: CustomerAddress::toSnapshot(): label, recipientName, phone, addressLine, provinceCode…villageCode, region{province,regency,district,village}, postalCode, lat, lng, note. Term Loco: { type: pickup, points: PickupPoint[] (ASUMSI A-90; tidak ada di order lama), label, address, lat, lng (= titik pertama), recipientName (perusahaan/nama customer), phone }. Term FOB/CIF (ASUMSI A-86): { type: port, label{id,en} (nama term), loadingPort, destinationPort (CIF, A-89) | null, companyName, companyAddress, countryCode, recipientName, phone }. Tidak pernah [] ({ type: none } bila tanpa alamat).' }
+        destinationPort: { allOf: [{ $ref: '#/components/schemas/DestinationPort' }], nullable: true, description: 'pelabuhan tujuan CIF yang dipilih customer saat checkout (ASUMSI A-89); null untuk term lain' }
+        pendingPaymentMethod: { type: object, nullable: true, description: 'metode + rekening yang dibekukan saat checkout CIF dan dipakai membuat payment saat penawaran disepakati; null untuk order lain', properties: { code: { type: string, example: manual_transfer }, bankAccountId: { type: integer, nullable: true } } }
+        freightQuotes: { type: array, items: { $ref: '#/components/schemas/FreightQuote' }, description: 'semua putaran penawaran ongkir CIF, terbaru dulu (kosong untuk term lain)' }
+        activeFreightQuote: { allOf: [{ $ref: '#/components/schemas/FreightQuote' }], nullable: true, description: 'putaran terakhir bila masih proposed (admin atau balasan customer), termasuk yang expired = true belum ditandai scheduler; null bila tidak ada' }
+        canAcceptFreightQuote: { type: boolean, description: 'customer: order awaiting_freight + penawaran admin terakhir proposed dan belum lewat validUntil' }
+        canCounterFreightQuote: { type: boolean, description: 'customer: syarat sama dengan canAcceptFreightQuote' }
+        canQuoteFreight: { type: boolean, description: 'admin: order awaiting_freight (boleh menawar baru / menerima balasan customer)' }
+        deliveryTerm: { type: object, nullable: true, description: 'cara serah terima order (ASUMSI A-85): code dari kolom orders.delivery_term, family/pricingMode dari snapshot, name/loadingPort dari baris delivery_terms bila masih ada; null untuk order lama', properties: { code: { type: string, example: loco }, name: { $ref: '#/components/schemas/I18n', nullable: true }, family: { type: string, enum: [pickup, door, port], nullable: true }, pricingMode: { type: string, enum: [none, zone, included, quoted], nullable: true }, loadingPort: { type: string, nullable: true } } }
+        paymentTerm: { type: object, nullable: true, description: 'syarat pembayaran yang dibekukan saat checkout (ASUMSI A-87); null untuk order lokal tanpa syarat', properties: { code: { type: string, example: tt_advance }, name: { $ref: '#/components/schemas/I18n', nullable: true }, description: { $ref: '#/components/schemas/I18n', nullable: true } } }
+        pickup: { type: object, nullable: true, description: 'titik ambil (pertama) yang dibekukan saat checkout (hanya order Loco)', properties: { label: { type: string, nullable: true }, address: { type: string, nullable: true }, lat: { type: number, nullable: true }, lng: { type: number, nullable: true } } }
+        pickupPoints: { type: array, items: { $ref: '#/components/schemas/PickupPoint' }, description: 'semua titik ambil, satu per pabrik asal item (ASUMSI A-90); order lama = satu titik dari field datar (code/name null); [] untuk order bukan Loco' }
         courier: { type: string, nullable: true }
-        trackingNumber: { type: string, nullable: true }
+        trackingNumber: { type: string, nullable: true, description: 'resi kurir; untuk order FOB/CIF berisi nomor B/L setelah dimuat ke kapal' }
+        isPort: { type: boolean, description: 'true untuk order term pelabuhan (FOB/CIF): shipped = dimuat ke kapal dengan vesselName + blNumber (ASUMSI A-88)' }
+        shipmentDetails: { allOf: [{ $ref: '#/components/schemas/ShipmentDetails' }], nullable: true, description: 'data kapal/B/L yang dicatat saat shipped on board; null untuk order darat/Loco atau sebelum dikirim' }
         note: { type: string, nullable: true }
         cancelReason: { type: string, nullable: true }
         paymentDueAt: { type: string, format: date-time, nullable: true }
@@ -645,11 +903,13 @@ components:
         payments: { type: array, items: { $ref: '#/components/schemas/Payment' } }
         timeline: { type: array, items: { $ref: '#/components/schemas/OrderTimelineEntry' } }
         trackingUpdates: { type: array, items: { $ref: '#/components/schemas/TrackingUpdate' } }
-        canAddTracking: { type: boolean, description: 'true hanya saat status shipped' }
+        canAddTracking: { type: boolean, description: 'true hanya saat status shipped dan bukan order Loco' }
         attachments: { type: array, items: { $ref: '#/components/schemas/OrderAttachment' } }
         canAttach: { type: boolean, description: 'true untuk order yang sudah dibayar (paid … completed)' }
-        canCancel: { type: boolean }
-        canUploadProof: { type: boolean }
+        proforma: { allOf: [{ $ref: '#/components/schemas/Proforma' }], nullable: true, description: 'proforma invoice yang bisa diedit admin (PUT /admin/orders/{number}/proforma, ASUMSI A-88); null sebelum pertama disimpan' }
+        canEditProforma: { type: boolean, description: 'false hanya untuk order cancelled/expired; FE memutuskan kapan menampilkan proforma (order ekspor)' }
+        canCancel: { type: boolean, description: 'true untuk awaiting_freight dan pending_payment' }
+        canUploadProof: { type: boolean, description: 'false selama awaiting_freight (belum ada payment)' }
         canChangePayment: { type: boolean }
         canConfirmReceived: { type: boolean }
         canComplete: { type: boolean }
@@ -674,8 +934,12 @@ components:
       properties:
         status: { type: string, enum: [processing, shipped, delivered, completed] }
         note: { type: string, nullable: true, maxLength: 1000 }
-        courier: { type: string, nullable: true, description: 'wajib untuk shipped' }
-        trackingNumber: { type: string, nullable: true, description: 'wajib untuk shipped' }
+        courier: { type: string, nullable: true, maxLength: 120, description: 'wajib untuk shipped pada order darat (Franco); diabaikan untuk order Loco (siap diambil tanpa kurir) dan order FOB/CIF' }
+        trackingNumber: { type: string, nullable: true, maxLength: 120, description: 'wajib untuk shipped pada order darat; diabaikan untuk Loco dan FOB/CIF (server mengisi Order.trackingNumber dengan nomor B/L)' }
+        vesselName: { type: string, nullable: true, maxLength: 120, description: 'order FOB/CIF (Order.isPort = true): WAJIB untuk shipped (422 vesselName); diabaikan untuk order lain (ASUMSI A-88)' }
+        voyage: { type: string, nullable: true, maxLength: 60, description: 'order FOB/CIF: opsional' }
+        blNumber: { type: string, nullable: true, maxLength: 60, description: 'order FOB/CIF: WAJIB untuk shipped (422 blNumber); disalin ke Order.trackingNumber' }
+        blDate: { type: string, format: date, nullable: true, description: 'order FOB/CIF: opsional, tidak boleh di masa depan; Order.shippedAt mengikuti tanggal ini (jam saat ini), kosong = sekarang' }
     WebhookResponse:
       type: object
       properties:
@@ -688,6 +952,7 @@ components:
       type: object
       description: Kompatibel CustomerDashboardStats FE + recentOrders + account
       properties:
+        currency: { type: string, enum: [IDR, USD], description: 'mata uang pasar customer; transactionValue dan monthly hanya dari order bermata uang ini (ASUMSI A-86)' }
         totalOrders: { type: integer }
         awaitingPayment: { type: integer, description: 'pending_payment + payment_review' }
         inProgress: { type: integer, description: 'paid + processing + shipped + delivered' }
@@ -710,7 +975,10 @@ components:
         orders: { type: integer }
     AdminDashboard:
       type: object
+      description: 'Semua angka uang (stats, kpis, salesChart, topProducts, paymentDue) hanya dari order IDR (ASUMSI A-86); order USD dirangkum terpisah di exportKpis (Phase E6). recentOrders/needsAction memuat semua mata uang dengan currency per baris.'
       properties:
+        currency: { type: string, enum: [IDR] }
+        exportKpis: { allOf: [{ $ref: '#/components/schemas/ExportKpis' }], nullable: true, description: 'Additive (Phase E6). Blok ekspor USD; null bila belum pernah ada order USD.' }
         stats:
           type: object
           properties:
@@ -747,6 +1015,7 @@ components:
           description: 'Additive. Antrean kerja; null = admin tidak punya modulnya (aturan sama dengan /admin/badges).'
           properties:
             paymentsToVerify: { type: integer, nullable: true, description: 'payment awaiting_verification (modul payments)' }
+            freightToQuote: { type: integer, nullable: true, description: 'order awaiting_freight tanpa penawaran admin proposed yang masih berlaku: order CIF baru, balasan customer, atau penawaran kedaluwarsa (modul orders, ASUMSI A-89)' }
             ordersToProcess: { type: integer, nullable: true, description: 'order paid (modul orders)' }
             ordersToShip: { type: integer, nullable: true, description: 'order processing (modul orders)' }
             ordersInTransit: { type: integer, nullable: true, description: 'order shipped (modul orders)' }
@@ -810,7 +1079,10 @@ components:
         changePct: { type: number, nullable: true, description: 'persen perubahan (1 desimal); null bila previous = 0' }
     SalesReport:
       type: object
+      description: 'summary, byMonth, byProduct hanya order IDR (ASUMSI A-86, currency IDR); byCurrency = total per mata uang dengan filter yang sama (Phase E6); orders memuat semua mata uang dengan currency per baris.'
       properties:
+        currency: { type: string, enum: [IDR], description: 'mata uang summary/byMonth/byProduct' }
+        byCurrency: { type: array, items: { $ref: '#/components/schemas/SalesByCurrency' }, description: 'hanya mata uang yang punya order dibayar dalam rentang, urut IDR lalu USD; kosong bila tidak ada order' }
         period: { type: object, properties: { from: { type: string, format: date-time }, to: { type: string, format: date-time }, year: { type: integer }, month: { type: integer, nullable: true } } }
         summary:
           type: object
@@ -830,7 +1102,53 @@ components:
             itemsSold: { type: integer, description: 'alias items (FE mock)' }
         byMonth: { type: array, items: { $ref: '#/components/schemas/SalesChartPoint' } }
         byProduct: { type: array, items: { type: object, properties: { productId: { type: integer }, productSlug: { type: string, nullable: true }, code: { type: string, nullable: true }, name: { $ref: '#/components/schemas/I18n' }, qty: { type: integer }, orders: { type: integer }, revenue: { type: integer, description: 'Σ (lineTotal − discountAmount)' } } } }
-        orders: { type: array, items: { $ref: '#/components/schemas/OrderSummary' }, description: 'maks 1000, paid_at terbaru dulu' }
+        orders: { type: array, items: { $ref: '#/components/schemas/OrderSummary' }, description: 'maks 1000, paid_at terbaru dulu, semua mata uang (tiap baris membawa currency)' }
+    SalesByCurrency:
+      type: object
+      description: 'Total laporan per mata uang (Phase E6) dengan filter paid_at/status yang sama dengan summary. Uang dalam satuan terkecil mata uang baris (IDR rupiah, USD sen).'
+      properties:
+        currency: { type: string, enum: [IDR, USD] }
+        orders: { type: integer, description: 'order dibayar dalam rentang' }
+        revenue: { type: integer, description: 'Σ grandTotal, satuan terkecil currency' }
+        paidOrders: { type: integer, description: 'sama dengan orders (laporan hanya menghitung order dibayar; alias seperti summary.paidCount)' }
+        averageOrder: { type: integer, description: 'revenue / orders dibulatkan ke bawah; 0 bila tidak ada order' }
+    ExportKpis:
+      type: object
+      description: 'Blok ekspor dashboard (Phase E6): order USD saja, periode = period.from..period.to (awal bulan s.d. sekarang). Uang dalam sen.'
+      properties:
+        currency: { type: string, enum: [USD] }
+        revenue: { type: integer, description: 'Σ grandTotal order USD dibayar (paid_at) dalam periode, sen' }
+        paidOrders: { type: integer, description: 'jumlah order USD dibayar dalam periode' }
+        orders: { type: integer, description: 'order USD dibuat (created_at) dalam periode, semua status' }
+        awaitingFreight: { type: integer, description: 'order USD berstatus awaiting_freight saat ini' }
+        pendingPayment: { type: integer, description: 'order USD berstatus pending_payment saat ini' }
+    ExchangeRate:
+      type: object
+      properties:
+        date: { type: string, format: date, example: '2026-10-30' }
+        rate: { type: integer, description: 'rupiah bulat per 1 USD', example: 18138 }
+        source: { type: string, enum: [jisdor, manual] }
+        fetchedAt: { type: string, format: date-time, nullable: true, description: 'waktu ambil dari BI; null untuk manual' }
+    ExchangeRateInput:
+      type: object
+      required: [date, rate]
+      properties:
+        date: { type: string, format: date, description: '<= hari ini' }
+        rate: { type: integer, minimum: 1000, maximum: 1000000, description: 'rupiah bulat per 1 USD' }
+    ExchangeRateSummary:
+      type: object
+      properties:
+        latest: { allOf: [{ $ref: '#/components/schemas/ExchangeRate' }], nullable: true, description: 'kurs tanggal terakhir <= hari ini, dari tabel (bukan hanya rentang)' }
+        average: { type: integer, nullable: true, description: 'rata-rata baris dalam rentang, dibulatkan' }
+        max: { type: integer, nullable: true }
+        min: { type: integer, nullable: true }
+        series:
+          type: array
+          description: baris dalam rentang, tanggal naik
+          items: { type: object, properties: { date: { type: string, format: date }, rate: { type: integer }, source: { type: string, enum: [jisdor, manual] } } }
+        fetchedAt: { type: string, format: date-time, nullable: true, description: 'fetched_at terbaru di tabel' }
+        staleDays: { type: integer, description: 'hari kerja sejak latest.date sampai hari ini; 0 bila hari ini atau kosong' }
+        stale: { type: boolean, description: 'staleDays > 3' }
     AuditLog:
       type: object
       properties:

@@ -11,13 +11,14 @@ import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { formatIDR } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
 import type { QuoteResult } from '@/lib/types';
 
 // Keranjang: item dari localStorage; ringkasan (harga berlaku, diskon, pajak, biaya) dari
 // POST /cart/quote tanpa alamat untuk customer login. Tamu diarahkan login saat checkout.
+// Semua angka dalam mata uang quote (IDR/USD mengikuti pasar customer, ASUMSI A-86).
 export default function CartPage() {
-  const { items, updateQty, remove, subtotal, count, ready } = useCart();
+  const { items, updateQty, remove, subtotal, count, ready, syncQuote, currency: cartCurrency, notice, dismissNotice } = useCart();
   const { customer, ready: authReady } = useAuth();
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
@@ -41,7 +42,9 @@ export default function CartPage() {
       body: { items: items.map((i) => ({ productSlug: i.slug, qty: i.qty })) },
     })
       .then((res) => {
-        if (active) setQuote(res);
+        if (!active) return;
+        setQuote(res);
+        syncQuote(res);
       })
       .catch((err) => {
         if (!active) return;
@@ -58,6 +61,8 @@ export default function CartPage() {
   }, [itemsKey, ready, authReady, customer?.id]);
 
   const quoteItem = (slug: string) => quote?.items.find((q) => q.productSlug === slug) || null;
+  const currency = quote?.currency ?? cartCurrency;
+  const formatIDR = (value: number | null | undefined) => formatMoney(value, currency);
   const checkoutHref = customer ? '/checkout' : '/login?next=/checkout';
 
   return (
@@ -85,6 +90,12 @@ export default function CartPage() {
           ) : (
             <div className="cart-grid">
               <div className="cart-items">
+                {notice && (
+                  <p className="cart-notice" role="status">
+                    <span>{notice}</span>
+                    <button type="button" onClick={dismissNotice}>{t('Tutup', 'Dismiss')}</button>
+                  </p>
+                )}
                 {items.map((it) => {
                   const q = quoteItem(it.slug);
                   const unitPrice = q?.unitPrice ?? it.unitPrice;

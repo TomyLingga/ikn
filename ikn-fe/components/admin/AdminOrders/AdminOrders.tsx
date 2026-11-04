@@ -8,20 +8,22 @@ import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/
 import AdminTabs, { type AdminTab, type AdminTabGroup } from '@/components/admin/AdminTabs';
 import { Pager } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
-import { orderLabel, orderStatus, paymentLabel } from '@/lib/commerce';
+import { orderLabel, orderStatus, orderVariant, paymentLabel } from '@/lib/commerce';
 import { apiPaged, errorMessage } from '@/lib/api';
 import { defaultDateRange, queryString, type CountsMeta } from '@/lib/admin';
-import { formatDateTime, formatIDR } from '@/lib/format';
+import { formatDateTime, formatMoney } from '@/lib/format';
 import type { IconName, OrderStatusKey, OrderSummary } from '@/lib/types';
 
 const STATUS_KEYS = Object.keys(orderStatus) as OrderStatusKey[];
 // Tab bawaan: antrean verifikasi pembayaran. Status yang menunggu tindakan admin memakai lencana merah.
 const DEFAULT_STATUS: OrderStatusKey = 'payment_review';
-const WORK_STATUSES: OrderStatusKey[] = ['payment_review', 'paid', 'processing', 'shipped', 'delivered'];
+const WORK_STATUSES: OrderStatusKey[] = ['awaiting_freight', 'payment_review', 'paid', 'processing', 'shipped', 'delivered'];
 // Antrean (tanpa filter tanggal: semua order yang masih berjalan tampil) vs riwayat (dengan rentang tanggal).
-const QUEUE_STATUSES: OrderStatusKey[] = ['pending_payment', 'payment_review', 'paid', 'processing', 'shipped', 'delivered'];
+// awaiting_freight (order CIF menunggu penawaran ongkir admin, ASUMSI A-89) berada paling depan.
+const QUEUE_STATUSES: OrderStatusKey[] = ['awaiting_freight', 'pending_payment', 'payment_review', 'paid', 'processing', 'shipped', 'delivered'];
 const HISTORY_STATUSES: StatusFilter[] = ['', 'completed', 'cancelled', 'expired'];
 const TAB_ICONS: Partial<Record<OrderStatusKey, IconName>> = {
+  awaiting_freight: 'globe',
   pending_payment: 'clock',
   payment_review: 'paymentCheck',
   paid: 'wallet',
@@ -105,10 +107,12 @@ export default function AdminOrders() {
   const filtersChanged = status !== DEFAULT_STATUS || !!q || (dated && (range.from !== defaults.from || range.to !== defaults.to));
   const counts = meta.counts || {};
   const allCount = STATUS_KEYS.reduce((sum, key) => sum + (counts[key] || 0), 0);
+  // Tab antrean CIF berjudul pendek "Penawaran ongkir" (label status lengkapnya tetap dipakai di badge baris).
+  const tabLabel = (key: OrderStatusKey) => (key === 'awaiting_freight' ? t('Penawaran ongkir', 'Freight quotes') : orderStatus[key][lang]);
   const tabFor = (key: StatusFilter): AdminTab<StatusFilter> =>
     key === ''
       ? { key, label: t('Semua', 'All'), icon: 'orders', count: allCount }
-      : { key, label: orderStatus[key][lang], icon: TAB_ICONS[key], count: counts[key] || 0, badge: WORK_STATUSES.includes(key) };
+      : { key, label: tabLabel(key), icon: TAB_ICONS[key], count: counts[key] || 0, badge: WORK_STATUSES.includes(key) };
   const groups: AdminTabGroup<StatusFilter>[] = [
     { key: 'queue', label: t('Perlu diproses', 'In progress'), note: t('semua tanggal', 'all dates'), tabs: QUEUE_STATUSES.map(tabFor) },
     { key: 'history', label: t('Riwayat', 'History'), note: t('filter tanggal', 'date filter'), tabs: HISTORY_STATUSES.map(tabFor) },
@@ -137,6 +141,7 @@ export default function AdminOrders() {
         <span>
           {order.customer.company || order.customer.name}
           {order.customer.company && order.customer.pic && <small className="admin-cell-sub">{order.customer.pic}</small>}
+          {order.destinationPort && <small className="admin-cell-sub">CIF · {order.destinationPort}</small>}
         </span>
       ),
     },
@@ -147,7 +152,17 @@ export default function AdminOrders() {
       align: 'right',
       render: (order) => String(order.itemsCount),
     },
-    { key: 'total', label: 'Total', align: 'right', render: (order) => <strong>{formatIDR(order.grandTotal)}</strong> },
+    {
+      key: 'total',
+      label: 'Total',
+      align: 'right',
+      render: (order) => (
+        <span>
+          <strong>{formatMoney(order.grandTotal, order.currency)}</strong>
+          {order.currency === 'USD' && <small className="admin-cell-sub">USD</small>}
+        </span>
+      ),
+    },
     {
       key: 'payment',
       label: t('Pembayaran', 'Payment'),
@@ -158,7 +173,7 @@ export default function AdminOrders() {
     {
       key: 'status',
       label: 'Status',
-      render: (order) => <StatusBadge label={orderLabel(order.status)[lang]} tone={orderLabel(order.status).tone} small />,
+      render: (order) => <StatusBadge label={orderLabel(order.status, orderVariant(order))[lang]} tone={orderLabel(order.status, orderVariant(order)).tone} small />,
     },
     {
       key: 'act',

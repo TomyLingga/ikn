@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Icon from '@/components/Icon';
-import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
-import { api, ApiError, errorMessage } from '@/lib/api';
 import { tr, type SiteData } from '@/lib/cms';
-import { formatIDR } from '@/lib/format';
+import { deliveryAddress, isPickupOrder, isPortAddress, isPortOrder, joinNames, orderPickupPoints, pickupPointName } from '@/lib/commerce';
+import { formatMoney, isUsd } from '@/lib/format';
 import { terbilangRupiah } from '@/lib/terbilang';
 import type { CommerceConfig, Order } from '@/lib/types';
+import { useOrderForPrint } from './useOrderForPrint';
 import styles from './InvoiceDocument.module.css';
 
 const MONTHS_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -18,6 +17,8 @@ interface InvoiceDocumentProps {
   number: string;
   site: SiteData;
   config: CommerceConfig | null;
+  /** Order yang sudah dimuat pemanggil (pemilih dokumen InvoicePrint); tanpa ini komponen memuat sendiri. */
+  order?: Order | null;
 }
 
 function longDate(iso: string | null | undefined): string {
@@ -30,25 +31,12 @@ function longDate(iso: string | null | undefined): string {
 // PMS/X/INV/RA/{urut}/{bulan Romawi}/{tahun}, "Kepada Yth", tabel JUMLAH BARANG / URAIAN / HARGA SATUAN /
 // JUMLAH HARGA, blok Pembayaran (rekening tujuan), Jumlah / PPN / TOTAL, Terbilang, tembusan, tanda tangan,
 // dan kaki halaman nilai AKHLAK + alamat kantor pusat. Dibuka customer (order miliknya) maupun admin.
-export default function InvoiceDocument({ number, site, config }: InvoiceDocumentProps) {
-  const { customer, admin, ready } = useAuth();
+// Order USD (customer ekspor) dicetak sebagai commercial invoice berbahasa Inggris oleh ExportInvoiceDocument; rute
+// /print/invoice memilihnya lewat InvoicePrint, jadi komponen ini tetap format rupiah untuk order lokal.
+export default function InvoiceDocument({ number, site, config, order: preloaded }: InvoiceDocumentProps) {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
-  const [order, setOrder] = useState<Order | null>(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!ready) return;
-    if (!customer && !admin) {
-      setError(t('Login dulu untuk membuka invoice.', 'Please log in to open the invoice.'));
-      return;
-    }
-    const path = admin ? `/admin/orders/${encodeURIComponent(number)}` : `/customer/orders/${encodeURIComponent(number)}`;
-    api<Order>(path)
-      .then(setOrder)
-      .catch((err) => setError(err instanceof ApiError && err.status === 404 ? t('Pesanan tidak ditemukan.', 'Order not found.') : errorMessage(err)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, customer, admin, number]);
+  const { order, error } = useOrderForPrint(number, preloaded);
 
   const office = site.contact?.locations?.[0];
   const officePhones = (office?.phones || []).map((p) => p.number).filter(Boolean);
@@ -76,8 +64,22 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
 
   const paidPayment = order.payments.find((p) => p.status === 'paid') || order.activePayment || order.payment || null;
   const bank = paidPayment?.bankAccount || null;
-  const address = order.shippingAddress;
-  const region = [address.region?.village, address.region?.district, address.region?.regency, address.region?.province].filter(Boolean).join(', ');
+  // Order Loco (ASUMSI A-85): snapshot alamat = titik ambil, bukan alamat customer; baris pengiriman memakai nama term.
+  const pickup = isPickupOrder(order);
+  // Loco beberapa pabrik (ASUMSI A-90): nama titik ambil digabung; alamat hanya bila satu titik.
+  const pickupPoints = orderPickupPoints(order);
+  const pickupNames = joinNames(pickupPoints.map((point) => pickupPointName(point, 'id')), 'id');
+  const pickupText = pickupPoints.length === 1 && pickupPoints[0]?.address ? `${pickupNames || 'pabrik'} (${pickupPoints[0]?.address})` : pickupNames;
+  // Order FOB (ASUMSI A-86): angka USD, alamat = identitas perusahaan pembeli dari snapshot port; commercial invoice
+  // berbahasa Inggris menyusul Phase E4, cetakan ini hanya menjaga angka dan alamat tetap benar.
+  const port = isPortOrder(order);
+  const portAddress = isPortAddress(order.shippingAddress) ? order.shippingAddress : null;
+  const usd = isUsd(order.currency);
+  const symbol = usd ? 'USD' : 'Rp.';
+  // Angka tanpa kode mata uang (kolom kiri sudah memuat simbolnya).
+  const money = (value: number | null | undefined) => formatMoney(value, order.currency).replace(/^(Rp|USD|IDR)\s?/, '');
+  const address = deliveryAddress(order.shippingAddress);
+  const region = address ? [address.region?.village, address.region?.district, address.region?.regency, address.region?.province].filter(Boolean).join(', ') : '';
   const issuedAt = order.paidAt || order.date;
   const city = (site.settings.company?.location || 'Medan').split(',')[0] || 'Medan';
   const invoiceNumber = order.invoiceNumber || '—';
@@ -148,12 +150,20 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
         <div className={styles.parties}>
           <div className={styles.toBlock}>
             <span>Kepada Yth :</span>
-            <strong>{order.customer.company || order.customer.name}</strong>
-            <p>
-              {address.addressLine}
-              {region ? `, ${region}` : ''}
-              {address.postalCode ? ` ${address.postalCode}` : ''}
-            </p>
+            <strong>{portAddress?.companyName || order.customer.company || order.customer.name}</strong>
+            {address?.addressLine && (
+              <p>
+                {address.addressLine}
+                {region ? `, ${region}` : ''}
+                {address.postalCode ? ` ${address.postalCode}` : ''}
+              </p>
+            )}
+            {port && (portAddress?.companyAddress || order.customer.companyAddress) && (
+              <p>
+                {portAddress?.companyAddress || order.customer.companyAddress}
+                {portAddress?.countryCode || order.customer.countryCode ? `, ${portAddress?.countryCode || order.customer.countryCode}` : ''}
+              </p>
+            )}
             <p>
               u.p. {order.customer.pic || order.customer.name}
               {order.customer.phone ? ` · ${order.customer.phone}` : ''}
@@ -192,12 +202,21 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
               <td />
               <td>
                 <u>Sesuai Order No. {order.number} Tgl. {longDate(order.date)}</u>
-                {order.shippingMethod && (
+                {(order.shippingMethod || order.deliveryTerm) && (
                   <>
                     <br />
-                    Pengiriman: {tr(order.shippingMethod.label, lang)}
-                    {order.courier ? ` · ${order.courier}` : ''}
-                    {order.trackingNumber ? ` · Resi ${order.trackingNumber}` : ''}
+                    Pengiriman: {tr(order.deliveryTerm?.name ?? order.shippingMethod?.label, lang) || tr(order.shippingMethod?.label, lang)}
+                    {pickup
+                      ? ` · Ambil di ${pickupText || 'pabrik'}`
+                      : port
+                        ? ` · Pelabuhan muat ${portAddress?.loadingPort || order.deliveryTerm?.loadingPort || '-'}`
+                        : `${order.courier ? ` · ${order.courier}` : ''}${order.trackingNumber ? ` · Resi ${order.trackingNumber}` : ''}`}
+                    {order.paymentTerm && (
+                      <>
+                        <br />
+                        Syarat pembayaran: {tr(order.paymentTerm.name, lang)}
+                      </>
+                    )}
                   </>
                 )}
               </td>
@@ -214,12 +233,12 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
                   {item.code ? <small> ({item.code})</small> : null}
                 </td>
                 <td className={styles.money}>
-                  <span>Rp.</span>
-                  <span>{formatIDR(item.unitPrice).replace(/^Rp\s?/, '')}</span>
+                  <span>{symbol}</span>
+                  <span>{money(item.unitPrice)}</span>
                 </td>
                 <td className={styles.money}>
-                  <span>Rp.</span>
-                  <span>{formatIDR(item.lineTotal).replace(/^Rp\s?/, '')}</span>
+                  <span>{symbol}</span>
+                  <span>{money(item.lineTotal)}</span>
                 </td>
               </tr>
             ))}
@@ -229,8 +248,8 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
                 <td>Diskon{order.voucherCode ? ` (${order.voucherCode})` : ''}</td>
                 <td />
                 <td className={styles.money}>
-                  <span>Rp.</span>
-                  <span>−{formatIDR(order.discountTotal).replace(/^Rp\s?/, '')}</span>
+                  <span>{symbol}</span>
+                  <span>−{money(order.discountTotal)}</span>
                 </td>
               </tr>
             )}
@@ -240,8 +259,8 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
                 <td>Ongkos kirim{order.shippingMethod ? ` · ${tr(order.shippingMethod.label, lang)}` : ''}</td>
                 <td />
                 <td className={styles.money}>
-                  <span>Rp.</span>
-                  <span>{formatIDR(order.shippingTotal).replace(/^Rp\s?/, '')}</span>
+                  <span>{symbol}</span>
+                  <span>{money(order.shippingTotal)}</span>
                 </td>
               </tr>
             )}
@@ -251,8 +270,8 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
                 <td>{tr(fee.name, lang)}</td>
                 <td />
                 <td className={styles.money}>
-                  <span>Rp.</span>
-                  <span>{formatIDR(fee.amount).replace(/^Rp\s?/, '')}</span>
+                  <span>{symbol}</span>
+                  <span>{money(fee.amount)}</span>
                 </td>
               </tr>
             ))}
@@ -262,7 +281,7 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
                 <td>Kode unik transfer</td>
                 <td />
                 <td className={styles.money}>
-                  <span>Rp.</span>
+                  <span>{symbol}</span>
                   <span>{order.uniqueCode.toLocaleString('id-ID')}</span>
                 </td>
               </tr>
@@ -277,6 +296,10 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
                 {bank ? (
                   <>
                     Pembayaran di transfer ke rekening {companyName} pada {bank.bankName} AC No. {bank.accountNumber} a.n. {bank.accountHolder}
+                    {bank.swiftCode ? ` · SWIFT ${bank.swiftCode}` : ''}
+                    {bank.bankAddress ? ` · ${bank.bankAddress}` : ''}
+                    {bank.correspondentBank ? ` · Bank koresponden ${bank.correspondentBank}` : ''}
+                    {usd ? '. Biaya bank di luar negeri ditanggung pembeli.' : ''}
                   </>
                 ) : (
                   <>Pembayaran melalui {paidPayment ? tr(paidPayment.methodName, lang) || paidPayment.method : 'metode yang dipilih saat checkout'}.</>
@@ -290,28 +313,28 @@ export default function InvoiceDocument({ number, site, config }: InvoiceDocumen
               </td>
               <td className={styles.sumLabel}>Jumlah</td>
               <td className={styles.money}>
-                <span>Rp.</span>
-                <span>{formatIDR(beforeTax).replace(/^Rp\s?/, '')}</span>
+                <span>{symbol}</span>
+                <span>{money(beforeTax)}</span>
               </td>
             </tr>
             <tr className={styles.payRow}>
               <td className={styles.sumLabel}>{taxLabel}</td>
               <td className={styles.money}>
-                <span>Rp.</span>
-                <span>{formatIDR(order.taxTotal).replace(/^Rp\s?/, '')}</span>
+                <span>{symbol}</span>
+                <span>{money(order.taxTotal)}</span>
               </td>
             </tr>
             <tr className={`${styles.payRow} ${styles.totalRow}`}>
               <td className={styles.sumLabel}>TOTAL</td>
               <td className={styles.money}>
-                <span>Rp.</span>
-                <span>{formatIDR(order.grandTotal).replace(/^Rp\s?/, '')}</span>
+                <span>{symbol}</span>
+                <span>{money(order.grandTotal)}</span>
               </td>
             </tr>
             <tr className={styles.payRow}>
               <td colSpan={2} className={styles.words}>
                 Terbilang :<br />
-                <em>{terbilangRupiah(order.grandTotal)}</em>
+                <em>{usd ? `USD ${money(order.grandTotal)}` : terbilangRupiah(order.grandTotal)}</em>
               </td>
             </tr>
           </tbody>

@@ -35,7 +35,8 @@ class CatalogController extends ApiController
                 $query->orderBy('name->id')->orderBy('id');
                 break;
             case 'price':
-                $query->orderByRaw('price ASC NULLS LAST')->orderBy('id');
+                // Customer ekspor mengurutkan berdasarkan harga USD (ASUMSI A-86); pengunjung lain berdasarkan rupiah.
+                $query->orderByRaw(ProductResource::exportViewer() ? 'price_usd ASC NULLS LAST' : 'price ASC NULLS LAST')->orderBy('id');
                 break;
             case 'newest':
                 $query->orderByDesc('created_at')->orderByDesc('id');

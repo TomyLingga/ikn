@@ -26,6 +26,12 @@ Route::prefix('admin')
             // Lampiran order (faktur pajak, surat jalan) di disk private (ASUMSI A-74).
             Route::post('orders/{order:number}/attachments', [Admin\OrderAttachmentController::class, 'store']);
             Route::delete('orders/{order:number}/attachments/{attachment}', [Admin\OrderAttachmentController::class, 'destroy'])->where('attachment', '[0-9]+');
+            // Proforma invoice yang bisa diedit admin, nomor tetap + revisi (ASUMSI A-88, kontrak 11.11).
+            Route::put('orders/{order:number}/proforma', [Admin\OrderProformaController::class, 'update']);
+            // Penawaran ongkir CIF per putaran (ASUMSI A-89, kontrak 11.12).
+            Route::post('orders/{order:number}/freight-quotes', [Admin\FreightQuoteController::class, 'store']);
+            Route::put('orders/{order:number}/freight-quotes/{quote}/extend', [Admin\FreightQuoteController::class, 'extend'])->where('quote', '[0-9]+');
+            Route::post('orders/{order:number}/freight-quotes/{quote}/accept', [Admin\FreightQuoteController::class, 'accept'])->where('quote', '[0-9]+');
         });
 
         Route::middleware('module:payments')->group(function () {
@@ -44,6 +50,9 @@ Route::prefix('admin')
 
         Route::middleware('module:reports')->group(function () {
             Route::get('reports/sales', [Admin\SalesReportController::class, 'show']);
+            // Kurs JISDOR untuk keuangan (kontrak 11.7, ASUMSI A-84); POST = kurs manual cadangan.
+            Route::get('exchange-rates', [Admin\ExchangeRateController::class, 'index']);
+            Route::post('exchange-rates', [Admin\ExchangeRateController::class, 'store']);
         });
 
         Route::middleware('role:super_admin')->group(function () {

@@ -16,6 +16,12 @@ class CartQuoteTest extends TestCase
 {
     use RefreshDatabase, CatalogFixtures;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seedDeliveryTerms(); // quote tanpa deliveryTermCode memakai Franco (tarif zona)
+    }
+
     public function test_requires_customer_session(): void
     {
         $product = $this->makeProduct(['slug' => 'resiprene-35'], 10);

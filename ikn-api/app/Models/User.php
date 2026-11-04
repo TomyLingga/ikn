@@ -120,4 +120,27 @@ class User extends Authenticatable implements HasLocalePreference
     {
         return $this->hasMany(Order::class);
     }
+
+    // ---- Pasar customer (ASUMSI A-86): local = IDR, export = USD. Admin dan user tanpa profil = local. ----
+
+    public function market(): string
+    {
+        if (! $this->isCustomer()) {
+            return CustomerProfile::MARKET_LOCAL;
+        }
+        $this->loadMissing('profile');
+
+        return $this->profile ? $this->profile->marketOrDefault() : CustomerProfile::MARKET_LOCAL;
+    }
+
+    public function isExport(): bool
+    {
+        return $this->market() === CustomerProfile::MARKET_EXPORT;
+    }
+
+    /** Mata uang order/harga untuk user ini (USD hanya customer ekspor). */
+    public function currency(): string
+    {
+        return CustomerProfile::currencyFor($this->market());
+    }
 }

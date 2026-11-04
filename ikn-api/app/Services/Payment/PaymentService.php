@@ -17,6 +17,7 @@ use App\Services\Commerce\UniqueCodeAllocator;
 use App\Services\Media\MediaService;
 use App\Services\Payment\Gateway\GatewayManager;
 use App\Services\Payment\Gateway\WebhookResult;
+use App\Support\Money;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -48,7 +49,8 @@ class PaymentService
             'payment_method_id' => $method->id,
             'method' => $method->code,
             'provider' => $method->driver,
-            'amount' => $order->grandTotalInt(),
+            'currency' => $order->currencyCode(),
+            'amount' => Money::fromMinor($order->grandTotalInt(), $order->currencyCode()),
             'status' => Payment::STATUS_PENDING,
             'expires_at' => $order->payment_due_at,
             'bank_account_id' => $method->isManualTransfer() ? $bank?->id : null,
@@ -67,30 +69,37 @@ class PaymentService
         return $payment;
     }
 
-    /** Rekening tujuan transfer manual: yang dipilih (harus aktif) atau rekening aktif pertama. */
-    public function resolveBankAccount(PaymentMethod $method, ?int $bankAccountId): ?BankAccount
+    /**
+     * Rekening tujuan transfer manual se-mata-uang dengan order (ASUMSI A-86): yang dipilih (harus aktif dan bermata
+     * uang sama; rekening mata uang lain → 422) atau rekening aktif pertama mata uang itu.
+     */
+    public function resolveBankAccount(PaymentMethod $method, ?int $bankAccountId, string $currency = Money::CURRENCY_IDR): ?BankAccount
     {
         if (! $method->isManualTransfer()) {
             return null;
         }
+        $currency = Money::normalizeCurrency($currency);
         if ($bankAccountId) {
             $bank = BankAccount::active()->find($bankAccountId);
             if (! $bank) {
                 throw ValidationException::withMessages(['bankAccountId' => [__('commerce.bank_account_invalid')]]);
             }
+            if ($bank->currencyCode() !== $currency) {
+                throw ValidationException::withMessages(['bankAccountId' => [__('commerce.bank_account_currency', ['currency' => $currency])]]);
+            }
 
             return $bank;
         }
-        $bank = BankAccount::active()->orderBy('sort_order')->orderBy('id')->first();
+        $bank = BankAccount::active()->forCurrency($currency)->orderBy('sort_order')->orderBy('id')->first();
         if (! $bank) {
-            throw ValidationException::withMessages(['bankAccountId' => [__('commerce.bank_account_required')]]);
+            throw ValidationException::withMessages(['bankAccountId' => [__('commerce.bank_account_required', ['currency' => $currency])]]);
         }
 
         return $bank;
     }
 
-    /** Metode bayar aktif berdasarkan kode (422 bila tidak ada). */
-    public function resolveMethod(?string $code): PaymentMethod
+    /** Metode bayar aktif berdasarkan kode (422 bila tidak ada). Order USD hanya transfer manual (ASUMSI A-86). */
+    public function resolveMethod(?string $code, string $currency = Money::CURRENCY_IDR): PaymentMethod
     {
         $code = strtolower(trim((string) $code));
         if ($code === '') {
@@ -99,6 +108,9 @@ class PaymentService
         $method = PaymentMethod::active()->where('code', $code)->first();
         if (! $method) {
             throw ValidationException::withMessages(['paymentMethodCode' => [__('commerce.payment_method_invalid')]]);
+        }
+        if (! Money::isIdr($currency) && ! $method->isManualTransfer()) {
+            throw ValidationException::withMessages(['paymentMethodCode' => [__('commerce.payment_method_currency', ['currency' => Money::normalizeCurrency($currency)])]]);
         }
 
         return $method;
@@ -204,18 +216,27 @@ class PaymentService
 
     // ---- Verifikasi admin ----
 
-    /** awaiting_verification → paid; order payment_review → paid (commit stok, invoice, email). */
-    public function accept(Payment $payment, User $admin): Payment
+    /**
+     * awaiting_verification → paid; order payment_review → paid (commit stok, invoice, email).
+     *
+     * @param  array{receivedAmount?:?int, bankCharges?:?int, receivedNote?:?string}  $received  catatan admin (satuan
+     *                                                                                             terkecil mata uang payment; informasi, ASUMSI A-86)
+     */
+    public function accept(Payment $payment, User $admin, array $received = []): Payment
     {
-        return DB::transaction(function () use ($payment, $admin) {
+        return DB::transaction(function () use ($payment, $admin, $received) {
             $payment = Payment::whereKey($payment->id)->lockForUpdate()->first();
             $this->assertPaymentStatus($payment, Payment::STATUS_AWAITING_VERIFICATION, Payment::STATUS_PAID);
 
+            $currency = $payment->currencyCode();
             $payment->forceFill([
                 'status' => Payment::STATUS_PAID,
                 'paid_at' => now(),
                 'verified_by' => $admin->id,
                 'verified_at' => now(),
+                'received_amount' => isset($received['receivedAmount']) ? Money::fromMinor((int) $received['receivedAmount'], $currency) : null,
+                'bank_charges' => isset($received['bankCharges']) ? Money::fromMinor((int) $received['bankCharges'], $currency) : null,
+                'received_note' => isset($received['receivedNote']) && trim((string) $received['receivedNote']) !== '' ? mb_substr(trim((string) $received['receivedNote']), 0, 255) : null,
             ])->save();
 
             $this->stateMachine->transition($payment->order, Order::STATUS_PAID, $admin, ['paymentId' => $payment->id]);
@@ -280,10 +301,11 @@ class PaymentService
             throw ApiException::conflict('ORDER_EXPIRED', __('commerce.order_expired'));
         }
 
-        $method = $this->resolveMethod($code);
-        $bank = $this->resolveBankAccount($method, $bankAccountId);
+        $currency = $order->currencyCode();
+        $method = $this->resolveMethod($code, $currency);
+        $bank = $this->resolveBankAccount($method, $bankAccountId, $currency);
 
-        return DB::transaction(function () use ($order, $method, $bank, $user) {
+        return DB::transaction(function () use ($order, $method, $bank, $user, $currency) {
             $order = Order::whereKey($order->id)->lockForUpdate()->first();
 
             foreach ($order->payments()->whereIn('status', Payment::ACTIVE_STATUSES)->get() as $active) {
@@ -293,12 +315,13 @@ class PaymentService
                 $active->forceFill(['status' => Payment::STATUS_CANCELLED, 'reject_reason' => __('commerce.note.payment_superseded', [], $order->preferredLocale())])->save();
             }
 
+            // Kode unik hanya order IDR (ASUMSI A-86); grand_total ditulis ulang dalam satuan mayor mata uang order.
             $base = $order->grandTotalBeforeUniqueCode();
-            $uniqueCode = $this->uniqueCodes->requiredFor($method)
+            $uniqueCode = $this->uniqueCodes->requiredFor($method, $currency)
                 ? $this->uniqueCodes->allocate($order->user_id.'|'.$order->number.'|'.$method->code, $order->id)
                 : 0;
             $order->unique_code = $uniqueCode;
-            $order->grand_total = $base + $uniqueCode;
+            $order->grand_total = Money::fromMinor($base + $uniqueCode, $currency);
             $order->save();
 
             return $this->create($order, $method, $bank, $user);
@@ -408,6 +431,15 @@ class PaymentService
     {
         $order = Order::whereKey($payment->order_id)->lockForUpdate()->first();
         $meta = ['actorType' => OrderStatusHistory::ACTOR_WEBHOOK, 'paymentId' => $payment->id, 'source' => 'gateway'];
+
+        // Gateway hanya untuk order IDR (ASUMSI A-86): payment mata uang lain tidak pernah dibuat lewat gateway; bila
+        // webhook merujuk ke payment USD (external_id ditebak), abaikan tanpa menyentuh order.
+        if (! Money::isIdr($payment->currencyCode())) {
+            $result->result = PaymentWebhookLog::RESULT_IGNORED;
+            $result->note = 'currency '.$payment->currencyCode().' not supported by gateway';
+
+            return;
+        }
 
         switch ($result->status) {
             case Payment::STATUS_PAID:

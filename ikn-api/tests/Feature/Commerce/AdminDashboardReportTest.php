@@ -5,7 +5,9 @@ namespace Tests\Feature\Commerce;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Commerce\CheckoutService;
 use App\Services\Commerce\OrderStateMachine;
+use App\Services\Payment\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\Support\CommerceFixtures;
@@ -77,7 +79,9 @@ class AdminDashboardReportTest extends TestCase
             ->assertJsonCount(12, 'data.salesChart')
             ->assertJsonPath('data.salesChart.0.monthIndex', 1)
             ->assertJsonPath('data.salesChart.0.month', 'Jan')
-            ->assertJsonPath('data.year', $year);
+            ->assertJsonPath('data.year', $year)
+            ->assertJsonPath('data.currency', 'IDR')
+            ->assertJsonPath('data.exportKpis', null); // belum ada order USD sama sekali (Phase E6)
 
         $thisMonth = (int) now()->month;
         $chart = collect($response->json('data.salesChart'));
@@ -222,6 +226,98 @@ class AdminDashboardReportTest extends TestCase
 
         $this->app['auth']->forgetGuards();
         $this->actingAs($this->adminWith(['orders']))->getJson('/api/v1/admin/reports/sales')->assertStatus(403);
+    }
+
+    /** Order USD FOB dibayar (bukti oleh eksportir, diterima admin). */
+    private function payUsdOrder(Order $order, User $admin): Order
+    {
+        $payment = app(PaymentService::class)->uploadProof($order, $this->proofFile(), null, $this->exporter);
+        app(PaymentService::class)->accept($payment, $admin);
+
+        return $order->fresh();
+    }
+
+    public function test_report_by_currency_and_dashboard_export_kpis_keep_usd_out_of_idr_totals(): void
+    {
+        $this->setUpCommerce(['exportPaymentDueHours' => 120]);
+        $this->setUpExport();
+        $this->makeFee(2500, true, 'USD'); // USD 25,00 hanya untuk order USD
+        $product = $this->makeProduct(['slug' => 'resiprene-35', 'price' => 100000, 'price_usd' => '12.50', 'unit' => 'kg'], 1000);
+        $admin = $this->superAdmin();
+        $checkout = app(CheckoutService::class);
+        $real = now()->startOfMonth()->addDays(14)->setTime(12, 0);
+
+        // Bulan lalu: satu order USD dibayar (masuk rentang from/to, tidak masuk periode dashboard bulan ini).
+        Carbon::setTestNow($real->copy()->startOfMonth()->subMonthNoOverflow()->addDays(19)->setTime(10, 0));
+        $usdLastMonth = $this->payUsdOrder($checkout->place($this->exporter, $this->exportCheckoutPayload($product, 100)), $admin);
+
+        // Bulan ini: 1 order IDR dibayar, 2 order USD dibayar (USD 1.275,00 dan USD 650,00), 1 CIF menunggu ongkir, 1 USD belum bayar.
+        Carbon::setTestNow($real->copy()->startOfMonth()->addDays(1)->setTime(9, 0));
+        $idr = $this->payOrder($this->placeOrder($product, 5), $admin);
+        $usdA = $this->payUsdOrder($checkout->place($this->exporter, $this->exportCheckoutPayload($product, 100)), $admin);
+        $usdB = $this->payUsdOrder($checkout->place($this->exporter, $this->exportCheckoutPayload($product, 50)), $admin);
+        Carbon::setTestNow($real->copy()->startOfMonth()->addDays(12)->setTime(9, 0));
+        $cif = $checkout->place($this->exporter, $this->exportCheckoutPayload($product, 100, [
+            'deliveryTermCode' => 'cif',
+            'destinationPort' => ['name' => 'Port Klang', 'country' => 'Malaysia', 'countryCode' => 'MY', 'lat' => 2.9997, 'lng' => 101.3929],
+        ]));
+        $pendingUsd = $checkout->place($this->exporter, $this->exportCheckoutPayload($product, 100));
+        Carbon::setTestNow($real);
+
+        $this->assertSame(Order::STATUS_AWAITING_FREIGHT, $cif->status);
+        $this->assertSame(Order::STATUS_PENDING_PAYMENT, $pendingUsd->status);
+        $this->assertSame(127500, $usdA->grandTotalInt());
+        $this->assertSame(65000, $usdB->grandTotalInt());
+
+        // Laporan bulan ini: agregat lama tetap IDR saja; byCurrency memberi baris IDR + USD; daftar order + CSV semua mata uang.
+        $year = (int) $real->year;
+        $month = (int) $real->month;
+        $report = $this->actingAs($admin)->getJson("/api/v1/admin/reports/sales?year={$year}&month={$month}")->assertOk();
+        $report->assertJsonPath('data.currency', 'IDR')
+            ->assertJsonPath('data.summary.orders', 1)
+            ->assertJsonPath('data.summary.revenue', $idr->grandTotalInt())
+            ->assertJsonPath('data.summary.items', 5)
+            ->assertJsonCount(1, 'data.byMonth')->assertJsonPath('data.byMonth.0.total', $idr->grandTotalInt())->assertJsonPath('data.byMonth.0.orders', 1)
+            ->assertJsonCount(1, 'data.byProduct')->assertJsonPath('data.byProduct.0.qty', 5)->assertJsonPath('data.byProduct.0.revenue', 500000)
+            ->assertJsonCount(2, 'data.byCurrency')
+            ->assertJsonPath('data.byCurrency.0', ['currency' => 'IDR', 'orders' => 1, 'revenue' => $idr->grandTotalInt(), 'paidOrders' => 1, 'averageOrder' => $idr->grandTotalInt()])
+            ->assertJsonPath('data.byCurrency.1', ['currency' => 'USD', 'orders' => 2, 'revenue' => 192500, 'paidOrders' => 2, 'averageOrder' => 96250])
+            ->assertJsonCount(3, 'data.orders');
+        $this->assertEqualsCanonicalizing([$idr->number, $usdA->number, $usdB->number], array_column($report->json('data.orders'), 'number'));
+        $this->assertEqualsCanonicalizing(['IDR', 'USD', 'USD'], array_column($report->json('data.orders'), 'currency'));
+        $this->assertNotContains($usdLastMonth->number, array_column($report->json('data.orders'), 'number'));
+        $this->assertNotContains($cif->number, array_column($report->json('data.orders'), 'number'));
+
+        // Rentang yang mencakup bulan lalu: USD 3 order, rata-rata dibulatkan ke bawah (320000 / 3).
+        $from = $real->copy()->startOfMonth()->subMonthNoOverflow()->toDateString();
+        $this->actingAs($admin)->getJson("/api/v1/admin/reports/sales?from={$from}&to={$real->toDateString()}")->assertOk()
+            ->assertJsonPath('data.summary.orders', 1)
+            ->assertJsonPath('data.byCurrency.1', ['currency' => 'USD', 'orders' => 3, 'revenue' => 320000, 'paidOrders' => 3, 'averageOrder' => 106666]);
+
+        $csv = $this->actingAs($admin)->get("/api/v1/admin/reports/sales?year={$year}&month={$month}&format=csv")->assertOk()->getContent();
+        $lines = array_values(array_filter(explode("\n", trim(str_replace("\xEF\xBB\xBF", '', $csv)))));
+        $this->assertCount(4, $lines); // header + 1 IDR + 2 USD
+        $this->assertStringContainsString($usdA->number.',', $csv);
+        $this->assertStringContainsString(',USD,100,125000,0,0,2500,0,0,127500,manual_transfer', $csv); // sen, tanpa kode unik
+        $this->assertStringContainsString(',IDR,5,', $csv);
+        $this->assertStringNotContainsString($pendingUsd->number, $csv);
+
+        // Dashboard: KPI IDR tidak berubah; exportKpis merangkum USD bulan ini + antrean saat ini.
+        $dashboard = $this->actingAs($admin)->getJson('/api/v1/admin/dashboard')->assertOk();
+        $dashboard->assertJsonPath('data.currency', 'IDR')
+            ->assertJsonPath('data.stats.revenueThisMonth', $idr->grandTotalInt())
+            ->assertJsonPath('data.stats.ordersThisMonth', 5) // dibuat bulan ini, semua mata uang
+            ->assertJsonPath('data.kpis.revenue.current', $idr->grandTotalInt())
+            ->assertJsonPath('data.kpis.paidOrders.current', 1)
+            ->assertJsonPath('data.kpis.avgOrderValue.current', $idr->grandTotalInt())
+            ->assertJsonCount(1, 'data.topProducts')->assertJsonPath('data.topProducts.0.qty', 5)->assertJsonPath('data.topProducts.0.revenue', 500000)
+            ->assertJsonPath('data.workQueue.freightToQuote', 1)
+            ->assertJsonPath('data.exportKpis', [
+                'currency' => 'USD', 'revenue' => 192500, 'paidOrders' => 2, 'orders' => 4, 'awaitingFreight' => 1, 'pendingPayment' => 1,
+            ]);
+        $chart = collect($dashboard->json('data.salesChart'));
+        $this->assertSame($idr->grandTotalInt(), $chart->firstWhere('monthIndex', $month)['total']);
+        $this->assertContains('USD', array_column($dashboard->json('data.recentOrders'), 'currency'));
     }
 
     public function test_audit_logs_are_listed_for_super_admin_with_filters(): void

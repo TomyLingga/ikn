@@ -1065,6 +1065,8 @@ components:
         modules: { type: array, items: { type: string }, description: admin saja }
         approvedAt: { type: string, nullable: true, description: customer saja }
         rejectionReason: { type: string, nullable: true, description: customer saja }
+        market: { type: string, enum: [local, export], description: 'customer saja; pasar yang dikunci admin (ASUMSI A-86)' }
+        currency: { type: string, enum: [IDR, USD], description: 'customer saja; mata uang harga/order: export = USD' }
         profile: { $ref: '#/components/schemas/UserProfile', description: customer saja }
     AdminUser:
       type: object

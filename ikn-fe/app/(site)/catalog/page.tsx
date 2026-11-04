@@ -1,6 +1,7 @@
 import Breadcrumb from '@/components/Breadcrumb';
 import CatalogBrowser, { parseCatalogQuery } from '@/components/CatalogBrowser';
 import { fetchCategories, fetchProducts } from '@/lib/server-data';
+import { sessionForward } from '@/lib/server-session';
 import { buildMetadata } from '@/lib/seo';
 
 export const metadata = buildMetadata({
@@ -14,7 +15,8 @@ type SearchParams = Record<string, string | string[] | undefined>;
 
 export default async function CatalogPage({ searchParams }: { searchParams: SearchParams }) {
   const query = parseCatalogQuery(searchParams);
-  const [products, categories] = await Promise.all([fetchProducts(query), fetchCategories()]);
+  // Sesi pengunjung diteruskan agar customer ekspor yang login melihat harga USD (tamu tetap jalur publik).
+  const [products, categories] = await Promise.all([fetchProducts(query, { forward: sessionForward() }), fetchCategories()]);
 
   return (
     <>

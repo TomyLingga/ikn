@@ -6,7 +6,8 @@ use App\Models\Payment;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Bentuk Payment (kontrak bagian 9–10): id, method, status, amount, instructions, bankAccount, qrisImageUrl, proof ringkas.
+ * Bentuk Payment (kontrak bagian 9–10): id, method, status, currency, amount (satuan terkecil), instructions, bankAccount,
+ * qrisImageUrl, proof ringkas, catatan verifikasi receivedAmount/bankCharges/receivedNote (ASUMSI A-86).
  * Butuh with(['paymentMethod', 'bankAccount', 'proof', 'verifier']).
  */
 class PaymentResource extends JsonResource
@@ -39,7 +40,11 @@ class PaymentResource extends JsonResource
             'type' => $method?->type ?? ($payload['type'] ?? null),
             'provider' => $payment->provider,
             'externalId' => $payment->external_id,
+            'currency' => $payment->currencyCode(),
             'amount' => $payment->amountInt(),
+            'receivedAmount' => $payment->receivedAmountInt(),
+            'bankCharges' => $payment->bankChargesInt(),
+            'receivedNote' => $payment->received_note,
             'status' => $payment->status,
             'expiresAt' => optional($payment->expires_at)->toApiString(),
             'paidAt' => optional($payment->paid_at)->toApiString(),

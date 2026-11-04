@@ -1,11 +1,13 @@
 import EmptyState from '@/components/EmptyState';
 import ProductDetail from '@/components/ProductDetail';
 import { fetchProduct } from '@/lib/server-data';
+import { sessionForward } from '@/lib/server-session';
 import JsonLd from '@/components/JsonLd';
 import { breadcrumbJsonLd, buildMetadata, productJsonLd } from '@/lib/seo';
 
+// Metadata selalu dari bentuk publik (rupiah) agar judul/deskripsi SEO sama untuk semua pengunjung dan mesin pencari.
 export async function generateMetadata({ params }: { params: { slug: string } }) {
-  const product = await fetchProduct(params.slug);
+  const product = await fetchProduct(params.slug, null);
   if (!product) return { title: 'Produk', robots: { index: false, follow: true } };
   // Harga & MOQ di depan agar tidak terpotong di hasil Google; ringkasan menyusul.
   const price = product.priceMode === 'fixed' && (product.effectivePrice ?? product.price) != null
@@ -21,8 +23,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 // RSC hanya mengambil data (GET /catalog/products/{slug}); tampilan bilingual di komponen klien.
+// Sesi pengunjung diteruskan agar customer ekspor yang login melihat harga USD (tamu = jalur publik, ASUMSI A-86).
 export default async function ProductDetailPage({ params }: { params: { slug: string } }) {
-  const product = await fetchProduct(params.slug);
+  const product = await fetchProduct(params.slug, sessionForward());
 
   if (!product) {
     return (

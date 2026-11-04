@@ -22,6 +22,8 @@ class CartQuoteRequest extends FormRequest
             'items.*.productSlug' => ['required_without:items.*.productId', 'nullable', 'string', 'max:160'],
             'items.*.productId' => ['nullable', 'integer'],
             'items.*.qty' => ['required', 'integer', 'min:1', 'max:1000000000'],
+            'deliveryTermCode' => ['nullable', 'string', 'max:32', 'exists:delivery_terms,code'],
+            'paymentTermCode' => ['nullable', 'string', 'max:32'],
             'addressId' => ['nullable', 'integer'],
             'shippingRateId' => ['nullable', 'integer'],
             'paymentMethodCode' => ['nullable', 'string', 'max:64'],

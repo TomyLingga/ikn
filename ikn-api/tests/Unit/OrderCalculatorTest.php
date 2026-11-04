@@ -199,8 +199,10 @@ class OrderCalculatorTest extends TestCase
         $product = $this->makeProduct(['price' => 10000, 'weight_gram' => 1250, 'length_cm' => 40, 'width_cm' => 30, 'height_cm' => 25], 100);
         $zone = $this->makeZone([['12', 'province']]);
         $rate = $this->makeRate($zone, ['base_amount' => 20000, 'per_km_amount' => 1000, 'per_kg_amount' => 2000, 'per_m3_amount' => 500000]);
-        // Titik asal = alamat yang sama digeser 0,1° bujur di khatulistiwa ≈ 11,12 km garis lurus × 1,3 = 14,46 → 15 km.
-        $this->commerceSettings(['shippingOriginLat' => 0, 'shippingOriginLng' => 100, 'shippingRoadFactor' => 1.3]);
+        // Titik asal (pabrik bawaan, ASUMSI A-90) = alamat yang sama digeser 0,1° bujur di khatulistiwa ≈ 11,12 km garis
+        // lurus × 1,3 = 14,46 → 15 km.
+        $this->factoryLocation(null, ['lat' => 0, 'lng' => 100]);
+        $this->commerceSettings(['shippingRoadFactor' => 1.3]);
         $address = ['province_code' => '12', 'lat' => 0, 'lng' => 100.1];
 
         $quote = $this->quote([['productSlug' => $product->slug, 'qty' => 2]], $address, $rate->id);
@@ -218,7 +220,7 @@ class OrderCalculatorTest extends TestCase
         $zone = $this->makeZone([['12', 'province']]);
         $byDistance = $this->makeRate($zone, ['per_km_amount' => 1000]);
         $flat = $this->makeRate($zone, ['type' => ShippingRate::TYPE_FLAT, 'base_amount' => 15000]);
-        $this->commerceSettings(['shippingOriginLat' => 3.3495, 'shippingOriginLng' => 99.0862]);
+        $this->factoryLocation(null, ['lat' => 3.3495, 'lng' => 99.0862]);
 
         $quote = $this->quote([['productSlug' => $product->slug, 'qty' => 1]], ['province_code' => '12']);
         $this->assertSame([$flat->id], array_column($quote->availableShippingRates, 'rateId'));
@@ -226,6 +228,93 @@ class OrderCalculatorTest extends TestCase
 
         $this->expectException(\Illuminate\Validation\ValidationException::class);
         $this->quote([['productSlug' => $product->slug, 'qty' => 1]], ['province_code' => '12'], $byDistance->id);
+    }
+
+    // ASUMSI A-90: keranjang dua pabrik = dua kiriman; tiap parcel dihitung dengan berat, volume, dan jarak dari pabriknya.
+    public function test_mixed_factory_cart_sums_per_factory_breakdowns(): void
+    {
+        $morawa = $this->factoryLocation(null, ['lat' => 0, 'lng' => 100]);
+        $bamban = $this->factoryLocation('sei-bamban', ['lat' => 0, 'lng' => 100.3]);
+        $this->commerceSettings(['shippingRoadFactor' => 1.3]);
+        // 40×30×25 cm, 2 × 1.250 g → 3 kg, 0,06 m³ dari Tanjung Morawa; 1 × 3.000 g tanpa dimensi dari Sei Bamban.
+        $article = $this->makeProduct(['price' => 10000, 'weight_gram' => 1250, 'length_cm' => 40, 'width_cm' => 30, 'height_cm' => 25], 100);
+        $resin = $this->makeProduct(['price' => 10000, 'weight_gram' => 3000, 'factory_location_id' => $bamban->id], 100);
+        $zone = $this->makeZone([['12', 'province']]);
+        $rate = $this->makeRate($zone, ['base_amount' => 20000, 'per_km_amount' => 1000, 'per_kg_amount' => 2000, 'per_m3_amount' => 500000]);
+        $address = ['province_code' => '12', 'lat' => 0, 'lng' => 100.1];
+
+        // Satu pabrik: angka sama persis dengan sebelum A-90 (lihat test_calculated_rate_combines_distance_weight_and_volume).
+        $single = $this->quote([['productSlug' => $article->slug, 'qty' => 2]], $address, $rate->id);
+        $this->assertSame(71000, $single->shippingTotal);
+        $this->assertCount(1, $single->shipping['origins']);
+        $this->assertSame('tanjung-morawa', $single->shipping['origins'][0]['factory']['code']);
+
+        // Dua pabrik: 0,1° → 15 km dari Tanjung Morawa, 0,2° ≈ 22,24 km × 1,3 = 28,91 → 29 km dari Sei Bamban.
+        $mixed = $this->quote([['productSlug' => $article->slug, 'qty' => 2], ['productSlug' => $resin->slug, 'qty' => 1]], $address, $rate->id);
+        [$first, $second] = $mixed->shipping['origins'];
+        $this->assertSame(['code' => 'tanjung-morawa', 'name' => $morawa->name], $first['factory']);
+        $this->assertSame([15, 3000, 0], [$first['distanceKm'], $second['weightGram'], $second['volumeCm3']]);
+        $this->assertSame(71000, $first['amount']);
+        $this->assertSame('sei-bamban', $second['factory']['code']);
+        $this->assertSame(29, $second['distanceKm']);
+        $this->assertSame(['base' => 20000, 'distance' => 29000, 'weight' => 6000, 'volume' => 0, 'minimumApplied' => false, 'free' => false], $second['breakdown']);
+        $this->assertSame(55000, $second['amount']);
+        $this->assertSame(126000, $mixed->shippingTotal);
+        $this->assertSame(126000, $mixed->shipping['amount']);
+        $this->assertSame(29, $mixed->shipping['distanceKm']); // jarak terjauh
+        $this->assertSame(['base' => 40000, 'distance' => 44000, 'weight' => 12000, 'volume' => 30000, 'minimumApplied' => false, 'free' => false], $mixed->shipping['breakdown']);
+        $this->assertSame(5500, $mixed->shipping['weightGram']);
+        $this->assertSame(126000, $mixed->availableShippingRates[0]['amount']);
+        $this->assertSame(['tanjung-morawa', 'sei-bamban'], array_map(fn ($item) => $item['factory']['code'], $mixed->toArray()['items']));
+    }
+
+    // ASUMSI A-90: min_amount dan base per parcel (tiap pabrik mengirim sendiri); free_above terhadap subtotal seluruh order.
+    public function test_min_amount_applies_per_factory_and_free_above_uses_whole_order(): void
+    {
+        $bamban = $this->factoryLocation('sei-bamban');
+        $article = $this->makeProduct(['price' => 100000, 'weight_gram' => 1000], 100);
+        $resin = $this->makeProduct(['price' => 100000, 'weight_gram' => 2000, 'factory_location_id' => $bamban->id], 100);
+        $zone = $this->makeZone([['12', 'province']]);
+        $rate = $this->makeRate($zone, ['base_amount' => 10000, 'per_kg_amount' => 1000, 'min_amount' => 30000, 'free_above' => 500000]);
+        $address = ['province_code' => '12'];
+
+        // 11.000 dan 12.000 sama-sama di bawah minimum → 2 × 30.000.
+        $paid = $this->quote([['productSlug' => $article->slug, 'qty' => 1], ['productSlug' => $resin->slug, 'qty' => 1]], $address, $rate->id);
+        $this->assertSame(60000, $paid->shippingTotal);
+        $this->assertSame([30000, 30000], array_column($paid->shipping['origins'], 'amount'));
+        $this->assertTrue($paid->shipping['breakdown']['minimumApplied']);
+        $this->assertSame(20000, $paid->shipping['breakdown']['base']);
+
+        // Subtotal order 500.000 (300.000 + 200.000; tiap pabrik di bawah ambang) → semua parcel gratis.
+        $free = $this->quote([['productSlug' => $article->slug, 'qty' => 3], ['productSlug' => $resin->slug, 'qty' => 2]], $address, $rate->id);
+        $this->assertSame(0, $free->shippingTotal);
+        $this->assertSame([0, 0], array_column($free->shipping['origins'], 'amount'));
+        $this->assertTrue($free->shipping['breakdown']['free']);
+        $this->assertFalse($free->shipping['breakdown']['minimumApplied']);
+    }
+
+    public function test_per_km_rate_is_withheld_when_a_cart_factory_has_no_coordinates(): void
+    {
+        $this->factoryLocation(null, ['lat' => 0, 'lng' => 100]);
+        $bamban = $this->factoryLocation('sei-bamban', ['lat' => null, 'lng' => null]);
+        $article = $this->makeProduct(['price' => 10000], 100);
+        $resin = $this->makeProduct(['price' => 10000, 'factory_location_id' => $bamban->id], 100);
+        $zone = $this->makeZone([['12', 'province']]);
+        $byDistance = $this->makeRate($zone, ['per_km_amount' => 1000]);
+        $flat = $this->makeRate($zone, ['type' => ShippingRate::TYPE_FLAT, 'base_amount' => 15000]);
+        $address = ['province_code' => '12', 'lat' => 0, 'lng' => 100.1];
+
+        $mixed = $this->quote([['productSlug' => $article->slug, 'qty' => 1], ['productSlug' => $resin->slug, 'qty' => 1]], $address);
+        $this->assertSame([$flat->id], array_column($mixed->availableShippingRates, 'rateId'));
+        $this->assertSame(30000, $mixed->availableShippingRates[0]['amount']); // flat per pabrik: 2 × 15.000
+        $this->assertSame(['factory_location_unset'], $mixed->warnings);
+        $this->assertSame(['factoryCodes' => ['sei-bamban']], $mixed->warningMeta['factory_location_unset']);
+        $this->assertArrayNotHasKey('unavailable', $mixed->availableShippingRates[0]);
+
+        // Keranjang hanya dari pabrik bertitik: tarif per km tetap ditawarkan.
+        $single = $this->quote([['productSlug' => $article->slug, 'qty' => 1]], $address);
+        $this->assertSame([$byDistance->id, $flat->id], array_column($single->availableShippingRates, 'rateId'));
+        $this->assertSame([], $single->warnings);
     }
 
     public function test_most_specific_zone_wins_and_default_zone_is_fallback(): void

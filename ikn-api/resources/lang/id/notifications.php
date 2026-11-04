@@ -31,6 +31,22 @@ return [
             'title' => 'Pesanan dikirim',
             'body' => 'Pesanan :number dikirim via :courier, resi :tracking.',
         ],
+        'ready_for_pickup' => [
+            'title' => 'Pesanan siap diambil',
+            'body' => 'Pesanan :number siap diambil di :label.',
+        ],
+        'shipped_on_board' => [
+            'title' => 'Pesanan dimuat ke kapal',
+            'body' => 'Pesanan :number dimuat ke kapal :vessel, B/L :bl.',
+        ],
+        'proforma_updated' => [
+            'title' => 'Proforma invoice diperbarui',
+            'body' => 'Proforma invoice :label untuk pesanan :number tersedia di halaman pesanan.',
+        ],
+        'picked_up' => [
+            'title' => 'Pesanan sudah diambil',
+            'body' => 'Pesanan :number tercatat sudah diambil. Konfirmasi selesai bila barang sesuai.',
+        ],
         'attachment' => [
             'title' => 'Dokumen pesanan baru',
             'body' => 'Admin melampirkan ":label" pada pesanan :number.',
@@ -46,6 +62,31 @@ return [
         'completed' => [
             'title' => 'Pesanan selesai',
             'body' => 'Pesanan :number selesai. Bagikan pengalaman Anda lewat ulasan.',
+        ],
+        // Penawaran ongkir CIF (ASUMSI A-89).
+        'freight_requested' => [
+            'title' => 'Pesanan diterima, menunggu ongkir',
+            'body' => 'Pesanan :number ke :port menunggu penawaran ongkir dari tim kami.',
+        ],
+        'freight_quoted' => [
+            'title' => 'Penawaran ongkir tersedia',
+            'body' => 'Penawaran ongkir :total untuk pesanan :number berlaku sampai :until. Setujui atau ajukan harga balasan.',
+        ],
+        'freight_quote_extended' => [
+            'title' => 'Masa berlaku penawaran diperpanjang',
+            'body' => 'Penawaran ongkir :total untuk pesanan :number kini berlaku sampai :until.',
+        ],
+        'freight_accepted' => [
+            'title' => 'Ongkir disepakati',
+            'body' => 'Ongkir :total untuk pesanan :number disepakati. Selesaikan pembayaran sebelum batas waktu.',
+        ],
+        'freight_expired' => [
+            'title' => 'Penawaran ongkir kedaluwarsa',
+            'body' => 'Penawaran ongkir putaran :round untuk pesanan :number melewati masa berlaku. Tim kami akan memperbaruinya.',
+        ],
+        'freight_cancelled' => [
+            'title' => 'Pesanan dibatalkan',
+            'body' => 'Pesanan :number dibatalkan otomatis karena melewati batas tunggu penawaran ongkir.',
         ],
     ],
     'account' => [

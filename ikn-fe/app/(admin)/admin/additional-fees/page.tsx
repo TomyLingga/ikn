@@ -10,14 +10,17 @@ import { I18nInput, firstError, type FieldErrors } from '@/components/admin/cms'
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n } from '@/lib/cms';
-import { audienceLabels, audienceSummary, feeTypeLabels, type Audience, type CustomerOption, type FeeRow, type FeeType } from '@/lib/admin';
-import { formatIDR } from '@/lib/format';
+import { audienceLabels, audienceSummary, currencyLabels, feeTypeLabels, type Audience, type CustomerOption, type FeeRow, type FeeType } from '@/lib/admin';
+import { currencyStep, formatMoney, fromMinorInput, toMinorInput } from '@/lib/format';
+import type { Currency } from '@/lib/types';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
 
 interface FeeForm {
   name: I18n;
   type: FeeType;
+  /** Biaya hanya masuk ke order se-mata-uang (ASUMSI A-86); nominal diketik desimal dan dikirim dalam satuan terkecil. */
+  currency: Currency;
   amount: string;
   isActive: boolean;
   sortOrder: number;
@@ -25,13 +28,14 @@ interface FeeForm {
   customers: CustomerOption[];
 }
 
-const emptyFee = (sortOrder: number): FeeForm => ({ name: emptyI18n(), type: 'other', amount: '', isActive: true, sortOrder, audience: 'all', customers: [] });
+const emptyFee = (sortOrder: number): FeeForm => ({ name: emptyI18n(), type: 'other', currency: 'IDR', amount: '', isActive: true, sortOrder, audience: 'all', customers: [] });
 
 function formFromRow(row: FeeRow): FeeForm {
   return {
     name: { ...row.name },
     type: row.type,
-    amount: String(row.amount),
+    currency: row.currency || 'IDR',
+    amount: fromMinorInput(row.amount, row.currency || 'IDR'),
     isActive: row.isActive,
     sortOrder: row.sortOrder,
     audience: row.audience || 'all',
@@ -43,7 +47,8 @@ function payload(form: FeeForm) {
   return {
     name: { id: form.name.id.trim(), en: form.name.en.trim() },
     type: form.type,
-    amount: Number(form.amount) || 0,
+    currency: form.currency,
+    amount: toMinorInput(form.amount, form.currency) as number, // submit() menolak nominal null sebelum memanggil payload()
     isActive: form.isActive,
     sortOrder: form.sortOrder,
     audience: form.audience,
@@ -105,6 +110,12 @@ export default function AdminAdditionalFees() {
       setFormError(t('Pilih minimal satu customer, atau ubah sasaran menjadi semua customer.', 'Pick at least one customer, or switch the audience to all customers.'));
       return;
     }
+    const amount = toMinorInput(form.amount, form.currency);
+    if (amount == null || amount < 0) {
+      setFormError('');
+      setFormErrors({ amount: [t(`Isi nominal ${form.currency} yang valid (0 atau lebih).`, `Enter a valid ${form.currency} amount (0 or more).`)] });
+      return;
+    }
     setSaving(true);
     setFormError('');
     setFormErrors({});
@@ -164,7 +175,7 @@ export default function AdminAdditionalFees() {
         </span>
       ),
     },
-    { key: 'amount', label: t('Nominal', 'Amount'), align: 'right', render: (f) => <strong>{formatIDR(f.amount)}</strong> },
+    { key: 'amount', label: t('Nominal', 'Amount'), align: 'right', render: (f) => <strong>{formatMoney(f.amount, f.currency)}</strong> },
     {
       key: 'audience',
       label: t('Dibebankan ke', 'Charged to'),
@@ -268,8 +279,26 @@ export default function AdminAdditionalFees() {
                 </Select>
               </label>
               <label>
-                <span className="field-label">{t('Nominal (Rp)', 'Amount (Rp)')} *</span>
-                <input type="number" min={0} step={1} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+                <span className="field-label">{t('Mata uang', 'Currency')}</span>
+                <Select
+                  value={form.currency}
+                  onChange={(e) => {
+                    const next = e.target.value as Currency;
+                    // Tanpa kurs, nominal lama tidak bisa dikonversi: dikosongkan agar admin mengisi ulang di mata uang baru.
+                    if (next !== form.currency) setForm({ ...form, currency: next, amount: '' });
+                  }}
+                >
+                  {(Object.keys(currencyLabels) as Currency[]).map((code) => (
+                    <option key={code} value={code}>
+                      {currencyLabels[code][lang]}
+                    </option>
+                  ))}
+                </Select>
+                {firstError(formErrors, 'currency') && <small className="cms-field-error">{firstError(formErrors, 'currency')}</small>}
+              </label>
+              <label>
+                <span className="field-label">{t(`Nominal (${form.currency})`, `Amount (${form.currency})`)} *</span>
+                <input type="number" min={0} step={currencyStep(form.currency)} inputMode="decimal" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
                 {firstError(formErrors, 'amount') && <small className="cms-field-error">{firstError(formErrors, 'amount')}</small>}
               </label>
               <label>

@@ -22,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\Commerce\Shipping\ShippingRateCalculator::class,
             \App\Services\Commerce\Shipping\ZoneRateCalculator::class
         );
+        // Daftar lokasi pabrik (ASUMSI A-90): satu query per request/job; worker antrean membuang instance antar job.
+        $this->app->scoped(\App\Services\Commerce\FactoryLocations::class);
 
         // Pengaturan email dari tabel settings (grup mail, Pengaturan Situs) menimpa config mail tepat sebelum
         // mailer pertama dibangun (ASUMSI A-82). Mailer dibangun malas, jadi request tanpa email tidak membayar query.

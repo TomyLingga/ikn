@@ -6,6 +6,7 @@ use App\Models\Concerns\HasCustomerAudience;
 use App\Support\HasTranslations;
 use App\Support\Money;
 
+// Biaya tambahan per order. Punya mata uang (ASUMSI A-86): hanya fee se-mata-uang dengan order yang dikenakan.
 class Fee extends Model
 {
     use HasCustomerAudience, HasTranslations;
@@ -20,7 +21,7 @@ class Fee extends Model
     public const TYPE_OTHER = 'other';
     public const TYPES = [self::TYPE_ADMIN, self::TYPE_OTHER];
 
-    protected $fillable = ['name', 'type', 'amount', 'is_active', 'sort_order', 'audience'];
+    protected $fillable = ['name', 'type', 'amount', 'currency', 'is_active', 'sort_order', 'audience'];
 
     protected $translatable = ['name'];
 
@@ -31,8 +32,19 @@ class Fee extends Model
         return $query->where('is_active', true);
     }
 
+    public function scopeForCurrency($query, string $currency)
+    {
+        return $query->where('currency', Money::normalizeCurrency($currency));
+    }
+
+    public function currencyCode(): string
+    {
+        return Money::normalizeCurrency($this->currency);
+    }
+
+    /** Nominal dalam satuan terkecil mata uang fee. */
     public function amountInt(): int
     {
-        return Money::toInt($this->amount);
+        return Money::toMinor($this->amount, $this->currencyCode()) ?? 0;
     }
 }

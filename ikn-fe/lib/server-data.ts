@@ -3,6 +3,7 @@
 // Konten company profile dan katalog sama-sama dari API nyata; tidak ada mock/Supabase.
 
 import { cache } from 'react';
+import type { SessionForward } from '@/lib/server-session';
 import type { Category, CommerceConfig, Product, ProductDetail, ProductQuery } from '@/lib/types';
 import type {
   BrochureData,
@@ -34,9 +35,19 @@ interface ServerEnvelope<T> {
   message?: string;
 }
 
-async function getEnvelope<T>(path: string): Promise<ServerEnvelope<T>> {
+/**
+ * `forward` (lib/server-session.ts) meneruskan cookie sesi + Origin/Referer pengunjung agar Sanctum mengenali
+ * customer yang login; dipakai katalog saja supaya customer ekspor mendapat harga USD juga pada render server.
+ */
+async function getEnvelope<T>(path: string, forward: SessionForward | null = null): Promise<ServerEnvelope<T>> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (forward) {
+    headers.Cookie = forward.cookie;
+    headers.Origin = forward.origin;
+    headers.Referer = `${forward.origin}/`;
+  }
   const res = await fetch(`${INTERNAL_URL}${path}`, {
-    headers: { Accept: 'application/json' },
+    headers,
     cache: 'no-store',
   });
   const payload = (await res.json().catch(() => ({}))) as ServerEnvelope<T>;
@@ -210,8 +221,9 @@ const emptyMeta: PagedMeta = { page: 1, perPage: 0, total: 0, lastPage: 1 };
 /**
  * Daftar produk published, berpaginasi; filter lewat query string kontrak bagian 6.
  * `cached` hanya untuk pratinjau di halaman profil (Bisnis); katalog dan detail produk selalu segar.
+ * `forward` = sesi pengunjung (sessionForward()) agar customer ekspor menerima harga USD; tidak dipakai bersama `cached`.
  */
-export async function fetchProducts(params: ProductQuery = {}, options: { cached?: boolean } = {}): Promise<ProductPage> {
+export async function fetchProducts(params: ProductQuery = {}, options: { cached?: boolean; forward?: SessionForward | null } = {}): Promise<ProductPage> {
   const qs = new URLSearchParams();
   if (params.q) qs.set('q', params.q);
   if (params.category && params.category !== 'all') qs.set('category', params.category);
@@ -221,7 +233,7 @@ export async function fetchProducts(params: ProductQuery = {}, options: { cached
   const query = qs.toString();
   try {
     const path = `/catalog/products${query ? `?${query}` : ''}`;
-    const payload = await (options.cached ? getEnvelopeCached<Product[]>(path) : getEnvelope<Product[]>(path));
+    const payload = await (options.cached && !options.forward ? getEnvelopeCached<Product[]>(path) : getEnvelope<Product[]>(path, options.forward ?? null));
     return { items: payload.data || [], meta: payload.meta || { ...emptyMeta, total: (payload.data || []).length } };
   } catch (err) {
     console.error('[server-data] /catalog/products:', err instanceof Error ? err.message : err);
@@ -229,10 +241,19 @@ export async function fetchProducts(params: ProductQuery = {}, options: { cached
   }
 }
 
-/** Detail produk + reviews[] + related[]; null bila tidak ada / tidak published. */
-export const fetchProduct = cache((slug: string): Promise<ProductDetail | null> =>
-  safe<ProductDetail | null>(`/catalog/products/${encodeURIComponent(slug)}`, null),
-);
+/** Detail produk + reviews[] + related[]; null bila tidak ada / tidak published. `forward` = sesi pengunjung (harga per pasar). */
+export const fetchProduct = cache(async (slug: string, forward: SessionForward | null = null): Promise<ProductDetail | null> => {
+  const path = `/catalog/products/${encodeURIComponent(slug)}`;
+  if (!forward) return safe<ProductDetail | null>(path, null);
+  try {
+    return (await getEnvelope<ProductDetail | null>(path, forward)).data ?? null;
+  } catch (err) {
+    if (!(err instanceof ServerApiError && err.status === 404)) {
+      console.error(`[server-data] ${path}:`, err instanceof Error ? err.message : err);
+    }
+    return null;
+  }
+});
 
 export function fetchCommerceConfig(): Promise<CommerceConfig | null> {
   return safe<CommerceConfig | null>('/commerce/config', null);

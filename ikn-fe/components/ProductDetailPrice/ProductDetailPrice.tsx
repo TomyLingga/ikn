@@ -2,11 +2,14 @@
 
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
-import { formatIDR, formatDate } from '@/lib/format';
+import { FobBadge } from '@/components/ProductCard/ProductCard';
+import { priceUnavailable, productPrice } from '@/lib/commerce';
+import { formatMoney, formatDate, isUsd } from '@/lib/format';
 import type { Product } from '@/lib/types';
 import Icon from '@/components/Icon';
 
 // Blok harga di halaman detail: harga efektif, coretan harga normal + masa promo, atau mode penawaran.
+// Customer ekspor melihat harga USD basis FOB Belawan (tanpa promo); tanpa harga USD = ajakan menghubungi kami.
 export default function ProductDetailPrice({ product }: { product: Product }) {
   const { customer } = useAuth();
   const { lang } = useLang();
@@ -31,16 +34,29 @@ export default function ProductDetailPrice({ product }: { product: Product }) {
     );
   }
 
-  const promo = product.promoPrice != null && product.price != null && product.promoPrice < product.price;
+  const price = productPrice(product);
+  if (priceUnavailable(product)) {
+    return (
+      <div className="pd-price">
+        <span className="pcard-quote">{t('Hubungi kami untuk harga', 'Contact us for pricing')}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="pd-price-block">
       <div className="pd-price">
-        {formatIDR(product.effectivePrice ?? product.price)}<small>/{product.unit}</small>
+        {formatMoney(price.amount, price.currency)}<small>/{product.unit}</small>
       </div>
-      {promo && (
+      {isUsd(price.currency) && (
         <p className="pd-promo">
-          <s>{formatIDR(product.price)}</s>
+          <FobBadge lang={lang} />
+          <span className="pd-promo-until">{t('Trucking ke pelabuhan dan biaya pelabuhan sudah termasuk.', 'Trucking to the port and port charges are included.')}</span>
+        </p>
+      )}
+      {price.promo && (
+        <p className="pd-promo">
+          <s>{formatMoney(price.base, price.currency)}</s>
           <span className="pd-promo-badge">{t('Promo', 'Promo')}</span>
           {product.promoEndsAt && (
             <span className="pd-promo-until">

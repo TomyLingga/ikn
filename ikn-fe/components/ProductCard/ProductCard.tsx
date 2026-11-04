@@ -10,13 +10,19 @@ import { useCart, isSellable } from '@/components/CartProvider';
 import { openChat } from '@/lib/shop';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
-import { stockLabels } from '@/lib/commerce';
-import { formatIDR } from '@/lib/format';
+import { priceUnavailable, productPrice, stockLabels } from '@/lib/commerce';
+import { formatMoney, isUsd } from '@/lib/format';
 import { tr } from '@/lib/cms';
 import { useShopPaths } from '@/lib/shop';
 import type { Product } from '@/lib/types';
 
+/** Penanda harga USD: basis FOB Belawan (trucking ke pelabuhan dan biaya pelabuhan termasuk; ASUMSI A-86). */
+export function FobBadge({ lang }: { lang: 'id' | 'en' }) {
+  return <span className="price-fob">{lang === 'en' ? 'FOB Belawan price' : 'Harga FOB Belawan'}</span>;
+}
+
 // Kartu produk katalog: harga efektif (+ coret harga normal saat promo), status stok, tombol keranjang.
+// Customer ekspor melihat harga USD (tanpa promo); produk tanpa harga USD = "Hubungi kami" tanpa tombol keranjang.
 export default function ProductCard({ product }: { product: Product }) {
   const { add } = useCart();
   const { customer } = useAuth();
@@ -32,13 +38,17 @@ export default function ProductCard({ product }: { product: Product }) {
   const name = tr(product.name, lang);
   // Di portal customer tautan tetap di portal (/dashboard/katalog/{slug}); di situs publik ke /catalog/{slug}.
   const href = shop.product(product.slug);
-  const promo = product.promoPrice != null && product.price != null && product.promoPrice < product.price;
+  const price = productPrice(product);
+  const promo = price.promo;
+  const usd = isUsd(price.currency);
+  const noPrice = priceUnavailable(product);
+  const priceText = formatMoney(price.amount, price.currency);
 
   // Portal customer: quick add uses the quantity stepper (never below MOQ, never above available stock).
   const portalCard = shop.portal && !!customer;
   const maxQty = product.stockStatus === 'made_to_order' ? Number.POSITIVE_INFINITY : Math.max(moq, product.available);
   const clamp = (v: number) => Math.min(Math.max(moq, Math.floor(v) || moq), maxQty);
-  const discount = promo && product.price ? Math.round((1 - (product.promoPrice as number) / product.price) * 100) : 0;
+  const discount = promo && price.base && product.promoPrice != null ? Math.round((1 - product.promoPrice / price.base) * 100) : 0;
   const askSeller = () => openChat({ type: 'product', slug: product.slug, label: name, image: product.image });
 
   function handleAdd() {
@@ -49,7 +59,7 @@ export default function ProductCard({ product }: { product: Product }) {
 
   if (portalCard) {
     const quote = product.priceMode !== 'fixed';
-    const soldOut = !quote && !sellable;
+    const soldOut = !quote && !noPrice && !sellable;
     return (
       <article className={`pcard pcard-portal ${soldOut ? 'is-soldout' : ''}`}>
         <Link href={href} className="pcard-media">
@@ -85,13 +95,16 @@ export default function ProductCard({ product }: { product: Product }) {
           <div className="pcard-price-row">
             {quote ? (
               <span className="pcard-quote">{t('Harga sesuai penawaran', 'Price on quotation')}</span>
+            ) : noPrice ? (
+              <span className="pcard-quote">{t('Hubungi kami untuk harga', 'Contact us for pricing')}</span>
             ) : (
               <>
-                {promo && <s className="pcard-price-old">{formatIDR(product.price)}</s>}
+                {promo && <s className="pcard-price-old">{formatMoney(price.base, price.currency)}</s>}
                 <span className="pcard-price">
-                  {formatIDR(product.effectivePrice ?? product.price)}
+                  {priceText}
                   <small>/{product.unit}</small>
                 </span>
+                {usd && <FobBadge lang={lang} />}
               </>
             )}
           </div>
@@ -107,12 +120,12 @@ export default function ProductCard({ product }: { product: Product }) {
                 <i aria-hidden="true" /> {t('Dibuat sesuai pesanan', 'Made to order')}
               </li>
             )}
-            {product.stockStatus === 'out_of_stock' && !quote && (
+            {product.stockStatus === 'out_of_stock' && !quote && !noPrice && (
               <li className="is-bad">
                 <i aria-hidden="true" /> {stock[lang] || stock.id}
               </li>
             )}
-            {!quote && (
+            {!quote && !noPrice && (
               <li>
                 {t('Min. order', 'Min. order')} {moq.toLocaleString('id-ID')} {product.unit}
               </li>
@@ -152,8 +165,8 @@ export default function ProductCard({ product }: { product: Product }) {
                 </button>
               </>
             ) : (
-              <button type="button" className={`pcard-ask ${quote ? 'is-quote' : ''}`} onClick={askSeller}>
-                <Icon name="chat" size={16} /> {quote ? t('Minta penawaran', 'Request a quote') : t('Tanya stok', 'Ask about stock')}
+              <button type="button" className={`pcard-ask ${quote || noPrice ? 'is-quote' : ''}`} onClick={askSeller}>
+                <Icon name="chat" size={16} /> {quote ? t('Minta penawaran', 'Request a quote') : noPrice ? t('Hubungi kami', 'Contact us') : t('Tanya stok', 'Ask about stock')}
               </button>
             )}
           </div>
@@ -197,10 +210,15 @@ export default function ProductCard({ product }: { product: Product }) {
           <span className="pcard-price">
             {customer ? (
               product.priceMode === 'fixed' ? (
-                <>
-                  {promo && <s className="pcard-price-old">{formatIDR(product.price)}</s>}
-                  {formatIDR(product.effectivePrice ?? product.price)}<small>/{product.unit}</small>
-                </>
+                noPrice ? (
+                  <span className="pcard-quote">{t('Hubungi kami untuk harga', 'Contact us for pricing')}</span>
+                ) : (
+                  <>
+                    {promo && <s className="pcard-price-old">{formatMoney(price.base, price.currency)}</s>}
+                    {priceText}<small>/{product.unit}</small>
+                    {usd && <FobBadge lang={lang} />}
+                  </>
+                )
               ) : (
                 <span className="pcard-quote">{t('Harga penawaran', 'Quote on request')}</span>
               )

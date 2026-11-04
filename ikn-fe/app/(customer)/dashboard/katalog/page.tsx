@@ -1,5 +1,6 @@
 import CatalogBrowser, { parseCatalogQuery } from '@/components/CatalogBrowser';
 import { fetchCategories, fetchProducts } from '@/lib/server-data';
+import { sessionForward } from '@/lib/server-session';
 
 export const metadata = {
   title: 'Belanja Produk',
@@ -9,10 +10,11 @@ export const metadata = {
 type SearchParams = Record<string, string | string[] | undefined>;
 
 // Katalog di dalam portal customer: kartu produk dan detailnya tetap di /dashboard/katalog (lib/shop.ts).
+// Sesi customer diteruskan ke API internal agar customer ekspor menerima harga USD (ASUMSI A-86).
 // The hero strip (title + search) is rendered by CatalogBrowser layout="top" so it follows the UI language.
 export default async function CustomerCatalogPage({ searchParams }: { searchParams: SearchParams }) {
   const query = parseCatalogQuery(searchParams);
-  const [products, categories] = await Promise.all([fetchProducts(query), fetchCategories()]);
+  const [products, categories] = await Promise.all([fetchProducts(query, { forward: sessionForward() }), fetchCategories()]);
 
   return (
     <div className="shop-page">

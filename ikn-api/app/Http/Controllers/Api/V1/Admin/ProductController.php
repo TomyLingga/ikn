@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\PublishProductRequest;
 use App\Http\Resources\AdminProductResource;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -88,6 +89,10 @@ class ProductController extends ApiController
             'slug' => $this->slug($data['slug'] ?? null, $data['name']['id'] ?? '', $existing),
             'code' => trim($data['code']),
             'category_id' => (int) $data['categoryId'],
+            // Pabrik asal (ASUMSI A-90): kunci tidak dikirim = nilai lama; null = pabrik bawaan.
+            'factory_location_id' => array_key_exists('factoryLocationId', $data)
+                ? ($data['factoryLocationId'] === null ? null : (int) $data['factoryLocationId'])
+                : ($existing->factory_location_id ?? null),
             'name' => $data['name'],
             'kind' => isset($data['kind']) ? trim($data['kind']) ?: null : null,
             'summary' => $data['summary'] ?? null,
@@ -99,6 +104,8 @@ class ProductController extends ApiController
             'price_mode' => $priceMode,
             'price' => $isFixed ? (int) ($data['price'] ?? 0) : null,
             'promo_price' => $isFixed && isset($data['promoPrice']) ? (int) $data['promoPrice'] : null,
+            // Harga USD (ASUMSI A-86) diterima dalam sen dan disimpan decimal "12.50"; tidak dikirim = nilai lama, null = dikosongkan.
+            'price_usd' => $isFixed ? $this->priceUsd($data, $existing) : null,
             'promo_starts_at' => $isFixed ? ($data['promoStartsAt'] ?? null) : null,
             'promo_ends_at' => $isFixed ? ($data['promoEndsAt'] ?? null) : null,
             'unit' => isset($data['unit']) && trim($data['unit']) !== '' ? trim($data['unit']) : ($existing->unit ?? 'pcs'),
@@ -121,7 +128,16 @@ class ProductController extends ApiController
         return $attributes;
     }
 
-    /** [[k,v]] dengan pasangan kosong dibuang. */
+    /** Harga USD: kunci tidak dikirim = nilai lama dipertahankan; null = dikosongkan; integer sen → decimal satuan mayor. */
+    private function priceUsd(array $data, ?Product $existing): ?string
+    {
+        if (! array_key_exists('priceUsd', $data)) {
+            return $existing && $existing->price_usd !== null ? (string) $existing->price_usd : null;
+        }
+
+        return $data['priceUsd'] === null ? null : Money::fromMinor((int) $data['priceUsd'], Money::CURRENCY_USD);
+    }
+
     /** Dimensi kemasan (cm, 1 desimal): kunci tidak dikirim = nilai lama dipertahankan; null/kosong = dikosongkan. */
     private function dimension(array $data, string $key, $current): ?float
     {

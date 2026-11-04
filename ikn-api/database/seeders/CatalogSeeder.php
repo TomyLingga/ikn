@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\FactoryLocation;
 use App\Models\Media;
 use App\Models\Product;
 use App\Models\ProductImage;
@@ -16,6 +17,12 @@ use Illuminate\Database\Seeder;
 // saldo stok awal lewat StockLedger (bukan set kolom), ulasan demo. Idempoten: tidak menimpa data yang sudah ada.
 class CatalogSeeder extends Seeder
 {
+    /** Kategori => kode pabrik asal (ASUMSI A-90). */
+    private const FACTORY_BY_CATEGORY = [
+        'resiprene' => FactoryLocationSeeder::SEI_BAMBAN,
+        'rubber-articles' => FactoryLocationSeeder::TANJUNG_MORAWA,
+    ];
+
     public function run(MediaService $media, StockLedger $ledger): void
     {
         $categories = $this->categories();
@@ -49,8 +56,15 @@ class CatalogSeeder extends Seeder
             $product = Product::withTrashed()->where('slug', $row['slug'])->first();
             if (! $product) {
                 $row['category_id'] = $categories[$row['category']]->id;
+                // Pabrik asal (ASUMSI A-90): Resiprene dari Sei Bamban, barang karet dari Tanjung Morawa. Hanya produk baru;
+                // produk yang sudah ada tidak diubah karena pabriknya bisa sudah diatur admin.
+                $row['factory_location_id'] = FactoryLocation::where('code', self::FACTORY_BY_CATEGORY[$row['category']] ?? '')->value('id');
                 unset($row['category']);
                 $product = Product::create($row + ['is_published' => true, 'is_taxable' => true]);
+            } elseif ($product->price_usd === null && isset($row['price_usd']) && $product->isFixedPrice()) {
+                // Harga USD demo (ASUMSI A-86) diisi juga untuk basis data yang sudah ada sebelum Phase E3; nilai yang
+                // sudah diisi admin tidak ditimpa.
+                $product->forceFill(['price_usd' => $row['price_usd']])->save();
             }
 
             if ($product->images()->count() === 0) {
@@ -113,7 +127,10 @@ class CatalogSeeder extends Seeder
         }
     }
 
-    /** Data produk: 3 dari mock + 9 dari foto di assets/products. Uang integer rupiah, berat gram realistis. */
+    /**
+     * Data produk: 3 dari mock + 9 dari foto di assets/products. Uang integer rupiah, berat gram realistis.
+     * price_usd = harga demo per satuan basis FOB Belawan (decimal satuan mayor, ASUMSI A-86), bukan harga resmi klien.
+     */
     private function productRows(): array
     {
         return [
@@ -121,7 +138,7 @@ class CatalogSeeder extends Seeder
                 'slug' => 'sarung-egrek', 'code' => 'IKN-PRD-001', 'category' => 'rubber-articles',
                 'name' => ['id' => 'Sarung Egrek', 'en' => 'Rubber Palm Sickle Cover'], 'kind' => 'Rubber Articles',
                 'aliases' => ['sarung egrek', 'sarung pisau egrek', 'sarung egrek sawit', 'egrek', 'cover egrek'],
-                'price_mode' => 'fixed', 'price' => 125000, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 350, 'length_cm' => 20, 'width_cm' => 15, 'height_cm' => 5, 'stock' => 500,
+                'price_mode' => 'fixed', 'price' => 125000, 'price_usd' => 7.80, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 350, 'length_cm' => 20, 'width_cm' => 15, 'height_cm' => 5, 'stock' => 500,
                 'summary' => ['id' => 'Sarung egrek dari karet alam tebal untuk menutup mata pisau egrek kelapa sawit saat dibawa antar blok. Klip karet fleksibel mengunci sarung agar tidak lepas.', 'en' => 'Thick natural rubber cover for oil palm harvesting sickles, worn while the sickle is carried between blocks. A flexible rubber clip keeps it locked on the blade.'],
                 'highlights' => ['id' => ['Karet alam tebal & elastis', 'Pengait pengunci presisi & aman', 'Tahan benturan & sayatan pisau'], 'en' => ['Thick, elastic natural rubber', 'Precise and secure locking hook', 'Resistant to impact and blade cuts']],
                 'specs' => [['Material', 'Karet Alam Tebal'], ['Fungsi', 'Pelindung Pisau Egrek Sawit'], ['Sistem Kancing', 'Klip Karet Fleksibel'], ['Aplikasi', 'Perkebunan Kelapa Sawit']],
@@ -132,7 +149,7 @@ class CatalogSeeder extends Seeder
                 'slug' => 'sepatu-boots', 'code' => 'IKN-PRD-002', 'category' => 'rubber-articles',
                 'name' => ['id' => 'Sepatu Boots', 'en' => 'Industrial Rubber Boots'], 'kind' => 'Rubber Articles',
                 'aliases' => ['sepatu boots', 'boots karet', 'sepatu boots industri', 'sepatu perkebunan', 'boots ptpn', 'rubin boots'],
-                'price_mode' => 'fixed', 'price' => 170000, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 1800, 'length_cm' => 30, 'width_cm' => 20, 'height_cm' => 8, 'stock' => 350,
+                'price_mode' => 'fixed', 'price' => 170000, 'price_usd' => 10.60, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 1800, 'length_cm' => 30, 'width_cm' => 20, 'height_cm' => 8, 'stock' => 350,
                 'summary' => ['id' => 'Sepatu boots karet berlogo Rubin PTPN untuk pekerja kebun sawit, kebun karet, dan pabrik. Tahan air dan lumpur, bersol anti-slip dengan alur dalam, setinggi betis.', 'en' => 'Rubin PTPN rubber boots for oil palm and rubber estate workers and factory crews. Water and mud resistant, with a deep-tread anti-slip sole, calf height.'],
                 'highlights' => ['id' => ['Sol anti-slip berdaya cengkeram kuat', 'Tahan air & tahan lumpur', 'Nyaman digunakan seharian', 'Standar resmi Rubin & PTPN'], 'en' => ['High-grip anti-slip sole', 'Waterproof and mud resistant', 'Comfortable for all-day wear', 'Official Rubin & PTPN standard']],
                 'specs' => [['Material', '100% Karet Alam / Lateks'], ['Tinggi', 'Tinggi Betis Standar Industri'], ['Fitur Sol', 'Deep Tread Anti-Slip'], ['Standar', 'Perkebunan & Industri']],
@@ -143,7 +160,7 @@ class CatalogSeeder extends Seeder
                 'slug' => 'resiprene-35', 'code' => 'RSP-35', 'category' => 'resiprene',
                 'name' => ['id' => 'Resiprene 35', 'en' => 'Resiprene 35'], 'kind' => 'Cyclised Natural Rubber',
                 'aliases' => ['resiprine', 'respirine', 'resiprene 35', 'karet siklis', 'cyclised rubber'],
-                'price_mode' => 'fixed', 'price' => 185000, 'unit' => 'kg', 'moq' => 25, 'weight_gram' => 1000, 'length_cm' => 40, 'width_cm' => 30, 'height_cm' => 25, 'stock' => 1200,
+                'price_mode' => 'fixed', 'price' => 185000, 'price_usd' => 11.50, 'unit' => 'kg', 'moq' => 25, 'weight_gram' => 1000, 'length_cm' => 40, 'width_cm' => 30, 'height_cm' => 25, 'stock' => 1200,
                 'summary' => ['id' => 'Karet alam tersiklisasi (cyclised natural rubber) berupa serpihan kristal amber. Larut sempurna dalam white spirit dan pelarut tak berbau, dipakai untuk cat pelindung, coating perawatan, cat kapal, dan tinta.', 'en' => 'Cyclised natural rubber in amber crystal flakes. Dissolves fully in white spirit and odourless solvents and is used in protective paints, maintenance coatings, marine paints and inks.'],
                 'highlights' => ['id' => ['Cepat kering', 'Sangat tahan air', 'Tahan kimia (alkali & asam)', 'Adhesi baik ke beragam substrat'], 'en' => ['Fast drying', 'Highly water resistant', 'Chemical resistant (alkali & acid)', 'Good adhesion to various substrates']],
                 'specs' => [['Bentuk', 'Padatan / Serpihan Amber'], ['Softening Point', '125–145 °C'], ['Viscosity', '18–24 detik (DIN 53211)'], ['Color', '11–13 Lovibond'], ['Acid Value', 'Maks. 5 mg KOH/g'], ['Density', '0,88–0,98 g/ml'], ['Appearance', 'Clear']],
@@ -166,7 +183,7 @@ class CatalogSeeder extends Seeder
                 'slug' => 'acting-rubber', 'code' => 'IKN-PRD-004', 'category' => 'rubber-articles',
                 'name' => ['id' => 'Acting Rubber', 'en' => 'Acting Rubber'], 'kind' => 'Rubber Articles',
                 'aliases' => ['acting rubber', 'karet acting', 'karet penggerak'],
-                'price_mode' => 'fixed', 'price' => 450000, 'unit' => 'pcs', 'moq' => 2, 'weight_gram' => 1800, 'length_cm' => 30, 'width_cm' => 30, 'height_cm' => 10, 'stock' => 120,
+                'price_mode' => 'fixed', 'price' => 450000, 'price_usd' => 28.00, 'unit' => 'pcs', 'moq' => 2, 'weight_gram' => 1800, 'length_cm' => 30, 'width_cm' => 30, 'height_cm' => 10, 'stock' => 120,
                 'summary' => ['id' => 'Komponen karet penggerak untuk mesin pabrik kelapa sawit, dicetak dari kompon karet alam tahan aus.', 'en' => 'Rubber actuating component for palm oil mill machinery, moulded from wear-resistant natural rubber compound.'],
                 'highlights' => ['id' => ['Tahan aus dan panas', 'Dimensi presisi', 'Umur pakai panjang'], 'en' => ['Wear and heat resistant', 'Precise dimensions', 'Long service life']],
                 'specs' => [['Material', 'Karet Alam Kompon'], ['Kekerasan', '60–65 Shore A'], ['Aplikasi', 'Mesin PKS']],
@@ -177,7 +194,7 @@ class CatalogSeeder extends Seeder
                 'slug' => 'rubber-ring', 'code' => 'IKN-PRD-005', 'category' => 'rubber-articles',
                 'name' => ['id' => 'Rubber Ring', 'en' => 'Rubber Ring'], 'kind' => 'Rubber Articles',
                 'aliases' => ['ring karet', 'rubber ring', 'o-ring', 'seal karet'],
-                'price_mode' => 'fixed', 'price' => 35000, 'unit' => 'pcs', 'moq' => 10, 'weight_gram' => 150, 'length_cm' => 15, 'width_cm' => 10, 'height_cm' => 3, 'stock' => 2000,
+                'price_mode' => 'fixed', 'price' => 35000, 'price_usd' => 2.20, 'unit' => 'pcs', 'moq' => 10, 'weight_gram' => 150, 'length_cm' => 15, 'width_cm' => 10, 'height_cm' => 3, 'stock' => 2000,
                 'summary' => ['id' => 'Ring karet untuk sambungan pipa dan perapat peralatan industri, tersedia dalam berbagai diameter.', 'en' => 'Rubber ring for pipe joints and industrial equipment seals, available in a range of diameters.'],
                 'highlights' => ['id' => ['Elastisitas tinggi', 'Tahan minyak dan air', 'Berbagai ukuran'], 'en' => ['High elasticity', 'Oil and water resistant', 'Various sizes']],
                 'specs' => [['Material', 'NBR / Karet Alam'], ['Kekerasan', '65–70 Shore A'], ['Diameter', '2–24 inci']],
@@ -188,7 +205,7 @@ class CatalogSeeder extends Seeder
                 'slug' => 'sarung-kampak', 'code' => 'IKN-PRD-006', 'category' => 'rubber-articles',
                 'name' => ['id' => 'Sarung Kampak', 'en' => 'Rubber Axe Sheath'], 'kind' => 'Rubber Articles',
                 'aliases' => ['sarung kampak', 'sarung kapak', 'cover kampak', 'pelindung kampak'],
-                'price_mode' => 'fixed', 'price' => 95000, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 400, 'length_cm' => 20, 'width_cm' => 15, 'height_cm' => 6, 'stock' => 300,
+                'price_mode' => 'fixed', 'price' => 95000, 'price_usd' => 5.90, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 400, 'length_cm' => 20, 'width_cm' => 15, 'height_cm' => 6, 'stock' => 300,
                 'summary' => ['id' => 'Sarung pelindung mata kampak dari karet alam tebal untuk keselamatan pekerja perkebunan.', 'en' => 'Thick natural rubber protective sheath for axe blades, for plantation worker safety.'],
                 'highlights' => ['id' => ['Karet alam tebal', 'Pas di berbagai ukuran mata kampak', 'Tahan sayatan'], 'en' => ['Thick natural rubber', 'Fits various axe blade sizes', 'Cut resistant']],
                 'specs' => [['Material', 'Karet Alam Tebal'], ['Fungsi', 'Pelindung Mata Kampak']],
@@ -199,7 +216,7 @@ class CatalogSeeder extends Seeder
                 'slug' => 'rubber-flange-packing', 'code' => 'IKN-PRD-007', 'category' => 'rubber-articles',
                 'name' => ['id' => 'Rubber Flange Packing', 'en' => 'Rubber Flange Packing'], 'kind' => 'Rubber Articles',
                 'aliases' => ['packing flange', 'gasket karet', 'flange gasket', 'packing karet'],
-                'price_mode' => 'fixed', 'price' => 65000, 'unit' => 'pcs', 'moq' => 5, 'weight_gram' => 300, 'length_cm' => 20, 'width_cm' => 15, 'height_cm' => 5, 'stock' => 800,
+                'price_mode' => 'fixed', 'price' => 65000, 'price_usd' => 4.10, 'unit' => 'pcs', 'moq' => 5, 'weight_gram' => 300, 'length_cm' => 20, 'width_cm' => 15, 'height_cm' => 5, 'stock' => 800,
                 'summary' => ['id' => 'Packing karet untuk sambungan flange pipa, mencegah kebocoran pada sistem uap, air, dan minyak.', 'en' => 'Rubber packing for pipe flange joints, preventing leaks in steam, water, and oil systems.'],
                 'highlights' => ['id' => ['Tahan tekanan', 'Tahan suhu hingga 120 °C', 'Ukuran standar ANSI/JIS'], 'en' => ['Pressure resistant', 'Withstands up to 120 °C', 'ANSI/JIS standard sizes']],
                 'specs' => [['Material', 'Karet Alam / EPDM'], ['Ketebalan', '3–6 mm'], ['Standar', 'ANSI / JIS']],
@@ -232,7 +249,7 @@ class CatalogSeeder extends Seeder
                 'slug' => 'packing-pintu-rebusan', 'code' => 'IKN-PRD-010', 'category' => 'rubber-articles',
                 'name' => ['id' => 'Packing Pintu Rebusan', 'en' => 'Sterilizer Door Packing'], 'kind' => 'Rubber Articles',
                 'aliases' => ['packing rebusan', 'packing sterilizer', 'sterilizer door seal', 'packing pintu sterilizer'],
-                'price_mode' => 'fixed', 'price' => 1250000, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 8000, 'length_cm' => 80, 'width_cm' => 50, 'height_cm' => 30, 'stock' => 40,
+                'price_mode' => 'fixed', 'price' => 1250000, 'price_usd' => 78.00, 'unit' => 'pcs', 'moq' => 1, 'weight_gram' => 8000, 'length_cm' => 80, 'width_cm' => 50, 'height_cm' => 30, 'stock' => 40,
                 'summary' => ['id' => 'Packing karet pintu rebusan (sterilizer) pabrik kelapa sawit, tahan uap bertekanan dan suhu tinggi.', 'en' => 'Rubber packing for palm oil mill sterilizer doors, resistant to pressurised steam and high temperature.'],
                 'highlights' => ['id' => ['Tahan uap 3 bar / 140 °C', 'Profil presisi sesuai pintu', 'Umur pakai panjang'], 'en' => ['Withstands 3 bar / 140 °C steam', 'Precise profile to door', 'Long service life']],
                 'specs' => [['Material', 'Kompon karet tahan panas'], ['Kekerasan', '55–65 Shore A'], ['Diameter pintu', '2,1–2,7 m']],
@@ -244,7 +261,7 @@ class CatalogSeeder extends Seeder
                 'slug' => 'rubber-sheet', 'code' => 'IKN-PRD-012', 'category' => 'rubber-articles', 'is_published' => false,
                 'name' => ['id' => 'Rubber Sheet (Lembaran Karet)', 'en' => 'Rubber Sheet'], 'kind' => 'Rubber Articles',
                 'aliases' => ['rubber sheet', 'lembaran karet', 'karet lembaran', 'karet gulungan'],
-                'price_mode' => 'fixed', 'price' => 285000, 'unit' => 'm', 'moq' => 5, 'weight_gram' => 4500, 'length_cm' => 100, 'width_cm' => 100, 'height_cm' => 1, 'stock' => 60,
+                'price_mode' => 'fixed', 'price' => 285000, 'price_usd' => 17.80, 'unit' => 'm', 'moq' => 5, 'weight_gram' => 4500, 'length_cm' => 100, 'width_cm' => 100, 'height_cm' => 1, 'stock' => 60,
                 'summary' => ['id' => 'Lembaran karet alam tebal 3–10 mm untuk alas mesin, lining, dan peredam getaran; dipotong per meter.', 'en' => 'Natural rubber sheet 3–10 mm thick for machine pads, lining, and vibration damping; cut per metre.'],
                 'highlights' => ['id' => ['Tebal 3–10 mm', 'Tahan abrasi dan air', 'Dipotong sesuai kebutuhan'], 'en' => ['3–10 mm thick', 'Abrasion and water resistant', 'Cut to size']],
                 'specs' => [['Material', 'Karet Alam / SBR'], ['Kekerasan', '55–65 Shore A'], ['Lebar', '100 cm']],

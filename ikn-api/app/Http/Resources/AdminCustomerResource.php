@@ -33,6 +33,11 @@ class AdminCustomerResource extends JsonResource
             'companyEmail' => $profile?->company_email,
             'companyPhone' => $profile?->company_phone,
             'taxId' => $profile?->tax_id,
+            'market' => $user->market(),
+            'currency' => $user->currency(),
+            'countryCode' => $profile?->country_code ?: \App\Models\CustomerProfile::DEFAULT_COUNTRY,
+            'companyAddress' => $profile?->company_address,
+            'openOrdersCount' => $user->orders()->whereNotIn('status', Order::FINAL_STATUSES)->count(),
             'joinedAt' => optional($user->created_at)->toApiString(),
             'emailVerifiedAt' => optional($user->email_verified_at)->toApiString(),
             'approvedAt' => optional($user->approved_at)->toApiString(),
@@ -61,9 +66,28 @@ class AdminCustomerResource extends JsonResource
                 'status' => $order->status,
                 'paymentStatus' => $order->payment_status,
                 'itemsCount' => (int) $order->items_count,
+                'currency' => $order->currencyCode(),
                 'grandTotal' => $order->grandTotalInt(),
                 'paidAt' => optional($order->paid_at)->toApiString(),
+                // Cara serah terima ringkas untuk label status per varian (pickup/port), sama dengan OrderSummaryResource.
+                'deliveryTerm' => $this->deliveryTerm($order),
             ])->values()->all();
+    }
+
+    /** @return array{code: string, family: string|null}|null */
+    private function deliveryTerm(Order $order): ?array
+    {
+        $shipping = $order->shipping_snapshot ?? [];
+        $code = $order->delivery_term ?: ($shipping['term'] ?? null);
+        if (! $code) {
+            return null;
+        }
+        $family = $shipping['family'] ?? null;
+        if ($family === null) {
+            $family = $order->isPickup() ? 'pickup' : ($order->isPort() ? 'port' : null);
+        }
+
+        return ['code' => $code, 'family' => $family];
     }
 
     public function ordersCount(User $user): int

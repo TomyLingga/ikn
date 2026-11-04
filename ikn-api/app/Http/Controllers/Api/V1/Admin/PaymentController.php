@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Exceptions\ApiException;
 use App\Http\Controllers\Api\V1\ApiController;
+use App\Http\Requests\Admin\AcceptPaymentRequest;
 use App\Http\Requests\Admin\RejectPaymentRequest;
 use App\Http\Resources\AdminPaymentResource;
 use App\Models\Order;
@@ -61,9 +62,10 @@ class PaymentController extends ApiController
         return $this->data(new AdminPaymentResource($payment->load(AdminPaymentResource::eager())));
     }
 
-    public function accept(Request $request, Payment $payment, PaymentService $payments)
+    /** Body opsional { receivedAmount, bankCharges, receivedNote } (satuan terkecil mata uang payment, ASUMSI A-86). */
+    public function accept(AcceptPaymentRequest $request, Payment $payment, PaymentService $payments)
     {
-        return $this->verified($payments->accept($payment, $request->user()));
+        return $this->verified($payments->accept($payment, $request->user(), $request->received()));
     }
 
     public function reject(RejectPaymentRequest $request, Payment $payment, PaymentService $payments)
@@ -72,9 +74,9 @@ class PaymentController extends ApiController
     }
 
     /** Alias kompatibilitas FE: accept payment aktif (awaiting_verification) dari nomor order. */
-    public function acceptByOrder(Request $request, Order $order, PaymentService $payments)
+    public function acceptByOrder(AcceptPaymentRequest $request, Order $order, PaymentService $payments)
     {
-        return $this->verified($payments->accept($this->awaiting($order), $request->user()));
+        return $this->verified($payments->accept($this->awaiting($order), $request->user(), $request->received()));
     }
 
     public function rejectByOrder(RejectPaymentRequest $request, Order $order, PaymentService $payments)

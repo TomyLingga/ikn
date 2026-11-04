@@ -2,6 +2,7 @@
 
 namespace App\Services\Commerce\Shipping;
 
+use App\Models\FactoryLocation;
 use App\Models\ShippingRate;
 use App\Models\ShippingZone;
 use App\Models\ShippingZoneRegion;
@@ -12,7 +13,10 @@ use Illuminate\Support\Arr;
  * Ongkir berbasis zona (arsitektur bagian 9 langkah 4): zona paling spesifik menang
  * (village → district → regency → province), lalu zona default (is_default atau tanpa region) sebagai cadangan.
  * Tarif "calculated" memakai tiga parameter (ASUMSI A-76): jarak km (garis lurus titik asal → titik peta alamat × faktor
- * jalan, dibulatkan ke atas), berat kg, volume m³ — lihat ShippingRate::breakdown(). 0 bila subtotal − diskon ≥ free_above.
+ * jalan, dibulatkan ke atas), berat kg, volume m³ — lihat ShippingRate::breakdown().
+ * Dua pabrik atau lebih (ASUMSI A-90): keranjang dipecah per pabrik asal (parcel); tiap parcel dihitung terpisah dengan
+ * berat, volume, dan jarak dari pabriknya (base dan min_amount per parcel karena tiap pabrik mengirim sendiri), lalu
+ * dijumlah. free_above dibandingkan dengan subtotal − diskon seluruh order: bila tercapai, semua parcel 0.
  */
 class ZoneRateCalculator implements ShippingRateCalculator
 {
@@ -22,24 +26,31 @@ class ZoneRateCalculator implements ShippingRateCalculator
     {
     }
 
-    public function ratesFor($address, int $weightGram, int $subtotalAfterDiscount, int $volumeCm3 = 0): array
+    public function ratesFor($address, array $parcels, int $subtotalAfterDiscount): array
     {
         $zone = $this->resolveZone($address);
         if (! $zone) {
             return [];
         }
 
+        $parcels = $parcels ?: [['factory' => null, 'weightGram' => 0, 'volumeCm3' => 0]];
         $rates = $zone->rates()->active()->orderBy('sort_order')->orderBy('id')->get();
-        $distanceKm = $rates->contains(fn (ShippingRate $rate) => $rate->needsDistance()) ? $this->distanceKm($address) : null;
+        // Jarak per pabrik dihitung sekali (bukan per tarif); null = pabrik atau alamat tanpa titik peta.
+        $distances = [];
+        if ($rates->contains(fn (ShippingRate $rate) => $rate->needsDistance())) {
+            foreach ($parcels as $i => $parcel) {
+                $distances[$i] = $this->distanceKm($parcel['factory'] ?? null, $address);
+            }
+        }
 
         return $rates
-            ->map(fn (ShippingRate $rate) => $this->present($rate, $weightGram, $subtotalAfterDiscount, $volumeCm3, $distanceKm))
+            ->map(fn (ShippingRate $rate) => $this->present($rate, $parcels, $distances, $subtotalAfterDiscount, $address))
             ->values()->all();
     }
 
-    public function quote(int $rateId, $address, int $weightGram, int $subtotalAfterDiscount, int $volumeCm3 = 0): ?array
+    public function quote(int $rateId, $address, array $parcels, int $subtotalAfterDiscount): ?array
     {
-        foreach ($this->ratesFor($address, $weightGram, $subtotalAfterDiscount, $volumeCm3) as $rate) {
+        foreach ($this->ratesFor($address, $parcels, $subtotalAfterDiscount) as $rate) {
             if ($rate['rateId'] === $rateId && $rate['available']) {
                 return $rate;
             }
@@ -49,22 +60,23 @@ class ZoneRateCalculator implements ShippingRateCalculator
     }
 
     /**
-     * Jarak jalan perkiraan (km, dibulatkan ke atas) dari titik asal pengaturan commerce ke titik peta alamat;
-     * null bila salah satu titik belum diatur.
+     * Jarak jalan perkiraan (km, dibulatkan ke atas) dari titik pabrik asal ke titik peta alamat; null bila salah satu
+     * titik belum diatur.
      *
+     * @param  FactoryLocation|object|array|null  $origin  pabrik asal (lat/lng)
      * @param  object|array  $address
      */
-    public function distanceKm($address): ?int
+    public function distanceKm($origin, $address): ?int
     {
-        $originLat = $this->settings->get('shipping_origin_lat');
-        $originLng = $this->settings->get('shipping_origin_lng');
+        $originLat = $origin === null ? null : $this->coordinate($origin, 'lat');
+        $originLng = $origin === null ? null : $this->coordinate($origin, 'lng');
         $lat = $this->coordinate($address, 'lat');
         $lng = $this->coordinate($address, 'lng');
         if ($originLat === null || $originLng === null || $lat === null || $lng === null) {
             return null;
         }
 
-        $straight = self::haversineKm((float) $originLat, (float) $originLng, $lat, $lng);
+        $straight = self::haversineKm($originLat, $originLng, $lat, $lng);
         $factor = max(1.0, (float) $this->settings->get('shipping_road_factor'));
 
         return (int) max(1, ceil($straight * $factor));
@@ -166,14 +178,57 @@ class ZoneRateCalculator implements ShippingRateCalculator
         return $codes;
     }
 
-    private function present(ShippingRate $rate, int $weightGram, int $subtotalAfterDiscount, int $volumeCm3, ?int $distanceKm): array
+    /**
+     * Satu tarif untuk semua parcel: amount = Σ amount parcel; breakdown = Σ bagian (minimumApplied bila ada parcel yang
+     * kena minimum); distanceKm = jarak terjauh; origins[] = rincian per pabrik. Tarif per km tidak tersedia bila ada
+     * parcel tanpa jarak; `unavailable` menjelaskan sebabnya untuk warning quote (tarif itu disaring sebelum ke FE).
+     *
+     * @param  array<int, array{factory: ?FactoryLocation, weightGram: int, volumeCm3: int}>  $parcels
+     * @param  array<int, int|null>  $distances  indeks parcel => km
+     * @param  object|array  $address
+     */
+    private function present(ShippingRate $rate, array $parcels, array $distances, int $subtotalAfterDiscount, $address): array
     {
-        $available = ! $rate->needsDistance() || $distanceKm !== null;
-        $breakdown = $rate->breakdown($weightGram, $subtotalAfterDiscount, $volumeCm3, $distanceKm);
-        $amount = $breakdown['amount'];
-        unset($breakdown['amount']);
+        $needsDistance = $rate->needsDistance();
+        $totals = ['base' => 0, 'distance' => 0, 'weight' => 0, 'volume' => 0];
+        $minimumApplied = false;
+        $free = false;
+        $amount = 0;
+        $origins = [];
+        $missing = [];
+        $kms = [];
 
-        return [
+        foreach ($parcels as $i => $parcel) {
+            /** @var FactoryLocation|null $factory */
+            $factory = $parcel['factory'] ?? null;
+            $km = $needsDistance ? ($distances[$i] ?? null) : null;
+            if ($needsDistance && $km === null && (! $factory || ! $factory->hasPoint())) {
+                $missing[] = $factory ? $factory->code : null;
+            }
+            $kms[] = $km;
+
+            $breakdown = $rate->breakdown((int) $parcel['weightGram'], $subtotalAfterDiscount, (int) $parcel['volumeCm3'], $km);
+            $parcelAmount = $breakdown['amount'];
+            unset($breakdown['amount']);
+            foreach ($totals as $part => $value) {
+                $totals[$part] = $value + $breakdown[$part];
+            }
+            $minimumApplied = $minimumApplied || $breakdown['minimumApplied'];
+            $free = $breakdown['free'];
+            $amount += $parcelAmount;
+
+            $origins[] = [
+                'factory' => $factory ? $factory->toBrief() : null,
+                'weightGram' => (int) $parcel['weightGram'],
+                'volumeCm3' => (int) $parcel['volumeCm3'],
+                'distanceKm' => $km,
+                'amount' => $parcelAmount,
+                'breakdown' => $breakdown,
+            ];
+        }
+
+        $available = ! $needsDistance || ! in_array(null, $kms, true);
+        $out = [
             'rateId' => $rate->id,
             'zoneId' => $rate->zone_id,
             'label' => $rate->name,
@@ -181,10 +236,22 @@ class ZoneRateCalculator implements ShippingRateCalculator
             'amount' => $available ? $amount : 0,
             'type' => $rate->isCalculated() ? ShippingRate::TYPE_CALCULATED : ShippingRate::TYPE_FLAT,
             'available' => $available,
-            'distanceKm' => $rate->needsDistance() ? $distanceKm : null,
-            'weightGram' => $weightGram,
-            'volumeCm3' => $volumeCm3,
-            'breakdown' => $breakdown,
+            'distanceKm' => $needsDistance && $available ? max($kms) : null,
+            'weightGram' => array_sum(array_map(fn ($parcel) => (int) $parcel['weightGram'], $parcels)),
+            'volumeCm3' => array_sum(array_map(fn ($parcel) => (int) $parcel['volumeCm3'], $parcels)),
+            'breakdown' => $totals + ['minimumApplied' => $minimumApplied, 'free' => $free],
+            'origins' => $origins,
         ];
+
+        if (! $available) {
+            $out['unavailable'] = [
+                // false = alamat belum punya titik peta (warning distance_unavailable).
+                'addressPoint' => $this->coordinate($address, 'lat') !== null && $this->coordinate($address, 'lng') !== null,
+                // Pabrik tanpa koordinat (warning factory_location_unset); null = tidak ada pabrik sama sekali.
+                'factoryCodes' => array_values(array_unique($missing, SORT_REGULAR)),
+            ];
+        }
+
+        return $out;
     }
 }

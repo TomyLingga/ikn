@@ -19,6 +19,10 @@ class Kernel extends ConsoleKernel
         $schedule->command('orders:expire')->everyMinute()->withoutOverlapping();
         $schedule->command('orders:remind')->everyFifteenMinutes()->withoutOverlapping();
         $schedule->command('orders:auto-complete')->dailyAt('01:00')->withoutOverlapping();
+        // Penawaran ongkir CIF (ASUMSI A-89): kedaluwarsa penawaran + batas tunggu order awaiting_freight, tiap 15 menit.
+        $schedule->command('orders:freight-expire')->everyFifteenMinutes()->withoutOverlapping();
+        // Kurs JISDOR (ASUMSI A-84): hari kerja tiap jam 10:00-17:00 WIB, upsert idempoten 35 hari ke belakang.
+        $schedule->command('rates:fetch')->weekdays()->hourly()->between('10:00', '17:00')->withoutOverlapping();
     }
 
     /**
