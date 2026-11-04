@@ -8,6 +8,7 @@ import JsonLd from '@/components/JsonLd';
 import { organizationJsonLd, websiteJsonLd } from '@/lib/seo';
 import '@/app/pages.css';
 import '@/app/styles/commerce.css';
+import '@/app/styles/site.css';
 
 // Site-wide CMS data (menus, settings, contact, doc links) is fetched once here
 // and shared with Navbar/Footer/sections through SiteProvider.

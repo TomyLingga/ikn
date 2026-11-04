@@ -7,7 +7,7 @@ use App\Models\Setting;
 use App\Services\Media\MediaService;
 use Illuminate\Database\Seeder;
 
-// Aset demo: foto dari mockup FE + PDF placeholder (diganti admin lewat media library).
+// Aset seed: foto pabrik/produk dari berkas klien + PDF placeholder (diganti admin lewat media library).
 class MediaSeeder extends Seeder
 {
     public const IMAGES = [
@@ -17,6 +17,34 @@ class MediaSeeder extends Seeder
         'kantor-direksi.png' => 'gallery',
         'resiprene-35.jpg' => 'gallery',
         'rubin-logo.png' => 'logos',
+        // Foto pabrik dan aktivitas dari doc/IKN/BAHAN FOTO IKN (berkas klien, dioptimalkan ke JPEG 1600 px), beranda 2026-11-04.
+        'pabrik-udara-1.jpg' => 'gallery',
+        'gedung-kantor-udara.jpg' => 'gallery',
+        'gedung-rubber-industry.jpg' => 'gallery',
+        'papan-pabrik-resiprene.jpg' => 'gallery',
+        'produksi-karet-2.jpg' => 'gallery',
+        'bahan-baku-gudang.jpg' => 'gallery',
+        'pengemasan-muat-1.jpg' => 'gallery',
+        'pengemasan-muat-2.jpg' => 'gallery',
+        // Perkebunan karet dan foto udara pabrik kedua (halaman Keberlanjutan, Tentang, Media), 2026-11-04.
+        'kebun-karet-1.jpg' => 'gallery',
+        'kebun-karet-2.jpg' => 'gallery',
+        'pohon-karet-sadap.jpg' => 'gallery',
+        'pabrik-udara-2.jpg' => 'gallery',
+        // Foto per tonggak sejarah: foto produk klien (doc/IKN/BAHAN FOTO IKN/Foto Produk Kamera IKN) dan dua foto ilustrasi
+        // sementara dari Wikimedia Commons (lisensi & atribusi di assets/CREDITS.md), 2026-11-04.
+        'sejarah-ban-sepeda.jpg' => 'gallery',
+        'sejarah-karet-gelang.jpg' => 'gallery',
+        'sejarah-flexible-joint.jpg' => 'gallery',
+        'sejarah-conveyor-belt.jpg' => 'gallery',
+        // Logo pelanggan Rubber Articles, dipotong dari slide "Our Costumer" klien (our-customer-2).
+        'logo-ptpn2.png' => 'logos',
+        'logo-ptpn3.png' => 'logos',
+        'logo-ptpn4.png' => 'logos',
+        'logo-ptpn5.png' => 'logos',
+        'logo-socfin.png' => 'logos',
+        // Foto produk "Packing Pintu Rebusan Endless" dari berkas klien (kartu Rubber Articles di beranda).
+        'rubber-articles-packing-endless.jpg' => 'products',
         // Kop & kaki cetakan invoice (pindaian kop surat klien dari doc/Invoice), ASUMSI A-83.
         'invoice-header.png' => 'invoice',
         'invoice-footer.png' => 'invoice',
@@ -42,6 +70,9 @@ class MediaSeeder extends Seeder
         'reach-compliance.pdf' => 'reach-registration-certificate.pdf',
         'sop-wbs.pdf' => 'wbs-sop.pdf',
         'sds-resiprene.pdf' => 'safety-data-sheet-resiprene.pdf',
+        // Brosur asli klien (doc/IKN/BROSUR & SERTIFIKAT), 2026-11-04.
+        'brosur-resiprene-35.pdf' => 'brosur-resiprene-35.pdf',
+        'katalog-barang-karet.pdf' => 'brosur-rubber-articles.pdf',
     ];
 
     public function run(MediaService $service)

@@ -42,7 +42,7 @@ final class SectionDefinitions
     private const GROUP_OF = [
         'page_header' => 'header', 'hero' => 'header', 'marquee' => 'header',
         'product_highlights' => 'showcase', 'link_cards' => 'showcase', 'cta' => 'showcase', 'team' => 'showcase',
-        'testimonials' => 'showcase', 'image_grid' => 'showcase', 'video_gallery' => 'showcase',
+        'testimonials' => 'showcase', 'image_grid' => 'showcase', 'video_gallery' => 'showcase', 'product_showcase' => 'showcase', 'customer_map' => 'showcase',
         'news' => 'data', 'latest_news' => 'data', 'gallery' => 'data', 'certificates' => 'data', 'brochures' => 'data', 'customer_logos' => 'data',
         'contact_info' => 'contact', 'contact_form' => 'contact', 'contact_summary' => 'contact', 'wbs_form' => 'contact',
     ];
@@ -172,6 +172,9 @@ final class SectionDefinitions
                         'name' => self::f('text', 'Nama', 'Name', ['required' => true, 'max' => 120]),
                         'kind' => self::f('text', 'Jenis', 'Kind', ['max' => 120]),
                         'summary' => self::f('i18n_textarea', 'Ringkasan', 'Summary'),
+                        // Opsional: daftar singkat di kartu (kosong = tidak tampil).
+                        'applications' => self::i18nList('Aplikasi utama', 'Main applications'),
+                        'features' => self::i18nList('Karakteristik utama', 'Key characteristics'),
                         'url' => self::f('url', 'Tautan detail', 'Detail URL'),
                     ]),
                 ], ['home']),
@@ -222,6 +225,7 @@ final class SectionDefinitions
                         'title' => self::f('i18n_text', 'Periode / judul (baris pertama kotak)', 'Period / title (first line of the box)', ['required' => true]),
                         'body' => self::f('i18n_textarea', 'Uraian', 'Body'),
                         'products' => self::f('i18n_text', 'Produk', 'Products'),
+                        'media' => self::f('media', 'Foto / video singkat (opsional)', 'Photo / short video (optional)', ['accept' => 'visual']),
                     ]),
                 ], ['tentang']),
 
@@ -232,11 +236,14 @@ final class SectionDefinitions
                     'vision' => self::f('i18n_textarea', 'Visi', 'Vision', ['required' => true]),
                     'mission_tag' => self::f('i18n_text', 'Tag misi', 'Mission tag'),
                     'missions' => self::i18nList('Butir misi', 'Mission points'),
+                    'vision_highlight' => self::f('i18n_text', 'Frasa visi yang digarisbawahi (opsional)', 'Highlighted vision phrase (optional)'),
+                    'mission_lead' => self::f('i18n_text', 'Kalimat pendek di samping judul misi', 'Short line beside the mission title'),
                 ], ['tentang']),
 
             'values' => self::type('Nilai perusahaan', 'Company values',
                 'Nilai inti (mis. AKHLAK) dengan uraian singkat.',
                 'Core values (e.g. AKHLAK) with short descriptions.', self::labelHeading() + [
+                    'lead' => self::f('i18n_textarea', 'Teks pengantar', 'Lead text'),
                     'items' => self::list('Nilai', 'Values', [
                         'title' => self::f('i18n_text', 'Nama nilai', 'Value name', ['required' => true]),
                         'body' => self::f('i18n_textarea', 'Uraian', 'Description'),
@@ -344,12 +351,13 @@ final class SectionDefinitions
                 'Label/judul opsional, paragraf pengantar; daftar logo diambil dari menu Logo Pelanggan.',
                 'Optional label/heading, intro paragraph; logos come from the Customer Logos menu.', self::labelHeading() + [
                     'lead' => self::f('i18n_textarea', 'Pengantar', 'Intro'),
+                    'layout' => self::f('select', 'Tata letak logo', 'Logo layout', ['options' => ['grid' => 'Kisi', 'marquee' => 'Kartu berjalan'], 'default' => 'grid']),
                 ], ['keberlanjutan']),
 
             'certificates' => self::type('Daftar sertifikat', 'Certificate list',
                 'Label/judul opsional; daftar sertifikat dari menu Sertifikat.',
                 'Optional label/heading; certificates from the Certificates menu.', self::labelHeading() + [
-                    'layout' => self::f('select', 'Tata letak', 'Layout', ['options' => ['list' => 'Daftar baris (logo kiri)', 'grid' => 'Kartu lencana (logo besar)'], 'default' => 'list']),
+                    'layout' => self::f('select', 'Tata letak', 'Layout', ['options' => ['list' => 'Daftar baris (logo kiri)', 'grid' => 'Kartu lencana (logo besar)', 'cards' => 'Kartu detail (status, nomor, penerbit)'], 'default' => 'list']),
                     'empty_text' => self::f('i18n_text', 'Teks bila kosong', 'Empty text'),
                 ], ['keberlanjutan']),
 
@@ -437,6 +445,12 @@ final class SectionDefinitions
                         'name' => self::f('text', 'Nama', 'Name', ['required' => true, 'max' => 120]),
                         'position' => self::f('i18n_text', 'Jabatan', 'Position', ['max' => 120]),
                         'bio' => self::f('i18n_textarea', 'Profil singkat', 'Short profile', ['max' => 600]),
+                        // Detail perorangan (jendela saat kartu diklik); bagian kosong tidak ditampilkan.
+                        'education' => self::f('i18n_textarea', 'Pendidikan', 'Education', ['max' => 1000]),
+                        'career' => self::i18nList('Perjalanan karir (satu jabatan per baris)', 'Career history (one role per line)'),
+                        'appointment' => self::f('i18n_textarea', 'Jabatan dan dasar pengangkatan', 'Position and legal basis of appointment', ['max' => 1000]),
+                        'quote_title' => self::f('i18n_text', 'Judul kutipan', 'Quote title', ['max' => 120]),
+                        'quote_body' => self::f('i18n_textarea', 'Isi kutipan', 'Quote text', ['max' => 600]),
                     ], ['max_items' => 24]),
                 ]),
 
@@ -456,11 +470,47 @@ final class SectionDefinitions
                 'Foto pilihan dengan keterangan; klik untuk memperbesar. Berbeda dari Galeri yang mengambil semua item menu Galeri.',
                 'Hand-picked photos with captions; click to enlarge. Unlike Gallery, which lists every Gallery menu item.', self::labelHeading() + [
                     'lead' => self::f('i18n_textarea', 'Teks pengantar', 'Lead text'),
+                    'link_label' => self::f('i18n_text', 'Label tautan', 'Link label', ['max' => 40]),
+                    'link_url' => self::f('url', 'Tautan', 'Link URL'),
                     'items' => self::list('Foto', 'Photos', [
                         'image' => self::f('media', 'Foto', 'Photo', ['required' => true, 'accept' => 'image']),
                         'caption' => self::f('i18n_text', 'Keterangan', 'Caption', ['max' => 160]),
                     ], ['max_items' => 24]),
                 ]),
+
+            'product_showcase' => self::type('Panel produk', 'Product panels',
+                'Satu panel lebar per produk: foto besar, nomor urut, nama, uraian, poin, dan data teknis opsional di samping uraian. Kunci item menjadi anchor menu.',
+                'One wide panel per product: large photo, counter, name, description, points, and optional technical data beside the text. The item key becomes a menu anchor.', self::labelHeading() + [
+                    'lead' => self::f('i18n_textarea', 'Teks pengantar', 'Lead text'),
+                    'items' => self::list('Produk', 'Products', [
+                        'key' => self::f('text', 'Kunci (anchor)', 'Key (anchor)', ['max' => 40]),
+                        'image' => self::f('media', 'Foto produk', 'Product photo', ['accept' => 'image']),
+                        'code' => self::f('text', 'Kode', 'Code', ['max' => 40]),
+                        'name' => self::f('text', 'Nama', 'Name', ['required' => true, 'max' => 120]),
+                        'kind' => self::f('text', 'Jenis', 'Kind', ['max' => 120]),
+                        'summary' => self::f('i18n_textarea', 'Uraian (pisahkan paragraf dengan baris kosong)', 'Description (blank line between paragraphs)'),
+                        'points' => self::i18nList('Poin', 'Points'),
+                        'specs' => self::list('Data teknis', 'Technical data', [
+                            'label' => self::f('i18n_text', 'Parameter', 'Parameter', ['required' => true, 'max' => 120]),
+                            'value' => self::f('i18n_text', 'Nilai', 'Value', ['required' => true, 'max' => 200]),
+                        ], ['max_items' => 20]),
+                        'button_label' => self::f('i18n_text', 'Label tombol', 'Button label', ['max' => 60]),
+                        'button_url' => self::f('url', 'Tautan tombol', 'Button URL'),
+                    ], ['max_items' => 12]),
+                ], ['bisnis']),
+
+            'customer_map' => self::type('Peta pelanggan', 'Customer map',
+                'Peta dunia bertitik per negara dengan rute dari Belawan, daftar pelanggan per kawasan, dan kartu nama pelanggan berjalan.',
+                'World map with a dot per country and routes from Belawan, customers listed by region, and scrolling customer name cards.', self::labelHeading() + [
+                    'lead' => self::f('i18n_textarea', 'Teks pengantar', 'Lead text'),
+                    'origin_label' => self::f('i18n_text', 'Label titik asal', 'Origin label', ['max' => 60]),
+                    'items' => self::list('Negara', 'Countries', [
+                        'region' => self::f('select', 'Kawasan', 'Region', ['options' => ['asia' => 'Asia', 'europe' => 'Eropa', 'middle_east' => 'Timur Tengah', 'americas' => 'Amerika'], 'default' => 'asia']),
+                        'country' => self::f('i18n_text', 'Negara', 'Country', ['required' => true, 'max' => 80]),
+                        'geo' => self::f('geo', 'Titik peta', 'Map point'),
+                        'customers' => self::f('textarea', 'Pelanggan (pisahkan dengan koma)', 'Customers (comma separated)', ['required' => true, 'max' => 600]),
+                    ], ['max_items' => 60]),
+                ], ['kemitraan']),
 
             'rich_text' => self::type('Teks bebas', 'Rich text',
                 'Blok teks dari editor (judul, daftar, tabel, gambar, video) dengan label/judul opsional.',

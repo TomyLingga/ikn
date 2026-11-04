@@ -1,6 +1,6 @@
 'use client';
 
-// Peta lokasi kontak (Leaflet + tile OpenStreetMap, tanpa API key). Selalu dimuat lewat dynamic import ssr:false
+// Peta lokasi kontak (Leaflet + citra satelit Esri World Imagery + lapisan nama tempat, tanpa API key). Selalu dimuat lewat dynamic import ssr:false
 // (lihat index.tsx) karena Leaflet menyentuh `window` saat diimpor.
 import { useEffect } from 'react';
 import L from 'leaflet';
@@ -36,7 +36,7 @@ function Fit({ points }: { points: MapPoint[] }) {
     if (points.length > 1) {
       map.fitBounds(points.map((p) => [p.lat, p.lng] as [number, number]), { padding: [48, 48], maxZoom: 13 });
     } else {
-      map.setView([first.lat, first.lng], 15);
+      map.setView([first.lat, first.lng], 16);
     }
   }, [points, map]);
   return null;
@@ -61,10 +61,13 @@ export default function ContactMap({ points, compact = false, lang = 'id' }: Con
         attributionControl={!compact}
         style={{ width: '100%', height: '100%' }}
       >
+        {/* Tampilan satelit (permintaan pemilik 2026-11-04); lapisan kedua menambah nama jalan/tempat di atas citra. */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics"
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          maxZoom={19}
         />
+        <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}" maxZoom={19} />
         <Fit points={points} />
         {points.map((p) => (
           <Marker key={`${p.lat},${p.lng}`} position={[p.lat, p.lng]} icon={pinIcon}>

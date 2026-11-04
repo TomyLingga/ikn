@@ -22,29 +22,50 @@ class SeededPagesTest extends TestCase
         $this->seed(MenuSeeder::class);
         $this->seed(CmsPageSeeder::class);
 
+        // Beranda (brief 2026-11-04): hero, sekilas, tentang, bisnis, manufaktur, sejarah, kualitas, keberlanjutan,
+        // pelanggan, berita, galeri + video, CTA.
+        $home = $this->getJson('/api/v1/content/pages/home')->assertOk()->json('data.sections');
+        $this->assertSame(
+            ['hero', 'glance', 'about', 'products', 'manufaktur', 'fasilitas', 'history', 'kualitas', 'sertifikat', 'keberlanjutan', 'pilar-keberlanjutan', 'pelanggan', 'news', 'galeri', 'videos', 'cta'],
+            array_column($home, 'key')
+        );
+        $this->assertSame('Engineering Rubber Solutions'."\n".'for a Better Tomorrow.', $home[0]['content']['title']['en']);
+        $this->assertCount(2, $home[3]['content']['items']);
+        $this->assertNotEmpty($home[3]['content']['items'][0]['applications']);
+        $this->assertCount(7, $home[6]['content']['items']); // tonggak sejarah sejak 1965
+        $this->assertSame('/galeri', $home[13]['content']['link_url']);
+
+        // Susunan konten brief 2026-11-04 (About, Business, Quality, Sustainability, News & Media, Partnership, Contact).
+        $keys = fn (string $slug) => array_column($this->getJson("/api/v1/content/pages/{$slug}")->assertOk()->json('data.sections'), 'key');
+
         $tentang = $this->getJson('/api/v1/content/pages/tentang')->assertOk()->json('data.sections');
-        $this->assertSame(['header', 'profile', 'history', 'vision-mission', 'struktur', 'values'], array_column($tentang, 'key'));
+        $this->assertSame(['header', 'profile', 'history', 'vision-mission', 'values', 'komisaris', 'manajemen', 'struktur', 'struktur-korporasi', 'cta'], array_column($tentang, 'key'));
         // Slideshow kepala halaman: dua foto seed (dihidrasi menjadi ringkasan media), 6 detik per foto, tata letak split.
         $this->assertCount(2, $tentang[0]['content']['media']);
         $this->assertStringStartsWith('image/', $tentang[0]['content']['media'][0]['file']['mime']);
         $this->assertSame(6, $tentang[0]['content']['interval']);
-        $this->assertSame('split', $tentang[0]['content']['layout']);
-        $this->assertSame('org_chart', $tentang[4]['type']);
-        $this->assertGreaterThan(60, count($tentang[4]['content']['nodes']));
-        $this->assertSame('rups', $tentang[4]['content']['nodes'][0]['level']);
-        $this->assertSame('pelaksana', collect($tentang[4]['content']['nodes'])->firstWhere('key', 'driver')['level']);
+        $this->assertSame('cover', $tentang[0]['content']['layout']);
+        $this->assertSame('org_chart', $tentang[7]['type']);
+        $this->assertGreaterThan(60, count($tentang[7]['content']['nodes']));
+        $this->assertSame('rups', $tentang[7]['content']['nodes'][0]['level']);
+        $this->assertSame('pelaksana', collect($tentang[7]['content']['nodes'])->firstWhere('key', 'driver')['level']);
 
         $kontak = $this->getJson('/api/v1/content/pages/kontak')->assertOk()->json('data.sections');
-        $this->assertSame(3.5387, $kontak[1]['content']['locations'][0]['geo']['lat']);
+        $this->assertSame(['header', 'kantor-pusat', 'lokasi-pabrik', 'contact-info', 'form'], array_column($kontak, 'key'));
+        $this->assertSame(3.5387, $kontak[3]['content']['locations'][0]['geo']['lat']);
 
-        $keberlanjutan = $this->getJson('/api/v1/content/pages/keberlanjutan')->assertOk()->json('data.sections');
-        $this->assertSame(['header', 'esg', 'sertifikat', 'pelanggan', 'reach', 'whistleblowing', 'wbs-form'], array_column($keberlanjutan, 'key'));
+        // Anchor dropdown navbar (#esg, #sertifikat, #pelanggan, #reach, #whistleblowing) tetap ada.
+        $this->assertSame(['header', 'lingkungan', 'k3', 'tata-kelola', 'esg', 'reach', 'sertifikat', 'pelanggan', 'whistleblowing', 'wbs-form'], $keys('keberlanjutan'));
+        $this->assertSame(['header', 'lini-bisnis', 'ragam-produk', 'fasilitas', 'fasilitas-foto', 'kapabilitas', 'cara-pesan', 'links', 'unduhan', 'tanya-jawab', 'cta'], $keys('bisnis'));
+        $this->assertSame(['header', 'jaminan-mutu', 'pengembangan', 'laboratorium', 'standar-produk', 'sertifikasi', 'cta'], $keys('kualitas'));
+        $this->assertSame(['header', 'berita-terbaru', 'kegiatan', 'galeri', 'video'], $keys('media'));
+        $this->assertSame(['header', 'pelanggan', 'pelanggan-resiprene', 'kerja-sama', 'form', 'permintaan-produk'], $keys('kemitraan'));
 
-        $bisnis = $this->getJson('/api/v1/content/pages/bisnis')->assertOk()->json('data.sections');
-        $this->assertSame(['header', 'resiprene-35', 'barang-karet', 'cara-pesan', 'links', 'unduhan', 'tanya-jawab', 'cta'], array_column($bisnis, 'key'));
-
-        $media = $this->getJson('/api/v1/content/pages/media')->assertOk()->json('data.sections');
-        $this->assertSame(['page_header', 'link_cards'], array_column($media, 'type'));
+        // Navbar tetap 6 menu; halaman Kualitas & Kemitraan hanya di footer.
+        $header = $this->getJson('/api/v1/content/menus/header')->assertOk()->json('data.items');
+        $this->assertSame(['home', 'tentang', 'bisnis', 'media', 'keberlanjutan', 'kontak'], array_column($header, 'key'));
+        $footer = array_column($this->getJson('/api/v1/content/menus/footer')->assertOk()->json('data.items'), 'url');
+        $this->assertSame(['/', '/tentang', '/bisnis', '/kualitas', '/keberlanjutan', '/media', '/kemitraan', '/kontak'], $footer);
 
         foreach (['sertifikat', 'pelanggan', 'reach', 'whistleblowing', 'unduhan', 'produk'] as $gone) {
             $this->getJson("/api/v1/content/pages/{$gone}")->assertStatus(404);

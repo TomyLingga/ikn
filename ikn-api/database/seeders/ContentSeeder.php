@@ -164,8 +164,24 @@ class ContentSeeder extends Seeder
             ['karet-1-1-scaled.jpg', 'Pengolahan Karet Alam', 'Natural Rubber Processing'],
             ['pabrik-2-1.png', 'Kompleks Pabrik Hilir', 'Downstream Plant Complex'],
             ['produksi-karet-1.webp', 'Aktivitas Pemotongan Slab Karet', 'Rubber Slab Cutting Activity'],
+            // Foto aktivitas pabrik dari berkas klien (doc/IKN/BAHAN FOTO IKN).
+            ['pabrik-udara-1.jpg', 'Foto udara kompleks pabrik PT IKN', 'Aerial view of a PT IKN plant'],
+            ['gedung-kantor-udara.jpg', 'Foto udara gedung PT Industri Karet Nusantara', 'Aerial view of the PT Industri Karet Nusantara building'],
+            ['gedung-rubber-industry.jpg', 'Gedung PT Industri Karet Nusantara (Rubber Industry)', 'PT Industri Karet Nusantara (Rubber Industry) building'],
+            ['papan-pabrik-resiprene.jpg', 'Papan nama Pabrik Resiprene Sei Bamban', 'Sign of the Sei Bamban Resiprene plant'],
+            ['produksi-karet-2.jpg', 'Pemeriksaan bahan baku karet', 'Checking rubber raw material'],
+            ['bahan-baku-gudang.jpg', 'Bahan baku karet di rak penyimpanan', 'Rubber raw material on storage racks'],
+            ['pengemasan-muat-1.jpg', 'Pemuatan produk dalam kemasan karung', 'Loading bagged products'],
+            ['pengemasan-muat-2.jpg', 'Pemeriksaan muatan sebelum pengiriman', 'Checking the load before shipment'],
+            ['pabrik-udara-2.jpg', 'Foto udara pabrik PT IKN di tengah perkebunan', 'Aerial view of a PT IKN plant among plantations'],
+            ['kebun-karet-1.jpg', 'Perkebunan karet', 'Rubber plantation'],
+            ['kebun-karet-2.jpg', 'Barisan pohon karet', 'Rows of rubber trees'],
+            ['pohon-karet-sadap.jpg', 'Pohon karet yang disadap', 'A tapped rubber tree'],
         ];
         foreach ($images as $i => [$file, $id, $en]) {
+            if (! MediaSeeder::id($file)) {
+                continue; // berkas aset tidak ada: lewati agar item galeri tidak tanpa gambar
+            }
             GalleryItem::create([
                 'title' => ['id' => $id, 'en' => $en], 'type' => GalleryItem::TYPE_IMAGE,
                 'media_id' => MediaSeeder::id($file), 'is_published' => true, 'sort_order' => $i,
@@ -191,20 +207,25 @@ class ContentSeeder extends Seeder
 
         Certificate::create([
             'name' => ['id' => 'ISO 37001:2016', 'en' => 'ISO 37001:2016'],
-            'material' => ['id' => 'Sistem Manajemen Anti Penyuapan (SMAP)', 'en' => 'Anti-Bribery Management System (ABMS)'],
+            'material' => ['id' => 'Anti-penyuapan (SMAP)', 'en' => 'Anti-bribery (ABMS)'],
             'description' => ['id' => 'Sertifikasi kepatuhan anti-penyuapan berstandar internasional.', 'en' => 'International-standard anti-bribery compliance certification.'],
+            'standard' => 'ISO 37001:2016', 'status' => 'active',
             'media_id' => MediaSeeder::id('iso-37001.pdf'), 'is_published' => true, 'sort_order' => 0,
         ]);
         Certificate::create([
             'name' => ['id' => 'REACH Compliance', 'en' => 'REACH Compliance'],
-            'material' => ['id' => 'European Chemicals Agency (ECHA)', 'en' => 'European Chemicals Agency (ECHA)'],
-            'description' => ['id' => 'Kepatuhan ekspor bahan kimia dan polimer ke Uni Eropa.', 'en' => 'Compliance for exporting chemicals and polymers to the European Union.'],
+            // Data dari REACH-Registration-certificate-OR-2.pdf klien (Only Representative: B-Lands Consulting).
+            'material' => ['id' => 'Registrasi bahan kimia (REACH)', 'en' => 'Chemical registration (REACH)'],
+            'description' => ['id' => 'Registrasi REACH untuk Cyclized Rubber Resiprene 35, termasuk monomer isoprena (CAS 78-79-5), untuk pasokan ke Uni Eropa.', 'en' => 'REACH registration of Cyclized Rubber Resiprene 35, including the isoprene monomer (CAS 78-79-5), for supply to the European Union.'],
+            'number' => '8111161-7', 'issuer' => 'B-Lands Consulting (Only Representative)', 'standard' => 'Regulation (EC) No 1907/2006', 'status' => 'active',
             'media_id' => MediaSeeder::id('reach-compliance.pdf'), 'is_published' => true, 'sort_order' => 1,
         ]);
         Certificate::create([
             'name' => ['id' => 'Safety Data Sheet Resiprene 35', 'en' => 'Safety Data Sheet Resiprene 35'],
-            'material' => ['id' => 'Lembar Data Keselamatan (SDS/MSDS)', 'en' => 'Safety Data Sheet (SDS/MSDS)'],
+            'material' => ['id' => 'Lembar data keselamatan', 'en' => 'Safety data sheet'],
             'description' => ['id' => 'Informasi keselamatan, penanganan, dan penyimpanan Resiprene 35.', 'en' => 'Safety, handling, and storage information for Resiprene 35.'],
+            // Data dari SAFETY-DATA-SHEET-RESIPRENE.pdf klien (versi 1, terbit 14-11-2016).
+            'number' => '05-2114998345-32-0000', 'issuer' => 'PT Industri Karet Nusantara', 'standard' => 'EC 1907/2006, 1272/2008, 830/2015', 'status' => 'active',
             'media_id' => MediaSeeder::id('sds-resiprene.pdf'), 'is_published' => true, 'sort_order' => 2,
         ]);
     }
@@ -220,15 +241,36 @@ class ContentSeeder extends Seeder
             'media_id' => MediaSeeder::id('brosur-resiprene-35.pdf'), 'is_published' => true, 'sort_order' => 0,
         ]);
         Brochure::create([
-            'title' => ['id' => 'Katalog Barang Karet & Komponen Industri', 'en' => 'Rubber Articles & Industrial Components Catalogue'],
+            'title' => ['id' => 'Brosur Produk Rubber Articles', 'en' => 'Rubber Articles Product Brochure'],
             'media_id' => MediaSeeder::id('katalog-barang-karet.pdf'), 'is_published' => true, 'sort_order' => 1,
         ]);
     }
 
+    /**
+     * Pelanggan Rubber Articles menurut profil perusahaan klien (COMPANY PROFILE PT IKN.pptx, slide "Our Costumer").
+     * Hanya nama (tanpa logo) sampai klien memberi berkas logo dan izin tampil. Nama contoh lama yang tidak ada di
+     * sumber klien dihapus.
+     */
+    public const CUSTOMERS = [
+        'PT Perkebunan Nusantara II',
+        'PT Perkebunan Nusantara III',
+        'PT Perkebunan Nusantara IV',
+        'PT Perkebunan Nusantara V',
+        'PT Socfin Indonesia',
+    ];
+
     private function logos(): void
     {
-        foreach (['PT Perkebunan Nusantara', 'PT Maritim Warna', 'Coating Solutions Co.'] as $i => $name) {
-            CustomerLogo::firstOrCreate(['name' => $name], ['is_active' => true, 'sort_order' => $i]);
+        CustomerLogo::whereIn('name', ['PT Perkebunan Nusantara', 'PT Maritim Warna', 'Coating Solutions Co.'])->whereNull('media_id')->delete();
+        $logos = [
+            'PT Perkebunan Nusantara II' => 'logo-ptpn2.png',
+            'PT Perkebunan Nusantara III' => 'logo-ptpn3.png',
+            'PT Perkebunan Nusantara IV' => 'logo-ptpn4.png',
+            'PT Perkebunan Nusantara V' => 'logo-ptpn5.png',
+            'PT Socfin Indonesia' => 'logo-socfin.png',
+        ];
+        foreach (self::CUSTOMERS as $i => $name) {
+            CustomerLogo::firstOrCreate(['name' => $name], ['is_active' => true, 'sort_order' => $i, 'media_id' => MediaSeeder::id($logos[$name] ?? '')]);
         }
     }
 

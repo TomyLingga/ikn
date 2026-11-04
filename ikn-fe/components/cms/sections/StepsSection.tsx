@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import Reveal from '@/components/Reveal';
 import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
@@ -23,7 +24,7 @@ export default function StepsSection({ section }: { section: PageSection }) {
       <div className="container">
         {(label || heading) && <SecHead label={label} heading={heading} />}
         {lead && <p className="lead sec-lead">{lead}</p>}
-        <ol className="proc-steps">
+        <ol className="proc-steps" style={{ '--steps': items.length } as CSSProperties}>
           {items.map((step, i) => {
             const body = tr(step.body, lang);
             return (

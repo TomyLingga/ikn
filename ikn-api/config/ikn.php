@@ -39,7 +39,7 @@ return [
         // Halaman bawaan yang dirujuk route FE: slug tidak boleh diubah/dihapus dari admin.
         // Halaman bawaan (punya rute statis di FE): sertifikat/pelanggan/reach/whistleblowing kini section di
         // keberlanjutan, unduhan section di bisnis (2026-09-29).
-        'protected_pages' => ['home', 'tentang', 'bisnis', 'media', 'berita', 'galeri', 'keberlanjutan', 'kontak'],
+        'protected_pages' => ['home', 'tentang', 'bisnis', 'kualitas', 'media', 'berita', 'galeri', 'keberlanjutan', 'kemitraan', 'kontak'],
     ],
 
     'media' => [

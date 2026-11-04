@@ -77,7 +77,17 @@ export interface ProductHighlightsContent {
   heading: I18n;
   link_label: I18n;
   link_url: string;
-  items: { image?: MediaSummary | null; code: string; name: string; kind: string; summary: I18n; url: string }[];
+  items: {
+    image?: MediaSummary | null;
+    code: string;
+    name: string;
+    kind: string;
+    summary: I18n;
+    /** Opsional: daftar singkat aplikasi utama dan karakteristik di kartu. */
+    applications?: I18nItem[];
+    features?: I18nItem[];
+    url: string;
+  }[];
 }
 
 export interface VideoGalleryContent {
@@ -115,7 +125,8 @@ export interface TimelineContent {
   label: I18n;
   heading: I18n;
   /** `name` (di atas pin) dan `products` opsional; konten lama hanya year/title/body. */
-  items: { year: string; name?: I18n; title: I18n; body: I18n; products?: I18n }[];
+  /** `media` opsional (gambar atau video singkat) tampil di atas kotak uraian. */
+  items: { year: string; name?: I18n; title: I18n; body: I18n; products?: I18n; media?: MediaSummary | null }[];
   /** Posisi awal geser: oldest (bawaan, mulai di kiri) atau newest (track digulir ke ujung kanan saat dimuat). Urutan tetap lama → baru. */
   start?: 'oldest' | 'newest';
 }
@@ -127,11 +138,17 @@ export interface VisionMissionContent {
   vision: I18n;
   mission_tag: I18n;
   missions: I18nItem[];
+  /** Frasa di dalam visi yang diberi garis lengkung (opsional). */
+  vision_highlight?: I18n;
+  /** Kalimat pendek di samping judul misi (opsional). */
+  mission_lead?: I18n;
 }
 
 export interface ValuesContent {
   label: I18n;
   heading: I18n;
+  /** Pengantar di samping judul (opsional). */
+  lead?: I18n;
   items: { title: I18n; body: I18n }[];
 }
 
@@ -211,6 +228,8 @@ export interface InfoBlocksContent extends SectionHeadContent {
 
 export interface CustomerLogosContent extends SectionHeadContent {
   lead: I18n;
+  /** grid (bawaan) atau marquee (kartu berjalan). */
+  layout?: '' | 'grid' | 'marquee';
 }
 
 export interface EmptyTextContent extends SectionHeadContent {
@@ -262,7 +281,42 @@ export interface SpecTableContent extends SectionHeadContent {
 
 export interface TeamContent extends SectionHeadContent {
   lead?: I18n;
-  items: { photo: MediaSummary | null; name: string; position: I18n; bio: I18n }[];
+  items: TeamMember[];
+}
+
+export interface TeamMember {
+  photo: MediaSummary | null;
+  name: string;
+  position: I18n;
+  bio: I18n;
+  /** Detail perorangan (modal): semuanya opsional. */
+  education?: I18n;
+  career?: I18nItem[];
+  appointment?: I18n;
+  quote_title?: I18n;
+  quote_body?: I18n;
+}
+
+export interface ProductShowcaseContent extends SectionHeadContent {
+  lead?: I18n;
+  items: {
+    key?: string;
+    image: MediaSummary | null;
+    code?: string;
+    name: string;
+    kind?: string;
+    summary: I18n;
+    points?: I18nItem[];
+    specs?: { label: I18n; value: I18n }[];
+    button_label?: I18n;
+    button_url?: string;
+  }[];
+}
+
+export interface CustomerMapContent extends SectionHeadContent {
+  lead?: I18n;
+  origin_label?: I18n;
+  items: { region: string; country: I18n; geo?: { lat: number | null; lng: number | null } | null; customers: string }[];
 }
 
 export interface TestimonialsContent extends SectionHeadContent {
@@ -271,6 +325,8 @@ export interface TestimonialsContent extends SectionHeadContent {
 
 export interface ImageGridContent extends SectionHeadContent {
   lead?: I18n;
+  link_label?: I18n;
+  link_url?: string;
   items: { image: MediaSummary | null; caption: I18n }[];
 }
 

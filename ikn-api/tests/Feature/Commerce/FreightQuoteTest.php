@@ -235,6 +235,8 @@ class FreightQuoteTest extends TestCase
     public function test_customer_accept_creates_usd_payment_recomputes_totals_and_moves_to_pending_payment(): void
     {
         Mail::fake();
+        // Order dibuat sebelum waktu terima (bukan jam sistem), agar urutan riwayat status tidak bergantung jam test.
+        Carbon::setTestNow(Carbon::parse('2026-11-04 10:00:00', config('app.timezone')));
         $product = $this->setUpCif();
         $order = $this->cifOrder($product);
         $admin = $this->adminWith(['orders']);

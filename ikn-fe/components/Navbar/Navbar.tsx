@@ -14,6 +14,7 @@ import { t } from '@/lib/i18n';
 import { isPrimaryMenuItem, tr, type MenuNode } from '@/lib/cms';
 import Icon from '@/components/Icon';
 import styles from './Navbar.module.css';
+import NavMeniscus from './NavMeniscus';
 import { isSiteFile, openFile } from '@/components/FileViewer';
 
 const pathOf = (href: string) => href.split('#')[0] || '/';
@@ -34,6 +35,7 @@ export default function Navbar() {
   const [openGroup, setOpenGroup] = useState<string | null>(null); // dropdown terbuka di mobile
   const [activeHash, setActiveHash] = useState('');
   const innerRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname() || '/';
   const { lang } = useLang();
   const { customer, admin } = useAuth();
@@ -233,7 +235,13 @@ export default function Navbar() {
         </Link>
 
         <nav id="main-navigation" className={styles.links} aria-label="Navigasi utama">
-          <div className={styles.menuGrid}>{items.map(renderItem)}</div>
+          {/* Pembungkus berposisi untuk garis lekuk + tetesan hover (NavMeniscus, layar lebar saja). */}
+          <div className={styles.menuWrap}>
+            <div ref={gridRef} className={styles.menuGrid}>
+              {items.map(renderItem)}
+            </div>
+            <NavMeniscus gridRef={gridRef} routeKey={pathname} />
+          </div>
 
           <div className={styles.actions}>
             <LangToggle />

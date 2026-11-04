@@ -87,6 +87,16 @@ class DashboardService
             'lowStock' => $this->lowStock(),
             'paymentDue' => $this->paymentDue($now),
             'exportKpis' => $this->exportKpis($monthStart, $now),
+            // Tambahan 2026-11-04 (additive): ringkasan hari ini, tren 30 hari (sparkline), sebaran status order
+            // bulan ini, kategori dan pelanggan teratas bulan ini. Uang IDR saja seperti kpis.
+            'today' => $this->today($todayStart, $now),
+            'trend30' => SalesBreakdowns::trend(
+                Order::revenue()->inCurrency(Money::CURRENCY_IDR)->whereBetween('paid_at', [$todayStart->copy()->subDays(29), $now]),
+                $todayStart->copy()->subDays(29), $now, 'day'
+            )['points'],
+            'statusBreakdown' => $this->statusBreakdown($monthStart, $now),
+            'topCustomers' => SalesBreakdowns::topCustomers($this->monthRevenue($monthStart, $now), 5),
+            'byCategory' => SalesBreakdowns::byCategory($this->monthRevenue($monthStart, $now)),
         ];
     }
 
@@ -98,6 +108,43 @@ class DashboardService
      *
      * @return array{currency: string, revenue: int, paidOrders: int, orders: int, awaitingFreight: int, pendingPayment: int}|null
      */
+    private function monthRevenue(Carbon $monthStart, Carbon $now)
+    {
+        return Order::revenue()->inCurrency(Money::CURRENCY_IDR)->whereBetween('paid_at', [$monthStart, $now]);
+    }
+
+    /** Hari ini vs kemarin pada jam yang sama: pendapatan & order dibayar (IDR), order dibuat (semua mata uang). */
+    private function today(Carbon $todayStart, Carbon $now): array
+    {
+        $paid = fn (Carbon $from, Carbon $to) => Order::revenue()->inCurrency(Money::CURRENCY_IDR)->whereBetween('paid_at', [$from, $to])
+            ->select(DB::raw('COUNT(*) AS orders'), DB::raw('COALESCE(SUM(grand_total), 0) AS total'))->toBase()->first();
+        $yesterdayStart = $todayStart->copy()->subDay();
+        $sameTimeYesterday = $now->copy()->subDay();
+        $cur = $paid($todayStart, $now);
+        $prev = $paid($yesterdayStart, $sameTimeYesterday);
+
+        return [
+            'revenue' => Money::toInt($cur->total),
+            'paidOrders' => (int) $cur->orders,
+            'ordersCreated' => Order::whereBetween('created_at', [$todayStart, $now])->count(),
+            'yesterdayRevenue' => Money::toInt($prev->total),
+            'yesterdayPaidOrders' => (int) $prev->orders,
+            'yesterdayOrdersCreated' => Order::whereBetween('created_at', [$yesterdayStart, $sameTimeYesterday])->count(),
+        ];
+    }
+
+    /** Jumlah order yang dibuat bulan ini per status saat ini (semua mata uang), urut alur status. */
+    private function statusBreakdown(Carbon $monthStart, Carbon $now): array
+    {
+        $counts = Order::whereBetween('created_at', [$monthStart, $now])
+            ->select('status', DB::raw('COUNT(*) AS n'))->groupBy('status')->pluck('n', 'status');
+
+        return collect(Order::STATUSES)
+            ->filter(fn ($status) => (int) ($counts[$status] ?? 0) > 0)
+            ->map(fn ($status) => ['status' => $status, 'count' => (int) $counts[$status]])
+            ->values()->all();
+    }
+
     private function exportKpis(Carbon $monthStart, Carbon $now): ?array
     {
         $usd = Money::CURRENCY_USD;

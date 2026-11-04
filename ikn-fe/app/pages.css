@@ -666,6 +666,7 @@
   .road-name { grid-column: 2; grid-row: 1; align-self: start; max-width: none; text-align: left; padding: 10px 0 6px; }
   .road-pin { grid-column: 1; grid-row: 1 / span 3; width: 62px; height: 62px; align-self: start; }
   .road-pin-year { font-size: 0.92rem; max-width: 56px; }
+  .road-pin-year:is([data-long]) { font-size: 0.6rem; line-height: 1.1; }
   .road-post { display: none; }
   .road-card { grid-column: 2; grid-row: 2; }
 }
@@ -1575,8 +1576,9 @@ a.cert-card-media { cursor: zoom-in; }
 .ph-slide img, .ph-slide video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ph-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 44px 20px 16px; color: #fff; font-size: 0.9rem; background: linear-gradient(transparent, rgba(10, 22, 40, 0.65)); }
 .ph-cover { position: relative; display: flex; align-items: flex-end; min-height: 62vh; border-bottom: 0; color: #fff; }
-.ph-cover .ph-grid { position: relative; z-index: 2; grid-template-columns: 1fr; }
-.ph-cover .ph-text { max-width: 720px; }
+/* Grid tidak diposisikan agar foto (.ph-stage absolute) memenuhi seluruh section, bukan hanya kontainer. */
+.ph-cover .ph-grid { grid-template-columns: 1fr; }
+.ph-cover .ph-text { position: relative; z-index: 2; max-width: 720px; }
 .ph-cover .ph-text .label, .ph-cover .ph-text .pagehead-title, .ph-cover .ph-text .lead { color: #fff; }
 .ph-cover .ph-text .lead { color: rgba(255, 255, 255, 0.85); }
 .ph-cover .ph-stage { position: absolute; inset: 0; z-index: 0; aspect-ratio: auto; border-radius: 0; box-shadow: none; }

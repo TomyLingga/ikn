@@ -8,7 +8,7 @@ import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import SecHead from './SecHead';
 import SmartLink from '../SmartLink';
-import { asList, asText, type ProductHighlightsContent } from '../utils';
+import { asList, asText, type I18nItem, type ProductHighlightsContent } from '../utils';
 
 // Kartu produk andalan. Kisi lentur: baris terakhir selalu penuh berapa pun jumlah kartunya (tanpa sel kosong).
 export default function ProductHighlightsSection({ section }: { section: PageSection }) {
@@ -18,6 +18,7 @@ export default function ProductHighlightsSection({ section }: { section: PageSec
   const linkLabel = tr(c.link_label, lang);
   const linkUrl = asText(c.link_url) || '/bisnis';
   const detailLabel = lang === 'en' ? 'View details' : 'Lihat detail';
+  const listTitles = lang === 'en' ? { applications: 'Main applications', features: 'Key characteristics' } : { applications: 'Aplikasi utama', features: 'Karakteristik utama' };
 
   return (
     <section className="section prod-section" id={section.key || undefined}>
@@ -53,6 +54,20 @@ export default function ProductHighlightsSection({ section }: { section: PageSec
                   <h3 className="prod-preview-name">{name}</h3>
                   {kind && <span className="prod-preview-kind">{kind}</span>}
                   <p className="prod-preview-sum">{tr(p.summary, lang)}</p>
+                  {(['applications', 'features'] as const).map((field) => {
+                    const points = asList<I18nItem>(p[field]).map((item) => tr(item.text, lang)).filter(Boolean);
+                    if (points.length === 0) return null;
+                    return (
+                      <div key={field} className={`prod-preview-list prod-preview-${field}`}>
+                        <h4 className="prod-preview-list-title">{listTitles[field]}</h4>
+                        <ul>
+                          {points.map((text, j) => (
+                            <li key={j}>{text}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })}
                   <SmartLink href={asText(p.url) || linkUrl} className="link prod-preview-link">
                     {detailLabel} <Icon name="arrow" />
                   </SmartLink>

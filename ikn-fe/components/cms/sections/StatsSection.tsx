@@ -9,6 +9,8 @@ import type { PageSection } from '@/lib/cms';
 import SecHead from './SecHead';
 import { asList, asText, type StatsContent } from '../utils';
 
+const YEAR = /^(1[89]|20)\d{2}$/;
+
 // Angka kunci ("datarow"): kolom mengikuti jumlah angka (maks. 4 per baris), diikuti garis pemisah.
 export default function StatsSection({ section }: { section: PageSection }) {
   const { lang } = useLang();
@@ -29,7 +31,8 @@ export default function StatsSection({ section }: { section: PageSection }) {
             {items.map((s, i) => (
               <Reveal key={i} className="datacell" delay={i * 70}>
                 <div className="datacell-num">
-                  <CountUp text={asText(s.value)} delay={i * 70} />
+                  {/* Tahun (mis. 1965) tampil apa adanya; menghitung naik dari 0 ke angka tahun terasa janggal. */}
+                  {YEAR.test(asText(s.value).trim()) ? asText(s.value).trim() : <CountUp text={asText(s.value)} delay={i * 70} />}
                   {asText(s.unit) && <span className="datacell-unit">{asText(s.unit)}</span>}
                 </div>
                 <p className="datacell-label">{tr(s.label, lang)}</p>

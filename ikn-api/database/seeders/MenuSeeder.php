@@ -19,7 +19,7 @@ class MenuSeeder extends Seeder
 
         $footer = Menu::firstOrCreate(['location' => Menu::LOCATION_FOOTER]);
         if ($footer->items()->count() === 0) {
-            $this->insert($footer, array_map(fn ($item) => array_diff_key($item, ['children' => 1]), $tree), null);
+            $this->insert($footer, self::footerTree(), null);
         }
     }
 
@@ -49,6 +49,27 @@ class MenuSeeder extends Seeder
     private static function c(string $id, string $en, string $url, string $descId, string $descEn): array
     {
         return ['label' => ['id' => $id, 'en' => $en], 'url' => $url, 'description' => ['id' => $descId, 'en' => $descEn]];
+    }
+
+    /**
+     * Menu footer = menu utama header tanpa anak, ditambah dua halaman yang tidak ada di navbar (Quality & Innovation,
+     * Partnership; susunan konten brief 2026-11-04, navbar sengaja tetap 6 menu).
+     */
+    public static function footerTree(): array
+    {
+        $top = array_map(fn ($item) => array_diff_key($item, ['children' => 1]), self::headerTree());
+        $byKey = array_column($top, null, 'key');
+
+        return [
+            $byKey['home'],
+            $byKey['tentang'],
+            $byKey['bisnis'],
+            self::i('kualitas', 'Kualitas & Inovasi', 'Quality & Innovation', '/kualitas'),
+            $byKey['keberlanjutan'],
+            $byKey['media'],
+            self::i('kemitraan', 'Kemitraan', 'Partnership', '/kemitraan'),
+            $byKey['kontak'],
+        ];
     }
 
     public static function headerTree(): array

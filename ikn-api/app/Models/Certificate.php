@@ -8,7 +8,15 @@ class Certificate extends Model
 {
     use HasTranslations;
 
-    protected $fillable = ['name', 'material', 'description', 'media_id', 'logo_media_id', 'is_published', 'sort_order'];
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_EXPIRED = 'expired';
+    public const STATUS_IN_PROGRESS = 'in_progress';
+    public const STATUSES = [self::STATUS_ACTIVE, self::STATUS_EXPIRED, self::STATUS_IN_PROGRESS];
+
+    protected $fillable = [
+        'name', 'material', 'description', 'number', 'issuer', 'accreditation', 'standard', 'status',
+        'media_id', 'logo_media_id', 'is_published', 'sort_order',
+    ];
 
     protected $translatable = ['name', 'material', 'description'];
 

@@ -165,6 +165,48 @@ export interface DashboardData {
   lowStock: { total: number; rule: { min: number; moqFactor: number }; items: DashboardLowStockItem[] };
   paymentDue: { overdue: number; dueSoon: number; windowHours: number; items: OrderSummary[] };
   exportKpis: DashboardExportKpis | null;
+  // Dashboard v3 (2026-11-04, additive).
+  today?: { revenue: number; paidOrders: number; ordersCreated: number; yesterdayRevenue: number; yesterdayPaidOrders: number; yesterdayOrdersCreated: number };
+  trend30?: TrendPoint[];
+  statusBreakdown?: { status: string; count: number }[];
+  topCustomers?: SalesTopCustomer[];
+  byCategory?: SalesByCategory[];
+}
+
+/** Satu titik deret waktu pendapatan (tanggal awal bucket hari/minggu/bulan). */
+export interface TrendPoint {
+  date: string;
+  total: number;
+  orders: number;
+}
+
+export interface SalesByCategory {
+  categoryId: number | null;
+  name: I18n;
+  qty: number;
+  orders: number;
+  revenue: number;
+}
+
+export interface SalesTopCustomer {
+  userId: number | null;
+  name: string;
+  company: string;
+  orders: number;
+  revenue: number;
+  lastPaidAt: string | null;
+}
+
+export interface SalesFunnel {
+  created: number;
+  paid: number;
+  open: number;
+  cancelled: number;
+  expired: number;
+  paidValue: number;
+  openValue: number;
+  lostValue: number;
+  conversionPct: number | null;
 }
 
 // ---- Laporan penjualan (GET /admin/reports/sales) ----
@@ -214,6 +256,16 @@ export interface SalesReport {
   byProduct: SalesReportProduct[];
   /** Order dibayar semua mata uang (maks 1000); tiap baris membawa `currency`. */
   orders: OrderSummary[];
+  // Rincian 2026-11-04 (additive, IDR).
+  comparison?: { from: string; to: string; orders: number; revenue: number; avgOrder: number; items: number; changePct: { orders: number | null; revenue: number | null; avgOrder: number | null; items: number | null } };
+  trend?: { granularity: 'day' | 'week' | 'month'; points: TrendPoint[] };
+  byCategory?: SalesByCategory[];
+  topCustomers?: SalesTopCustomer[];
+  /** `region` = provinsi; `__pickup` = ambil di pabrik, `__none` = tanpa alamat. */
+  byRegion?: { region: string; orders: number; revenue: number }[];
+  byPaymentMethod?: { method: string; orders: number; revenue: number }[];
+  byDeliveryTerm?: { term: string; orders: number; revenue: number }[];
+  funnel?: SalesFunnel;
 }
 
 // ---- Kurs JISDOR (GET/POST /admin/exchange-rates, kontrak 11.7, ASUMSI A-84) ----
@@ -640,6 +692,14 @@ export const paymentMethodTypeLabels: Record<PaymentMethodType, { id: string; en
   qris_dynamic: { id: 'QRIS dinamis (gateway)', en: 'Dynamic QRIS (gateway)' },
   virtual_account: { id: 'Virtual account (gateway)', en: 'Virtual account (gateway)' },
   ewallet: { id: 'E-wallet (gateway)', en: 'E-wallet (gateway)' },
+};
+
+/** Label cara serah terima untuk laporan (kode delivery_terms bawaan; kode lain tampil apa adanya). */
+export const deliveryTermReportLabels: Record<string, { id: string; en: string }> = {
+  loco: { id: 'Loco (ambil di pabrik)', en: 'Loco (plant pickup)' },
+  franco: { id: 'Franco (dikirim)', en: 'Franco (delivered)' },
+  fob: { id: 'FOB Belawan', en: 'FOB Belawan' },
+  cif: { id: 'CIF (pelabuhan tujuan)', en: 'CIF (destination port)' },
 };
 
 export const stockMovementLabels: Record<StockMovementType, StatusLabel> = {

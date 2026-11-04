@@ -26,10 +26,13 @@ export default async function Berita({ searchParams }: Props) {
   ]);
 
   return (
-    <SectionRenderer
-      sections={page.sections}
-      extra={{ ...extra, news, newsCategories: categories, activeCategory: category }}
-      page={{ slug: page.slug, title: page.title }}
-    />
+    <div className="site-v2 page-v2">
+      <SectionRenderer
+        sections={page.sections}
+        extra={{ ...extra, news, newsCategories: categories, activeCategory: category }}
+        page={{ slug: page.slug, title: page.title }}
+        blocks
+      />
+    </div>
   );
 }

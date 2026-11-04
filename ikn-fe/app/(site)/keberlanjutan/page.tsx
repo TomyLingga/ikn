@@ -17,5 +17,9 @@ export default async function Keberlanjutan() {
   if (!page) return <PageFallback />;
   const extra = await fetchSectionExtra(page.sections);
 
-  return <SectionRenderer sections={page.sections} extra={extra} page={{ slug: page.slug, title: page.title }} />;
+  return (
+    <div className="site-v2 page-v2">
+      <SectionRenderer sections={page.sections} extra={extra} page={{ slug: page.slug, title: page.title }} blocks />
+    </div>
+  );
 }

@@ -15,7 +15,7 @@ interface Props {
 }
 
 interface CertificatesContent extends EmptyTextContent {
-  layout?: 'list' | 'grid' | '';
+  layout?: 'list' | 'grid' | 'cards' | '';
 }
 
 function fileOf(cert: CertificateData, lang: 'id' | 'en') {
@@ -39,7 +39,8 @@ function Badge({ cert, index, lang, large = false }: { cert: CertificateData; in
   );
 }
 
-// Daftar sertifikat dari GET /content/certificates (lewat `extra`). Tata letak: baris (logo kiri) atau kartu lencana.
+// Daftar sertifikat dari GET /content/certificates (lewat `extra`). Tata letak: baris (logo kiri), kartu lencana, atau
+// kartu detail (2026-11-04, gaya new.inl.co.id: logo, lencana status, kategori, nama, uraian, nomor/penerbit/akreditasi/standar).
 // Berkas sertifikat (PDF) dibuka di penampil dalam situs. Section id = key (#sertifikat).
 export default function CertificatesSection({ section, items }: Props) {
   const { lang } = useLang();
@@ -57,6 +58,12 @@ export default function CertificatesSection({ section, items }: Props) {
         {(label || heading) && <SecHead label={label} heading={heading} />}
         {items.length === 0 ? (
           <p className="form-note">{emptyText}</p>
+        ) : c.layout === 'cards' ? (
+          <div className="certx-grid">
+            {items.map((cert, i) => (
+              <DetailCard key={cert.id} cert={cert} index={i} lang={lang} viewLabel={viewLabel} />
+            ))}
+          </div>
         ) : grid ? (
           <div className="cert-grid">
             {items.map((cert, i) => {
@@ -120,5 +127,61 @@ export default function CertificatesSection({ section, items }: Props) {
         )}
       </div>
     </section>
+  );
+}
+
+const STATUS_LABEL: Record<string, { id: string; en: string }> = {
+  active: { id: 'Aktif', en: 'Active' },
+  expired: { id: 'Kedaluwarsa', en: 'Expired' },
+  in_progress: { id: 'Dalam proses', en: 'In progress' },
+};
+
+function DetailCard({ cert, index, lang, viewLabel }: { cert: CertificateData; index: number; lang: 'id' | 'en'; viewLabel: string }) {
+  const file = fileOf(cert, lang);
+  const status = cert.status ?? 'active';
+  const rows: [string, string][] = (
+    [
+      [lang === 'en' ? 'Number' : 'Nomor', cert.number],
+      [lang === 'en' ? 'Issuer' : 'Penerbit', cert.issuer],
+      [lang === 'en' ? 'Accreditation' : 'Akreditasi', cert.accreditation],
+      [lang === 'en' ? 'Standard' : 'Standar', cert.standard],
+    ] as [string, string | null | undefined][]
+  ).filter((row): row is [string, string] => !!row[1]);
+
+  return (
+    <Reveal as="article" className="certx-card" delay={Math.min(index, 7) * 60}>
+      <div className="certx-top">
+        <span className="certx-logo">
+          {cert.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={cert.logo.url} alt={tr(cert.name, lang)} loading="lazy" />
+          ) : (
+            <Icon name="shieldCheck" size={26} />
+          )}
+        </span>
+        <span className={`certx-status is-${status}`}>
+          <Icon name={status === 'active' ? 'checkCircle' : 'clock'} size={13} />
+          {(STATUS_LABEL[status] ?? STATUS_LABEL.active!)[lang]}
+        </span>
+      </div>
+      {tr(cert.material, lang) && <span className="certx-cat">{tr(cert.material, lang)}</span>}
+      <h3 className="certx-name">{tr(cert.name, lang)}</h3>
+      {tr(cert.description, lang) && <p className="certx-desc">{tr(cert.description, lang)}</p>}
+      {rows.length > 0 && (
+        <dl className="certx-rows">
+          {rows.map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {file && (
+        <FileLink file={file} className="certx-view">
+          <Icon name="eye" size={15} /> {viewLabel}
+        </FileLink>
+      )}
+    </Reveal>
   );
 }

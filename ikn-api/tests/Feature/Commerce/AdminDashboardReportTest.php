@@ -228,6 +228,43 @@ class AdminDashboardReportTest extends TestCase
         $this->actingAs($this->adminWith(['orders']))->getJson('/api/v1/admin/reports/sales')->assertStatus(403);
     }
 
+    public function test_report_and_dashboard_breakdowns_comparison_and_funnel(): void
+    {
+        $this->setUpCommerce();
+        $orders = $this->seedScenario();
+        $admin = $this->adminWith(['reports', 'dashboard']);
+        $year = (int) now()->year;
+        $month = (int) now()->month;
+
+        $data = $this->actingAs($admin)->getJson("/api/v1/admin/reports/sales?year={$year}&month={$month}")->assertOk()->json('data');
+        // Pembanding = bulan lalu (order completed 10 unit).
+        $this->assertSame(1, $data['comparison']['orders']);
+        $this->assertSame($orders['completed']->grandTotalInt(), $data['comparison']['revenue']);
+        $this->assertSame(10, $data['comparison']['items']);
+        $this->assertSame(-50.0, (float) $data['comparison']['changePct']['items']);
+        // Tren harian sepanjang bulan; semua pendapatan masuk satu hari.
+        $this->assertSame('day', $data['trend']['granularity']);
+        $this->assertCount(now()->daysInMonth, $data['trend']['points']);
+        $this->assertSame($orders['paid']->grandTotalInt(), array_sum(array_column($data['trend']['points'], 'total')));
+        $this->assertSame(500000, $data['byCategory'][0]['revenue']);
+        $this->assertCount(1, $data['topCustomers']);
+        $this->assertSame(1, $data['topCustomers'][0]['orders']);
+        $this->assertSame('manual_transfer', $data['byPaymentMethod'][0]['method']);
+        $this->assertSame(1, array_sum(array_column($data['byDeliveryTerm'], 'orders')));
+        $this->assertSame(1, array_sum(array_column($data['byRegion'], 'orders')));
+        // Kohort order dibuat bulan ini: paid, expired, cancelled, pending (menunggu verifikasi).
+        $this->assertSame(['created' => 4, 'paid' => 1, 'open' => 1, 'cancelled' => 1, 'expired' => 1], array_intersect_key($data['funnel'], array_flip(['created', 'paid', 'open', 'cancelled', 'expired'])));
+        $this->assertSame($orders['expired']->grandTotalInt() + $orders['cancelled']->grandTotalInt(), $data['funnel']['lostValue']);
+        $this->assertSame(25.0, (float) $data['funnel']['conversionPct']);
+
+        $dash = $this->actingAs($admin)->getJson('/api/v1/admin/dashboard')->assertOk()->json('data');
+        $this->assertCount(30, $dash['trend30']);
+        $this->assertSame(1, $dash['today']['ordersCreated']);
+        $this->assertSame(['payment_review' => 1, 'paid' => 1, 'cancelled' => 1, 'expired' => 1], array_column($dash['statusBreakdown'], 'count', 'status'));
+        $this->assertSame(500000, $dash['byCategory'][0]['revenue']);
+        $this->assertCount(1, $dash['topCustomers']);
+    }
+
     /** Order USD FOB dibayar (bukti oleh eksportir, diterima admin). */
     private function payUsdOrder(Order $order, User $admin): Order
     {

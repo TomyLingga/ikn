@@ -25,10 +25,10 @@ export default async function Bisnis() {
   const after = cut === -1 ? [] : page.sections.slice(cut);
 
   return (
-    <>
-      <SectionRenderer sections={before} extra={extra} page={meta} />
+    <div className="site-v2 page-v2">
+      <SectionRenderer sections={before} extra={extra} page={meta} blocks />
       <BusinessProducts products={products.items} />
-      <SectionRenderer sections={after} extra={extra} page={meta} />
-    </>
+      <SectionRenderer sections={after} extra={extra} page={meta} blocks />
+    </div>
   );
 }

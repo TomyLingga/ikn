@@ -922,6 +922,11 @@ components:
               name: { $ref: '#/components/schemas/I18n' }
               material: { $ref: '#/components/schemas/I18n' }
               description: { $ref: '#/components/schemas/I18n' }
+              number: { type: string, nullable: true, maxLength: 120 }
+              issuer: { type: string, nullable: true, maxLength: 160 }
+              accreditation: { type: string, nullable: true, maxLength: 120 }
+              standard: { type: string, nullable: true, maxLength: 120 }
+              status: { type: string, enum: [active, expired, in_progress], description: 'bawaan active' }
               mediaId: { type: integer, nullable: true, description: 'berkas sertifikat; hanya media PDF (422 bila bukan PDF)' }
               logoMediaId: { type: integer, nullable: true, description: 'logo/lencana sertifikat; hanya media gambar (422 bila bukan gambar)' }
               isPublished: { type: boolean }
@@ -1318,6 +1323,11 @@ components:
         name: { $ref: '#/components/schemas/I18n' }
         material: { $ref: '#/components/schemas/I18n' }
         description: { $ref: '#/components/schemas/I18n' }
+        number: { type: string, nullable: true }
+        issuer: { type: string, nullable: true }
+        accreditation: { type: string, nullable: true }
+        standard: { type: string, nullable: true }
+        status: { type: string, enum: [active, expired, in_progress] }
         file: { $ref: '#/components/schemas/MediaSummary' }
         logo: { $ref: '#/components/schemas/MediaSummary' }
         isPublished: { type: boolean }

@@ -265,11 +265,19 @@ export interface GalleryItemData {
   updatedAt?: string | null;
 }
 
+export type CertificateStatus = 'active' | 'expired' | 'in_progress';
+
 export interface CertificateData {
   id: number;
   name: I18n;
+  /** Kategori/jenis sertifikat. */
   material: I18n;
   description: I18n;
+  number?: string | null;
+  issuer?: string | null;
+  accreditation?: string | null;
+  standard?: string | null;
+  status?: CertificateStatus;
   file: MediaSummary | null;
   /** Logo/lencana sertifikat (gambar), opsional. */
   logo?: MediaSummary | null;

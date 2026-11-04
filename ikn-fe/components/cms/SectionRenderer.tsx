@@ -50,6 +50,8 @@ import SpecTableSection from './sections/SpecTableSection';
 import TeamSection from './sections/TeamSection';
 import TestimonialsSection from './sections/TestimonialsSection';
 import ImageGridSection from './sections/ImageGridSection';
+import ProductShowcaseSection from './sections/ProductShowcaseSection';
+import CustomerMapSection from './sections/CustomerMapSection';
 
 // Lists for the data-backed sections, fetched by the RSC page (lib/section-data.ts) and handed down here.
 export interface SectionExtra {
@@ -72,6 +74,9 @@ interface SectionRendererProps {
   sections: PageSection[];
   extra?: SectionExtra;
   page?: PageMeta | null;
+  /** true = tiap blok dibungkus <div class="sec-block" data-section-key data-section-type> agar halaman
+   *  (mis. beranda) bisa menata blok per kunci/tipe dari CSS-nya sendiri. Bawaan false: markup tidak berubah. */
+  blocks?: boolean;
 }
 
 // Section types that share one two-column "contact-grid" block when adjacent (contact_info punya blok sendiri).
@@ -143,6 +148,10 @@ function renderSection(section: PageSection, extra: SectionExtra, page: PageMeta
       return <SpecTableSection section={section} />;
     case 'team':
       return <TeamSection section={section} />;
+    case 'product_showcase':
+      return <ProductShowcaseSection section={section} />;
+    case 'customer_map':
+      return <CustomerMapSection section={section} />;
     case 'testimonials':
       return <TestimonialsSection section={section} />;
     case 'image_grid':
@@ -173,7 +182,7 @@ function renderSection(section: PageSection, extra: SectionExtra, page: PageMeta
 // hand-written pages they replace.
 // "Tampilan blok" per section (field `surface`): polos (bawaan), kartu timbul, atau pita berwarna selebar layar.
 // Tipe selebar layar / berlatar sendiri tidak dibungkus (sama dengan SectionDefinitions::NO_SURFACE di API).
-const NO_SURFACE = new Set(['page_header', 'hero', 'marquee', 'cta', 'contact_info']);
+const NO_SURFACE = new Set(['page_header', 'hero', 'marquee', 'cta', 'contact_info', 'product_showcase']);
 
 function withSurface(section: PageSection, node: ReactNode): ReactNode {
   const surface = (section.content as { surface?: unknown } | null)?.surface;
@@ -185,7 +194,15 @@ function withSurface(section: PageSection, node: ReactNode): ReactNode {
   );
 }
 
-export default function SectionRenderer({ sections, extra = {}, page = null }: SectionRendererProps) {
+function block(section: PageSection, node: ReactNode): ReactNode {
+  return (
+    <div className="sec-block" data-section-key={section.key || undefined} data-section-type={section.type}>
+      {node}
+    </div>
+  );
+}
+
+export default function SectionRenderer({ sections, extra = {}, page = null, blocks = false }: SectionRendererProps) {
   const visible = sections
     .filter((s) => s.isVisible !== false)
     .slice()
@@ -227,7 +244,7 @@ export default function SectionRenderer({ sections, extra = {}, page = null }: S
     }
 
     const node = renderSection(section, extra, page);
-    if (node) nodes.push(<Fragment key={section.id}>{withSurface(section, node)}</Fragment>);
+    if (node) nodes.push(<Fragment key={section.id}>{blocks ? block(section, withSurface(section, node)) : withSurface(section, node)}</Fragment>);
   }
 
   return <>{nodes}</>;

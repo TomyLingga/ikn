@@ -4318,3 +4318,109 @@ div.media-thumb {
   .admin-app .rp-stat-main strong { font-size: 1.7rem; }
 }
 @media (prefers-reduced-motion: reduce) { .admin-app .rp-break { animation: none; } }
+
+/* =====================================================================
+   Grafik laporan (components/admin/ReportCharts, 2026-11-04): sparkline, donat, daftar batang, tren interaktif.
+   ===================================================================== */
+.admin-app .ach-spark { display: block; width: 100%; height: 100%; overflow: visible; }
+.admin-app .ach-empty { margin: 0; padding: 22px 0; font-size: 0.88rem; color: var(--ink-soft); text-align: center; }
+
+/* Donat + legenda berdampingan bila muat (masing-masing >= 200px), selain itu bertumpuk. */
+.admin-app .ach-donut { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px 22px; align-items: center; }
+.admin-app .ach-donut-ring { position: relative; aspect-ratio: 1; width: 100%; max-width: 200px; justify-self: center; }
+.admin-app .ach-donut-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.admin-app .ach-donut-track { fill: none; stroke: color-mix(in srgb, var(--ink) 7%, transparent); stroke-width: 12; }
+.admin-app .ach-donut-seg { fill: none; stroke-width: 12; stroke-linecap: butt; cursor: pointer; transition: opacity 0.2s var(--ease), stroke-width 0.2s var(--ease); }
+.admin-app .ach-donut-seg:hover { stroke-width: 14; }
+.admin-app .ach-donut-seg.is-dim { opacity: 0.28; }
+.admin-app .ach-donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22%; text-align: center; pointer-events: none; }
+.admin-app .ach-donut-center strong { font-size: clamp(1.05rem, 1.6vw, 1.35rem); font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.15; }
+.admin-app .ach-donut-center span { margin-top: 2px; font-size: 0.72rem; color: var(--ink-soft); line-height: 1.25; }
+.admin-app .ach-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-width: 0; }
+.admin-app .ach-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; transition: background 0.15s var(--ease); }
+.admin-app .ach-legend li.is-active,
+.admin-app .ach-legend li:hover { background: var(--adm-hover); }
+.admin-app .ach-dot { width: 10px; height: 10px; border-radius: 3px; }
+.admin-app .ach-legend-label { min-width: 0; font-size: 0.86rem; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.admin-app .ach-legend-label small,
+.admin-app .ach-legend-value small { display: block; font-size: 0.72rem; font-weight: 500; color: var(--ink-soft); }
+.admin-app .ach-legend-value { text-align: right; font-size: 0.86rem; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+@media (max-width: 520px) {
+  .admin-app .ach-donut { grid-template-columns: minmax(0, 1fr); }
+  .admin-app .ach-donut-ring { max-width: 200px; justify-self: center; width: 100%; }
+}
+
+.admin-app .ach-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.admin-app .ach-bars-top,
+.admin-app .ach-bars-sub { display: flex; justify-content: space-between; gap: 12px; }
+.admin-app .ach-bars-label { min-width: 0; font-size: 0.88rem; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.admin-app .ach-bars-value { font-size: 0.88rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+.admin-app .ach-bars-track { height: 8px; margin: 6px 0 4px; border-radius: 99px; background: color-mix(in srgb, var(--ink) 7%, transparent); overflow: hidden; }
+.admin-app .ach-bars-track span { display: block; height: 100%; border-radius: inherit; transform-origin: left; animation: achGrow 0.7s var(--ease) backwards; animation-delay: calc(var(--i, 0) * 60ms); }
+@keyframes achGrow { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .admin-app .ach-bars-track span { animation: none; } }
+.admin-app .ach-bars-sub { font-size: 0.74rem; color: var(--ink-soft); }
+
+.admin-app .ach-trend { position: relative; }
+.admin-app .ach-trend svg { display: block; width: 100%; height: auto; overflow: visible; outline: none; border-radius: 8px; }
+.admin-app .ach-trend svg:focus-visible { box-shadow: var(--adm-ring); }
+.admin-app .ach-grid { stroke: color-mix(in srgb, var(--ink) 8%, transparent); stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
+.admin-app .ach-axis { font-size: 11px; fill: var(--ink-soft); font-family: var(--font-sans); }
+.admin-app .ach-cross { stroke: color-mix(in srgb, var(--adm-primary) 55%, transparent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.admin-app .ach-hover-dot { fill: var(--surface); stroke: var(--adm-primary); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.admin-app .ach-best { fill: var(--adm-primary); stroke: var(--surface); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.admin-app .ach-tip {
+  position: absolute;
+  top: 6px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 150px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--adm-shadow-md, var(--shadow-md));
+  transform: translateX(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.admin-app .ach-tip span { font-size: 0.74rem; color: var(--ink-soft); }
+.admin-app .ach-tip strong { font-size: 0.98rem; font-variant-numeric: tabular-nums; color: var(--ink); }
+.admin-app .ach-tip small { font-size: 0.74rem; color: var(--adm-primary); font-weight: 600; }
+
+/* ---- Laporan penjualan v3: delta, tren, konversi, kisi rincian ---- */
+.admin-app .rp-delta { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 0.74rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.admin-app .rp-delta.is-up { color: var(--ok); background: var(--ok-tint); }
+.admin-app .rp-delta.is-down { color: var(--red); background: var(--red-tint); }
+.admin-app .rp-delta.is-flat { color: var(--ink-soft); background: var(--adm-hover); }
+.admin-app .rp-stat-main .rp-delta.is-up { color: #fff; background: rgba(255, 255, 255, 0.2); }
+.admin-app .rp-stat-main .rp-delta.is-down { color: #fff; background: rgba(208, 96, 94, 0.55); }
+.admin-app .rp-compare { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 6px; font-size: 0.76rem; }
+.admin-app .rp-compare .rp-delta { flex: none; width: auto; max-width: max-content; }
+.admin-app .rp-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 22px; }
+.admin-app .rp-grid-2 > * { min-width: 0; }
+.admin-app .rp-trend-head { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.admin-app .rp-trend-fact { display: flex; flex-direction: column; min-width: 130px; padding: 10px 14px; border-radius: 10px; background: var(--adm-tint, var(--paper)); }
+.admin-app .rp-trend-fact small { font-size: 0.72rem; color: var(--ink-soft); }
+.admin-app .rp-trend-fact b { font-size: 0.98rem; font-variant-numeric: tabular-nums; color: var(--ink); }
+.admin-app .rp-funnel { display: grid; gap: 16px; }
+.admin-app .rp-funnel-bar { display: flex; height: 16px; border-radius: 99px; overflow: hidden; background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.admin-app .rp-funnel-bar span { height: 100%; }
+.admin-app .rp-funnel-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.admin-app .rp-funnel-stat { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.admin-app .rp-funnel-stat small { display: flex; align-items: center; gap: 6px; font-size: 0.74rem; color: var(--ink-soft); }
+.admin-app .rp-funnel-stat b { font-size: 1.15rem; font-variant-numeric: tabular-nums; color: var(--ink); }
+.admin-app .rp-funnel-stat em { font-style: normal; font-size: 0.74rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.admin-app .rp-funnel-note { margin: 0; font-size: 0.82rem; color: var(--ink-soft); }
+.admin-app .rp-funnel-note strong { color: var(--ink); }
+.admin-app .rp-share { display: inline-flex; align-items: center; gap: 8px; min-width: 90px; }
+.admin-app .rp-share-track { flex: 1; height: 6px; border-radius: 99px; background: color-mix(in srgb, var(--ink) 7%, transparent); overflow: hidden; }
+.admin-app .rp-share-track span { display: block; height: 100%; border-radius: inherit; background: var(--adm-primary); }
+@media (max-width: 1100px) {
+  .admin-app .rp-grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .admin-app .rp-funnel-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

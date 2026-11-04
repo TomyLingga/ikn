@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Reveal from '@/components/Reveal';
+import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import Lightbox, { type LightboxPhoto } from '../Lightbox';
 import SecHead from './SecHead';
-import { asList, type ImageGridContent } from '../utils';
+import SmartLink from '../SmartLink';
+import { asList, asText, type ImageGridContent } from '../utils';
 
 // Kisi foto pilihan (bukan dari menu Galeri): baris lentur tanpa sel kosong, klik membuka pembesar.
 export default function ImageGridSection({ section }: { section: PageSection }) {
@@ -22,11 +24,19 @@ export default function ImageGridSection({ section }: { section: PageSection }) 
   const label = tr(c.label, lang);
   const heading = tr(c.heading, lang);
   const lead = tr(c.lead, lang);
+  const linkLabel = tr(c.link_label, lang);
+  const linkUrl = asText(c.link_url);
+  const link =
+    linkLabel && linkUrl ? (
+      <SmartLink href={linkUrl} className="link">
+        {linkLabel} <Icon name="arrow" />
+      </SmartLink>
+    ) : undefined;
 
   return (
     <section className="section-tight" id={section.key || undefined}>
       <div className="container">
-        {(label || heading) && <SecHead label={label} heading={heading} />}
+        {(label || heading) && <SecHead label={label} heading={heading} aside={link} />}
         {lead && <p className="lead sec-lead">{lead}</p>}
         {/* data-count: tinggi baris menyesuaikan jumlah foto (1, 2, atau banyak). */}
         <div className="photo-grid" data-count={Math.min(photos.length, 3)}>

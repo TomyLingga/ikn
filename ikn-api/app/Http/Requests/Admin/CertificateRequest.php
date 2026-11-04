@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Support\I18n;
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Certificate;
 use Illuminate\Validation\Rule;
 
 class CertificateRequest extends FormRequest
@@ -19,6 +20,11 @@ class CertificateRequest extends FormRequest
             // Berkas sertifikat: hanya PDF. Logo: hanya gambar.
             'mediaId' => ['nullable', 'integer', Rule::exists('media', 'id')->where('mime', 'application/pdf')],
             'logoMediaId' => ['nullable', 'integer', Rule::exists('media', 'id')->where(fn ($q) => $q->where('mime', 'like', 'image/%'))],
+            'number' => ['nullable', 'string', 'max:120'],
+            'issuer' => ['nullable', 'string', 'max:160'],
+            'accreditation' => ['nullable', 'string', 'max:120'],
+            'standard' => ['nullable', 'string', 'max:120'],
+            'status' => ['nullable', 'string', Rule::in(Certificate::STATUSES)],
             'isPublished' => ['nullable', 'boolean'],
             'sortOrder' => ['nullable', 'integer', 'min:0'],
         ], I18n::rules('name', true, 200), I18n::rules('material', false, 200), I18n::rules('description', false, 2000));

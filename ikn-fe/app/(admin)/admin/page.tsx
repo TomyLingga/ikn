@@ -7,6 +7,7 @@ import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
 import StatusBadge from '@/components/StatusBadge';
 import AdminSalesChart from '@/components/admin/AdminSalesChart';
+import { CHART_COLORS, DonutChart, Sparkline, TrendChart, deltaText } from '@/components/admin/ReportCharts';
 import { AdminPageHead, DataTable, type Column } from '@/components/admin/AdminPage';
 import { useLang } from '@/components/LanguageProvider';
 import { orderLabel, orderVariant, paymentLabel } from '@/lib/commerce';
@@ -25,7 +26,8 @@ type T = (id: string, en: string) => string;
 
 // Dashboard admin: GET /admin/dashboard?year. Urutan: KPI (bulan berjalan vs rentang sama bulan lalu) → antrean kerja
 // (hanya modul yang dimiliki admin) → grafik 12 bulan → daftar dua kolom (tindakan, jatuh tempo, terlaris, stok) →
-// order terbaru.
+// order terbaru. Tambahan 2026-11-04: ringkasan hari ini, sparkline 30 hari di kartu KPI, tren 30 hari + sebaran
+// status order, serta kategori & pelanggan teratas bulan ini.
 export default function AdminDashboard() {
   const { lang } = useLang();
   const t: T = (id, en) => (lang === 'en' ? en : id);
@@ -74,6 +76,9 @@ export default function AdminDashboard() {
   }
 
   const { kpis, period, workQueue, needsAction, recentOrders, salesChart, topProducts, lowStock, paymentDue, exportKpis } = data;
+  const trend30 = data.trend30 ?? [];
+  const today = data.today;
+  const shortIDR = (n: number) => shortMoney(n, lang);
   const range = (from: string, to: string) => {
     const a = formatDate(from, lang);
     const b = formatDate(to, lang);
@@ -82,9 +87,9 @@ export default function AdminDashboard() {
   const periodText = range(period.from, period.to);
   const previousText = range(period.previousFrom, period.previousTo);
 
-  const kpiCards: Array<{ key: string; label: string; icon: IconName; metric: DashboardMetric; money?: boolean; href: string }> = [
-    { key: 'revenue', label: t('Pendapatan', 'Revenue'), icon: 'trendUp', metric: kpis.revenue, money: true, href: '/admin/reports/sales' },
-    { key: 'orders', label: t('Order dibayar', 'Paid orders'), icon: 'orders', metric: kpis.paidOrders, href: '/admin/reports/sales' },
+  const kpiCards: Array<{ key: string; label: string; icon: IconName; metric: DashboardMetric; money?: boolean; href: string; spark?: number[] }> = [
+    { key: 'revenue', label: t('Pendapatan', 'Revenue'), icon: 'trendUp', metric: kpis.revenue, money: true, href: '/admin/reports/sales', spark: trend30.map((p) => p.total) },
+    { key: 'orders', label: t('Order dibayar', 'Paid orders'), icon: 'orders', metric: kpis.paidOrders, href: '/admin/reports/sales', spark: trend30.map((p) => p.orders) },
     { key: 'aov', label: t('Rata-rata nilai order', 'Average order value'), icon: 'wallet', metric: kpis.avgOrderValue, money: true, href: '/admin/reports/sales' },
     { key: 'customers', label: t('Customer baru', 'New customers'), icon: 'users', metric: kpis.newCustomers, href: '/admin/customers' },
   ];
@@ -149,6 +154,8 @@ export default function AdminDashboard() {
 
       {error && <p className="form-error">{error}</p>}
 
+      {today && <TodayStrip today={today} t={t} />}
+
       {/* KPI: bulan berjalan s.d. hari ini vs rentang yang sama bulan lalu */}
       <section className={styles.kpis} aria-label={t('Kinerja bulan ini', 'This month performance')}>
         {kpiCards.map((card, i) => (
@@ -157,6 +164,11 @@ export default function AdminDashboard() {
               <Icon name={card.icon} size={18} strokeWidth={1.8} /> {card.label}
             </span>
             <strong className={styles.kpiValue}><CountUp value={card.metric.current} format={card.money ? formatIDR : undefined} /></strong>
+            {card.spark && card.spark.some((v) => v > 0) && (
+              <span className={styles.kpiSpark}>
+                <Sparkline values={card.spark} label={t('Tren 30 hari terakhir', 'Last 30 days trend')} />
+              </span>
+            )}
             <span className={styles.kpiCompare}>
               <Delta metric={card.metric} t={t} lang={lang} />
               <span className={styles.kpiPrev}>
@@ -180,7 +192,84 @@ export default function AdminDashboard() {
 
       <WorkQueue queue={workQueue} t={t} />
 
+      <div className={styles.insights}>
+        <Panel
+          eyebrow={t('30 hari terakhir', 'Last 30 days')}
+          title={t('Tren pendapatan harian', 'Daily revenue trend')}
+          href="/admin/reports/sales"
+          linkLabel={t('Laporan', 'Report')}
+          meta={<TrendSummary points={trend30} t={t} />}
+        >
+          {trend30.some((p) => p.total > 0) ? (
+            <TrendChart points={trend30} granularity="day" formatMoney={formatIDR} formatShortMoney={shortIDR} lang={lang} height={230} />
+          ) : (
+            <EmptyState icon="trendUp" text={t('Belum ada order dibayar dalam 30 hari terakhir.', 'No paid orders in the last 30 days.')} />
+          )}
+        </Panel>
+        <Panel eyebrow={t('Bulan ini', 'This month')} title={t('Status order', 'Order status')} href="/admin/orders?status=all" linkLabel={t('Order', 'Orders')}>
+          <DonutChart
+            segments={(data.statusBreakdown ?? []).map((row) => ({
+              key: row.status,
+              label: orderLabel(row.status)[lang],
+              value: row.count,
+              color: STATUS_COLORS[row.status] ?? CHART_COLORS[6],
+            }))}
+            format={(n) => String(n)}
+            centerLabel={t('order dibuat', 'orders created')}
+            empty={t('Belum ada order bulan ini.', 'No orders this month yet.')}
+          />
+        </Panel>
+      </div>
+
       <AdminSalesChart data={salesChart} year={year} onYearChange={setYear} loading={loading} />
+
+      <div className={styles.insightsEven}>
+        <Panel eyebrow={t('Bulan ini', 'This month')} title={t('Penjualan per kategori', 'Sales by category')} href="/admin/reports/sales" linkLabel={t('Laporan', 'Report')}>
+          <DonutChart
+            segments={(data.byCategory ?? []).map((row, i) => ({
+              key: String(row.categoryId ?? 'none'),
+              label: tr(row.name, lang),
+              value: row.revenue,
+              color: CHART_COLORS[i % CHART_COLORS.length],
+              hint: `${row.qty.toLocaleString(lang === 'en' ? 'en-GB' : 'id-ID')} unit · ${row.orders} order`,
+            }))}
+            format={formatIDR}
+            centerValue={shortIDR((data.byCategory ?? []).reduce((sum, row) => sum + row.revenue, 0))}
+            centerLabel={t('pendapatan', 'revenue')}
+            empty={t('Belum ada penjualan dibayar bulan ini.', 'No paid sales this month yet.')}
+          />
+        </Panel>
+        <Panel eyebrow={t('Bulan ini', 'This month')} title={t('Pelanggan teratas', 'Top customers')} href="/admin/customers" linkLabel={t('Customer', 'Customers')}>
+          {(data.topCustomers ?? []).length === 0 ? (
+            <EmptyState icon="users" text={t('Belum ada pelanggan yang membayar bulan ini.', 'No paying customers this month yet.')} />
+          ) : (
+            <ol className={styles.rank}>
+              {(data.topCustomers ?? []).map((c, index, all) => {
+                const best = all[0]?.revenue ?? 0;
+                return (
+                  <li key={`${c.userId}-${index}`} className={styles.rankItem}>
+                    <span className={styles.rankNo}>{index + 1}</span>
+                    <span className={styles.rankBody}>
+                      <span className={styles.rankTop}>
+                        <strong>{c.company || c.name || '—'}</strong>
+                        <span className={styles.amount}>{formatIDR(c.revenue)}</span>
+                      </span>
+                      <span className={styles.bar} aria-hidden="true">
+                        <span style={{ width: `${Math.max(best > 0 ? (c.revenue / best) * 100 : 0, 3)}%` }} />
+                      </span>
+                      <small>
+                        {c.name && c.company ? `${c.name} · ` : ''}
+                        {c.orders} {t('order', c.orders === 1 ? 'order' : 'orders')}
+                        {c.lastPaidAt ? ` · ${t('terakhir', 'last')} ${formatDate(c.lastPaidAt, lang)}` : ''}
+                      </small>
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </Panel>
+      </div>
 
       <div className={styles.columns}>
         <div className={styles.column}>
@@ -381,6 +470,81 @@ export default function AdminDashboard() {
 }
 
 // ---- Bagian kecil ----
+
+// Warna per status (nuansa berbeda untuk status bertona sama agar irisan donat bisa dibedakan).
+const STATUS_COLORS: Record<string, string> = {
+  awaiting_freight: '#b97a12',
+  pending_payment: '#e0a23b',
+  payment_review: '#f1c776',
+  paid: '#2e9e8f',
+  processing: '#42a5d5',
+  shipped: '#1769aa',
+  delivered: '#6cc3b4',
+  completed: '#1f6f63',
+  cancelled: '#d0605e',
+  expired: '#8a98ab',
+};
+
+/** Rupiah ringkas untuk sumbu & pusat donat: 1,2 jt / 3,4 M. */
+function shortMoney(n: number, lang: Lang): string {
+  const abs = Math.abs(n);
+  const fmt = (v: number) => v.toLocaleString(lang === 'en' ? 'en-GB' : 'id-ID', { maximumFractionDigits: 1 });
+  if (abs >= 1e9) return `${fmt(n / 1e9)} ${lang === 'en' ? 'bn' : 'M'}`;
+  if (abs >= 1e6) return `${fmt(n / 1e6)} ${lang === 'en' ? 'm' : 'jt'}`;
+  if (abs >= 1e3) return `${fmt(n / 1e3)} rb`;
+  return String(n);
+}
+
+/** Hari ini s.d. sekarang vs kemarin pada jam yang sama. */
+function TodayStrip({ today, t }: { today: NonNullable<DashboardData['today']>; t: T }) {
+  const items: Array<{ key: string; icon: IconName; label: string; value: string; prev: number; cur: number; prevText: string }> = [
+    { key: 'rev', icon: 'wallet', label: t('Pendapatan hari ini', 'Revenue today'), value: formatIDR(today.revenue), cur: today.revenue, prev: today.yesterdayRevenue, prevText: formatIDR(today.yesterdayRevenue) },
+    { key: 'paid', icon: 'paymentCheck', label: t('Order dibayar hari ini', 'Paid orders today'), value: String(today.paidOrders), cur: today.paidOrders, prev: today.yesterdayPaidOrders, prevText: String(today.yesterdayPaidOrders) },
+    { key: 'new', icon: 'bag', label: t('Order baru hari ini', 'New orders today'), value: String(today.ordersCreated), cur: today.ordersCreated, prev: today.yesterdayOrdersCreated, prevText: String(today.yesterdayOrdersCreated) },
+  ];
+  return (
+    <section className={styles.today} aria-label={t('Hari ini', 'Today')}>
+      <span className={styles.todayTag}>
+        <span className={styles.liveDot} aria-hidden="true" />
+        {t('Hari ini', 'Today')}
+      </span>
+      {items.map((item) => {
+        const pct = item.prev > 0 ? ((item.cur - item.prev) / item.prev) * 100 : null;
+        const text = deltaText(pct);
+        return (
+          <div key={item.key} className={styles.todayItem}>
+            <span className={styles.todayIcon}>
+              <Icon name={item.icon} size={18} />
+            </span>
+            <span className={styles.todayBody}>
+              <small>{item.label}</small>
+              <strong>{item.value}</strong>
+              <em>
+                {text && <b className={pct !== null && pct < 0 ? styles.textRed : styles.textOk}>{text}</b>}
+                {t('kemarin', 'yesterday')} {item.prevText}
+              </em>
+            </span>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+/** Ringkasan kecil di kepala panel tren: total 30 hari dan hari terbaik. */
+function TrendSummary({ points, t }: { points: NonNullable<DashboardData['trend30']>; t: T }) {
+  const total = points.reduce((sum, p) => sum + p.total, 0);
+  const active = points.filter((p) => p.total > 0).length;
+  if (total <= 0) return null;
+  return (
+    <span className={styles.trendMeta}>
+      <b>{formatIDR(total)}</b>
+      <small>
+        {active} {t('hari ada penjualan', active === 1 ? 'day with sales' : 'days with sales')}
+      </small>
+    </span>
+  );
+}
 
 function Delta({ metric, t, lang }: { metric: DashboardMetric; t: T; lang: Lang }) {
   if (metric.changePct === null) {

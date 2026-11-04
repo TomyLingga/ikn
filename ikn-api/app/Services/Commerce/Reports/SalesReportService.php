@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\DB;
  * (cancelled/expired tidak dihitung). Rentang inklusif di zona aplikasi; CSV untuk unduhan.
  * Agregat lama (summary, byMonth, byProduct) hanya order IDR (ASUMSI A-86); `byCurrency` memberi total per
  * mata uang dengan filter yang sama (Phase E6). Daftar order dan CSV memuat semua mata uang, tiap baris
- * membawa `currency` dan angkanya dalam satuan terkecil mata uang itu.
+ * membawa `currency` dan angkanya dalam satuan terkecil mata uang itu. Rincian tambahan (comparison, trend,
+ * byCategory, topCustomers, byRegion, byPaymentMethod, byDeliveryTerm, funnel) lewat SalesBreakdowns, juga IDR.
  */
 class SalesReportService
 {
@@ -92,6 +93,15 @@ class SalesReportService
 
         $list = (clone $allCurrencies)->with(OrderSummaryResource::eager())->orderByDesc('paid_at')->orderByDesc('id')->limit(self::MAX_ORDERS)->get();
 
+        // Rincian tambahan (2026-11-04, additive): pembanding periode sebelumnya, tren dalam rentang, dan rincian
+        // per kategori/pelanggan/wilayah/metode bayar/serah terima, plus kohort order dibuat (konversi & batal).
+        $previous = $this->previousPeriod($period);
+        $prev = $this->query($previous)->select(DB::raw('COUNT(*) AS orders'), DB::raw('COALESCE(SUM(grand_total), 0) AS revenue'))->toBase()->first();
+        $prevOrders = (int) $prev->orders;
+        $prevRevenue = Money::toInt($prev->revenue);
+        $prevItems = (int) OrderItem::whereIn('order_id', $this->query($previous)->select('id'))->sum('qty');
+        $prevAvg = $prevOrders > 0 ? Money::round($prevRevenue / $prevOrders) : 0;
+
         return [
             'currency' => Money::CURRENCY_IDR,
             'period' => [
@@ -104,6 +114,27 @@ class SalesReportService
             'byCurrency' => $this->byCurrency($allCurrencies),
             'byMonth' => $byMonth,
             'byProduct' => $byProduct,
+            'comparison' => [
+                'from' => $previous['from']->toApiString(),
+                'to' => $previous['to']->toApiString(),
+                'orders' => $prevOrders,
+                'revenue' => $prevRevenue,
+                'avgOrder' => $prevAvg,
+                'items' => $prevItems,
+                'changePct' => [
+                    'orders' => SalesBreakdowns::changePct($orders, $prevOrders),
+                    'revenue' => SalesBreakdowns::changePct($revenue, $prevRevenue),
+                    'avgOrder' => SalesBreakdowns::changePct($summary['avgOrder'], $prevAvg),
+                    'items' => SalesBreakdowns::changePct($items, $prevItems),
+                ],
+            ],
+            'trend' => SalesBreakdowns::trend($query, $period['from'], $period['to']),
+            'byCategory' => SalesBreakdowns::byCategory($query),
+            'topCustomers' => SalesBreakdowns::topCustomers($query, 10),
+            'byRegion' => SalesBreakdowns::byRegion($query),
+            'byPaymentMethod' => SalesBreakdowns::byPaymentMethod($query),
+            'byDeliveryTerm' => SalesBreakdowns::byDeliveryTerm($query),
+            'funnel' => SalesBreakdowns::funnel($period['from'], $period['to']),
             'orders' => OrderSummaryResource::collection($list)->resolve(),
         ];
     }
@@ -185,6 +216,30 @@ class SalesReportService
     public function csvFilename(array $period): string
     {
         return sprintf('sales-report-%s-%s.csv', $period['from']->format('Ymd'), $period['to']->format('Ymd'));
+    }
+
+    /**
+     * Periode pembanding: tahun sebelumnya (mode tahun), bulan sebelumnya (mode bulan), atau rentang sepanjang
+     * yang sama tepat sebelum `from` (mode rentang tanggal).
+     *
+     * @return array{from: Carbon, to: Carbon}
+     */
+    private function previousPeriod(array $period): array
+    {
+        $from = $period['from']->copy();
+        $to = $period['to']->copy();
+        $isCalendar = $from->isSameDay($from->copy()->startOfMonth()) && $to->isSameDay($to->copy()->endOfMonth());
+        if ($period['month'] !== null || ($isCalendar && $from->isSameMonth($to))) {
+            $start = $from->copy()->subMonthNoOverflow()->startOfMonth();
+
+            return ['from' => $start, 'to' => $start->copy()->endOfMonth()];
+        }
+        if ($isCalendar && $from->month === 1 && $to->month === 12 && $from->year === $to->year) {
+            return ['from' => $from->copy()->subYear()->startOfYear(), 'to' => $from->copy()->subYear()->endOfYear()];
+        }
+        $days = $from->copy()->startOfDay()->diffInDays($to->copy()->startOfDay()) + 1;
+
+        return ['from' => $from->copy()->subDays($days)->startOfDay(), 'to' => $from->copy()->subDay()->endOfDay()];
     }
 
     /** Order dibayar dalam rentang; $currency null = semua mata uang (daftar, CSV, byCurrency). */

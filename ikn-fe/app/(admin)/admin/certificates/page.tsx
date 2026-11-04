@@ -7,7 +7,8 @@ import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/
 import { I18nInput, MediaPicker, firstError, type FieldErrors } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
-import { emptyI18n, tr, type CertificateData, type I18n, type MediaSummary } from '@/lib/cms';
+import { emptyI18n, tr, type CertificateData, type CertificateStatus, type I18n, type MediaSummary } from '@/lib/cms';
+import Select from '@/components/Select';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import { FileLink } from '@/components/FileViewer';
 
@@ -15,6 +16,11 @@ interface CertificateForm {
   name: I18n;
   material: I18n;
   description: I18n;
+  number: string;
+  issuer: string;
+  accreditation: string;
+  standard: string;
+  status: CertificateStatus;
   file: MediaSummary | null;
   logo: MediaSummary | null;
   isPublished: boolean;
@@ -25,6 +31,11 @@ const emptyForm = (): CertificateForm => ({
   name: emptyI18n(),
   material: emptyI18n(),
   description: emptyI18n(),
+  number: '',
+  issuer: '',
+  accreditation: '',
+  standard: '',
+  status: 'active',
   file: null,
   logo: null,
   isPublished: true,
@@ -36,6 +47,11 @@ function formFromRow(row: CertificateData): CertificateForm {
     name: row.name,
     material: row.material ?? emptyI18n(),
     description: row.description ?? emptyI18n(),
+    number: row.number ?? '',
+    issuer: row.issuer ?? '',
+    accreditation: row.accreditation ?? '',
+    standard: row.standard ?? '',
+    status: row.status ?? 'active',
     file: row.file,
     logo: row.logo ?? null,
     isPublished: row.isPublished,
@@ -49,6 +65,11 @@ function toPayload(form: CertificateForm) {
     name: form.name,
     material: form.material,
     description: form.description,
+    number: form.number || null,
+    issuer: form.issuer || null,
+    accreditation: form.accreditation || null,
+    standard: form.standard || null,
+    status: form.status,
     mediaId: form.file?.id ?? null,
     logoMediaId: form.logo?.id ?? null,
     isPublished: form.isPublished,
@@ -161,7 +182,7 @@ export default function AdminCertificates() {
         </span>
       ),
     },
-    { key: 'material', label: t('Materi / standar', 'Scope / standard'), render: (c) => tr(c.material, lang) || '—' },
+    { key: 'material', label: t('Kategori', 'Category'), render: (c) => tr(c.material, lang) || '—' },
     {
       key: 'file',
       label: t('Berkas', 'File'),
@@ -229,11 +250,11 @@ export default function AdminCertificates() {
               errorEn={firstError(formErrors, 'name.en')}
             />
             <I18nInput
-              label={t('Materi / standar', 'Scope / standard')}
+              label={t('Kategori sertifikat', 'Certificate category')}
               value={form.material}
               onChange={(material) => setForm({ ...form, material })}
               maxLength={200}
-              placeholder="Contoh: Sistem Manajemen Mutu"
+              placeholder="Contoh: Anti-penyuapan"
               errorId={firstError(formErrors, 'material.id')}
               errorEn={firstError(formErrors, 'material.en')}
             />
@@ -247,6 +268,34 @@ export default function AdminCertificates() {
               errorId={firstError(formErrors, 'description.id')}
               errorEn={firstError(formErrors, 'description.en')}
             />
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">{t('Nomor sertifikat', 'Certificate number')}</span>
+                <input value={form.number} maxLength={120} onChange={(e) => setForm({ ...form, number: e.target.value })} />
+              </label>
+              <label>
+                <span className="field-label">{t('Penerbit', 'Issuer')}</span>
+                <input value={form.issuer} maxLength={160} onChange={(e) => setForm({ ...form, issuer: e.target.value })} />
+              </label>
+            </div>
+            <div className="admin-form-row">
+              <label>
+                <span className="field-label">{t('Akreditasi', 'Accreditation')}</span>
+                <input value={form.accreditation} maxLength={120} onChange={(e) => setForm({ ...form, accreditation: e.target.value })} />
+              </label>
+              <label>
+                <span className="field-label">{t('Standar', 'Standard')}</span>
+                <input value={form.standard} maxLength={120} onChange={(e) => setForm({ ...form, standard: e.target.value })} />
+              </label>
+              <label>
+                <span className="field-label">{t('Status sertifikat', 'Certificate status')}</span>
+                <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as CertificateStatus })}>
+                  <option value="active">{t('Aktif', 'Active')}</option>
+                  <option value="expired">{t('Kedaluwarsa', 'Expired')}</option>
+                  <option value="in_progress">{t('Dalam proses', 'In progress')}</option>
+                </Select>
+              </label>
+            </div>
             <MediaPicker
               label={t('Berkas sertifikat (PDF)', 'Certificate file (PDF)')}
               value={form.file}

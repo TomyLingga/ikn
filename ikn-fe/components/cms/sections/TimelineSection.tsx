@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import Image from 'next/image';
 import Icon from '@/components/Icon';
 import Reveal from '@/components/Reveal';
 import { useLang } from '@/components/LanguageProvider';
@@ -86,6 +87,16 @@ export default function TimelineSection({ section }: { section: PageSection }) {
                   </span>
                   <span className="road-post" aria-hidden="true" />
                   <div className="road-card">
+                    {/* Gambar atau video singkat opsional per tonggak (video bisu, berulang). */}
+                    {item.media?.url && (
+                      <figure className="road-media">
+                        {item.media.mime?.startsWith('video/') ? (
+                          <video src={item.media.url} muted loop playsInline autoPlay preload="metadata" />
+                        ) : (
+                          <Image src={item.media.url} alt={title || name} fill sizes="(max-width: 720px) 90vw, 280px" style={{ objectFit: 'cover' }} />
+                        )}
+                      </figure>
+                    )}
                     {showTitle && <strong className="road-period">{title}</strong>}
                     {body && <p className="road-body">{body}</p>}
                     {products && (
