@@ -10,7 +10,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { useSite } from '@/components/SiteProvider';
 import { t } from '@/lib/i18n';
 import { tr } from '@/lib/cms';
-import { contactMapPoints } from '@/components/cms/utils';
+import { contactMapPoints, mapsUrl } from '@/components/cms/utils';
 import { isWhatsAppLink, whatsappContacts, whatsappHref } from '@/lib/whatsapp';
 import styles from './Footer.module.css';
 
@@ -93,8 +93,9 @@ export default function Footer() {
   const waContacts = whatsappContacts(site.settings, waMessage, 'Marketing');
   const waHref = waContacts[0]?.href ?? '';
   const socialHref = (label: string, url: string) => (isWhatsAppLink(label, url) ? waHref || whatsappHref(url, waMessage) || url : url);
-  const mapPoints = site.contact ? contactMapPoints(site.contact, lang).slice(0, 1) : [];
-  const firstLocation = site.contact?.locations[0];
+  // Semua lokasi blok kontak (kantor pusat + pabrik): satu peta berpin + daftar alamat, lokasi pertama = kantor utama.
+  const mapPoints = site.contact ? contactMapPoints(site.contact, lang) : [];
+  const locations = (site.contact?.locations ?? []).filter((loc) => loc.address);
 
   const headline = tr(siteText.footer_headline, lang) || ui.footer.headline;
   const ctaLabel = tr(siteText.footer_cta_label, lang) || ui.footer.startConvo;
@@ -194,11 +195,26 @@ export default function Footer() {
             {mapPoints.length > 0 && (
               <section className={`${styles.block} ${styles.mapBlock}`}>
                 <h2 className={styles.blockTitle}>{copy.location}</h2>
-                {firstLocation?.address && (
-                  <p className={styles.address}>
-                    <Icon name="pin" size={15} /> <span>{firstLocation.address}</span>
-                  </p>
-                )}
+                <ul className={styles.locationList}>
+                  {locations.map((loc, i) => {
+                    const lat = loc.geo?.lat;
+                    const lng = loc.geo?.lng;
+                    return (
+                      <li key={i} className={styles.address}>
+                        <Icon name="pin" size={15} />
+                        <span>
+                          <strong>{tr(loc.name, lang)}</strong>
+                          {loc.address}
+                          {typeof lat === 'number' && typeof lng === 'number' && (
+                            <a href={mapsUrl(lat, lng)} target="_blank" rel="noreferrer">
+                              {lang === 'en' ? 'Open in Google Maps' : 'Buka di Google Maps'} ↗
+                            </a>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
                 <div className={styles.mapCard}>
                   <ContactMap points={mapPoints} compact lang={lang} />
                 </div>

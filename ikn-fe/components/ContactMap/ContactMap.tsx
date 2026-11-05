@@ -70,7 +70,7 @@ export default function ContactMap({ points, compact = false, lang = 'id' }: Con
         <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}" maxZoom={19} />
         <Fit points={points} />
         {points.map((p) => (
-          <Marker key={`${p.lat},${p.lng}`} position={[p.lat, p.lng]} icon={pinIcon}>
+          <Marker key={`${p.lat},${p.lng}`} position={[p.lat, p.lng]} icon={pinIcon} title={p.name}>
             {!compact && (
               <Popup>
                 <strong>{p.name}</strong>
@@ -89,7 +89,8 @@ export default function ContactMap({ points, compact = false, lang = 'id' }: Con
           </Marker>
         ))}
       </MapContainer>
-      {compact && (
+      {/* Lebih dari satu titik: tautan peta per lokasi ada di daftar alamat pemanggil (mis. footer). */}
+      {compact && points.length === 1 && (
         <a className="footer-map-link" href={mapsUrl(first.lat, first.lng)} target="_blank" rel="noreferrer">
           {openLabel} ↗
         </a>

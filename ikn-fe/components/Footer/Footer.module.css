@@ -259,6 +259,37 @@
   margin-top: 3px;
 }
 
+/* Dua lokasi (kantor pusat & pabrik): nama tebal, alamat, tautan peta per lokasi. */
+.locationList {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.locationList .address {
+  margin: 0 0 10px;
+}
+
+.address strong {
+  display: block;
+  color: #fff;
+  font-weight: 650;
+}
+
+.address a {
+  display: block;
+  width: fit-content;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.82rem;
+}
+
+.address a:hover {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .mapCard :global(.footer-map) {
   max-width: none;
   height: 200px;
