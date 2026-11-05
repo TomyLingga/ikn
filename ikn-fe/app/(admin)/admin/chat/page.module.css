@@ -129,7 +129,7 @@
 
 .rowOn .avatar {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 :global([data-theme='dark']) .rowOn .avatar { color: #06121f; }

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Icon from '@/components/Icon';
 import { VideoLightbox } from '@/components/VideoGallery';
 import HeroTileMap from '@/components/HeroTileMap';
+import MediaVideo, { isEmbedVideo, type VideoSource } from '@/components/MediaVideo';
 import { useSite } from '@/components/SiteProvider';
 import SmartLink from '../SmartLink';
 import HeroSlider from '@/components/HeroSlider';
@@ -117,7 +118,7 @@ function HeroGrid({
 }) {
   const [playing, setPlaying] = useState(false);
   const site = useSite();
-  const videos = [c.video?.url, ...asList<{ file?: { url?: string } | null }>(c.videos).map((v) => v.file?.url)].filter((u): u is string => !!u);
+  const videos = [c.video, ...asList<{ file?: VideoSource | null }>(c.videos).map((v) => v.file)].filter((v): v is VideoSource => !!v?.url);
   const links = asList<{ title: HeroContent['title']; note?: HeroContent['title']; image?: { url?: string } | null; url: string }>(c.links).filter((l) => tr(l.title, lang) && asText(l.url));
   // Lokasi fasilitas di ubin peta: daftar dari CMS (`locations`), kosong = lokasi blok kontak halaman Kontak.
   const ownFacilities = asList<NonNullable<HeroContent['locations']>[number]>(c.locations)
@@ -341,10 +342,17 @@ function HeroGrid({
  * Beberapa video latar diputar bergantian: tiap video bertumpuk, hanya yang aktif berjalan dan terlihat; saat
  * selesai, video berikutnya diputar dengan transisi pudar. Satu video saja = diulang terus.
  */
-function VideoPlaylist({ sources, poster }: { sources: string[]; poster?: string }) {
+function VideoPlaylist({ sources, poster }: { sources: VideoSource[]; poster?: string }) {
   const [active, setActive] = useState(0);
   const refs = useRef<(HTMLVideoElement | null)[]>([]);
   const single = sources.length === 1;
+
+  // Video dari URL (iframe YouTube/Vimeo) berulang sendiri dan tidak memberi sinyal selesai: berganti tiap 30 detik.
+  useEffect(() => {
+    if (single || !isEmbedVideo(sources[active])) return;
+    const timer = window.setTimeout(() => setActive((a) => (a + 1) % sources.length), 30000);
+    return () => window.clearTimeout(timer);
+  }, [active, single, sources]);
 
   useEffect(() => {
     refs.current.forEach((video, i) => {
@@ -361,13 +369,14 @@ function VideoPlaylist({ sources, poster }: { sources: string[]; poster?: string
   return (
     <>
       {sources.map((src, i) => (
-        <video
-          key={src}
+        <MediaVideo
+          key={`${src.url}-${i}`}
           ref={(el) => {
             refs.current[i] = el;
           }}
           className={`hgrid-video${i === active ? ' is-active' : ''}`}
-          src={src}
+          source={src}
+          background
           muted
           playsInline
           loop={single}

@@ -28,6 +28,7 @@ import ValuesSection from './sections/ValuesSection';
 import ContactInfoSection from './sections/ContactInfoSection';
 import ContactInfoBand from './sections/ContactInfoBand';
 import ContactMap from '@/components/ContactMap';
+import MediaVideo from '@/components/MediaVideo';
 import ContactSummarySection from './sections/ContactSummarySection';
 import LinkCardsSection from './sections/LinkCardsSection';
 import OrgChartSection from './sections/OrgChartSection';
@@ -209,7 +210,7 @@ function withBackground(section: PageSection, node: ReactNode): ReactNode {
     <div className={`sec-bg sec-bg-${tone}`} style={{ '--sec-bg-op': opacity } as CSSProperties}>
       <div className="sec-bg-media" aria-hidden="true">
         {media.mime?.startsWith('video/') ? (
-          <video src={media.url} autoPlay muted loop playsInline preload="metadata" />
+          <MediaVideo source={media} background autoPlay muted loop playsInline preload="metadata" />
         ) : (
           // Ukuran latar tidak diketahui; img biasa + object-fit cover.
           // eslint-disable-next-line @next/next/no-img-element

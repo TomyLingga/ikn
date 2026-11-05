@@ -84,24 +84,30 @@ class SettingsAndSiteTest extends TestCase
 
     public function test_theme_colours_are_public_validated_and_resettable(): void
     {
-        $this->getJson('/api/v1/content/settings')->assertOk()
-            ->assertJsonPath('data.theme.primary', '#0b6fb8')
-            ->assertJsonPath('data.theme.primary_deep', '#0a3f6b')
-            ->assertJsonPath('data.theme.accent', '#1785cc');
+        $public = $this->getJson('/api/v1/content/settings')->assertOk()
+            ->assertJsonPath('data.theme.light_base', '#f4ede0')
+            ->assertJsonPath('data.theme.light_ink', '#102d50')
+            ->assertJsonPath('data.theme.light_accent', '#ff6b5b')
+            ->assertJsonPath('data.theme.light_soft', '#dceaf7')
+            ->assertJsonPath('data.theme.dark_base', '#102d50')
+            ->assertJsonPath('data.theme.dark_ink', '#f4ede0')
+            ->assertJsonPath('data.theme.dark_accent', '#ff6b5b')
+            ->assertJsonPath('data.theme.dark_deep', '#0b1220');
+        $this->assertArrayNotHasKey('primary', $public->json('data.theme'), 'old blue keys are gone');
 
         $admin = $this->adminWith(['settings']);
 
-        $this->actingAs($admin)->putJson('/api/v1/admin/site-settings', ['theme' => ['primary' => 'biru']])
+        $this->actingAs($admin)->putJson('/api/v1/admin/site-settings', ['theme' => ['dark_base' => 'biru']])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['theme.primary']);
+            ->assertJsonValidationErrors(['theme.dark_base']);
 
-        $this->actingAs($admin)->putJson('/api/v1/admin/site-settings', ['theme' => ['primary' => '#1E88E5', 'accent' => '']])
+        $this->actingAs($admin)->putJson('/api/v1/admin/site-settings', ['theme' => ['light_accent' => '#E5503F', 'dark_deep' => '']])
             ->assertOk()
-            ->assertJsonPath('data.theme.primary', '#1e88e5')
-            ->assertJsonPath('data.theme.accent', '')
-            ->assertJsonPath('data.theme.primary_deep', '#0a3f6b');
+            ->assertJsonPath('data.theme.light_accent', '#e5503f')
+            ->assertJsonPath('data.theme.dark_deep', '')
+            ->assertJsonPath('data.theme.light_base', '#f4ede0');
 
-        $this->getJson('/api/v1/content/settings')->assertJsonPath('data.theme.primary', '#1e88e5');
+        $this->getJson('/api/v1/content/settings')->assertJsonPath('data.theme.light_accent', '#e5503f');
     }
 
     public function test_site_bundle_returns_menus_contact_and_doc_links(): void

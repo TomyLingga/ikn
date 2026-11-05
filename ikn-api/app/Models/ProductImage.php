@@ -37,6 +37,6 @@ class ProductImage extends Model
             'type' => $this->isVideo() ? self::TYPE_VIDEO : self::TYPE_IMAGE,
             'mime' => $this->media?->mime,
             'isThumbnail' => (bool) $this->is_thumbnail,
-        ];
+        ] + ($this->media ? $this->media->externalSummary() : []);
     }
 }

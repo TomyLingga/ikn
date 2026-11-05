@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
-import Spinner from '@/components/Spinner';
 import StatusBadge from '@/components/StatusBadge';
 import AdminSalesChart from '@/components/admin/AdminSalesChart';
 import { CHART_COLORS, DonutChart, Sparkline, TrendChart, deltaText } from '@/components/admin/ReportCharts';
@@ -146,8 +145,15 @@ export default function AdminDashboard() {
           <span className={styles.periodChip} title={`${t('Dibandingkan dengan', 'Compared with')} ${previousText}`}>
             <Icon name="clock" size={14} /> {periodText}
           </span>
-          <button type="button" className="btn btn-line btn-sm" onClick={() => void refresh()} disabled={loading}>
-            {loading ? <Spinner size={16} label={t('Memuat...', 'Loading...')} /> : t('Segarkan', 'Refresh')}
+          <button
+            type="button"
+            className={`btn btn-line btn-sm ${styles.refreshBtn}${loading ? ` ${styles.refreshing}` : ''}`}
+            onClick={() => void refresh()}
+            disabled={loading}
+            aria-label={t('Segarkan data', 'Refresh data')}
+            title={t('Segarkan data', 'Refresh data')}
+          >
+            <Icon name="refresh" size={17} />
           </button>
         </div>
       </div>

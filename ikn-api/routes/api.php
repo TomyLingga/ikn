@@ -73,6 +73,7 @@ Route::prefix('admin')
         Route::middleware('module:media')->group(function () {
             Route::get('media', [Admin\MediaController::class, 'index']);
             Route::post('media', [Admin\MediaController::class, 'store']);
+            Route::post('media/url', [Admin\MediaController::class, 'storeUrl']);
             Route::delete('media/{media}', [Admin\MediaController::class, 'destroy']);
         });
 

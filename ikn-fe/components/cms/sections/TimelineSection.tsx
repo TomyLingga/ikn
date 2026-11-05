@@ -7,6 +7,7 @@ import Reveal from '@/components/Reveal';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
+import MediaVideo from '@/components/MediaVideo';
 import SecHead from './SecHead';
 import { ANCHOR_BY_TYPE, asList, asText, type TimelineContent } from '../utils';
 
@@ -91,7 +92,7 @@ export default function TimelineSection({ section }: { section: PageSection }) {
                     {item.media?.url && (
                       <figure className="road-media">
                         {item.media.mime?.startsWith('video/') ? (
-                          <video src={item.media.url} muted loop playsInline autoPlay preload="metadata" />
+                          <MediaVideo source={item.media} background muted loop playsInline autoPlay preload="metadata" />
                         ) : (
                           <Image src={item.media.url} alt={title || name} fill sizes="(max-width: 720px) 90vw, 280px" style={{ objectFit: 'cover' }} />
                         )}

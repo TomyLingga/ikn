@@ -23,6 +23,7 @@ export type Tone = 'ok' | 'warn' | 'bad' | 'info';
 
 // Nama ikon yang tersedia di komponen Icon.
 export type IconName =
+  | 'refresh'
   | 'eye'
   | 'eyeOff'
   | 'microscope'
@@ -282,6 +283,10 @@ export interface ProductImage {
   type?: 'image' | 'video';
   mime?: string | null;
   isThumbnail?: boolean;
+  // Video dari URL (A-92): diputar lewat iframe penyedia.
+  embedUrl?: string | null;
+  provider?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 export interface ProductCategoryRef {

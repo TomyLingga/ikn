@@ -4,14 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import Spinner from '@/components/Spinner';
 import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
 import FileUploadDropzone from '@/components/admin/FileUploadDropzone/FileUploadDropzone';
-import { MediaGrid, Pager } from '@/components/admin/cms';
+import { MediaGrid, MediaUrlForm, Pager } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, apiPaged, ApiError, errorMessage, uploadMedia } from '@/lib/api';
 import type { MediaItem, PagedMeta } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import { FileLink } from '@/components/FileViewer';
 
-type MediaFilter = '' | 'image' | 'document';
+type MediaFilter = '' | 'image' | 'video' | 'document';
 
 // Media library: paginated grid of uploaded files (GET /admin/media), upload, delete, copy URL.
 export default function AdminMediaLibrary() {
@@ -102,6 +102,7 @@ export default function AdminMediaLibrary() {
   const filters: Array<{ value: MediaFilter; label: string }> = [
     { value: '', label: t('Semua', 'All') },
     { value: 'image', label: t('Gambar', 'Images') },
+    { value: 'video', label: t('Video', 'Videos') },
     { value: 'document', label: t('Dokumen', 'Documents') },
   ];
 
@@ -136,6 +137,18 @@ export default function AdminMediaLibrary() {
                 ? t('Mengunggah...', 'Uploading...')
                 : t('Gambar (JPG, PNG, WebP, GIF, SVG) atau dokumen PDF.', 'Images (JPG, PNG, WebP, GIF, SVG) or PDF documents.')
             }
+          />
+        </AdminCard>
+      </div>
+
+      <div style={{ marginBottom: 22 }}>
+        <AdminCard title={t('Tautkan dari URL (tanpa unggah)', 'Link from a URL (no upload)')}>
+          <MediaUrlForm
+            onDone={(media) => {
+              setNotice(t(`"${media.originalName}" ditambahkan dari URL.`, `"${media.originalName}" added from URL.`));
+              setPage(1);
+              void load();
+            }}
           />
         </AdminCard>
       </div>
@@ -185,7 +198,7 @@ export default function AdminMediaLibrary() {
               <button type="button" className="row-act" onClick={() => void copyUrl(item)}>
                 {t('Salin URL', 'Copy URL')}
               </button>
-              <FileLink file={{ url: item.url, name: item.originalName, mime: item.mime }} className="row-act">
+              <FileLink file={{ url: item.url, name: item.originalName, mime: item.mime, embedUrl: item.embedUrl, provider: item.provider }} className="row-act">
                 {t('Buka', 'Open')}
               </FileLink>
               <button type="button" className="row-act row-act-danger" onClick={() => void remove(item)}>

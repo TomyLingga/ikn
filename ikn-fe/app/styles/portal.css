@@ -42,7 +42,7 @@
 .cust-app .btn-solid {
   border-color: var(--primary);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 [data-theme='dark'] .cust-app .btn-solid { color: #06121f; }
@@ -272,7 +272,7 @@
   border: 0;
   border-radius: 8px;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font: inherit;
   font-size: 0.88rem;
   font-weight: 650;
@@ -364,7 +364,7 @@
 .shop-chip.is-active {
   border-color: var(--primary);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 [data-theme='dark'] .shop-chip.is-active { color: #06121f; }
@@ -661,7 +661,7 @@
   border: 1px solid var(--primary);
   border-radius: var(--cu-r);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font: inherit;
   font-size: 0.84rem;
   font-weight: 650;
@@ -700,7 +700,7 @@
   border-color: var(--primary);
   border-radius: 12px;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 [data-theme='dark'] .cust-app .pcard-add { color: #06121f; }
@@ -1070,7 +1070,7 @@
 }
 
 .cust-app .step-label { font-family: var(--font-sans); font-size: 0.88rem; font-weight: 600; letter-spacing: 0; }
-.cust-app .step.is-active .step-num { border-color: var(--primary); background: var(--primary); color: #fff; }
+.cust-app .step.is-active .step-num { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
 [data-theme='dark'] .cust-app .step.is-active .step-num { color: #06121f; }
 .cust-app .step.is-done .step-num { border-color: var(--ok); background: var(--ok); }
 

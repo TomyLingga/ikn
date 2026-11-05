@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AnchorHTMLAttributes, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '@/components/Icon';
+import MediaVideo from '@/components/MediaVideo';
 import styles from './FileViewer.module.css';
 
 export interface ViewerFile {
@@ -11,6 +12,9 @@ export interface ViewerFile {
   /** Nama yang ditampilkan dan dipakai saat mengunduh. */
   name?: string | null;
   mime?: string | null;
+  /** Media dari URL (YouTube/Vimeo/Drive): diputar lewat iframe penyedia. */
+  embedUrl?: string | null;
+  provider?: string | null;
 }
 
 export type FileKind = 'pdf' | 'image' | 'video' | 'other';
@@ -329,19 +333,22 @@ export default function FileViewerHost() {
               </button>
             </div>
           )}
-          <button
-            type="button"
-            className={styles.action}
-            disabled={downloading}
-            onClick={async () => {
-              setDownloading(true);
-              await downloadFile(file);
-              setDownloading(false);
-            }}
-          >
-            <Icon name="arrowDown" size={16} />
-            <span>{downloading ? t('Mengunduh…', 'Downloading…') : t('Unduh', 'Download')}</span>
-          </button>
+          {/* Video dari URL (YouTube/Vimeo/Drive) tidak punya berkas yang bisa diunduh. */}
+          {!file.embedUrl && (
+            <button
+              type="button"
+              className={styles.action}
+              disabled={downloading}
+              onClick={async () => {
+                setDownloading(true);
+                await downloadFile(file);
+                setDownloading(false);
+              }}
+            >
+              <Icon name="arrowDown" size={16} />
+              <span>{downloading ? t('Mengunduh…', 'Downloading…') : t('Unduh', 'Download')}</span>
+            </button>
+          )}
           <button ref={closeBtn} type="button" className={styles.close} onClick={close} aria-label={t('Tutup', 'Close')}>
             <Icon name="close" size={18} />
           </button>
@@ -358,7 +365,7 @@ export default function FileViewerHost() {
         )}
         {kind === 'video' && (
           <div className={styles.videoWrap}>
-            <video src={file.url} controls autoPlay playsInline />
+            <MediaVideo source={file} title={file.name ?? undefined} controls autoPlay playsInline />
           </div>
         )}
         {kind === 'other' && (

@@ -359,7 +359,7 @@
   place-items: center;
   border-radius: 50%;
   background: var(--green);
-  color: #fff;
+  color: var(--on-primary);
   font-family: var(--font-mono);
   font-size: 0.72rem;
 }

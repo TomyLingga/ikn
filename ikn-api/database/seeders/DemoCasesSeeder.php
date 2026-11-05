@@ -172,7 +172,7 @@ class DemoCasesSeeder extends Seeder
 
         $rows = [
             [$now->copy()->subDays(21)->setTime(9, 40), $super, 'PUT api/v1/admin/products/{product}', $resiprene, ['price' => 180000], ['price' => 185000, 'moq' => 25, '_path' => 'api/v1/admin/products/'.($resiprene?->id ?? 0), '_status' => 200]],
-            [$now->copy()->subDays(14)->setTime(10, 5), $super, 'PUT api/v1/admin/site-settings', null, null, ['contact' => ['whatsapp' => '628116123993'], 'theme' => ['primary' => '#0b6fb8'], '_path' => 'api/v1/admin/site-settings', '_status' => 200]],
+            [$now->copy()->subDays(14)->setTime(10, 5), $super, 'PUT api/v1/admin/site-settings', null, null, ['contact' => ['whatsapp' => '628116123993'], 'theme' => ['light_accent' => '#ff6b5b'], '_path' => 'api/v1/admin/site-settings', '_status' => 200]],
             [$now->copy()->subDays(6)->setTime(14, 12), $sales, 'POST api/v1/admin/payments/{payment}/accept', null, null, ['_path' => 'api/v1/admin/payments/12/accept', '_status' => 200]],
             [$now->copy()->subDays(5)->setTime(16, 10), $sales, 'POST api/v1/admin/products/{product}/stock', $packing, null, ['type' => 'adjust', 'qty' => -31, 'note' => 'Stock opname', '_path' => 'api/v1/admin/products/'.($packing?->id ?? 0).'/stock', '_status' => 201]],
             [$now->copy()->subDays(3)->setTime(11, 30), $content, 'PUT api/v1/admin/news/{post}', $post, ['isPublished' => false], ['isPublished' => true, '_path' => 'api/v1/admin/news/'.($post?->id ?? 0), '_status' => 200]],

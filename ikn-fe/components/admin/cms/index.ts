@@ -7,6 +7,7 @@ export { default as ListField } from './ListField';
 export { default as MediaPicker, MediaLibraryModal, type MediaKind } from './MediaPicker';
 export { default as MediaGrid, formatBytes, isImageMedia } from './MediaGrid';
 export { default as Pager } from './Pager';
+export { default as MediaUrlForm } from './MediaUrlForm';
 export { default as SectionForm, FieldRenderer } from './SectionForm';
 export { default as MenuEditor, emptyMenuNode, menuPayload } from './MenuEditor';
 export * from './schema';

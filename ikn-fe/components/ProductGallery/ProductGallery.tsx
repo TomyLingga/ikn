@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import type { ProductImage } from '@/lib/types';
+import MediaVideo from '@/components/MediaVideo';
 import styles from './ProductGallery.module.css';
 
 interface ProductGalleryProps {
@@ -98,7 +99,7 @@ export default function ProductGallery({ media, name, code, poster }: ProductGal
           {media.map((item, index) => (
             <div key={item.id || item.url} className={styles.slide} role="group" aria-roledescription="slide" aria-label={`${index + 1} / ${total}`}>
               {item.type === 'video' ? (
-                <video data-slide={index} src={item.url} controls playsInline preload="metadata" poster={poster || undefined} aria-label={`${t('Video', 'Video')} ${name}`} />
+                <MediaVideo data-slide={index} source={item} title={`${t('Video', 'Video')} ${name}`} controls playsInline preload="metadata" poster={poster || undefined} aria-label={`${t('Video', 'Video')} ${name}`} />
               ) : (
                 <Image src={item.url} alt={`${name} ${index + 1}`} fill sizes="(max-width: 900px) 100vw, 560px" priority={index === 0} />
               )}

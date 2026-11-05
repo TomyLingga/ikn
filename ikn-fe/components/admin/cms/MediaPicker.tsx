@@ -8,6 +8,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { apiPaged, errorMessage, uploadMedia } from '@/lib/api';
 import type { MediaItem, MediaSummary, PagedMeta } from '@/lib/cms';
 import MediaGrid, { formatBytes, isImageMedia } from './MediaGrid';
+import MediaUrlForm from './MediaUrlForm';
 import Pager from './Pager';
 import { mediaId, mediaSummary, type MediaValue } from './schema';
 import { FileLink } from '@/components/FileViewer';
@@ -51,6 +52,7 @@ export default function MediaPicker({
   const [uploading, setUploading] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [urlOpen, setUrlOpen] = useState(false);
   const id = mediaId(value);
   const summary = mediaSummary(value);
   const t = (idText: string, en: string) => (lang === 'en' ? en : idText);
@@ -71,6 +73,17 @@ export default function MediaPicker({
   if (summary && isImageMedia(summary)) {
     // eslint-disable-next-line @next/next/no-img-element
     preview = <img className="admin-image-preview" src={summary.url} alt={summary.originalName} />;
+  } else if (summary && isVideoMedia(summary) && summary.embedUrl) {
+    // Video dari URL: gambar pratinjau penyedia bila ada (YouTube/Drive), selain itu ikon video.
+    preview = summary.thumbnailUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img className="admin-image-preview" src={summary.thumbnailUrl} alt={summary.originalName} />
+    ) : (
+      <div className="admin-image-placeholder">
+        <Icon name="video" size={22} />
+        <span>{summary.originalName}</span>
+      </div>
+    );
   } else if (summary && isVideoMedia(summary)) {
     preview = <video className="admin-image-preview" src={summary.url} muted controls preload="metadata" />;
   } else if (id) {
@@ -104,10 +117,10 @@ export default function MediaPicker({
         <div className="admin-image-actions">
           {summary ? (
             <p className="admin-field-hint">
-              <FileLink file={{ url: summary.url, name: summary.originalName, mime: summary.mime }} className="cms-link">
+              <FileLink file={{ url: summary.url, name: summary.originalName, mime: summary.mime, embedUrl: summary.embedUrl, provider: summary.provider }} className="cms-link">
                 {summary.originalName}
               </FileLink>{' '}
-              · {formatBytes(summary.size)} · #{summary.id}
+              · {summary.provider ? t('Tautan', 'Link') : formatBytes(summary.size)} · #{summary.id}
             </p>
           ) : id ? (
             <p className="admin-field-hint">Media #{id}</p>
@@ -126,6 +139,11 @@ export default function MediaPicker({
             <button type="button" className="btn btn-line btn-sm" onClick={() => setLibraryOpen(true)}>
               {t('Pilih dari media', 'Choose from library')}
             </button>
+            {accept !== 'document' && (
+              <button type="button" className="btn btn-line btn-sm" aria-expanded={urlOpen} onClick={() => setUrlOpen((v) => !v)}>
+                {t('Dari URL', 'From URL')}
+              </button>
+            )}
             {id && (
               <button type="button" className="row-act row-act-danger" onClick={() => onChange(null)}>
                 {t('Hapus', 'Remove')}
@@ -135,6 +153,17 @@ export default function MediaPicker({
           {shownError && <small className="cms-field-error">{shownError}</small>}
         </div>
       </div>
+      {urlOpen && (
+        <MediaUrlForm
+          kind={accept === 'image' ? 'image' : accept === 'video' ? 'video' : 'auto'}
+          collection={collection}
+          onCancel={() => setUrlOpen(false)}
+          onDone={(media) => {
+            onChange(media);
+            setUrlOpen(false);
+          }}
+        />
+      )}
       <input
         ref={inputRef}
         type="file"

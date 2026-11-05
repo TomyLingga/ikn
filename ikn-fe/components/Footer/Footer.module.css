@@ -1,20 +1,18 @@
-/* Footer: latar biru tua bergradasi + panel membulat (Terhubung · Hubungi kami · Lokasi), pil "Bagikan" di tepi atas panel. */
+/* Footer: latar navy paling tua + panel navy membulat (Terhubung · Hubungi kami · Lokasi), pil "Bagikan" di tepi atas panel.
+   Selalu navy di kedua mode (tema A-91): --primary/--primary-deep dipetakan ulang di sini karena --primary global
+   mode gelap = cream; tanpa sorotan radial agar latar satu warna. */
 .footer {
+  --primary: var(--band);
+  --primary-deep: var(--tm-deep);
   position: relative;
   overflow: hidden;
   padding: clamp(72px, 9vw, 112px) 0 28px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--primary-deep) 92%, #000) 0%, var(--primary-deep) 55%, color-mix(in srgb, var(--primary-deep) 80%, var(--primary)) 100%);
+  background: var(--tm-deep);
   color: rgba(255, 255, 255, 0.82);
 }
 
 .glow {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(42rem 26rem at 8% 92%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%),
-    radial-gradient(36rem 24rem at 96% 70%, color-mix(in srgb, var(--primary) 45%, transparent), transparent 70%);
-  opacity: 0.55;
+  display: none;
 }
 
 .inner {
@@ -27,7 +25,7 @@
   padding: 44px clamp(22px, 4vw, 52px) 40px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 22px;
-  background: color-mix(in srgb, var(--primary) 62%, var(--primary-deep));
+  background: var(--band);
   box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.55);
 }
 
@@ -474,7 +472,4 @@
   }
 }
 
-/* Tema gelap: --primary lebih terang, jadi panel dicampur lebih banyak warna dasar agar teks putih tetap kontras. */
-:global([data-theme='dark']) .panel {
-  background: color-mix(in srgb, var(--primary) 30%, var(--primary-deep));
-}
+

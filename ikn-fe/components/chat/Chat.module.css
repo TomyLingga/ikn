@@ -94,7 +94,7 @@
 .mine .bubble {
   border-bottom-right-radius: 4px;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 :global([data-theme='dark']) .mine .bubble {
@@ -213,7 +213,7 @@
   border: 0;
   border-radius: 12px;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   cursor: pointer;
   transition: background 0.15s var(--ease), transform 0.12s var(--ease);
 }

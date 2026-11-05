@@ -7,7 +7,8 @@ import Breadcrumb from '@/components/Breadcrumb';
 import { useLang } from '@/components/LanguageProvider';
 import { useSite } from '@/components/SiteProvider';
 import { tr } from '@/lib/cms';
-import type { I18n, PageSection } from '@/lib/cms';
+import type { I18n, MediaSummary, PageSection } from '@/lib/cms';
+import MediaVideo, { isEmbedVideo } from '@/components/MediaVideo';
 import type { Lang } from '@/lib/types';
 import { asList, asText, breadcrumbItems, type PageHeaderContent } from '../utils';
 
@@ -19,6 +20,7 @@ interface Props {
 interface Slide {
   url: string;
   video: boolean;
+  source?: MediaSummary;
   caption: string;
 }
 
@@ -34,7 +36,7 @@ export default function PageHeaderSection({ section, pageTitle }: Props) {
   const title = tr(c.title, lang);
   const lead = tr(c.lead, lang);
   const slides: Slide[] = asList<NonNullable<PageHeaderContent['media']>[number]>(c.media).flatMap((m) =>
-    m.file?.url ? [{ url: m.file.url, video: (m.file.mime || '').startsWith('video/'), caption: tr(m.caption, lang) }] : [],
+    m.file?.url ? [{ url: m.file.url, video: (m.file.mime || '').startsWith('video/'), source: m.file, caption: tr(m.caption, lang) }] : [],
   );
   const crumbs = c.breadcrumb ? breadcrumbItems(pathname || '/', site.menus.header.items, lang, pageTitle) : null;
 
@@ -97,7 +99,8 @@ function Showcase({ slides, interval, lang }: { slides: Slide[]; interval: numbe
   const next = useCallback(() => setIndex((i) => (i + 1) % count), [count]);
 
   useEffect(() => {
-    if (count < 2 || !current || current.video) return;
+    // Video unggahan berganti saat selesai (onEnded); video dari URL (iframe) tidak memberi sinyal selesai, jadi memakai timer.
+    if (count < 2 || !current || (current.video && !isEmbedVideo(current.source))) return;
     const timer = window.setTimeout(next, interval * 1000);
     return () => window.clearTimeout(timer);
   }, [index, count, current, interval, next]);
@@ -121,11 +124,12 @@ function Showcase({ slides, interval, lang }: { slides: Slide[]; interval: numbe
       {slides.map((slide, i) => (
         <div key={`${slide.url}-${i}`} className={`ph-slide${i === index ? ' is-active' : ''}`} aria-hidden={i !== index}>
           {slide.video ? (
-            <video
+            <MediaVideo
               ref={(el) => {
                 videos.current[i] = el;
               }}
-              src={slide.url}
+              source={slide.source ?? { url: slide.url }}
+              background
               muted
               playsInline
               preload={i === 0 ? 'auto' : 'metadata'}

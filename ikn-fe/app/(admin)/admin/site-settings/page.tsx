@@ -8,7 +8,7 @@ import MailSettingsCard from '@/components/admin/MailSettingsCard';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { EMPTY_MAIL_SETTINGS, type MailSettings, type SiteSettings, type WhatsAppContact, type AuthSlide } from '@/lib/cms';
-import { THEME_DEFAULTS, THEME_VARIABLES, themeColor, type ThemeSettings } from '@/lib/theme';
+import { THEME_DEFAULTS, THEME_KEYS, THEME_VARIABLES, themeColor, type ThemeSettings } from '@/lib/theme';
 
 type CompanyPatch = Partial<SiteSettings['company']>;
 type SitePatch = Partial<SiteSettings['site']>;
@@ -20,7 +20,6 @@ type ThemePatch = Partial<ThemeSettings>;
 const emptyContact = { whatsapp: '', whatsapp_message: { id: '', en: '' }, whatsapp_contacts: [] as WhatsAppContact[] };
 const emptyAnalytics = { ga_measurement_id: '', gsc_verification: '' };
 const emptyTheme: ThemeSettings = { ...THEME_DEFAULTS };
-const THEME_KEYS = Object.keys(THEME_VARIABLES) as (keyof ThemeSettings)[];
 
 // Site settings (GET/PUT /admin/site-settings): company identity, footer texts, default SEO.
 export default function AdminSiteSettings() {
@@ -54,7 +53,7 @@ export default function AdminSiteSettings() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  // Pratinjau langsung: warna tema di form dipasang ke --theme-* pada <html> (mengalahkan style dari server);
+  // Pratinjau langsung: warna tema di form dipasang ke --tl-*/--td-* pada <html> (mengalahkan style dari server);
   // nilai kosong/tidak valid dipratinjau sebagai bawaan. Saat halaman ditinggalkan, kembali ke nilai tersimpan.
   const previewTheme = settings?.theme;
   useEffect(() => {
@@ -130,6 +129,20 @@ export default function AdminSiteSettings() {
   }
 
   const theme = settings.theme ?? emptyTheme;
+  const themeModes: [string, string, [keyof ThemeSettings, string, string][]][] = [
+    ['light', t('Mode terang', 'Light mode'), [
+      ['light_base', t('Warna dominan (latar)', 'Dominant colour (background)'), t('Latar halaman dan kartu, sekitar 60%. Bawaan cream.', 'Page and card background, about 60%. Default cream.')],
+      ['light_ink', t('Warna kedua (teks & pita)', 'Second colour (text & bands)'), t('Teks, judul, pita, tombol utama, header email, sekitar 30%. Bawaan navy.', 'Text, headings, bands, main buttons, email header, about 30%. Default navy.')],
+      ['light_accent', t('Warna aksen', 'Accent colour'), t('Ikon, label kecil, tombol CTA, penanda menu aktif, sekitar 10%. Bawaan coral.', 'Icons, small labels, CTA buttons, active menu marker, about 10%. Default coral.')],
+      ['light_soft', t('Latar section berfoto', 'Photo section background'), t('Warna dasar section berfoto latar bernada terang. Bawaan biru muda.', 'Base colour of light-toned photo-background sections. Default light blue.')],
+    ]],
+    ['dark', t('Mode gelap', 'Dark mode'), [
+      ['dark_base', t('Warna dominan (latar)', 'Dominant colour (background)'), t('Latar halaman, kartu, dan pita, sekitar 60%. Bawaan navy.', 'Page, card and band background, about 60%. Default navy.')],
+      ['dark_ink', t('Warna kedua (teks)', 'Second colour (text)'), t('Teks, judul, dan tombol utama, sekitar 30%. Bawaan cream.', 'Text, headings and main buttons, about 30%. Default cream.')],
+      ['dark_accent', t('Warna aksen', 'Accent colour'), t('Ikon, label kecil, tombol CTA, penanda menu aktif, sekitar 10%. Bawaan coral.', 'Icons, small labels, CTA buttons, active menu marker, about 10%. Default coral.')],
+      ['dark_deep', t('Latar terdalam', 'Deepest background'), t('Latar panel admin, sidebar, dan bilah atas di mode gelap. Bawaan navy hampir hitam.', 'Admin panel, sidebar and top bar background in dark mode. Default near-black navy.')],
+    ]],
+  ];
   const themeField = (key: keyof ThemeSettings, label: string, hint: string) => (
     <label>
       <span className="field-label">{label}</span>
@@ -392,22 +405,42 @@ export default function AdminSiteSettings() {
           <div className="admin-form">
             <p className="admin-field-hint">
               {t(
-                'Warna logo IKN: biru dan putih. Perubahan langsung dipratinjau di panel ini dan berlaku di seluruh situs (company profile dan toko online) setelah disimpan. Tombol "Bawaan" mengembalikan warna standar.',
-                'IKN logo colours: blue and white. Changes preview instantly in this panel and apply to the whole site (company profile and shop) once saved. "Bawaan" restores the default colour.',
+                'Satu set warna untuk tiap mode tampilan. Komposisi: warna dominan sekitar 60% (latar), warna kedua 30% (teks, pita, tombol), warna aksen 10% (ikon, label kecil, penanda aktif). Perubahan langsung dipratinjau di panel ini dan berlaku di company profile, toko online, portal customer, dan panel admin setelah disimpan. Tombol "Bawaan" mengembalikan warna standar.',
+                'One colour set per display mode. Composition: dominant colour about 60% (background), second colour 30% (text, bands, buttons), accent 10% (icons, small labels, active markers). Changes preview instantly and apply to the company profile, shop, customer portal and admin panel once saved. "Bawaan" restores the default.',
               )}
             </p>
-            <div className="admin-form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-              {themeField('primary', t('Warna utama', 'Primary colour'), t('Tombol, tautan, label, ikon aktif.', 'Buttons, links, labels, active icons.'))}
-              {themeField('primary_deep', t('Warna gelap', 'Deep colour'), t('Footer dan blok berlatar gelap.', 'Footer and dark background blocks.'))}
-              {themeField('accent', t('Warna aksen', 'Accent colour'), t('Nomor bagian, badge promo, sorotan kecil.', 'Section numbers, promo badges, small highlights.'))}
-            </div>
-            <div className="theme-swatches" aria-hidden="true">
-              {THEME_KEYS.map((key) => (
-                <div key={key} className="theme-swatch" style={{ background: themeColor(theme, key) }}>
-                  {themeColor(theme, key)}
-                </div>
-              ))}
-            </div>
+            {themeModes.map(([mode, title, fields]) => {
+              const base = themeColor(theme, fields[0]![0]);
+              const ink = themeColor(theme, fields[1]![0]);
+              const accent = themeColor(theme, fields[2]![0]);
+              const onAccent = mode === 'light' ? ink : base;
+              return (
+                <fieldset key={mode} className="theme-mode">
+                  <legend>{title}</legend>
+                  <div className="admin-form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))' }}>
+                    {fields.map(([key, label, hint]) => (
+                      <div key={key}>{themeField(key, label, hint)}</div>
+                    ))}
+                  </div>
+                  {/* Pratinjau komposisi mode ini, tidak bergantung pada mode yang sedang aktif di panel. */}
+                  <div className="theme-preview" aria-hidden="true" style={{ background: base, color: ink }}>
+                    <div className="theme-preview-text">
+                      <small style={{ color: accent }}>/ {title}</small>
+                      <strong>{t('Judul contoh halaman', 'Sample page heading')}</strong>
+                      <span>{t('Teks isi memakai warna kedua di atas warna dominan.', 'Body text uses the second colour on the dominant colour.')}</span>
+                    </div>
+                    <span className="theme-preview-btn" style={{ background: accent, color: onAccent }}>
+                      {t('Tombol aksen', 'Accent button')}
+                    </span>
+                    <div className="theme-preview-bar">
+                      <i style={{ background: base, flex: 6 }}>60%</i>
+                      <i style={{ background: ink, color: base, flex: 3 }}>30%</i>
+                      <i style={{ background: accent, color: onAccent, flex: 1 }}>10%</i>
+                    </div>
+                  </div>
+                </fieldset>
+              );
+            })}
           </div>
         </AdminCard>
 

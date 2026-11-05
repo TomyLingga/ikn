@@ -86,7 +86,7 @@
 .pillIconWa { background: #25d366; }
 .pillIconChat { background: var(--ink); color: var(--paper); }
 :global([data-theme='dark']) .pillIconChat { background: var(--primary); color: #06121f; }
-.pillOn .pillIconChat { background: var(--primary); color: #fff; }
+.pillOn .pillIconChat { background: var(--primary); color: var(--on-primary); }
 
 .badge {
   position: absolute;

@@ -19,6 +19,6 @@ class MediaResource extends JsonResource
             'isImage' => $this->isImage(),
             'meta' => $this->meta,
             'createdAt' => optional($this->created_at)->toApiString(),
-        ];
+        ] + $this->externalSummary();
     }
 }

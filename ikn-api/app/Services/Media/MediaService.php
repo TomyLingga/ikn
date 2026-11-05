@@ -120,8 +120,28 @@ class MediaService
             throw ApiException::conflict('MEDIA_IN_USE', __('api.media_in_use'));
         }
 
-        Storage::disk($media->disk)->delete($media->path);
+        if (! $media->isExternal()) {
+            Storage::disk($media->disk)->delete($media->path);
+        }
         $media->delete();
+    }
+
+    /** Media dari URL (A-92): tidak ada berkas yang disimpan, hanya baris media berdisk external. */
+    public function fromUrl(string $url, string $kind = 'auto', ?string $name = null, string $collection = 'general', ?User $user = null): Media
+    {
+        $resolved = ExternalMedia::resolve($url, $kind);
+
+        return Media::create([
+            'disk' => Media::DISK_EXTERNAL,
+            // Penanda unik (bukan URL): pencarian rujukan teks berbasis path tidak pernah cocok untuk media URL.
+            'path' => 'external/'.Str::uuid(),
+            'original_name' => mb_substr(trim((string) $name) ?: $resolved['name'], 0, 255),
+            'mime' => $resolved['mime'],
+            'size' => 0,
+            'collection' => $collection,
+            'meta' => $resolved['meta'],
+            'uploaded_by' => $user?->id,
+        ]);
     }
 
     /**

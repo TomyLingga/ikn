@@ -381,6 +381,26 @@ paths:
         '201': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Media' } } } } } }
         '413': { description: FILE_TOO_LARGE }
         '415': { description: UNSUPPORTED_MEDIA_TYPE }
+  /admin/media/url:
+    post:
+      tags: [admin-media]
+      security: [{ cookieAuth: [] }]
+      summary: Tautkan foto/video dari URL tanpa mengunggah (A-92)
+      description: 'YouTube (watch, youtu.be, shorts, embed), Vimeo, Google Drive (berkas dibagikan publik; bawaan gambar, kind=video untuk video), atau URL langsung berkas gambar/video (jenis dari ekstensi; tanpa ekstensi wajib kind). Disimpan sebagai media disk external berukuran 0, tidak ada berkas di server. URL tidak dikenali / jenis tidak cocok → 422 pada url.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, maxLength: 2048, example: 'https://youtu.be/FGJQW6l2hrk' }
+                kind: { type: string, enum: [auto, image, video], default: auto }
+                name: { type: string, maxLength: 120, description: 'nama tampilan; kosong = dari URL' }
+                collection: { type: string, default: general }
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Media' } } } } } }
+        '422': { description: VALIDATION_ERROR (url) }
   /admin/media/{media}:
     delete:
       tags: [admin-media]
@@ -1038,14 +1058,18 @@ components:
       properties:
         id: { type: integer }
         url: { type: string }
-        disk: { type: string, enum: [public, private] }
-        mime: { type: string }
+        disk: { type: string, enum: [public, private, external] }
+        mime: { type: string, description: 'media URL: video/youtube, video/vimeo, video/x-gdrive, image/x-gdrive, image/x-url, video/x-url, atau mime dari ekstensi' }
         size: { type: integer }
         originalName: { type: string }
         collection: { type: string }
         isImage: { type: boolean }
         meta: { type: object, nullable: true }
         createdAt: { type: string, format: date-time }
+        provider: { type: string, enum: [youtube, vimeo, gdrive, url], description: 'hanya media dari URL (disk external)' }
+        embedUrl: { type: string, nullable: true, description: 'URL pemutar iframe (YouTube/Vimeo/Drive); null = putar langsung lewat <video>/<img>' }
+        thumbnailUrl: { type: string, nullable: true }
+        sourceUrl: { type: string, nullable: true, description: 'URL asli yang ditempel admin' }
     MediaSummary:
       type: object
       nullable: true
@@ -1055,6 +1079,10 @@ components:
         mime: { type: string }
         size: { type: integer }
         originalName: { type: string }
+        provider: { type: string, enum: [youtube, vimeo, gdrive, url], description: 'hanya media dari URL (disk external)' }
+        embedUrl: { type: string, nullable: true, description: 'URL pemutar iframe (YouTube/Vimeo/Drive); null = putar langsung lewat <video>/<img>' }
+        thumbnailUrl: { type: string, nullable: true }
+        sourceUrl: { type: string, nullable: true, description: 'URL asli yang ditempel admin' }
     User:
       type: object
       properties:
@@ -1144,11 +1172,16 @@ components:
             gsc_verification: { type: string, description: 'token meta google-site-verification' }
         theme:
           type: object
-          description: 'Warna tema situs, hex #rrggbb (disimpan lowercase; kosong = warna bawaan CSS). FE menyuntik nilai valid sebagai --theme-primary / --theme-primary-deep / --theme-accent di root layout; nilai lain → 422.'
+          description: 'Tema Navy · Cream · Coral (A-91), satu set per mode, hex #rrggbb (disimpan lowercase; kosong = warna bawaan CSS). FE menyuntik nilai valid sebagai --tl-* (terang) / --td-* (gelap) di root layout; nilai lain → 422.'
           properties:
-            primary: { type: string, example: '#0b6fb8', description: 'tombol, tautan, label, ikon aktif' }
-            primary_deep: { type: string, example: '#0a3f6b', description: 'footer dan blok latar gelap' }
-            accent: { type: string, example: '#1785cc', description: 'nomor bagian, badge promo, sorotan kecil' }
+            light_base: { type: string, example: '#f4ede0', description: 'terang: latar dominan (cream)' }
+            light_ink: { type: string, example: '#102d50', description: 'terang: teks, pita, tombol (navy); juga header email' }
+            light_accent: { type: string, example: '#ff6b5b', description: 'terang: sorotan kecil, ikon (coral)' }
+            light_soft: { type: string, example: '#dceaf7', description: 'terang: latar section berfoto (biru muda)' }
+            dark_base: { type: string, example: '#102d50', description: 'gelap: latar dominan (navy)' }
+            dark_ink: { type: string, example: '#f4ede0', description: 'gelap: teks dan tombol (cream)' }
+            dark_accent: { type: string, example: '#ff6b5b', description: 'gelap: sorotan kecil, ikon (coral)' }
+            dark_deep: { type: string, example: '#0b1220', description: 'gelap: latar terdalam (panel admin, pita)' }
         invoice:
           type: object
           description: 'Kop & kaki cetakan invoice dari gambar (A-83), publik. PUT menerima id media gambar (PNG/JPG; PDF → 422) atau null/"" = kosong (FE merender kop/kaki dari teks). Bawaan seeder = pindaian kop surat klien. Media yang dipakai tidak bisa dihapus.'

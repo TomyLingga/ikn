@@ -1,5 +1,7 @@
 import './globals.css';
 import './shared.css';
+// Tema Navy · Cream · Coral (A-91): aturan lintas area (ikon, CTA, sidebar admin); token di globals.css.
+import './styles/theme.css';
 import { Archivo, IBM_Plex_Mono } from 'next/font/google';
 import { LanguageProvider } from '@/components/LanguageProvider';
 import { CartProvider } from '@/components/CartProvider';

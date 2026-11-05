@@ -214,3 +214,9 @@
   .today { grid-template-columns: minmax(0, 1fr); }
   .todayItem { padding-left: 0; border-left: 0; }
 }
+
+/* Tombol segarkan berupa ikon (permintaan pemilik 2026-11-05); ikon berputar selama memuat. */
+.refreshBtn { width: 36px; height: 36px; padding: 0; display: inline-grid; place-items: center; }
+.refreshing svg { animation: refreshSpin 0.9s linear infinite; }
+@keyframes refreshSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .refreshing svg { animation: none; } }

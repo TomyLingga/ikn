@@ -22,7 +22,7 @@
   top: 2px;
   right: 2px;
   background: var(--amber);
-  color: #fff;
+  color: var(--on-accent);
   font-family: var(--font-mono);
   font-size: 0.6rem;
   font-weight: 600;

@@ -74,7 +74,7 @@ export default function NavMeniscus({ gridRef, routeKey }: { gridRef: RefObject<
       grad.setAttribute('x2', String(x + GLINT));
       svg.style.opacity = String(op);
       bead.style.opacity = String(op);
-      bead.style.transform = `translate(${(left + x).toFixed(1)}px, ${(top + depth).toFixed(1)}px) translate(-50%, -88%) rotate(${(v * 0.9).toFixed(1)}deg)`;
+      bead.style.transform = `translate(${(left + x).toFixed(1)}px, ${(top + depth).toFixed(1)}px) translate(-50%, -50%)`;
     };
     const tick = () => {
       raf = 0;

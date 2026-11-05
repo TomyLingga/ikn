@@ -17,7 +17,7 @@
 .identity strong, .identity small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .identity strong { font-size: 0.86rem; }
 .identity small { margin-top: 3px; color: var(--ink-soft); font-size: 0.7rem; }
-.avatar { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; background: var(--green); color: #fff; font-family: var(--font-mono); font-size: 0.72rem; }
+.avatar { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; background: var(--green); color: var(--on-primary); font-family: var(--font-mono); font-size: 0.72rem; }
 .main { min-width: 0; display: flex; flex-direction: column; }
 .topbar { position: sticky; top: 0; z-index: 30; min-height: 70px; background: var(--neu-bg-strong); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
 .topbarInner { width: 100%; max-width: 1400px; margin: 0 auto; display: flex; align-items: center; gap: 16px; padding: 12px clamp(20px, 3vw, 38px); }

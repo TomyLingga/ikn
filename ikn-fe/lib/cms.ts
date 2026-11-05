@@ -1,3 +1,4 @@
+import type { ThemeSettings } from '@/lib/theme';
 // ============================ TIPE & HELPER CMS ============================
 // Bentuk data dari ikn-api (/api/v1/content/*, /api/v1/admin/*). Field translatable
 // selalu berbentuk { id, en }; pilih bahasa dengan tr() + useLang().
@@ -15,10 +16,15 @@ export interface MediaSummary {
   mime: string;
   size: number;
   originalName: string;
+  // Media dari URL (ASUMSI A-92): penyedia + URL pemutar iframe (YouTube/Vimeo/Drive) + gambar pratinjau.
+  provider?: 'youtube' | 'vimeo' | 'gdrive' | 'url';
+  embedUrl?: string | null;
+  thumbnailUrl?: string | null;
+  sourceUrl?: string | null;
 }
 
 export interface MediaItem extends MediaSummary {
-  disk: 'public' | 'private';
+  disk: 'public' | 'private' | 'external';
   collection: string;
   isImage: boolean;
   meta: { width?: number; height?: number } | null;
@@ -201,12 +207,8 @@ export interface SiteSettings {
     ga_measurement_id: string; // G-XXXXXXX; kosong = tanpa GA
     gsc_verification: string; // token meta google-site-verification
   };
-  // Tema warna (hex #rrggbb; kosong = bawaan CSS). Disuntik ke --theme-* oleh app/layout.tsx, lihat lib/theme.ts.
-  theme?: {
-    primary: string;
-    primary_deep: string;
-    accent: string;
-  };
+  // Tema warna per mode (hex #rrggbb; kosong = bawaan CSS). Disuntik ke --tl-*/--td-* oleh app/layout.tsx, lihat lib/theme.ts.
+  theme?: ThemeSettings;
   /** Kop & kaki cetakan invoice dari gambar (ASUMSI A-83); kosong = dirender dari teks. */
   invoice?: {
     header_image: MediaSummary | null;

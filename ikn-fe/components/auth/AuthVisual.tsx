@@ -7,11 +7,13 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { useSite } from '@/components/SiteProvider';
 import { tr } from '@/lib/cms';
+import MediaVideo, { isEmbedVideo, type VideoSource } from '@/components/MediaVideo';
 import styles from '@/app/(auth)/login/page.module.css';
 
 interface Slide {
   src: string;
   kind: 'image' | 'video';
+  source?: VideoSource;
   caption: { id: string; en: string };
 }
 
@@ -35,6 +37,7 @@ export default function AuthVisual() {
       .map((s) => ({
         src: s.media.url,
         kind: (s.media.mime || '').startsWith('video/') ? ('video' as const) : ('image' as const),
+        source: s.media,
         caption: { id: tr(s.caption, 'id'), en: tr(s.caption, 'en') },
       }));
     return custom.length > 0 ? custom : DEFAULT_SLIDES;
@@ -44,7 +47,8 @@ export default function AuthVisual() {
   const next = useCallback(() => setIndex((i) => (i + 1) % slides.length), [slides.length]);
 
   useEffect(() => {
-    if (slides.length < 2 || current.kind === 'video') return;
+    // Video dari URL (iframe) tidak memberi sinyal selesai: berganti dengan timer seperti foto.
+    if (slides.length < 2 || (current.kind === 'video' && !isEmbedVideo(current.source))) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const timer = window.setTimeout(next, INTERVAL_MS);
     return () => window.clearTimeout(timer);
@@ -56,9 +60,10 @@ export default function AuthVisual() {
         <div key={`${slide.src}-${i}`} className={`${styles.visualSlide} ${i === index ? styles.visualSlideOn : ''}`} aria-hidden={i !== index}>
           {slide.kind === 'video' ? (
             i === index && (
-              <video
+              <MediaVideo
                 className={styles.visualVideo}
-                src={slide.src}
+                source={slide.source ?? { url: slide.src }}
+                background
                 autoPlay
                 muted
                 playsInline

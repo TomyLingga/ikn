@@ -8,7 +8,11 @@ class Media extends Model
 {
     public const DISK_PUBLIC = 'public';
     public const DISK_PRIVATE = 'private';
+    /** Media dari URL (A-92): tanpa berkas; meta {provider, url, embedUrl, thumbnailUrl, sourceUrl}. */
+    public const DISK_EXTERNAL = 'external';
     public const DISKS = [self::DISK_PUBLIC, self::DISK_PRIVATE];
+    /** Disk yang tampil di media library dan boleh dirujuk konten publik. */
+    public const LIBRARY_DISKS = [self::DISK_PUBLIC, self::DISK_EXTERNAL];
 
     protected $table = 'media';
 
@@ -18,7 +22,12 @@ class Media extends Model
 
     public function isPublic(): bool
     {
-        return $this->disk === self::DISK_PUBLIC;
+        return in_array($this->disk, self::LIBRARY_DISKS, true);
+    }
+
+    public function isExternal(): bool
+    {
+        return $this->disk === self::DISK_EXTERNAL;
     }
 
     public function isImage(): bool
@@ -34,7 +43,10 @@ class Media extends Model
     // URL publik untuk disk public; endpoint ber-Policy untuk disk private.
     public function url(): string
     {
-        if ($this->isPublic()) {
+        if ($this->isExternal()) {
+            return (string) ($this->meta['url'] ?? '');
+        }
+        if ($this->disk === self::DISK_PUBLIC) {
             return Storage::disk(self::DISK_PUBLIC)->url($this->path);
         }
 
@@ -54,6 +66,21 @@ class Media extends Model
             'mime' => $this->mime,
             'size' => $this->size,
             'originalName' => $this->original_name,
+        ] + $this->externalSummary();
+    }
+
+    /** Field tambahan media dari URL: penyedia, URL embed (pemutar YouTube/Vimeo/Drive), dan gambar pratinjau. */
+    public function externalSummary(): array
+    {
+        if (! $this->isExternal()) {
+            return [];
+        }
+
+        return [
+            'provider' => $this->meta['provider'] ?? 'url',
+            'embedUrl' => $this->meta['embedUrl'] ?? null,
+            'thumbnailUrl' => $this->meta['thumbnailUrl'] ?? null,
+            'sourceUrl' => $this->meta['sourceUrl'] ?? null,
         ];
     }
 }

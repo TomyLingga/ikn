@@ -1,0 +1,92 @@
+/* =====================================================================
+   TEMA Navy · Cream · Coral (ASUMSI A-91, 2026-11-05): aturan yang tidak bisa dinyatakan hanya lewat token.
+   Token warna ada di globals.css (--tl-* / --td-* dari Pengaturan Situs → --tm-* mode aktif → --paper, --ink, dst.)
+   dan site.css (.site-v2 → --c-* / --hv-*). File ini diimpor root layout, jadi berlaku di situs, toko, portal, dan admin.
+
+   Proporsi: terang = cream dominan · navy (teks, pita, tombol) · coral sedikit.
+             gelap  = navy dominan (tanpa blok terang) · cream (teks, tombol) · coral sedikit.
+   Kontras: tombol coral selalu bertulisan navy (--on-accent); teks coral di latar terang = --tm-accent-ink.
+   ===================================================================== */
+
+/* ------------------------------------------------------------------ IKON: coral di semua halaman
+   Ikon komponen Icon (svg 24×24, stroke currentColor). Specificity nol (:where) agar aturan komponen yang memberi
+   warna langsung pada svg tetap menang. Ikon di dalam tombol mengikuti warna teks tombol (tidak hilang di atas coral). */
+:where(svg[viewBox='0 0 24 24'][stroke='currentColor']) { color: var(--tm-icon); }
+:where(button, .btn, [class*='btn'], [class*='Btn'], [class*='button'], [class*='Button'], [class*='FloatingContacts'], [class*='badge'], [class*='Badge'], [class*='chip'], [class*='pill'], .hgrid-watch, .cta-btn) :where(svg[viewBox='0 0 24 24'][stroke='currentColor']){ color: inherit; }
+
+/* ------------------------------------------------------------------ SITUS (.site-v2) */
+/* Sedikit coral: label kecil, tombol utama/CTA (bertulisan navy), garis tautan. */
+html .site-v2 .label{ color: var(--tm-accent-ink); }
+html .site-v2 .btn-solid,
+html .site-v2 .hgrid-actions .btn-solid,
+html .site-v2 .cta-btn{ background: var(--tm-accent); border-color: var(--tm-accent); color: var(--on-accent); }
+html .site-v2 .btn-solid:hover:not(:disabled),
+html .site-v2 .hgrid-actions .btn-solid:hover,
+html .site-v2 .cta-btn:hover:not(:disabled){ background: var(--tm-ink); border-color: var(--tm-ink); color: var(--tm-base); }
+html .site-v2 .link{ color: var(--hv-heading); text-decoration-color: var(--tm-accent); }
+
+/* Section berfoto latar bernada terang: dasar biru muda di mode terang (Pengaturan Situs "Latar section berfoto"). */
+html .site-v2 .sec-bg-light{ background: var(--hv-photo-bg); }
+
+/* Pita (manufaktur, CTA penutup): navy di kedua mode; label coral murni karena latarnya gelap. */
+html .home-v2 [data-section-key='manufaktur'],
+html .home-v2 [data-section-key='fasilitas']{ --hv-line: color-mix(in srgb, var(--hv-band-text) 16%, transparent); }
+html .home-v2 [data-section-key='manufaktur'] .label,
+html .site-v2 .sec-bg-dark .label,
+html .site-v2 .cta-label{ color: var(--tm-accent); }
+html .site-v2 .cta-title{ color: var(--hv-band-text); }
+html .site-v2 .cta-body{ color: color-mix(in srgb, var(--hv-band-text) 80%, transparent); }
+html .site-v2 .cta-btn-ghost{ color: var(--hv-band-text); border-color: color-mix(in srgb, var(--hv-band-text) 45%, transparent); }
+
+/* Hero kisi: lapisan navy dari video, sorotan coral. Kartu sorotan memakai set TERANG di kedua mode
+   (permintaan pemilik 2026-11-04: kartu Resiprene tetap terang di mode gelap). */
+html .site-v2 .hgrid-card{ background: linear-gradient(135deg, color-mix(in srgb, var(--tl-base) 45%, #ffffff) 0%, var(--tl-base) 75%); color: var(--tl-ink); }
+html .site-v2 .hgrid-card-title{ color: var(--tl-ink) !important; }
+html .site-v2 .hgrid-card-note{ color: color-mix(in srgb, var(--tl-ink) 75%, var(--tl-base)); }
+html .site-v2 .hgrid-card-note i{ background: var(--tl-accent); }
+html .site-v2 .hgrid-play{ color: var(--tl-ink); }
+html .site-v2 .hgrid-play span{ background: var(--tl-ink); color: var(--tl-base); }
+html .site-v2 .hgrid-play:hover span{ background: var(--tl-accent); color: var(--tl-ink); }
+html .site-v2 .hgrid-link:hover,
+html .site-v2 .hgrid-link:focus-visible{ background: color-mix(in srgb, var(--tl-ink) 70%, transparent); border-color: color-mix(in srgb, var(--tm-accent) 80%, transparent); }
+html .site-v2 .hgrid-map-pin span{ background: var(--tm-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tm-accent) 35%, transparent), 0 2px 8px rgba(0, 0, 0, 0.45); }
+html .site-v2 .hgrid-map-pin.is-active span{ background: #fff; border-color: var(--tm-accent); }
+html .site-v2 .hgrid-map-pin.is-active span::after{ border-color: var(--tm-accent); }
+html .site-v2 .hgrid-fac-list button i{ background: var(--tm-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tm-accent) 30%, transparent); }
+html .site-v2 .hgrid-fac-list button.is-active{ color: var(--tm-accent); }
+
+/* ------------------------------------------------------------------ ADMIN */
+html :is(.admin-app, .admin-modal-backdrop){ --adm-ring: 0 0 0 3px color-mix(in srgb, var(--tm-accent) 35%, transparent); }
+/* Gelap: latar panel = warna terdalam; sidebar dan bilah atas sedikit lebih terang, kartu = permukaan navy. */
+html[data-theme='dark'] .admin-app{ --paper: var(--td-deep); --adm-field: var(--td-deep); }
+html[data-theme='dark'] .admin-app [class*='AdminShell_sidebar'],
+html[data-theme='dark'] .admin-app [class*='AdminShell_topbar']{ --surface: color-mix(in oklab, var(--td-deep), var(--td-base) 45%); }
+/* Sidebar mengikuti mode; menu aktif = garis kiri + teks coral. */
+html .admin-app [class*='AdminShell_sidebar']{
+  --primary: var(--tm-accent-ink);
+  --green: var(--tm-accent-ink);
+  --green-tint: color-mix(in srgb, var(--tm-accent) 12%, var(--surface));
+  --adm-primary: var(--tm-accent);
+  --adm-tint: color-mix(in srgb, var(--tm-accent) 12%, var(--surface));
+}
+html .admin-app [class*='AdminShell_main']{
+  background:
+    radial-gradient(900px 420px at 16% -10%, color-mix(in srgb, var(--tm-accent) 6%, transparent), transparent 62%),
+    var(--paper);
+}
+
+/* ------------------------------------------------------------------ PORTAL CUSTOMER */
+html[data-theme='dark'] .cust-app{ --paper: var(--td-base); }
+
+/* Tombol utama admin di mode gelap: coral bertulisan navy (gradasi cream terlihat "hitam putih"). Mode terang tetap navy. */
+html[data-theme='dark'] :is(.admin-app, .admin-modal-backdrop) .btn-solid {
+  border-color: var(--tm-accent);
+  background: var(--tm-accent);
+  color: var(--on-accent);
+  box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--tm-accent) 70%, transparent);
+}
+html[data-theme='dark'] :is(.admin-app, .admin-modal-backdrop) .btn-solid:hover:not(:disabled) {
+  border-color: var(--tm-accent);
+  background: color-mix(in srgb, var(--tm-accent) 88%, #ffffff);
+  color: var(--on-accent);
+}

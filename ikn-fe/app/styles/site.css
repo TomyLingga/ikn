@@ -6,32 +6,34 @@
    ===================================================================== */
 
 .site-v2 {
-  /* Palet merek IKN (brief bagian 3). */
-  --c-deep: #102d50;        /* Deep Corporate Blue: judul, blok gelap */
-  --c-blue: #1769aa;        /* IKN Blue: tombol, tautan */
-  --c-industrial: #398bcb;  /* Industrial Blue: aksen sekunder */
-  --c-sky: #42a5d5;         /* Sky Blue: sorotan */
-  --c-soft: #dceaf7;        /* Soft Blue: section biru muda */
-  --c-white: #ffffff;       /* Pure White: latar utama */
-  --c-cloud: #f3f6fa;       /* Cloud Grey: section selang-seling */
-  --c-slate: #344054;       /* Slate: teks isi */
-  --c-muted: #667085;       /* Muted Grey: teks sekunder */
+  /* Palet situs diturunkan dari tema Navy · Cream · Coral (globals.css --tm-*, ASUMSI A-91). Nama --c-* lama dipertahankan
+     agar aturan komponen tidak berubah: deep/blue = navy (teks & pita), sky = coral (sorotan), soft/cloud = cream lebih tua. */
+  --c-deep: var(--tm-ink);
+  --c-blue: var(--tm-ink);
+  --c-industrial: color-mix(in oklab, var(--tm-ink), #ffffff 18%);
+  --c-sky: var(--tm-accent);
+  --c-soft: color-mix(in srgb, var(--tm-ink) 6%, var(--tm-base));
+  --c-white: var(--tm-surface);
+  --c-cloud: color-mix(in srgb, var(--tm-ink) 6%, var(--tm-base));
+  --c-slate: color-mix(in srgb, var(--tm-ink) 84%, var(--tm-base));
+  --c-muted: color-mix(in srgb, var(--tm-ink) 64%, var(--tm-base));
 
   /* Token semantik situs (diganti di mode gelap di bawah). */
-  --hv-bg: var(--c-white);
-  --hv-bg-alt: var(--c-cloud);
+  --hv-bg: var(--tm-base);
+  --hv-bg-alt: color-mix(in srgb, var(--tm-ink) 3.5%, var(--tm-base));
   --hv-bg-soft: var(--c-soft);
-  --hv-band: var(--c-deep);
-  --hv-band-text: var(--c-white);
-  --hv-heading: var(--c-deep);
+  --hv-band: var(--tm-ink);
+  --hv-band-text: var(--tm-base);
+  --hv-heading: var(--tm-ink);
   --hv-text: var(--c-slate);
   --hv-muted: var(--c-muted);
-  --hv-blue: var(--c-blue);
+  --hv-blue: var(--tm-ink);
   --hv-blue-hover: var(--c-industrial);
-  --hv-sky: var(--c-sky);
-  --hv-card: var(--c-white);
-  --hv-line: color-mix(in srgb, var(--c-deep) 12%, transparent);
-  --hv-line-strong: color-mix(in srgb, var(--c-deep) 22%, transparent);
+  --hv-sky: var(--tm-accent);
+  --hv-card: var(--tm-surface);
+  --hv-line: color-mix(in srgb, var(--tm-ink) 13%, transparent);
+  --hv-line-strong: color-mix(in srgb, var(--tm-ink) 24%, transparent);
+  --hv-photo-bg: var(--tm-soft); /* dasar section berfoto latar bernada terang */
   --hv-radius: 6px;
   --hv-pad: clamp(64px, 8vw, 116px);
 
@@ -63,25 +65,28 @@
   color: var(--hv-text);
 }
 
-/* Mode gelap: latar navy berlapis, teks terang, biru dicerahkan agar kontras. */
+/* Mode gelap: navy dominan berlapis (latar, selang-seling sedikit lebih tua, pita paling tua), cream untuk teks,
+   coral untuk tautan/label/tombol. Tidak ada blok terang. */
 [data-theme='dark'] .site-v2 {
-  --c-deep: #0a1f38;
-  --hv-bg: #0c1626;
-  --hv-bg-alt: #111d31;
-  --hv-bg-soft: #13284a;
-  --hv-band: #081a30;
-  --hv-band-text: #f2f7fc;
-  --hv-heading: #eef4fb;
-  --hv-text: #c3cfdd;
-  --hv-muted: #93a3b8;
-  --hv-blue: #5aa9e6;
-  --hv-blue-hover: #7fbdec;
-  --hv-sky: #6cc0e6;
-  --hv-card: #13213a;
-  --hv-line: color-mix(in srgb, #ffffff 11%, transparent);
-  --hv-line-strong: color-mix(in srgb, #ffffff 20%, transparent);
-  --theme-primary: #5aa9e6;
-  --theme-primary-deep: #081a30;
+  --c-deep: color-mix(in oklab, var(--td-base), var(--td-deep) 45%);
+  --c-blue: var(--tm-accent);
+  --c-industrial: color-mix(in oklab, var(--tm-accent), #ffffff 15%);
+  --c-white: var(--tm-surface);
+  --c-cloud: color-mix(in oklab, var(--td-base), var(--td-deep) 22%);
+  --c-soft: var(--tm-surface);
+
+  --hv-bg: var(--td-base);
+  --hv-bg-alt: color-mix(in oklab, var(--td-base), var(--td-deep) 22%);
+  --hv-bg-soft: var(--tm-surface);
+  --hv-band: color-mix(in oklab, var(--td-base), var(--td-deep) 55%);
+  --hv-band-text: var(--td-ink);
+  --hv-blue: var(--tm-accent);
+  --hv-blue-hover: var(--c-industrial);
+  --hv-line: color-mix(in srgb, var(--td-ink) 13%, transparent);
+  --hv-line-strong: color-mix(in srgb, var(--td-ink) 24%, transparent);
+  --hv-photo-bg: transparent;
+  --theme-primary: var(--tm-accent);
+  --theme-primary-deep: var(--c-deep);
 }
 
 /* ---------- Dasar tipografi & kontrol (semua halaman konten) ---------- */
@@ -972,6 +977,7 @@
 .site-v2 .sec-bg-media { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .site-v2 .sec-bg-media img,
 .site-v2 .sec-bg-media video { width: 100%; height: 100%; object-fit: cover; opacity: var(--sec-bg-op, 0.25); }
+.site-v2 .sec-bg-media .media-embed { opacity: var(--sec-bg-op, 0.25); }
 /* Section bawaan punya warna latar datar; saat ada foto latar, warna itu mengalah agar foto terlihat. */
 .site-v2 .sec-bg-body > section,
 .site-v2 .sec-bg-body > .sec-surface > section { background: transparent !important; }

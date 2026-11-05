@@ -4,6 +4,9 @@ import type { ReactNode } from 'react';
 import Icon from '@/components/Icon';
 import type { MediaSummary } from '@/lib/cms';
 
+// Lencana media dari URL (A-92) di kisi media library.
+const PROVIDER_LABEL: Record<string, string> = { youtube: 'YouTube', vimeo: 'Vimeo', gdrive: 'Drive', url: 'URL' };
+
 export function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -43,9 +46,18 @@ export default function MediaGrid<T extends MediaSummary>({
     <div className="media-grid">
       {items.map((item) => {
         const selected = selectedId != null && selectedId === item.id;
-        const thumb = isImageMedia(item) ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.url} alt={item.originalName} loading="lazy" />
+        const thumbUrl = isImageMedia(item) ? item.url : item.thumbnailUrl;
+        const thumb = thumbUrl ? (
+          <span className="media-thumb-img">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={thumbUrl} alt={item.originalName} loading="lazy" />
+            {item.provider && <span className="media-thumb-badge">{PROVIDER_LABEL[item.provider] ?? 'URL'}</span>}
+          </span>
+        ) : item.provider ? (
+          <div className="media-doc">
+            <Icon name="video" size={22} />
+            <span>{PROVIDER_LABEL[item.provider] ?? 'URL'}</span>
+          </div>
         ) : (
           <div className="media-doc">
             <Icon name="quote" size={22} />

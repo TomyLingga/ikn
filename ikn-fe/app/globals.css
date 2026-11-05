@@ -3,28 +3,50 @@
   --font-sans: var(--font-archivo, 'Archivo'), 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
   --font-mono: var(--font-plex-mono, 'IBM Plex Mono'), 'Cascadia Mono', ui-monospace, 'Courier New', monospace;
 
-  /* Palet putih + biru (logo IKN). Latar putih-kebiruan, tinta navy. */
-  --paper: #f4f7fb;
-  --paper-2: #e9eef5;
-  --surface: #ffffff;
-  --ink: #0f1b2d;
-  --ink-soft: #4b5a6e;
-  --line: #d6dee9;
-  --line-strong: #b4c1d2;
-
-  /* Warna tema: bawaan di sini, dapat diubah admin di Pengaturan Situs (settings.theme.*);
-     app/layout.tsx menyuntik nilai tersimpan sebagai html:root{--theme-*} (lib/theme.ts).
+  /* Tema Navy · Cream · Coral (ASUMSI A-91). Satu set per mode, bawaan di sini; admin mengubahnya di Pengaturan Situs
+     (settings.theme.light_* / dark_*) dan app/layout.tsx menyuntik html:root{--tl-* / --td-*} (lib/theme.ts).
      Ubah bawaan di sini = ubah juga THEME_DEFAULTS di lib/theme.ts dan SettingsService (API). */
-  --theme-primary: #0b6fb8;
-  --theme-primary-deep: #0a3f6b;
-  --theme-accent: #1785cc;
+  --tl-base: #f4ede0;   /* terang: latar dominan (cream) */
+  --tl-ink: #102d50;    /* terang: teks, pita, tombol (navy) */
+  --tl-accent: #ff6b5b; /* terang: sorotan kecil (coral) */
+  --tl-soft: #dceaf7;   /* terang: latar section berfoto (biru muda) */
+  --td-base: #102d50;   /* gelap: latar dominan (navy) */
+  --td-ink: #f4ede0;    /* gelap: teks, tombol (cream) */
+  --td-accent: #ff6b5b; /* gelap: sorotan kecil (coral) */
+  --td-deep: #0b1220;   /* gelap: latar terdalam (panel admin) */
+
+  /* Set mode aktif (--tm-*): semua token lain diturunkan dari sini, rumus sama di kedua mode kecuali ditimpa di bawah.
+     Kontras: teks coral di latar terang memakai --tm-accent-ink (≥ 4,5:1), ikon --tm-icon (≥ 3:1). */
+  --tm-base: var(--tl-base);
+  --tm-ink: var(--tl-ink);
+  --tm-accent: var(--tl-accent);
+  --tm-soft: var(--tl-soft);
+  --tm-deep: color-mix(in oklab, var(--tl-ink), #000 28%);
+  --tm-surface: color-mix(in srgb, var(--tm-base) 45%, #ffffff);
+  --tm-accent-ink: color-mix(in srgb, var(--tm-accent) 68%, #000000);
+  --tm-icon: color-mix(in srgb, var(--tm-accent) 88%, #000000);
+  --on-primary: var(--tm-base); /* teks di atas tombol/latar --primary */
+  --on-accent: var(--tm-ink);   /* teks di atas latar coral */
+  --band: var(--tm-ink);        /* pita/banner gelap (navy di kedua mode) */
+
+  --paper: var(--tm-base);
+  --paper-2: color-mix(in srgb, var(--tm-ink) 6%, var(--tm-base));
+  --surface: var(--tm-surface);
+  --ink: var(--tm-ink);
+  --ink-soft: color-mix(in srgb, var(--tm-ink) 72%, var(--tm-base));
+  --line: color-mix(in srgb, var(--tm-ink) 14%, var(--tm-base));
+  --line-strong: color-mix(in srgb, var(--tm-ink) 26%, var(--tm-base));
+
+  --theme-primary: var(--tm-ink);
+  --theme-primary-deep: var(--tm-deep);
+  --theme-accent: var(--tm-accent);
 
   --primary: var(--theme-primary);
   --primary-deep: var(--theme-primary-deep);
-  --primary-tint: color-mix(in srgb, var(--theme-primary) 10%, #ffffff);
-  --primary-soft: color-mix(in srgb, var(--theme-primary) 40%, #ffffff); /* label di atas foto/latar gelap */
-  --accent: var(--theme-accent);
-  --accent-tint: color-mix(in srgb, var(--theme-accent) 12%, #ffffff);
+  --primary-tint: color-mix(in srgb, var(--theme-primary) 9%, var(--tm-surface));
+  --primary-soft: color-mix(in srgb, var(--tm-accent) 55%, #ffffff); /* label di atas foto/latar gelap */
+  --accent: var(--tm-accent-ink);
+  --accent-tint: color-mix(in srgb, var(--tm-accent) 12%, var(--tm-surface));
 
   /* Alias lama (palet hijau/oker) agar CSS komponen tidak perlu diubah: semua menunjuk ke token tema. */
   --green: var(--primary);
@@ -73,21 +95,19 @@
 
 /* ---------- Mode gelap ---------- */
 [data-theme='dark'] {
-  --paper: #0b1220;
-  --paper-2: #101a2b;
-  --surface: #141f33;
-  --ink: #e8eef7;
-  --ink-soft: #a9b6c8;
-  --line: #263349;
-  --line-strong: #364764;
-
-  /* Warna tema diterangkan agar kontras di latar gelap; --green/--amber tetap alias ke sini. */
-  --primary: color-mix(in srgb, var(--theme-primary) 60%, #ffffff);
-  --primary-deep: color-mix(in srgb, var(--theme-primary-deep) 60%, #000000);
-  --primary-tint: color-mix(in srgb, var(--theme-primary) 22%, var(--surface));
-  --primary-soft: color-mix(in srgb, var(--theme-primary) 45%, #ffffff);
-  --accent: color-mix(in srgb, var(--theme-accent) 70%, #ffffff);
-  --accent-tint: color-mix(in srgb, var(--theme-accent) 22%, var(--surface));
+  /* Set gelap: navy dominan, cream untuk teks dan tombol utama, coral sedikit. Token turunan memakai rumus :root. */
+  --tm-base: var(--td-base);
+  --tm-ink: var(--td-ink);
+  --tm-accent: var(--td-accent);
+  --tm-soft: var(--td-base);
+  --tm-deep: var(--td-deep);
+  --tm-surface: color-mix(in oklab, var(--td-base), #ffffff 6%);
+  --tm-accent-ink: var(--td-accent);
+  --tm-icon: var(--td-accent);
+  --on-accent: var(--td-base);
+  --band: color-mix(in oklab, var(--td-base), #ffffff 4%);
+  --paper-2: color-mix(in oklab, var(--td-base), #ffffff 10%);
+  --accent-tint: color-mix(in srgb, var(--tm-accent) 18%, var(--tm-surface));
   --red: #e0705f;
   --red-tint: #3a1f1c;
   --ok: #6fd3a0;
@@ -137,7 +157,7 @@ body {
 
 ::selection {
   background: var(--green);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 a { color: inherit; text-decoration: none; }
@@ -264,7 +284,7 @@ p { color: var(--ink-soft); }
   background: var(--ink);
   color: var(--paper);
 }
-.btn-solid:hover:not(:disabled) { background: var(--green); border-color: var(--green); color: #fff; }
+.btn-solid:hover:not(:disabled) { background: var(--green); border-color: var(--green); color: var(--on-primary); }
 
 .btn-line:hover:not(:disabled) {
   background: var(--ink);
@@ -274,7 +294,7 @@ p { color: var(--ink-soft); }
 .btn-amber {
   background: var(--amber);
   border-color: var(--amber);
-  color: #fff;
+  color: var(--on-accent);
 }
 .btn-amber:hover:not(:disabled) { background: var(--paper); color: var(--ink); border-color: var(--paper); }
 
@@ -376,3 +396,12 @@ p { color: var(--ink-soft); }
 /* Leaflet: garis putih di sambungan tile pada skala layar pecahan (125%/150%). Bawaan Leaflet `plus-lighter` menjumlahkan
    piksel tepi yang bertumpuk (jadi terang); tile dilebarkan setengah piksel dan ditumpuk biasa agar sambungan tertutup. */
 .leaflet-container img.leaflet-tile { width: 256.5px !important; height: 256.5px !important; mix-blend-mode: normal !important; }
+
+/* Video dari URL (YouTube/Vimeo/Google Drive, components/MediaVideo, ASUMSI A-92). Mode latar = memenuhi kotak induk
+   seperti object-fit: cover (ukuran 16:9 dihitung dari kotak induk lewat container units). */
+.media-embed { position: relative; display: block; overflow: hidden; }
+.media-embed iframe { display: block; border: 0; }
+.media-embed.is-bg { position: absolute; inset: 0; container-type: size; pointer-events: none; }
+.media-embed.is-bg iframe { position: absolute; top: 50%; left: 50%; width: max(100cqw, calc(100cqh * 16 / 9)); height: max(100cqh, calc(100cqw * 9 / 16)); transform: translate(-50%, -50%); }
+.media-embed.is-inline { width: 100%; aspect-ratio: 16 / 9; background: #000; }
+.media-embed.is-inline iframe { width: 100%; height: 100%; }

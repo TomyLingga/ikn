@@ -74,23 +74,26 @@
 .link:hover { color: var(--ink); }
 /* Item utama aktif: halaman ini (atau anaknya) sedang dibuka; garis pendek di bawah label. */
 .active { color: var(--green); position: relative; }
-.active::after { content: ''; position: absolute; left: 13px; right: 13px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--green); }
+.active::after { content: ''; position: absolute; left: 13px; right: 13px; bottom: 3px; height: 2px; border-radius: 2px; background: var(--tm-accent); }
 .linkParent.active::after { right: 30px; }
 /* Garis lekuk + tetesan di bawah menu utama (NavMeniscus): tampil hanya di layar lebar setelah komponen siap
    (.hasBead), lalu garis aktif statis disembunyikan karena tetesan sudah menandai item aktif. */
 .menuWrap { position: relative; }
 .meniscus,
 .bead { display: none; position: absolute; pointer-events: none; }
-.meniscus { overflow: visible; color: var(--accent); opacity: 0; }
+/* Warna aksen tema (coral, permintaan pemilik 2026-11-05). */
+.meniscus { overflow: visible; color: var(--tm-accent); opacity: 0; }
 .meniscus path { fill: none; stroke-width: 1.25px; stroke-linecap: round; }
+/* Bulatan coral (dulu tetesan biru; diganti atas permintaan pemilik 2026-11-05). */
 .bead {
   top: 0;
   left: 0;
-  width: 0.7rem;
-  height: 0.91rem;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
   opacity: 0;
-  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 130'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='.15' y1='.1' x2='.85' y2='1'%3E%3Cstop offset='0' stop-color='%2399D3EF'/%3E%3Cstop offset='.55' stop-color='%2342A5D5'/%3E%3Cstop offset='1' stop-color='%231769AA'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M66 2C58 22 4 50 4 82a46 46 0 0 0 92 0C96 52 74 24 66 2Z'/%3E%3C/svg%3E");
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 70%, transparent)) drop-shadow(0 2px 3px rgba(10, 22, 40, 0.28));
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--tm-accent) 45%, #ffffff), var(--tm-accent) 55%, color-mix(in srgb, var(--tm-accent) 80%, #000000));
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--tm-accent) 65%, transparent)) drop-shadow(0 2px 3px rgba(10, 22, 40, 0.28));
   will-change: transform, opacity;
 }
 @media (min-width: 901px) {
@@ -280,7 +283,7 @@
   padding: 0 5px;
   border-radius: 999px;
   background: var(--amber);
-  color: #fff;
+  color: var(--on-accent);
   font-family: var(--font-mono);
   font-size: 0.64rem;
 }

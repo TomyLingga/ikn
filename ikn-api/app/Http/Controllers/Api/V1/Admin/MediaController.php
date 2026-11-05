@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Requests\Admin\StoreMediaRequest;
+use App\Http\Requests\Admin\StoreMediaUrlRequest;
 use App\Http\Resources\MediaResource;
 use App\Models\Media;
 use App\Services\Media\MediaService;
@@ -15,7 +16,7 @@ class MediaController extends ApiController
     public function index(Request $request)
     {
         $query = Media::query()
-            ->where('disk', Media::DISK_PUBLIC)
+            ->whereIn('disk', Media::LIBRARY_DISKS)
             ->when($request->query('collection'), fn ($q, $c) => $q->where('collection', $c))
             // type: image | video | visual (gambar + video) | document (selain gambar & video)
             ->when($request->query('type') === 'image', fn ($q) => $q->where('mime', 'like', 'image/%'))
@@ -34,6 +35,20 @@ class MediaController extends ApiController
             $request->file('file'),
             $request->input('collection', 'general'),
             Media::DISK_PUBLIC,
+            $request->user()
+        );
+
+        return $this->created(new MediaResource($media));
+    }
+
+    /** Tautkan foto/video dari URL (YouTube, Vimeo, Google Drive, URL berkas) tanpa mengunggah (A-92). */
+    public function storeUrl(StoreMediaUrlRequest $request, MediaService $service)
+    {
+        $media = $service->fromUrl(
+            $request->input('url'),
+            $request->input('kind', 'auto'),
+            $request->input('name'),
+            $request->input('collection', 'general'),
             $request->user()
         );
 

@@ -106,7 +106,7 @@
 .step-num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-strong); font-family: var(--font-mono); font-size: 0.8rem; flex-shrink: 0; }
 .step.is-active { color: var(--ink); }
 .step.is-active .step-num { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.step.is-done .step-num { background: var(--green); color: #fff; border-color: var(--green); }
+.step.is-done .step-num { background: var(--green); color: var(--on-primary); border-color: var(--green); }
 .step-line { width: clamp(20px, 5vw, 56px); height: 1px; background: var(--line-strong); margin: 0 12px; }
 .step-label { font-family: var(--font-mono); font-size: 0.76rem; letter-spacing: 0.04em; }
 
@@ -319,7 +319,7 @@
 
 /* ==================== PHASE E-COMMERCE (API nyata) ==================== */
 /* ---- Kartu produk: promo, stok ---- */
-.pcard-promo { position: absolute; top: 10px; right: 10px; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; background: var(--amber); color: #fff; padding: 4px 8px; }
+.pcard-promo { position: absolute; top: 10px; right: 10px; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; background: var(--amber); color: var(--on-accent); padding: 4px 8px; }
 .pcard-price-old { display: block; font-size: 0.78rem; color: var(--ink-soft); font-weight: 400; }
 .pcard-stock { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-soft); }
 .pcard-video { position: absolute; left: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: rgba(10, 18, 30, 0.66); color: #fff; font-size: 0.68rem; font-weight: 600; }
@@ -332,7 +332,7 @@
 .pd-thumb.is-active { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-tint); }
 .pd-price-block { margin-bottom: 22px; }
 .pd-promo { display: flex; align-items: center; gap: 10px; margin-top: 6px; color: var(--ink-soft); font-size: 0.9rem; }
-.pd-promo-badge { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; background: var(--amber); color: #fff; padding: 3px 8px; }
+.pd-promo-badge { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; background: var(--amber); color: var(--on-accent); padding: 3px 8px; }
 .pd-promo-until { font-family: var(--font-mono); font-size: 0.76rem; }
 .pd-login-note { width: 100%; padding: 16px; background: var(--amber-tint); border: 1px solid var(--amber); }
 .pd-login-note strong { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; margin-bottom: 6px; }

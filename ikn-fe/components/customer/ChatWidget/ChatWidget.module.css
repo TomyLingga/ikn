@@ -250,7 +250,7 @@
   border: 0;
   border-radius: 10px;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font: inherit;
   font-size: 1rem;
   font-weight: 650;

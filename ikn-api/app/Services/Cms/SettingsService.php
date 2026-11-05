@@ -49,11 +49,19 @@ class SettingsService
         'contact.whatsapp_contacts' => ['type' => 'whatsapp_contacts', 'public' => true, 'default' => []],
         'analytics.ga_measurement_id' => ['type' => 'text', 'public' => true, 'default' => ''],
         'analytics.gsc_verification' => ['type' => 'text', 'public' => true, 'default' => ''],
-        // Tema warna situs (logo IKN: biru dan putih). Hex #rrggbb; kosong = warna bawaan di ikn-fe/app/globals.css.
-        // FE menyuntik nilai valid sebagai --theme-primary/--theme-primary-deep/--theme-accent di root layout (lib/theme.ts).
-        'theme.primary' => ['type' => 'color', 'public' => true, 'default' => '#0b6fb8'],
-        'theme.primary_deep' => ['type' => 'color', 'public' => true, 'default' => '#0a3f6b'],
-        'theme.accent' => ['type' => 'color', 'public' => true, 'default' => '#1785cc'],
+        // Tema warna Navy · Cream · Coral (ASUMSI A-91, 2026-11-05), satu set per mode. Hex #rrggbb; kosong = bawaan di
+        // ikn-fe/app/globals.css. FE menyuntik nilai valid sebagai --tl-* (terang) / --td-* (gelap) di root layout
+        // (lib/theme.ts); globals.css menurunkan semua token lain dari sana.
+        // Terang: base = latar dominan, ink = teks/pita, accent = sorotan kecil, soft = latar section berfoto.
+        'theme.light_base' => ['type' => 'color', 'public' => true, 'default' => '#f4ede0'],
+        'theme.light_ink' => ['type' => 'color', 'public' => true, 'default' => '#102d50'],
+        'theme.light_accent' => ['type' => 'color', 'public' => true, 'default' => '#ff6b5b'],
+        'theme.light_soft' => ['type' => 'color', 'public' => true, 'default' => '#dceaf7'],
+        // Gelap: base = latar dominan, ink = teks, accent = sorotan kecil, deep = latar terdalam (panel admin, pita).
+        'theme.dark_base' => ['type' => 'color', 'public' => true, 'default' => '#102d50'],
+        'theme.dark_ink' => ['type' => 'color', 'public' => true, 'default' => '#f4ede0'],
+        'theme.dark_accent' => ['type' => 'color', 'public' => true, 'default' => '#ff6b5b'],
+        'theme.dark_deep' => ['type' => 'color', 'public' => true, 'default' => '#0b1220'],
         // Panel foto/video halaman login, daftar, dan lupa password (ASUMSI A-79): [{mediaId, caption {id,en}}], maks. 6.
         // Kosong = foto bawaan di FE (components/auth/AuthVisual).
         'auth.slides' => ['type' => 'media_slides', 'public' => true, 'default' => []],

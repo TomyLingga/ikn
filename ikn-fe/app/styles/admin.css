@@ -767,7 +767,7 @@
 .filter-pill.is-active {
   background: var(--green);
   border-color: var(--green);
-  color: #ffffff;
+  color: var(--on-primary);
   font-weight: 600;
 }
 
@@ -923,7 +923,7 @@
 .pagination-btn.is-active {
   background: var(--green);
   border-color: var(--green);
-  color: #fff;
+  color: var(--on-primary);
   font-weight: 600;
 }
 
@@ -1869,7 +1869,7 @@ div.media-thumb {
 .rte-lang-tab.is-active {
   background: var(--green);
   border-color: var(--green);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .rte-lang-tab.has-error:not(.is-active) {
@@ -2405,9 +2405,17 @@ div.media-thumb {
 }
 
 /* ---------- Pengaturan Situs: pratinjau tema warna ---------- */
-.theme-swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.theme-swatch { min-height: 56px; display: flex; align-items: flex-end; padding: 8px 10px; border: 1px solid var(--line); color: #fff; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
-@media (max-width: 640px) { .theme-swatches { grid-template-columns: 1fr; } }
+.theme-mode { display: grid; gap: 14px; margin: 0; padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: var(--adm-r-lg, 12px); }
+.theme-mode legend { padding: 0 6px; font-weight: 650; color: var(--ink); }
+.theme-preview { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 18px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; }
+.theme-preview-text { display: grid; gap: 4px; }
+.theme-preview-text small { font-size: 0.7rem; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; }
+.theme-preview-text strong { font-size: 1.15rem; }
+.theme-preview-text span { font-size: 0.86rem; opacity: 0.8; }
+.theme-preview-btn { padding: 9px 16px; border-radius: 6px; font-size: 0.86rem; font-weight: 650; white-space: nowrap; }
+.theme-preview-bar { grid-column: 1 / -1; display: flex; overflow: hidden; height: 26px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 6px; }
+.theme-preview-bar i { display: grid; place-items: center; font-style: normal; font-family: var(--font-mono); font-size: 0.68rem; }
+@media (max-width: 640px) { .theme-preview { grid-template-columns: 1fr; } }
 
 /* ---------- Field geo (pin peta) ---------- */
 .geo-picker { display: grid; gap: 10px; }
@@ -2598,7 +2606,7 @@ div.media-thumb {
 :is(.admin-app, .admin-modal-backdrop) .btn-solid {
   border-color: var(--adm-primary);
   background: var(--adm-primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 :is(.admin-app, .admin-modal-backdrop) .btn-solid:hover:not(:disabled) {
@@ -3150,7 +3158,7 @@ div.media-thumb {
 .admin-app .pagination-btn.is-active {
   border-color: var(--adm-primary);
   background: var(--adm-primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 /* ---------- Kartu CMS, media, menu ---------- */
@@ -3183,7 +3191,7 @@ div.media-thumb {
 :is(.admin-app, .admin-modal-backdrop) .filter-pill.is-active {
   border-color: var(--adm-primary);
   background: var(--adm-primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 :is(.admin-app, .admin-modal-backdrop) .cms-switch {
@@ -4009,7 +4017,7 @@ div.media-thumb {
 .admin-app .xr-range button:focus-visible { outline: none; box-shadow: var(--adm-ring); }
 .admin-app .xr-range button.is-active {
   background: var(--adm-grad);
-  color: #fff;
+  color: var(--on-primary);
   box-shadow: 0 6px 14px -8px color-mix(in srgb, var(--adm-primary) 75%, transparent);
 }
 .admin-app .xr-period { color: var(--ink-soft); font-size: 0.86rem; font-variant-numeric: tabular-nums; }
@@ -4433,3 +4441,13 @@ div.media-thumb {
 .admin-modal-backdrop .cms-range input[type='range'] { flex: 1; accent-color: var(--adm-primary); }
 .admin-app .cms-range output,
 .admin-modal-backdrop .cms-range output { min-width: 3ch; font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+
+/* Media dari URL (ASUMSI A-92): form tautan di MediaPicker & media library, lencana penyedia di kisi media. */
+.media-url-form { display: grid; gap: 10px; margin-top: 12px; padding: 14px 16px; border: 1px dashed var(--line-strong); border-radius: var(--adm-r, 8px); background: var(--paper-2); }
+.media-url-form input { width: 100%; }
+.media-url-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.media-url-form label { display: grid; gap: 6px; }
+.media-url-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.media-thumb-img { position: relative; display: block; width: 100%; height: 100%; }
+.media-thumb-img img { width: 100%; height: 100%; object-fit: cover; }
+.media-thumb-badge { position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, #000 70%, transparent); color: #fff; font-size: 0.66rem; font-weight: 650; letter-spacing: 0.04em; }

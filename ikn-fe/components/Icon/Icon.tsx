@@ -249,6 +249,14 @@ const paths: Record<IconName, ReactNode> = {
       <path d="m16 10.5 5-3v9l-5-3" />
     </>
   ),
+  refresh: (
+    <>
+      <path d="M20 11a8 8 0 0 0-14.9-3.6L4 9" />
+      <path d="M4 4v5h5" />
+      <path d="M4 13a8 8 0 0 0 14.9 3.6L20 15" />
+      <path d="M20 20v-5h-5" />
+    </>
+  ),
   clock: (
     <>
       <circle cx="12" cy="12" r="9" />
