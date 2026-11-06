@@ -8,6 +8,7 @@ import { paragraphs, tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import SmartLink from '../SmartLink';
 import { asText, looksLikeHtml, type TextVisualContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 // Teks di satu sisi, visual di sisi lain (image_side). Visual = foto bila diisi; tanpa foto tampil panel
 // berwarna tema berisi label + kata besar. Dipakai profil (Tentang), lini bisnis, REACH.
@@ -48,7 +49,7 @@ export default function TextVisualSection({ section }: { section: PageSection })
         {imageUrl ? (
           <Reveal as="figure" className="about-figure">
             <div className="about-figure-frame">
-              <Image src={imageUrl} alt={tr(c.image_alt, lang) || heading} fill sizes="(max-width: 780px) 100vw, 560px" style={{ objectFit: 'cover' }} />
+              <Image src={imageUrl} alt={tr(c.image_alt, lang) || heading} fill sizes="(max-width: 780px) 100vw, 560px" style={{ objectFit: 'cover', ...frameStyle(c.image?.frame) }} />
             </div>
             {visualLabel && <figcaption className="about-figure-cap">{visualLabel}</figcaption>}
           </Reveal>

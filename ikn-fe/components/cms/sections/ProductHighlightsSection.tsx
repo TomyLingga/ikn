@@ -9,6 +9,7 @@ import type { PageSection } from '@/lib/cms';
 import SecHead from './SecHead';
 import SmartLink from '../SmartLink';
 import { asList, asText, type I18nItem, type ProductHighlightsContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 // Kartu produk andalan. Kisi lentur: baris terakhir selalu penuh berapa pun jumlah kartunya (tanpa sel kosong).
 export default function ProductHighlightsSection({ section }: { section: PageSection }) {
@@ -43,7 +44,7 @@ export default function ProductHighlightsSection({ section }: { section: PageSec
               <Reveal key={`${asText(p.code)}-${i}`} className="prod-preview-card" delay={i * 90}>
                 {p.image?.url && (
                   <div className="prod-preview-media">
-                    <Image src={p.image.url} alt={name} fill sizes="(max-width: 720px) 100vw, 400px" style={{ objectFit: 'cover' }} />
+                    <Image src={p.image.url} alt={name} fill sizes="(max-width: 720px) 100vw, 400px" style={{ objectFit: 'cover', ...frameStyle(p.image.frame) }} />
                   </div>
                 )}
                 <div className="prod-preview-body">

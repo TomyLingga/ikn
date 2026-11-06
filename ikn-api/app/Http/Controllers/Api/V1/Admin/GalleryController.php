@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Requests\Admin\GalleryItemRequest;
 use App\Http\Resources\GalleryItemResource;
 use App\Models\GalleryItem;
+use App\Support\MediaFrame;
 
 class GalleryController extends ApiController
 {
@@ -45,6 +46,7 @@ class GalleryController extends ApiController
             'title' => $data['title'],
             'type' => $data['type'],
             'media_id' => $isVideo ? null : ($data['mediaId'] ?? null),
+            'frame' => $isVideo ? null : MediaFrame::normalize($data['frame'] ?? null),
             'external_url' => $isVideo ? ($data['externalUrl'] ?? null) : null,
             'is_published' => $data['isPublished'] ?? true,
             'sort_order' => $data['sortOrder'] ?? 0,

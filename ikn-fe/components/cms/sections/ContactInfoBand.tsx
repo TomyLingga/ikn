@@ -9,6 +9,7 @@ import { isWhatsAppLink, whatsappContacts, whatsappHref } from '@/lib/whatsapp';
 import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import { asList, asText, contactMapPoints, mapsUrl, pad2, type ContactInfoContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 interface Props {
   section: PageSection;
@@ -40,7 +41,7 @@ export default function ContactInfoBand({ section, map = true }: Props) {
         {background && (
           <div
             className="contact-band-bg"
-            style={{ backgroundImage: `url(${background})`, opacity: typeof c.bg_opacity === 'number' ? Math.min(100, Math.max(0, c.bg_opacity)) / 100 : undefined }}
+            style={{ backgroundImage: `url(${background})`, ...frameBackground(c.background?.frame), opacity: typeof c.bg_opacity === 'number' ? Math.min(100, Math.max(0, c.bg_opacity)) / 100 : undefined }}
             aria-hidden="true"
           />
         )}

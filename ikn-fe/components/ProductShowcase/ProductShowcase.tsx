@@ -7,6 +7,7 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import type { Product } from '@/lib/types';
+import { frameStyle } from '@/lib/media-frame';
 
 // Pratinjau produk di halaman Bisnis (company profile): kartu ringkas berisi foto, jenis, nama, ringkasan,
 // spesifikasi utama, dan tautan ke katalog. id = slug agar bisa dituju anchor (mis. /bisnis#resiprene-35).
@@ -28,7 +29,7 @@ export default function ProductShowcase({ products }: { products: Product[] }) {
           <Reveal as="article" key={p.slug} id={p.slug} className={`biz-prod${big ? ' is-featured' : ''}`} delay={(i % 4) * 60}>
             <Link href={href} className="biz-prod-media" aria-label={name} tabIndex={-1}>
               {p.image ? (
-                <Image src={p.image} alt={name} fill sizes={big ? '(max-width: 1100px) 100vw, 640px' : '(max-width: 600px) 100vw, (max-width: 1100px) 50vw, 300px'} />
+                <Image src={p.image} alt={name} fill sizes={big ? '(max-width: 1100px) 100vw, 640px' : '(max-width: 600px) 100vw, (max-width: 1100px) 50vw, 300px'} style={frameStyle(p.imageFrame)} />
               ) : (
                 <Icon name="drop" size={56} strokeWidth={1} />
               )}

@@ -7,6 +7,7 @@ import { tr } from '@/lib/cms';
 import type { PostSummary } from '@/lib/cms';
 import { formatDate } from '@/lib/format';
 import type { Lang } from '@/lib/types';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 interface NewsCardProps {
   post: PostSummary;
@@ -24,7 +25,7 @@ export default function NewsCard({ post, lang, featured = false }: NewsCardProps
     <article className={`news-card${featured ? ' news-card--featured' : ''}`}>
       <Link href={href} className="news-card-media" aria-label={title}>
         {post.cover?.url ? (
-          <Image src={post.cover.url} alt={title} fill sizes={featured ? '(max-width:960px) 100vw, 800px' : '(max-width:640px) 100vw, 400px'} style={{ objectFit: 'cover' }} />
+          <Image src={post.cover.url} alt={title} fill sizes={featured ? '(max-width:960px) 100vw, 800px' : '(max-width:640px) 100vw, 400px'} style={{ objectFit: 'cover', ...frameStyle(post.cover.frame) }} />
         ) : (
           <span className="news-card-placeholder" aria-hidden="true">
             <Icon name="image" size={28} strokeWidth={1.2} />

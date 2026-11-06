@@ -67,6 +67,8 @@ export function toPayload(form: NewsForm) {
     categoryId: form.categoryId,
     author: form.author.trim() || null,
     coverMediaId: form.cover?.id ?? null,
+    // Bingkai sampul (A-93): titik fokus/zoom untuk kartu dan kepala artikel.
+    coverFrame: form.cover?.frame ?? null,
     isPublished: form.isPublished,
     publishedAt: fromLocalInput(form.publishedAt),
   };

@@ -8,9 +8,9 @@ class ProductImage extends Model
     public const TYPE_IMAGE = 'image';
     public const TYPE_VIDEO = 'video';
 
-    protected $fillable = ['product_id', 'media_id', 'sort_order', 'is_thumbnail'];
+    protected $fillable = ['product_id', 'media_id', 'sort_order', 'is_thumbnail', 'frame'];
 
-    protected $casts = ['sort_order' => 'integer', 'is_thumbnail' => 'boolean'];
+    protected $casts = ['sort_order' => 'integer', 'is_thumbnail' => 'boolean', 'frame' => 'array'];
 
     public function product()
     {
@@ -37,6 +37,7 @@ class ProductImage extends Model
             'type' => $this->isVideo() ? self::TYPE_VIDEO : self::TYPE_IMAGE,
             'mime' => $this->media?->mime,
             'isThumbnail' => (bool) $this->is_thumbnail,
+            'frame' => $this->frame,
         ] + ($this->media ? $this->media->externalSummary() : []);
     }
 }

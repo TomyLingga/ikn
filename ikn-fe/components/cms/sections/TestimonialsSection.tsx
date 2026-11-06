@@ -8,6 +8,7 @@ import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import SecHead from './SecHead';
 import { asList, asText, type TestimonialsContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 // Testimoni pelanggan/mitra: kutipan pertama tampil besar, sisanya kartu ringkas di sampingnya.
 export default function TestimonialsSection({ section }: { section: PageSection }) {
@@ -33,7 +34,7 @@ export default function TestimonialsSection({ section }: { section: PageSection 
                 <figcaption>
                   {item.photo?.url && (
                     <span className="quote-photo">
-                      <Image src={item.photo.url} alt="" fill sizes="48px" style={{ objectFit: 'cover' }} />
+                      <Image src={item.photo.url} alt="" fill sizes="48px" style={{ objectFit: 'cover', ...frameStyle(item.photo.frame) }} />
                     </span>
                   )}
                   <span className="quote-who">

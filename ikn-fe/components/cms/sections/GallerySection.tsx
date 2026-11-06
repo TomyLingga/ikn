@@ -10,6 +10,8 @@ import { tr } from '@/lib/cms';
 import type { GalleryItemData, PageSection } from '@/lib/cms';
 import Lightbox, { type LightboxPhoto } from '../Lightbox';
 import type { GalleryContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
+import type { MediaFrame } from '@/lib/cms';
 
 interface Props {
   section: PageSection;
@@ -25,8 +27,8 @@ export default function GallerySection({ section, items }: Props) {
   const videosLabel = tr(c.videos_label, lang) || (lang === 'en' ? 'Videos' : 'Video');
   const emptyText = tr(c.empty_text, lang) || (lang === 'en' ? 'No media published yet.' : 'Belum ada media yang dipublikasikan.');
 
-  const photos: LightboxPhoto[] = items.flatMap((g) =>
-    g.type === 'image' && g.media?.url ? [{ id: g.id, src: g.media.url, title: tr(g.title, lang) }] : [],
+  const photos: (LightboxPhoto & { frame?: MediaFrame | null })[] = items.flatMap((g) =>
+    g.type === 'image' && g.media?.url ? [{ id: g.id, src: g.media.url, title: tr(g.title, lang), frame: g.media.frame }] : [],
   );
   const videos = items.flatMap((g) => {
     const id = g.type === 'video' ? g.youtubeId || g.externalUrl || '' : '';
@@ -57,7 +59,7 @@ export default function GallerySection({ section, items }: Props) {
               {photos.map((g, i) => (
                 <Reveal key={g.id} delay={Math.min(i, 8) * 60}>
                   <button type="button" className="gallery-card" onClick={() => setActive(i)} aria-label={`${lang === 'en' ? 'Open' : 'Buka'} ${g.title}`}>
-                    <Image src={g.src} alt={g.title} fill sizes="(max-width:700px) 100vw, (max-width:1100px) 50vw, 400px" style={{ objectFit: 'cover' }} />
+                    <Image src={g.src} alt={g.title} fill sizes="(max-width:700px) 100vw, (max-width:1100px) 50vw, 400px" style={{ objectFit: 'cover', ...frameStyle(g.frame) }} />
                     <span className="gallery-card-cap">{g.title}</span>
                   </button>
                 </Reveal>

@@ -2,11 +2,15 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Icon from '@/components/Icon';
+import type { MediaFrame } from '@/lib/cms';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 // Slider gambar latar hero — cross-fade otomatis antar foto. Foto berasal dari CMS (section hero).
 export interface HeroSlide {
   src: string;
   alt: string;
+  /** Bingkai foto (A-93): titik fokus sebagai background-position. */
+  frame?: MediaFrame | null;
 }
 
 const INTERVAL = 5000;
@@ -38,7 +42,7 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
           key={`${s.src}-${i}`}
           aria-hidden="true"
           className={`hero-slide ${i === active ? 'is-active' : ''}`}
-          style={{ backgroundImage: `url(${s.src})` }}
+          style={{ backgroundImage: `url(${s.src})`, ...frameBackground(s.frame) }}
         />
       ))}
       <span className="hero-video-scrim" aria-hidden="true" />

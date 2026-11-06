@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\PublishProductRequest;
 use App\Http\Resources\AdminProductResource;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Support\MediaFrame;
 use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,7 @@ class ProductController extends ApiController
 
         $product = DB::transaction(function () use ($data) {
             $product = Product::create($this->attributes($data, null));
-            $this->syncImages($product, $data['images'] ?? [], $data['thumbnailMediaId'] ?? null, array_key_exists('thumbnailMediaId', $data));
+            $this->syncImages($product, $data['images'] ?? [], $data['thumbnailMediaId'] ?? null, array_key_exists('thumbnailMediaId', $data), $data['imageFrames'] ?? null);
 
             return $product;
         });
@@ -59,7 +60,7 @@ class ProductController extends ApiController
         DB::transaction(function () use ($product, $data) {
             $product->update($this->attributes($data, $product));
             if (array_key_exists('images', $data)) {
-                $this->syncImages($product, $data['images'] ?? [], $data['thumbnailMediaId'] ?? null, array_key_exists('thumbnailMediaId', $data));
+                $this->syncImages($product, $data['images'] ?? [], $data['thumbnailMediaId'] ?? null, array_key_exists('thumbnailMediaId', $data), $data['imageFrames'] ?? null);
             }
         });
 
@@ -170,7 +171,7 @@ class ProductController extends ApiController
      * (berkasnya tidak dihapus). Thumbnail: bila `thumbnailMediaId` dikirim, tanda dipindah ke media itu
      * (null = kembali ke foto pertama); bila tidak dikirim, tanda yang ada dipertahankan.
      */
-    private function syncImages(Product $product, array $mediaIds, ?int $thumbnailId, bool $thumbnailGiven): void
+    private function syncImages(Product $product, array $mediaIds, ?int $thumbnailId, bool $thumbnailGiven, ?array $frames = null): void
     {
         $mediaIds = array_values(array_unique(array_map('intval', $mediaIds)));
 
@@ -180,6 +181,10 @@ class ProductController extends ApiController
             $values = ['sort_order' => $sort];
             if ($thumbnailGiven) {
                 $values['is_thumbnail'] = $thumbnailId !== null && $mediaId === (int) $thumbnailId;
+            }
+            // imageFrames dikirim = bingkai semua gambar diganti (id tanpa bingkai = bawaan); tidak dikirim = dipertahankan.
+            if ($frames !== null) {
+                $values['frame'] = MediaFrame::normalize($frames[$mediaId] ?? $frames[(string) $mediaId] ?? null);
             }
             ProductImage::updateOrCreate(['product_id' => $product->id, 'media_id' => $mediaId], $values);
         }

@@ -4,6 +4,7 @@ namespace App\Services\Cms;
 
 use App\Exceptions\ApiException;
 use App\Models\Media;
+use App\Support\MediaFrame;
 use App\Support\I18n;
 
 /**
@@ -100,7 +101,14 @@ class SectionRegistry
                     $rules[$fieldPath] = [$req, 'boolean'];
                     break;
                 case 'media':
-                    $rules[$fieldPath] = [$req, 'integer', 'exists:media,id'];
+                    // Id media, atau {id, frame} bila dibingkai (A-93); ringkasan media hasil hydrate juga diterima.
+                    $rules[$fieldPath] = [$req, function ($attribute, $value, $fail) {
+                        $id = is_array($value) ? ($value['id'] ?? null) : $value;
+                        if (! is_numeric($id) || ! Media::whereKey((int) $id)->exists()) {
+                            $fail(__('validation.exists', ['attribute' => $attribute]));
+                        }
+                    }];
+                    $rules += MediaFrame::rules("$fieldPath.frame");
                     break;
                 case 'geo':
                     // Titik peta { lat, lng }; keduanya boleh null (tanpa pin).
@@ -161,11 +169,16 @@ class SectionRegistry
             case 'boolean':
                 return filter_var($value, FILTER_VALIDATE_BOOLEAN);
             case 'media':
+                // Tanpa bingkai = id saja (bentuk lama); dengan bingkai = {id, frame} (A-93).
+                $frame = is_array($value) ? MediaFrame::normalize($value['frame'] ?? null) : null;
                 if (is_array($value)) {
                     $value = $value['id'] ?? null;
                 }
+                if (! is_numeric($value) || (int) $value <= 0) {
+                    return null;
+                }
 
-                return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+                return $frame ? ['id' => (int) $value, 'frame' => $frame] : (int) $value;
             case 'geo':
                 // Nilai numerik dibulatkan 6 desimal (~0,1 m); nilai di luar rentang dibiarkan agar validator menolak.
                 $lat = is_array($value) && isset($value['lat']) && is_numeric($value['lat']) ? round((float) $value['lat'], 6) : null;
@@ -209,8 +222,11 @@ class SectionRegistry
                 continue;
             }
             if ($field['type'] === 'media') {
-                $id = $content[$key];
-                $content[$key] = $id && isset($media[$id]) ? $media[$id]->toSummary() : null;
+                $value = $content[$key];
+                $id = is_array($value) ? ($value['id'] ?? null) : $value;
+                $content[$key] = $id && isset($media[$id])
+                    ? $media[$id]->toSummary() + (is_array($value) && ! empty($value['frame']) ? ['frame' => $value['frame']] : [])
+                    : null;
             } elseif ($field['type'] === 'list' && is_array($content[$key])) {
                 $content[$key] = array_map(
                     fn ($item) => $this->hydrateFields($field['fields'], is_array($item) ? $item : [], $media),

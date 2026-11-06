@@ -70,6 +70,11 @@ export function FieldRenderer({ fieldKey, def, value, onChange, path, errors, ic
           label={label}
           value={toMediaRef(value)}
           onChange={onChange}
+          frame={toMediaRef(value)?.frame ?? null}
+          onFrameChange={(frame) => {
+            const ref = toMediaRef(value);
+            if (ref) onChange(frame ? { ...ref, frame } : { ...ref, frame: null });
+          }}
           accept={def.accept ?? 'image'}
           collection={def.accept === 'document' ? 'documents' : def.accept === 'visual' || def.accept === 'video' ? 'hero' : 'general'}
           required={def.required}

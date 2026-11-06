@@ -11,6 +11,7 @@ import type { I18n, MediaSummary, PageSection } from '@/lib/cms';
 import MediaVideo, { isEmbedVideo } from '@/components/MediaVideo';
 import type { Lang } from '@/lib/types';
 import { asList, asText, breadcrumbItems, type PageHeaderContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 interface Props {
   section: PageSection;
@@ -109,7 +110,8 @@ function Showcase({ slides, interval, lang }: { slides: Slide[]; interval: numbe
     videos.current.forEach((video, i) => {
       if (!video) return;
       if (i === index) {
-        video.currentTime = 0;
+        // Mulai dari detik awal rentang bingkai (A-93), bawaan 0.
+        video.currentTime = slides[i]?.source?.frame?.start ?? 0;
         void video.play().catch(() => undefined);
       } else {
         video.pause();
@@ -137,7 +139,7 @@ function Showcase({ slides, interval, lang }: { slides: Slide[]; interval: numbe
               onEnded={count > 1 ? next : undefined}
             />
           ) : (
-            <Image src={slide.url} alt={slide.caption} fill priority={i === 0} sizes="(max-width: 860px) 100vw, 60vw" style={{ objectFit: 'cover' }} />
+            <Image src={slide.url} alt={slide.caption} fill priority={i === 0} sizes="(max-width: 860px) 100vw, 60vw" style={{ objectFit: 'cover', ...frameStyle(slide.source?.frame) }} />
           )}
           {slide.caption && <span className="ph-caption">{slide.caption}</span>}
         </div>

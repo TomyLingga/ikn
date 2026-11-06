@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Support\MediaFrame;
 use App\Support\I18n;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -22,6 +23,7 @@ class PostRequest extends FormRequest
             'categoryId' => ['nullable', 'integer', 'exists:post_categories,id'],
             'author' => ['nullable', 'string', 'max:120'],
             'coverMediaId' => ['nullable', 'integer', 'exists:media,id'],
+        ] + MediaFrame::rules('coverFrame') + [
             'isPublished' => ['nullable', 'boolean'],
             'publishedAt' => ['nullable', 'date'],
         ], I18n::rules('title', true, 200), I18n::rules('excerpt', false, 1000), I18n::rules('body', false, 60000));

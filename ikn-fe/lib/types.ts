@@ -24,6 +24,7 @@ export type Tone = 'ok' | 'warn' | 'bad' | 'info';
 // Nama ikon yang tersedia di komponen Icon.
 export type IconName =
   | 'refresh'
+  | 'pause'
   | 'eye'
   | 'eyeOff'
   | 'microscope'
@@ -283,6 +284,8 @@ export interface ProductImage {
   type?: 'image' | 'video';
   mime?: string | null;
   isThumbnail?: boolean;
+  /** Bingkai gambar ini di galeri produk (A-93). */
+  frame?: import('@/lib/cms').MediaFrame | null;
   // Video dari URL (A-92): diputar lewat iframe penyedia.
   embedUrl?: string | null;
   provider?: string | null;
@@ -327,6 +330,8 @@ export interface Product {
   images: ProductImage[];
   /** Thumbnail: foto pilihan admin atau foto pertama; tidak pernah video. */
   image: string | null;
+  /** Bingkai foto thumbnail (A-93) untuk kartu produk; null = tengah. */
+  imageFrame?: import('@/lib/cms').MediaFrame | null;
   hasVideo?: boolean;
   summary: I18n;
   highlights: I18nList;

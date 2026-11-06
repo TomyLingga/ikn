@@ -72,6 +72,8 @@ class ProductResource extends JsonResource
             'images' => $images->map(fn ($image) => $image->toSummary())->values()->all(),
             // Thumbnail pilihan admin (atau foto pertama); video tidak pernah menjadi thumbnail (ASUMSI A-72).
             'image' => $this->primaryImageUrl(),
+            // Bingkai foto thumbnail untuk kartu produk (A-93); null = tengah.
+            'imageFrame' => optional($this->resource->thumbnailImage())->frame,
             'hasVideo' => $images->contains(fn ($image) => $image->isVideo()),
             'summary' => $this->summary,
             'highlights' => $this->highlights,

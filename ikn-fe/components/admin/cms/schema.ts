@@ -2,10 +2,12 @@
 // Content state keeps hydrated media objects for previews; toPayload() turns
 // them back into ids before sending to the API.
 
-import type { FieldDef, I18n, MediaSummary, SectionContent } from '@/lib/cms';
+import type { FieldDef, I18n, MediaFrame, MediaSummary, SectionContent } from '@/lib/cms';
 import { emptyI18n } from '@/lib/cms';
+import { toFrame } from '@/lib/media-frame';
 
-export type MediaRef = MediaSummary | { id: number };
+// Bingkai per pemakaian (A-93) menempel di referensi media: { id, frame } atau ringkasan + frame.
+export type MediaRef = (MediaSummary | { id: number }) & { frame?: MediaFrame | null };
 export type MediaValue = MediaRef | number | null | undefined;
 export type FieldErrors = Record<string, string[]>;
 
@@ -22,9 +24,20 @@ export function toI18n(value: unknown): I18n {
 export function toMediaRef(value: unknown): MediaRef | null {
   if (typeof value === 'number' && value > 0) return { id: value };
   if (isRecord(value) && typeof value.id === 'number' && value.id > 0) {
-    return typeof value.url === 'string' ? (value as unknown as MediaSummary) : { id: value.id };
+    const frame = toFrame(value.frame);
+    const ref: MediaRef = typeof value.url === 'string' ? { ...(value as unknown as MediaSummary) } : { id: value.id };
+    if (frame) ref.frame = frame;
+    else delete ref.frame;
+    return ref;
   }
   return null;
+}
+
+/** Payload API untuk satu field media: id saja, atau { id, frame } bila dibingkai. */
+export function mediaPayload(value: unknown): number | { id: number; frame: MediaFrame } | null {
+  const ref = toMediaRef(value);
+  if (!ref) return null;
+  return ref.frame ? { id: ref.id, frame: ref.frame } : ref.id;
 }
 
 export function mediaId(value: unknown): number | null {
@@ -96,7 +109,7 @@ export function toPayload(fields: Record<string, FieldDef>, content: SectionCont
   for (const [key, def] of Object.entries(fields)) {
     const value: unknown = content[key];
     if (def.type === 'media') {
-      out[key] = mediaId(value);
+      out[key] = mediaPayload(value);
     } else if (def.type === 'list') {
       out[key] = Array.isArray(value)
         ? value.map((item) => toPayload(def.fields ?? {}, isRecord(item) ? item : {}))

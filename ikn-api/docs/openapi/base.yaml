@@ -904,6 +904,7 @@ components:
               categoryId: { type: integer, nullable: true, description: id dari /admin/news-categories }
               author: { type: string, nullable: true, maxLength: 120 }
               coverMediaId: { type: integer, nullable: true }
+              coverFrame: { $ref: '#/components/schemas/MediaFrame' }
               isPublished: { type: boolean }
               publishedAt: { type: string, format: date-time, nullable: true }
     PostCategory:
@@ -928,6 +929,7 @@ components:
               title: { $ref: '#/components/schemas/I18n' }
               type: { type: string, enum: [image, video] }
               mediaId: { type: integer, nullable: true, description: wajib untuk image }
+              frame: { $ref: '#/components/schemas/MediaFrame' }
               externalUrl: { type: string, nullable: true, description: ID/URL YouTube, wajib untuk video }
               isPublished: { type: boolean }
               sortOrder: { type: integer }
@@ -1083,6 +1085,17 @@ components:
         embedUrl: { type: string, nullable: true, description: 'URL pemutar iframe (YouTube/Vimeo/Drive); null = putar langsung lewat <video>/<img>' }
         thumbnailUrl: { type: string, nullable: true }
         sourceUrl: { type: string, nullable: true, description: 'URL asli yang ditempel admin' }
+        frame: { $ref: '#/components/schemas/MediaFrame' }
+    MediaFrame:
+      type: object
+      nullable: true
+      description: 'Bingkai per pemakaian (A-93): titik fokus x/y (persen dari kiri/atas), zoom 1-3, rentang putar video start/end (detik). null = bawaan (tengah, tanpa zoom, tanpa rentang). Field media section menerima id atau {id, frame}; nilai di luar rentang dipotong ke batas untuk section, 422 untuk entitas lain.'
+      properties:
+        x: { type: number, minimum: 0, maximum: 100, example: 30 }
+        y: { type: number, minimum: 0, maximum: 100, example: 40 }
+        zoom: { type: number, minimum: 1, maximum: 3, example: 1.4 }
+        start: { type: number, nullable: true, minimum: 0, example: 3 }
+        end: { type: number, nullable: true, minimum: 0, example: 9 }
     User:
       type: object
       properties:

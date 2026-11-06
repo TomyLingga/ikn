@@ -787,6 +787,11 @@ components:
         isPublished: { type: boolean, default: false }
         images: { type: array, maxItems: 20, items: { type: integer }, description: 'media id foto/video berurutan (sort_order = indeks); media harus disk public bertipe image/* atau video/*' }
         thumbnailMediaId: { type: integer, nullable: true, description: 'foto di dalam images[] yang menjadi thumbnail; null = foto pertama; tidak dikirim = tanda yang ada dipertahankan' }
+        imageFrames:
+          type: object
+          nullable: true
+          description: 'Bingkai per id media (A-93) {"<mediaId>": MediaFrame}; dikirim = semua bingkai diganti (id tanpa entri = bawaan), tidak dikirim = dipertahankan. Respons: images[].frame dan imageFrame (bingkai thumbnail).'
+          additionalProperties: { $ref: '#/components/schemas/MediaFrame' }
     Review:
       type: object
       properties:

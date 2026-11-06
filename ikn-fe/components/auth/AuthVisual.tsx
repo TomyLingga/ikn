@@ -9,6 +9,7 @@ import { useSite } from '@/components/SiteProvider';
 import { tr } from '@/lib/cms';
 import MediaVideo, { isEmbedVideo, type VideoSource } from '@/components/MediaVideo';
 import styles from '@/app/(auth)/login/page.module.css';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 interface Slide {
   src: string;
@@ -37,7 +38,8 @@ export default function AuthVisual() {
       .map((s) => ({
         src: s.media.url,
         kind: (s.media.mime || '').startsWith('video/') ? ('video' as const) : ('image' as const),
-        source: s.media,
+        // Bingkai slide (A-93) menempel di sumber agar foto & video sama-sama memakainya.
+        source: { ...s.media, frame: s.frame ?? null },
         caption: { id: tr(s.caption, 'id'), en: tr(s.caption, 'en') },
       }));
     return custom.length > 0 ? custom : DEFAULT_SLIDES;
@@ -72,7 +74,7 @@ export default function AuthVisual() {
               />
             )
           ) : (
-            <Image src={slide.src} alt="" fill sizes="(max-width: 860px) 100vw, 560px" priority={i === 0} style={{ objectFit: 'cover' }} />
+            <Image src={slide.src} alt="" fill sizes="(max-width: 860px) 100vw, 560px" priority={i === 0} style={{ objectFit: 'cover', ...frameStyle(slide.source?.frame) }} />
           )}
         </div>
       ))}

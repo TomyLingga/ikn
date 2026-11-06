@@ -8,6 +8,7 @@ import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import SmartLink from '../SmartLink';
 import { asText, type CtaContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 // Pita ajakan berwarna tema: teks di kiri, satu atau dua tombol di kanan; foto latar opsional di balik lapisan warna.
 export default function CtaSection({ section }: { section: PageSection }) {
@@ -30,7 +31,7 @@ export default function CtaSection({ section }: { section: PageSection }) {
           sizes="100vw"
           className="cta-bg"
           // Kekuatan latar (bg_opacity, 0-100) dari pengaturan section; kosong = penuh seperti sebelumnya.
-          style={{ objectFit: 'cover', opacity: typeof c.bg_opacity === 'number' ? Math.min(100, Math.max(0, c.bg_opacity)) / 100 : undefined }}
+          style={{ objectFit: 'cover', ...frameStyle(c.background?.frame), opacity: typeof c.bg_opacity === 'number' ? Math.min(100, Math.max(0, c.bg_opacity)) / 100 : undefined }}
         />
       )}
       <div className="container cta-inner">

@@ -9,6 +9,7 @@ import { tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import SecHead from './SecHead';
 import { asList, asText, type I18nItem, type TeamContent, type TeamMember } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 function initials(name: string): string {
   return name
@@ -23,7 +24,7 @@ function initials(name: string): string {
 function Portrait({ person, sizes }: { person: TeamMember; sizes: string }) {
   const name = asText(person.name);
   return person.photo?.url ? (
-    <Image src={person.photo.url} alt={name} fill sizes={sizes} style={{ objectFit: 'cover', objectPosition: 'top center' }} />
+    <Image src={person.photo.url} alt={name} fill sizes={sizes} style={{ objectFit: 'cover', objectPosition: 'top center', ...frameStyle(person.photo.frame) }} />
   ) : (
     <span className="team-initials" aria-hidden="true">
       {initials(name)}

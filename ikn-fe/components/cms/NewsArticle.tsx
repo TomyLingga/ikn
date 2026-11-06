@@ -11,6 +11,7 @@ import type { PostDetail } from '@/lib/cms';
 import { formatDate } from '@/lib/format';
 import type { Lang } from '@/lib/types';
 import NewsCard from './NewsCard';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 // Detail berita (/berita/[slug]): band judul (tautan kembali, kategori, tanggal), sampul, isi HTML satu kolom,
 // tombol bagikan, lalu berita terkait sebagai kartu.
@@ -49,7 +50,7 @@ export default function NewsArticle({ post }: { post: PostDetail }) {
         <div className="container">
           {post.cover && (
             <figure className="article-cover">
-              <Image src={post.cover.url} alt={title} fill priority sizes="(max-width: 1100px) 100vw, 1000px" style={{ objectFit: 'cover' }} />
+              <Image src={post.cover.url} alt={title} fill priority sizes="(max-width: 1100px) 100vw, 1000px" style={{ objectFit: 'cover', ...frameStyle(post.cover.frame) }} />
             </figure>
           )}
 

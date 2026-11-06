@@ -6,9 +6,11 @@ import Spinner from '@/components/Spinner';
 import AdminModal from '@/components/admin/AdminModal';
 import { useLang } from '@/components/LanguageProvider';
 import { apiPaged, errorMessage, uploadMedia } from '@/lib/api';
-import type { MediaItem, MediaSummary, PagedMeta } from '@/lib/cms';
+import type { MediaFrame, MediaItem, MediaSummary, PagedMeta } from '@/lib/cms';
 import MediaGrid, { formatBytes, isImageMedia } from './MediaGrid';
 import MediaUrlForm from './MediaUrlForm';
+import FrameEditor from './FrameEditor';
+import { frameSummary } from '@/lib/media-frame';
 import Pager from './Pager';
 import { mediaId, mediaSummary, type MediaValue } from './schema';
 import { FileLink } from '@/components/FileViewer';
@@ -31,6 +33,9 @@ interface MediaPickerProps {
   value: MediaValue;
   onChange: (media: MediaSummary | null) => void;
   accept?: MediaKind;
+  /** Bingkai pemakaian ini (A-93); onFrameChange diisi = tombol "Atur bingkai" muncul untuk gambar/video. */
+  frame?: MediaFrame | null;
+  onFrameChange?: (frame: MediaFrame | null) => void;
   collection?: string;
   error?: string;
   required?: boolean;
@@ -46,6 +51,8 @@ export default function MediaPicker({
   error,
   required = false,
   hint,
+  frame,
+  onFrameChange,
 }: MediaPickerProps) {
   const { lang } = useLang();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +60,7 @@ export default function MediaPicker({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [localError, setLocalError] = useState('');
   const [urlOpen, setUrlOpen] = useState(false);
+  const [frameOpen, setFrameOpen] = useState(false);
   const id = mediaId(value);
   const summary = mediaSummary(value);
   const t = (idText: string, en: string) => (lang === 'en' ? en : idText);
@@ -144,15 +152,32 @@ export default function MediaPicker({
                 {t('Dari URL', 'From URL')}
               </button>
             )}
+            {onFrameChange && summary && (isImageMedia(summary) || isVideoMedia(summary)) && (
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setFrameOpen(true)}>
+                {isVideoMedia(summary) ? t('Atur bingkai & durasi', 'Framing & duration') : t('Atur bingkai', 'Adjust framing')}
+              </button>
+            )}
             {id && (
               <button type="button" className="row-act row-act-danger" onClick={() => onChange(null)}>
                 {t('Hapus', 'Remove')}
               </button>
             )}
           </div>
+          {frame && <small className="frame-badge">{t('Bingkai', 'Framing')}: {frameSummary(frame, lang)}</small>}
           {shownError && <small className="cms-field-error">{shownError}</small>}
         </div>
       </div>
+      {frameOpen && summary && onFrameChange && (
+        <FrameEditor
+          media={summary}
+          value={frame}
+          onClose={() => setFrameOpen(false)}
+          onSave={(next) => {
+            onFrameChange(next);
+            setFrameOpen(false);
+          }}
+        />
+      )}
       {urlOpen && (
         <MediaUrlForm
           kind={accept === 'image' ? 'image' : accept === 'video' ? 'video' : 'auto'}

@@ -8,6 +8,7 @@ use App\Http\Resources\PostResource;
 use App\Models\Post;
 use App\Support\Html;
 use App\Support\I18n;
+use App\Support\MediaFrame;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -71,6 +72,7 @@ class PostController extends ApiController
             'category_id' => $data['categoryId'] ?? null,
             'author' => isset($data['author']) ? trim($data['author']) ?: null : null,
             'cover_media_id' => $data['coverMediaId'] ?? null,
+            'cover_frame' => ! empty($data['coverMediaId']) ? MediaFrame::normalize($data['coverFrame'] ?? null) : null,
             'is_published' => $isPublished,
             'published_at' => $publishedAt,
         ];

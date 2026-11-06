@@ -5,6 +5,7 @@ namespace App\Services\Cms;
 use App\Models\Media;
 use App\Models\Setting;
 use App\Support\I18n;
+use App\Support\MediaFrame;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Crypt;
@@ -311,7 +312,7 @@ class SettingsService
             if (! $media || ! (str_starts_with((string) $media->mime, 'image/') || str_starts_with((string) $media->mime, 'video/'))) {
                 return [null, __('validation.exists', ['attribute' => "{$key}.{$i}.mediaId"])];
             }
-            $out[] = ['mediaId' => (int) $media->id, 'caption' => I18n::normalize($row['caption'] ?? null)];
+            $out[] = ['mediaId' => (int) $media->id, 'caption' => I18n::normalize($row['caption'] ?? null), 'frame' => MediaFrame::normalize($row['frame'] ?? null)];
             if (count($out) > 6) {
                 return [null, __('validation.max.array', ['attribute' => $key, 'max' => 6])];
             }
@@ -379,7 +380,7 @@ class SettingsService
             $media = Media::whereIn('id', array_filter(array_column($value, 'mediaId')))->get()->keyBy('id');
 
             return array_values(array_filter(array_map(fn ($row) => isset($media[$row['mediaId'] ?? 0])
-                ? ['media' => $media[$row['mediaId']]->toSummary(), 'caption' => I18n::normalize($row['caption'] ?? null)]
+                ? ['media' => $media[$row['mediaId']]->toSummary(), 'caption' => I18n::normalize($row['caption'] ?? null), 'frame' => $row['frame'] ?? null]
                 : null, $value)));
         }
         if ($type === 'whatsapp_contacts') {

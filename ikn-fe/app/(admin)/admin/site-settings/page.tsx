@@ -100,7 +100,7 @@ export default function AdminSiteSettings() {
           theme: settings.theme ?? emptyTheme,
           mail: settings.mail ?? EMPTY_MAIL_SETTINGS,
           invoice: { header_image: settings.invoice?.header_image?.id ?? null, footer_image: settings.invoice?.footer_image?.id ?? null },
-          auth: { slides: (settings.auth?.slides ?? []).filter((s) => s.media?.id).map((s) => ({ mediaId: s.media.id, caption: s.caption })) },
+          auth: { slides: (settings.auth?.slides ?? []).filter((s) => s.media?.id).map((s) => ({ mediaId: s.media.id, caption: s.caption, frame: s.frame ?? null })) },
         },
       });
       setSettings(saved);
@@ -384,7 +384,9 @@ export default function AdminSiteSettings() {
                   <MediaPicker
                     label={t('Foto atau video', 'Photo or video')}
                     value={item.media ?? null}
-                    onChange={(media) => set({ ...item, media: media as AuthSlide['media'] })}
+                    onChange={(media) => set({ ...item, media: media as AuthSlide['media'], frame: null })}
+                    frame={item.frame ?? null}
+                    onFrameChange={(frame) => set({ ...item, frame })}
                     accept="visual"
                     required
                     hint={t('Lanskap/potret tinggi tampil paling baik (mis. 1200×1500). Video MP4/WebM pendek, tanpa suara.', 'Tall images work best (e.g. 1200×1500). Short MP4/WebM videos, muted.')}

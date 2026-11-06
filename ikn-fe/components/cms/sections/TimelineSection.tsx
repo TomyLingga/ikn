@@ -10,6 +10,7 @@ import type { PageSection } from '@/lib/cms';
 import MediaVideo from '@/components/MediaVideo';
 import SecHead from './SecHead';
 import { ANCHOR_BY_TYPE, asList, asText, type TimelineContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 // Linimasa model bagan "Sejarah Perusahaan" klien: jalan berkelok mendatar dengan pin tahun di atasnya,
 // nama entitas di atas pin, kotak uraian + produk di bawahnya (geser mendatar + tombol panah di layar lebar;
@@ -94,7 +95,7 @@ export default function TimelineSection({ section }: { section: PageSection }) {
                         {item.media.mime?.startsWith('video/') ? (
                           <MediaVideo source={item.media} background muted loop playsInline autoPlay preload="metadata" />
                         ) : (
-                          <Image src={item.media.url} alt={title || name} fill sizes="(max-width: 720px) 90vw, 280px" style={{ objectFit: 'cover' }} />
+                          <Image src={item.media.url} alt={title || name} fill sizes="(max-width: 720px) 90vw, 280px" style={{ objectFit: 'cover', ...frameStyle(item.media.frame) }} />
                         )}
                       </figure>
                     )}

@@ -48,6 +48,7 @@ function toPayload(form: GalleryForm) {
     title: form.title,
     type: form.type,
     mediaId: form.type === 'image' ? form.media?.id ?? null : null,
+    frame: form.type === 'image' ? form.media?.frame ?? null : null,
     externalUrl: form.type === 'video' ? form.externalUrl.trim() || null : null,
     isPublished: form.isPublished,
     sortOrder: form.sortOrder,
@@ -244,6 +245,8 @@ export default function AdminGallery() {
                 label={t('Gambar', 'Image')}
                 value={form.media}
                 onChange={(media) => setForm({ ...form, media })}
+                frame={form.media?.frame ?? null}
+                onFrameChange={(frame) => setForm({ ...form, media: form.media ? { ...form.media, frame } : null })}
                 accept="image"
                 collection="gallery"
                 required

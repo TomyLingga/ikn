@@ -15,6 +15,7 @@ import { formatMoney, isUsd } from '@/lib/format';
 import { tr } from '@/lib/cms';
 import { useShopPaths } from '@/lib/shop';
 import type { Product } from '@/lib/types';
+import { frameStyle } from '@/lib/media-frame';
 
 /** Penanda harga USD: basis FOB Belawan (trucking ke pelabuhan dan biaya pelabuhan termasuk; ASUMSI A-86). */
 export function FobBadge({ lang }: { lang: 'id' | 'en' }) {
@@ -64,7 +65,7 @@ export default function ProductCard({ product }: { product: Product }) {
       <article className={`pcard pcard-portal ${soldOut ? 'is-soldout' : ''}`}>
         <Link href={href} className="pcard-media">
           {product.image ? (
-            <Image src={product.image} alt={name} fill sizes="(max-width:620px) 50vw, (max-width:1200px) 33vw, 260px" />
+            <Image src={product.image} alt={name} fill sizes="(max-width:620px) 50vw, (max-width:1200px) 33vw, 260px" style={frameStyle(product.imageFrame)} />
           ) : (
             <span className="pcard-drop"><Icon name="drop" size={48} strokeWidth={1} /></span>
           )}
@@ -179,7 +180,7 @@ export default function ProductCard({ product }: { product: Product }) {
     <article className="pcard">
       <Link href={href} className="pcard-media">
         {product.image ? (
-          <Image src={product.image} alt={name} fill sizes="(max-width:900px) 50vw, 300px" />
+          <Image src={product.image} alt={name} fill sizes="(max-width:900px) 50vw, 300px" style={frameStyle(product.imageFrame)} />
         ) : (
           <span className="pcard-drop"><Icon name="drop" size={48} strokeWidth={1} /></span>
         )}

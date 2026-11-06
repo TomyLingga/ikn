@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Support\MediaFrame;
 use App\Http\Requests\Concerns\CatalogAttributes;
 use App\Models\Media;
 use App\Models\Product;
@@ -88,6 +89,9 @@ class ProductRequest extends FormRequest
             'images.*' => ['integer', 'distinct', 'exists:media,id'],
             // Foto yang menjadi thumbnail; harus salah satu dari images[] dan berupa gambar (ASUMSI A-72).
             'thumbnailMediaId' => ['nullable', 'integer'],
+            // Bingkai per gambar {mediaId: {x, y, zoom, start, end}} (A-93).
+            'imageFrames' => ['nullable', 'array'],
+        ] + MediaFrame::rules('imageFrames.*') + [
         ], I18n::rules('name', true, 200), I18n::rules('summary', false, 3000), I18nList::rules('highlights'), I18nList::rules('applications'));
     }
 }

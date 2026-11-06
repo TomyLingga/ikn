@@ -7,6 +7,7 @@ import { useLang } from '@/components/LanguageProvider';
 import type { ProductImage } from '@/lib/types';
 import MediaVideo from '@/components/MediaVideo';
 import styles from './ProductGallery.module.css';
+import { frameStyle } from '@/lib/media-frame';
 
 interface ProductGalleryProps {
   media: ProductImage[];
@@ -101,7 +102,7 @@ export default function ProductGallery({ media, name, code, poster }: ProductGal
               {item.type === 'video' ? (
                 <MediaVideo data-slide={index} source={item} title={`${t('Video', 'Video')} ${name}`} controls playsInline preload="metadata" poster={poster || undefined} aria-label={`${t('Video', 'Video')} ${name}`} />
               ) : (
-                <Image src={item.url} alt={`${name} ${index + 1}`} fill sizes="(max-width: 900px) 100vw, 560px" priority={index === 0} />
+                <Image src={item.url} alt={`${name} ${index + 1}`} fill sizes="(max-width: 900px) 100vw, 560px" priority={index === 0} style={frameStyle(item.frame)} />
               )}
             </div>
           ))}

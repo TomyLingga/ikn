@@ -316,6 +316,8 @@ export default function AdminNewsEditor({ params }: { params: { id: string } }) 
               <MediaPicker
                 value={form.cover}
                 onChange={(cover) => setForm({ ...form, cover })}
+                frame={form.cover?.frame ?? null}
+                onFrameChange={(frame) => setForm({ ...form, cover: form.cover ? { ...form.cover, frame } : null })}
                 accept="image"
                 collection="news"
                 hint={t('Disarankan rasio 16:9, minimal 1200 px lebar.', 'Recommended 16:9, at least 1200 px wide.')}

@@ -54,6 +54,7 @@ import TestimonialsSection from './sections/TestimonialsSection';
 import ImageGridSection from './sections/ImageGridSection';
 import ProductShowcaseSection from './sections/ProductShowcaseSection';
 import CustomerMapSection from './sections/CustomerMapSection';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
 
 // Lists for the data-backed sections, fetched by the RSC page (lib/section-data.ts) and handed down here.
 export interface SectionExtra {
@@ -214,7 +215,7 @@ function withBackground(section: PageSection, node: ReactNode): ReactNode {
         ) : (
           // Ukuran latar tidak diketahui; img biasa + object-fit cover.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={media.url} alt="" loading="lazy" decoding="async" />
+          <img src={media.url} alt="" loading="lazy" decoding="async" style={frameStyle(media.frame)} />
         )}
       </div>
       <div className="sec-bg-body">{node}</div>

@@ -8,11 +8,11 @@ class Post extends Model
 {
     use HasTranslations;
 
-    protected $fillable = ['slug', 'title', 'excerpt', 'body', 'category_id', 'author', 'cover_media_id', 'is_published', 'published_at'];
+    protected $fillable = ['slug', 'title', 'excerpt', 'body', 'category_id', 'author', 'cover_media_id', 'cover_frame', 'is_published', 'published_at'];
 
     protected $translatable = ['title', 'excerpt', 'body'];
 
-    protected $casts = ['is_published' => 'boolean', 'published_at' => 'datetime'];
+    protected $casts = ['is_published' => 'boolean', 'published_at' => 'datetime', 'cover_frame' => 'array'];
 
     /** Estimasi menit baca dari isi bahasa Indonesia. */
     public function readingMinutes(): int

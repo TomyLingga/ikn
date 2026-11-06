@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Support\MediaFrame;
 use App\Models\GalleryItem;
 use App\Support\I18n;
 use Illuminate\Foundation\Http\FormRequest;
@@ -19,6 +20,7 @@ class GalleryItemRequest extends FormRequest
         return array_merge([
             'type' => ['required', Rule::in(GalleryItem::TYPES)],
             'mediaId' => ['required_if:type,'.GalleryItem::TYPE_IMAGE, 'nullable', 'integer', 'exists:media,id'],
+        ] + MediaFrame::rules('frame') + [
             'externalUrl' => ['required_if:type,'.GalleryItem::TYPE_VIDEO, 'nullable', 'string', 'max:300'],
             'isPublished' => ['nullable', 'boolean'],
             'sortOrder' => ['nullable', 'integer', 'min:0'],

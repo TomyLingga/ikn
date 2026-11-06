@@ -299,6 +299,8 @@ export interface AdminProductImage {
   type?: 'image' | 'video';
   mime?: string | null;
   isThumbnail?: boolean;
+  /** Bingkai gambar ini di kartu/galeri produk (A-93). */
+  frame?: import('@/lib/cms').MediaFrame | null;
   mediaId: number;
   media: MediaSummary | null;
 }
@@ -365,6 +367,8 @@ export interface ProductPayload {
   images: number[];
   /** Foto di dalam `images` yang menjadi thumbnail; null = foto pertama. */
   thumbnailMediaId: number | null;
+  /** Bingkai per id media (A-93); dikirim = semua bingkai diganti, id tanpa entri = bawaan. */
+  imageFrames?: Record<string, import('@/lib/cms').MediaFrame>;
   /** Pabrik asal; null = pabrik bawaan (urutan pertama di Lokasi pabrik). Tidak dikirim = tetap. */
   factoryLocationId?: number | null;
 }

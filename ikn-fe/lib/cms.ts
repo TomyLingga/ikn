@@ -21,6 +21,17 @@ export interface MediaSummary {
   embedUrl?: string | null;
   thumbnailUrl?: string | null;
   sourceUrl?: string | null;
+  /** Bingkai per pemakaian (A-93): ada bila admin mengatur titik fokus/zoom/rentang video untuk pemakaian ini. */
+  frame?: MediaFrame | null;
+}
+
+/** Titik fokus (persen), zoom 1-3, dan rentang putar video (detik) untuk satu pemakaian media (A-93). */
+export interface MediaFrame {
+  x: number;
+  y: number;
+  zoom: number;
+  start: number | null;
+  end: number | null;
 }
 
 export interface MediaItem extends MediaSummary {
@@ -138,6 +149,8 @@ export interface WhatsAppContact {
 export interface AuthSlide {
   media: MediaSummary;
   caption: I18n;
+  /** Bingkai slide (A-93). */
+  frame?: MediaFrame | null;
 }
 
 export type MailMode = 'server' | 'smtp' | 'off';

@@ -17,6 +17,8 @@ import { useLang } from '@/components/LanguageProvider';
 import { lines, tr } from '@/lib/cms';
 import type { PageSection } from '@/lib/cms';
 import { asList, asText, contactMapPoints, mapsUrl, type HeroButtonItem, type HeroContent, type HeroMetaItem, type HeroSlideItem, type MarqueeContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
+import type { MediaFrame } from '@/lib/cms';
 
 interface Props {
   section: PageSection;
@@ -40,7 +42,7 @@ export default function HeroSection({ section, marquee }: Props) {
   const c = section.content as HeroContent;
 
   const slides = asList<HeroSlideItem>(c.slides).flatMap((s) =>
-    s.image?.url ? [{ src: s.image.url, alt: tr(s.alt, lang) }] : [],
+    s.image?.url ? [{ src: s.image.url, alt: tr(s.alt, lang), frame: s.image.frame }] : [],
   );
   const meta = asList<HeroMetaItem>(c.meta);
   const titleLines = lines(tr(c.title, lang));
@@ -110,7 +112,7 @@ function HeroGrid({
   lang,
 }: {
   c: HeroContent;
-  slides: { src: string; alt: string }[];
+  slides: { src: string; alt: string; frame?: MediaFrame | null }[];
   meta: HeroMetaItem[];
   titleLines: string[];
   buttons: HeroButton[];
@@ -119,7 +121,7 @@ function HeroGrid({
   const [playing, setPlaying] = useState(false);
   const site = useSite();
   const videos = [c.video, ...asList<{ file?: VideoSource | null }>(c.videos).map((v) => v.file)].filter((v): v is VideoSource => !!v?.url);
-  const links = asList<{ title: HeroContent['title']; note?: HeroContent['title']; image?: { url?: string } | null; url: string }>(c.links).filter((l) => tr(l.title, lang) && asText(l.url));
+  const links = asList<{ title: HeroContent['title']; note?: HeroContent['title']; image?: { url?: string; frame?: MediaFrame | null } | null; url: string }>(c.links).filter((l) => tr(l.title, lang) && asText(l.url));
   // Lokasi fasilitas di ubin peta: daftar dari CMS (`locations`), kosong = lokasi blok kontak halaman Kontak.
   const ownFacilities = asList<NonNullable<HeroContent['locations']>[number]>(c.locations)
     .map((l) => {
@@ -213,7 +215,7 @@ function HeroGrid({
                   <SmartLink href={asText(l.url)} className="hgrid-link">
                     {l.image?.url && (
                       <span className="hgrid-link-img">
-                        <Image src={l.image.url} alt="" fill sizes="56px" style={{ objectFit: 'cover' }} />
+                        <Image src={l.image.url} alt="" fill sizes="56px" style={{ objectFit: 'cover', ...frameStyle(l.image.frame) }} />
                       </span>
                     )}
                     <span className="hgrid-link-text">
@@ -326,7 +328,7 @@ function HeroGrid({
         <div className="hgrid-cell hgrid-corner">
           {c.corner_image?.url && (
             <span className="hgrid-corner-img">
-              <Image src={c.corner_image.url} alt="" fill sizes="160px" style={{ objectFit: 'cover' }} />
+              <Image src={c.corner_image.url} alt="" fill sizes="160px" style={{ objectFit: 'cover', ...frameStyle(c.corner_image.frame) }} />
             </span>
           )}
           {corner && <p>{corner}</p>}
@@ -358,7 +360,7 @@ function VideoPlaylist({ sources, poster }: { sources: VideoSource[]; poster?: s
     refs.current.forEach((video, i) => {
       if (!video) return;
       if (i === active) {
-        video.currentTime = 0;
+        video.currentTime = sources[i]?.frame?.start ?? 0;
         void video.play().catch(() => undefined);
       } else {
         video.pause();

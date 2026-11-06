@@ -11,14 +11,16 @@ import Lightbox, { type LightboxPhoto } from '../Lightbox';
 import SecHead from './SecHead';
 import SmartLink from '../SmartLink';
 import { asList, asText, type ImageGridContent } from '../utils';
+import { frameStyle, frameBackground } from '@/lib/media-frame';
+import type { MediaFrame } from '@/lib/cms';
 
 // Kisi foto pilihan (bukan dari menu Galeri): baris lentur tanpa sel kosong, klik membuka pembesar.
 export default function ImageGridSection({ section }: { section: PageSection }) {
   const { lang } = useLang();
   const c = section.content as ImageGridContent;
   const [active, setActive] = useState<number | null>(null);
-  const photos: LightboxPhoto[] = asList<ImageGridContent['items'][number]>(c.items).flatMap((item, i) =>
-    item.image?.url ? [{ id: i, src: item.image.url, title: tr(item.caption, lang) }] : [],
+  const photos: (LightboxPhoto & { frame?: MediaFrame | null })[] = asList<ImageGridContent['items'][number]>(c.items).flatMap((item, i) =>
+    item.image?.url ? [{ id: i, src: item.image.url, title: tr(item.caption, lang), frame: item.image.frame }] : [],
   );
   if (photos.length === 0) return null;
   const label = tr(c.label, lang);
@@ -43,7 +45,7 @@ export default function ImageGridSection({ section }: { section: PageSection }) 
           {photos.map((photo, i) => (
             <Reveal key={photo.id} className="photo-grid-item" delay={Math.min(i, 8) * 50}>
               <button type="button" className="photo-grid-btn" onClick={() => setActive(i)} aria-label={`${lang === 'en' ? 'Enlarge photo' : 'Perbesar foto'}${photo.title ? `: ${photo.title}` : ''}`}>
-                <Image src={photo.src} alt={photo.title} fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 400px" style={{ objectFit: 'cover' }} />
+                <Image src={photo.src} alt={photo.title} fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 400px" style={{ objectFit: 'cover', ...frameStyle(photo.frame) }} />
               </button>
               {photo.title && <p className="photo-grid-cap">{photo.title}</p>}
             </Reveal>

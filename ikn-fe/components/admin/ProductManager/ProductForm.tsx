@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
 import AdminModal from '@/components/admin/AdminModal';
-import { I18nInput, ListField, MediaPicker, firstError, mediaId, mediaSummary, type FieldErrors, type MediaValue } from '@/components/admin/cms';
+import { I18nInput, ListField, MediaPicker, firstError, mediaId, mediaSummary, toMediaRef, type FieldErrors, type MediaValue } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n } from '@/lib/cms';
@@ -122,7 +122,7 @@ function formFromProduct(product: AdminProduct): ProductFormState {
     stockStatus: product.stockStatus === 'made_to_order' ? 'made_to_order' : '',
     isTaxable: product.isTaxable,
     isPublished: product.isPublished,
-    images: product.images.map((image) => image.media ?? { id: image.mediaId }),
+    images: product.images.map((image) => ({ ...(image.media ?? { id: image.mediaId }), frame: image.frame ?? null })),
     thumbnailId: product.images.find((image) => image.isThumbnail)?.mediaId ?? null,
     factoryLocationId: product.factoryLocationId == null ? '' : String(product.factoryLocationId),
   };
@@ -169,6 +169,13 @@ function toPayload(form: ProductFormState, editing: AdminProduct | null): Produc
     images: form.images.map(mediaId).filter((id): id is number => id !== null),
     // Thumbnail hanya sah bila masih ada di daftar dan berupa foto; selain itu server memakai foto pertama.
     thumbnailMediaId: form.images.some((item) => mediaId(item) === form.thumbnailId && !isVideo(item)) ? form.thumbnailId : null,
+    // Bingkai per gambar (A-93): selalu dikirim penuh agar bingkai yang dihapus ikut kembali ke tengah.
+    imageFrames: Object.fromEntries(
+      form.images.flatMap((item) => {
+        const ref = toMediaRef(item);
+        return ref?.frame ? [[String(ref.id), ref.frame]] : [];
+      }),
+    ),
     // Kosong = pabrik bawaan (ASUMSI A-90).
     factoryLocationId: form.factoryLocationId ? Number(form.factoryLocationId) : null,
   };
@@ -512,7 +519,17 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
             const chosen = form.images.some((entry) => mediaId(entry) === form.thumbnailId && !isVideo(entry)) ? form.thumbnailId : mediaId(firstPhoto);
             return (
               <div className="product-media-item">
-                <MediaPicker value={item} onChange={set} accept="visual" collection="products" />
+                <MediaPicker
+                  value={item}
+                  onChange={set}
+                  accept="visual"
+                  collection="products"
+                  frame={toMediaRef(item)?.frame ?? null}
+                  onFrameChange={(frame) => {
+                    const ref = toMediaRef(item);
+                    if (ref) set({ ...ref, frame });
+                  }}
+                />
                 {id !== null &&
                   (video ? (
                     <span className="admin-field-hint">
