@@ -100,7 +100,7 @@ export default function CustomerProfileForm() {
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError(t('Konfirmasi password baru tidak sama.', 'New password confirmation does not match.'));
+      setPasswordError(t('Konfirmasi kata sandi baru belum sama.', 'New password confirmation does not match.'));
       return;
     }
     setPasswordSaving(true);
@@ -169,25 +169,25 @@ export default function CustomerProfileForm() {
 
       <div className="acct-section-head" style={{ marginTop: 34 }}>
         <div>
-          <h2 className="h3">{t('Ganti password', 'Change password')}</h2>
+          <h2 className="h3">{t('Ganti kata sandi', 'Change password')}</h2>
           <p className="form-note">{t('Minimal 8 karakter dengan huruf besar, huruf kecil, dan angka.', 'At least 8 characters with uppercase, lowercase and a number.')}</p>
         </div>
       </div>
       <form className="form acct-form" onSubmit={handlePasswordSubmit}>
         <div className="co-fields">
           <label className="co-full">
-            <span className="label">{t('Password saat ini', 'Current password')}</span>
+            <span className="label">{t('Kata sandi saat ini', 'Current password')}</span>
             <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required autoComplete="current-password" />
             {passwordErrors.currentPassword && <small className="form-error">{passwordErrors.currentPassword}</small>}
           </label>
           <label>
-            <span className="label">{t('Password baru', 'New password')}</span>
+            <span className="label">{t('Kata sandi baru', 'New password')}</span>
             <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
             {newPassword && <PasswordChecklist value={newPassword} />}
             {passwordErrors.password && <small className="form-error">{passwordErrors.password}</small>}
           </label>
           <label>
-            <span className="label">{t('Konfirmasi password baru', 'Confirm new password')}</span>
+            <span className="label">{t('Ulangi kata sandi baru', 'Confirm new password')}</span>
             <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} autoComplete="new-password" aria-invalid={!!confirmError(newPassword, confirmPassword, lang)} />
             {confirmError(newPassword, confirmPassword, lang) ? (
               <small className="form-error" role="alert">{confirmError(newPassword, confirmPassword, lang)}</small>
@@ -198,7 +198,7 @@ export default function CustomerProfileForm() {
         </div>
         {passwordError && <p className="form-error" role="alert">{passwordError}</p>}
         <button type="submit" className="btn btn-solid" disabled={passwordSaving}>
-          {passwordSaving ? t('Menyimpan…', 'Saving…') : passwordSaved ? <>{t('Password diganti', 'Password changed')} <Icon name="check" /></> : <>{t('Ganti password', 'Change password')} <Icon name="arrow" /></>}
+          {passwordSaving ? t('Menyimpan…', 'Saving…') : passwordSaved ? <>{t('Kata sandi diganti', 'Password changed')} <Icon name="check" /></> : <>{t('Ganti kata sandi', 'Change password')} <Icon name="arrow" /></>}
         </button>
       </form>
     </div>

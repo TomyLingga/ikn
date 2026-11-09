@@ -50,7 +50,7 @@ export default function CheckoutSuccess({ number }: { number: string }) {
       <section className="section-tight" style={{ paddingTop: 0 }}>
         <div className="container">
           {ready && !customer ? (
-            <EmptyState icon="bag" title={t('Login diperlukan', 'Login required')} body={t('Masuk untuk melihat pesanan ini.', 'Log in to view this order.')} action={{ href: `/login?next=/checkout/success/${encodeURIComponent(number)}`, label: 'Login' }} />
+            <EmptyState icon="bag" title={t('Masuk dulu', 'Please log in')} body={t('Masuk untuk melihat pesanan ini.', 'Log in to view this order.')} action={{ href: `/login?next=/checkout/success/${encodeURIComponent(number)}`, label: t('Masuk', 'Log in') }} />
           ) : error ? (
             <EmptyState icon="close" title={t('Pesanan tidak ditemukan', 'Order not found')} body={error} action={{ href: '/dashboard/pesanan', label: t('Semua pesanan', 'All orders') }} />
           ) : !order ? (
@@ -59,7 +59,7 @@ export default function CheckoutSuccess({ number }: { number: string }) {
             <div className="co-done">
               <div className="vm-icon co-done-icon"><Icon name="check" size={40} /></div>
               <h1 className="h2">{t('Pesanan dibuat', 'Order placed')}</h1>
-              <p className="co-done-num">{t('No. Pesanan', 'Order no.')}: <strong>{order.number}</strong></p>
+              <p className="co-done-num">{t('No. pesanan', 'Order no.')}: <strong>{order.number}</strong></p>
               {order.status === 'awaiting_freight' ? (
                 // Order CIF (ASUMSI A-89): belum ada payment; admin menawarkan ongkir ke pelabuhan tujuan dulu.
                 <p className="pd-quote-note">

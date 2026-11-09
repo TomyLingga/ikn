@@ -150,7 +150,7 @@ export default function StockPanel({ product, onClose, onChanged }: StockPanelPr
           </div>
         </form>
 
-        <h3 className="admin-subtitle">{t('Riwayat mutasi (ledger)', 'Movement history (ledger)')}</h3>
+        <h3 className="admin-subtitle">{t('Riwayat mutasi stok', 'Stock movement history')}</h3>
         {loading && !summary ? (
           <p className="admin-field-hint"><Spinner size={18} label={t('Memuat...', 'Loading...')} /></p>
         ) : summary && summary.movements.length === 0 ? (

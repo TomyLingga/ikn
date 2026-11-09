@@ -160,7 +160,7 @@ export default function AdminNewsCategories() {
           )}
         </AdminCard>
 
-        <AdminCard title={editing ? t('Ubah kategori', 'Edit category') : t('Kategori baru', 'New category')}>
+        <AdminCard title={editing ? t('Edit kategori', 'Edit category') : t('Kategori baru', 'New category')}>
           <form onSubmit={(event) => void submit(event)} className="admin-form">
             <I18nInput
               label={t('Nama', 'Name')}

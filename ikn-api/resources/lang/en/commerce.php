@@ -2,7 +2,7 @@
 
 // Order & payment messages (BE-3). Do not add to api.php.
 return [
-    'invalid_transition' => 'Invalid order status transition (:from → :to).',
+    'invalid_transition' => 'The order status cannot change from :from to :to.',
     'order_expired' => 'The payment deadline for this order has passed.',
     'payment_already_active' => 'A payment is still awaiting verification.',
     'payment_method_invalid' => 'Payment method is not available.',
@@ -17,7 +17,7 @@ return [
     'payment_term_code_immutable' => 'The payment term code cannot be changed.',
     'shipping_required' => 'Courier and tracking number are required for the shipped status.',
     'vessel_required' => 'Vessel name and B/L number are required for the shipped status on FOB/CIF orders.',
-    'proof_not_allowed' => 'This payment method is verified automatically; no transfer receipt is needed.',
+    'proof_not_allowed' => 'This payment method is verified automatically, so no transfer receipt is needed.',
     'payment_not_found' => 'Payment not found on this order.',
     'payment_invalid_status' => 'The payment status (:status) does not allow this action.',
     'review_not_completed' => 'Reviews can only be submitted for completed orders.',
@@ -43,18 +43,18 @@ return [
     'freight_quote_not_allowed' => 'Freight quotes are only possible while the order awaits a freight quote.',
     'freight_payment_unavailable' => 'No active manual transfer method or :currency bank account is available to pay this order. Please contact us.',
     'freight_quote_expired' => 'This freight quote has expired. Please wait for our team to renew it.',
-    'freight_quote_stale' => 'This freight quote is no longer current; see the latest quote.',
+    'freight_quote_stale' => 'This freight quote is no longer current. See the latest quote.',
     'freight_quote_total_required' => 'The freight quote total must be greater than 0.',
     'freight_valid_until_past' => 'The quote validity must be in the future.',
-    'freight_counter_not_allowed' => 'A counter offer can only answer an admin quote that is still valid.',
-    'freight_accept_not_allowed' => 'This quote is not yours to accept; wait for the other party to respond.',
+    'freight_counter_not_allowed' => 'A counter offer can only be made on a quote that is still valid.',
+    'freight_accept_not_allowed' => 'This quote is waiting for the other party to respond, so you cannot accept it yet.',
     'freight_counter_label' => 'Customer counter offer',
     'freight_max_wait_reason' => 'The waiting period for a freight quote has passed.',
 
     'status' => [
-        'awaiting_freight' => 'Awaiting Freight Quote',
-        'pending_payment' => 'Awaiting Payment',
-        'payment_review' => 'Awaiting Verification',
+        'awaiting_freight' => 'Awaiting freight quote',
+        'pending_payment' => 'Awaiting payment',
+        'payment_review' => 'Payment review',
         'paid' => 'Paid',
         'processing' => 'Processing',
         'shipped' => 'Shipped',
@@ -66,7 +66,7 @@ return [
 
     'payment_status' => [
         'pending' => 'Unpaid',
-        'awaiting_verification' => 'Awaiting Verification',
+        'awaiting_verification' => 'Awaiting verification',
         'paid' => 'Paid',
         'rejected' => 'Rejected',
         'expired' => 'Expired',
@@ -77,13 +77,13 @@ return [
     'note' => [
         'placed' => 'Order placed, awaiting payment.',
         'freight_requested' => 'Order placed, awaiting a freight quote to :port.',
-        'freight_accepted' => 'Freight of :total agreed; awaiting payment.',
-        'proof_uploaded' => 'Payment receipt uploaded, awaiting admin verification.',
+        'freight_accepted' => 'Freight of :total agreed, awaiting payment.',
+        'proof_uploaded' => 'Payment receipt uploaded, awaiting verification.',
         'gateway_pending' => 'Gateway notification received, awaiting confirmation.',
         'accepted' => 'Payment verified.',
         'gateway_paid' => 'Payment confirmed by gateway.',
         'rejected' => 'Payment receipt rejected: :reason',
-        'expired' => 'Payment deadline passed; stock released.',
+        'expired' => 'Payment deadline passed. Stock released.',
         'cancelled' => 'Order cancelled: :reason',
         'cancelled_no_reason' => 'Order cancelled.',
         'processing' => 'Order is being processed.',
@@ -118,8 +118,8 @@ return [
         'unique_code' => 'Unique code',
         'grand_total' => 'Total due',
         'customer' => 'Customer',
-        'view_order' => 'View Order',
-        'open_admin' => 'Open in Admin Panel',
+        'view_order' => 'View order',
+        'open_admin' => 'Open in admin panel',
         'placed' => [
             'subject' => 'Order :number received',
             'intro' => 'Thank you, we have received your order. Please complete the payment before :due so we can process it.',
@@ -195,7 +195,7 @@ return [
         ],
         'completed' => [
             'subject' => 'Order :number completed',
-            'intro' => 'Thank you for shopping with PT Industri Karet Nusantara. We look forward to your review of the products you purchased.',
+            'intro' => 'Thank you for shopping with PT Industri Karet Nusantara. If you like, leave a review of the products you bought on the order page.',
         ],
         'reminder' => [
             'subject' => 'Reminder: payment for :number is due :due',
@@ -219,7 +219,7 @@ return [
             'accepted_by' => ['customer' => 'accepted by the customer', 'admin' => 'customer counter offer accepted by admin'],
             'requested' => [
                 'subject' => 'Order :number received, awaiting freight quote',
-                'intro' => 'Thank you, we have received your CIF order to :port. Our team will send a quote for ocean freight and insurance; the total below does not include freight yet.',
+                'intro' => 'Thank you, we have received your CIF order to :port. Our team will send a quote for ocean freight and insurance. The total below does not include freight yet.',
                 'next' => 'You will receive an email once the quote is ready, and you can then accept it or submit a counter offer on the order page.',
             ],
             'requested_admin' => [

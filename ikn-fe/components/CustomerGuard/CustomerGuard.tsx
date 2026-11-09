@@ -26,7 +26,7 @@ export default function CustomerGuard({ children }: { children: ReactNode }) {
   }, [ready, customer, admin, pathname, router]);
 
   if (!ready || !customer) {
-    return <SessionLoader message="Memuat sesi customer..." portalName="Portal Customer" />;
+    return <SessionLoader message="Memuat sesi pelanggan..." portalName="Portal pelanggan" />;
   }
 
   return children;

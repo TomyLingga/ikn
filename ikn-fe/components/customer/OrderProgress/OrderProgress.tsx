@@ -80,13 +80,13 @@ export function orderNextStep(order: NextStepInput, lang: Lang): OrderNextStep {
       ? {
           tone: 'warn',
           icon: 'globe',
-          title: t('Penawaran ongkir diterima', 'Freight quote received'),
-          body: t('Penawaran ongkir diterima, silakan setujui atau ajukan harga lain.', 'A freight quote is waiting: accept it or propose another price.'),
+          title: t('Penawaran ongkir sudah masuk', 'Freight quote ready'),
+          body: t('Setujui penawaran atau ajukan harga lain.', 'Accept the quote or propose another price.'),
         }
       : {
           tone: 'info',
           icon: 'globe',
-          title: t('Menunggu penawaran ongkir dari admin', 'Awaiting a freight quote from our team'),
+          title: t('Menunggu penawaran ongkir dari tim kami', 'Awaiting a freight quote from our team'),
           body: t('Instruksi pembayaran dan batas bayar menyusul setelah penawaran ongkir disepakati.', 'Payment instructions and the payment deadline follow once the freight quote is agreed.'),
         };
   }
@@ -160,7 +160,7 @@ export function orderNextStep(order: NextStepInput, lang: Lang): OrderNextStep {
         tone: 'info',
         icon: 'shieldCheck',
         title: t('Pembayaran sedang diverifikasi', 'Payment under review'),
-        body: t('Tim kami memeriksa bukti bayar Anda, biasanya di hari kerja yang sama.', 'Our team is checking your payment proof, usually within the same business day.'),
+        body: t('Tim kami sedang memeriksa bukti bayar Anda.', 'Our team is checking your payment proof.'),
       };
     case 'paid':
     case 'processing':
@@ -194,7 +194,7 @@ export function orderNextStep(order: NextStepInput, lang: Lang): OrderNextStep {
             tone: 'ok',
             icon: 'star',
             title: t('Bagikan ulasan Anda', 'Share your review'),
-            body: t('Ulasan membantu customer lain memilih produk yang tepat.', 'Reviews help other buyers choose the right product.'),
+            body: t('Ulasan Anda membantu pelanggan lain memilih produk.', 'Your review helps other buyers choose a product.'),
           }
         : { tone: 'ok', icon: 'checkCircle', title: t('Pesanan selesai', 'Order completed'), body: t('Terima kasih telah berbelanja di PT IKN.', 'Thank you for ordering from PT IKN.') };
     case 'expired':

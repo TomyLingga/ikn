@@ -32,7 +32,7 @@ export default function AddToCart({ product }: { product: Product }) {
       <div className="pd-buy">
         <div className="pd-login-note">
           <strong>
-            <Icon name="shieldCheck" size={18} /> {t('Harga & pemesanan khusus customer', 'Pricing & ordering for customers')}
+            <Icon name="shieldCheck" size={18} /> {t('Harga & pemesanan khusus pelanggan', 'Pricing & ordering for customers')}
           </strong>
           <p>
             {t(
@@ -43,7 +43,7 @@ export default function AddToCart({ product }: { product: Product }) {
         </div>
         <div className="pd-buy-actions">
           <Link href={`/login?redirect=${encodeURIComponent(shop.product(product.slug))}`} className="btn btn-solid btn-block">
-            {t('Login untuk memesan', 'Login to order')} <Icon name="arrow" />
+            {t('Masuk untuk memesan', 'Log in to order')} <Icon name="arrow" />
           </Link>
         </div>
       </div>
@@ -153,7 +153,7 @@ export default function AddToCart({ product }: { product: Product }) {
         </div>
       </div>
       <p className="qty-moq">
-        {moq > 1 && <>{t('Minimum order', 'Minimum order')}: {moq} {product.unit}. </>}
+        {moq > 1 && <>{t('Minimum pembelian', 'Minimum order')}: {moq} {product.unit}. </>}
         {product.stockStatus === 'made_to_order'
           ? t('Dibuat sesuai pesanan.', 'Made to order.')
           : <>{t('Tersedia', 'Available')}: {product.available.toLocaleString('id-ID')} {product.unit}.</>}
@@ -176,7 +176,7 @@ export default function AddToCart({ product }: { product: Product }) {
           </div>
           <div className="pd-buy-links">
             <button type="button" className="pd-text-btn" onClick={askSeller}>
-              <Icon name="chat" size={16} /> {t('Chat penjual', 'Chat with seller')}
+              <Icon name="chat" size={16} /> {t('Chat dengan kami', 'Chat with us')}
             </button>
             <button type="button" className="pd-text-btn" onClick={openCartDrawer}>
               <Icon name="bag" size={16} /> {t('Lihat keranjang', 'View cart')}

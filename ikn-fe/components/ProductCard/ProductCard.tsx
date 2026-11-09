@@ -128,7 +128,7 @@ export default function ProductCard({ product }: { product: Product }) {
             )}
             {!quote && !noPrice && (
               <li>
-                {t('Min. order', 'Min. order')} {moq.toLocaleString('id-ID')} {product.unit}
+                {t('Min. pembelian', 'Min. order')} {moq.toLocaleString('id-ID')} {product.unit}
               </li>
             )}
           </ul>
@@ -225,7 +225,7 @@ export default function ProductCard({ product }: { product: Product }) {
               )
             ) : (
               <span className="pcard-quote" style={{ color: 'var(--amber)' }}>
-                {t('Harga tersedia setelah login', 'Price available after login')}
+                {t('Masuk untuk melihat harga', 'Log in to see the price')}
               </span>
             )}
           </span>
@@ -252,8 +252,8 @@ export default function ProductCard({ product }: { product: Product }) {
             <Link
               href={`/login?redirect=${encodeURIComponent(href)}`}
               className="pcard-add pcard-add-login"
-              aria-label={t('Login untuk memesan', 'Login to order')}
-              title={t('Login untuk memesan', 'Login to order')}
+              aria-label={t('Masuk untuk memesan', 'Log in to order')}
+              title={t('Masuk untuk memesan', 'Log in to order')}
               onClick={(e) => e.stopPropagation()}
             >
               <Icon name="arrow" size={18} />

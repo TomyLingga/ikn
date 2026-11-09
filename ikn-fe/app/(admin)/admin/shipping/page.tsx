@@ -669,7 +669,7 @@ export default function AdminShipping() {
                 {firstError(formErrors, 'freeAbove') && <small className="cms-field-error">{firstError(formErrors, 'freeAbove')}</small>}
               </label>
             </div>
-            <I18nInput label={t('Estimasi sampai', 'Delivery estimate')} value={rateForm.eta} onChange={(v) => setRateForm({ ...rateForm, eta: v })} placeholder="2–4 hari" errorId={firstError(formErrors, 'eta.id', 'eta')} errorEn={firstError(formErrors, 'eta.en')} />
+            <I18nInput label={t('Estimasi sampai', 'Delivery estimate')} value={rateForm.eta} onChange={(v) => setRateForm({ ...rateForm, eta: v })} placeholder="2-4 hari" errorId={firstError(formErrors, 'eta.id', 'eta')} errorEn={firstError(formErrors, 'eta.en')} />
             <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Urutan tampil', 'Display order')}</span>

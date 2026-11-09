@@ -17,7 +17,7 @@ interface FileUploadDropzoneProps {
 }
 
 export default function FileUploadDropzone({
-  label = 'Unggah Dokumen',
+  label = 'Unggah dokumen',
   accept = '.pdf,application/pdf',
   maxSizeMB = 20,
   selectedFile,
@@ -110,7 +110,7 @@ export default function FileUploadDropzone({
             <Icon name="plus" size={18} />
           </div>
           <span className={styles.dropzoneText}>
-            Geser & lepas file di sini, atau <strong>klik untuk memilih file</strong>
+            Seret dan lepas berkas di sini, atau <strong>klik untuk memilih berkas</strong>
           </span>
           <span className={styles.dropzoneHint}>{helperText}</span>
         </div>
@@ -119,7 +119,7 @@ export default function FileUploadDropzone({
       {activeFilePath && !selectedFile && (
         <div className={styles.activeBadge}>
           <Icon name="checkCircle" size={15} style={{ color: 'var(--green)' }} />
-          <span>File Aktif:</span>
+          <span>Berkas aktif:</span>
           <FileLink
             file={{ url: activeFilePath, name: activeFileName || null }}
             className="link"

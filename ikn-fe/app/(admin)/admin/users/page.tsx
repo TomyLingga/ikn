@@ -215,7 +215,7 @@ export default function AdminUsers() {
   const columns: Column<AdminUserData>[] = [
     { key: 'name', label: t('Nama', 'Name'), render: (u) => <strong>{u.name}</strong> },
     { key: 'email', label: 'Email', render: (u) => <span className="mono">{u.email}</span> },
-    { key: 'role', label: 'Role', render: (u) => (u.role === 'super_admin' ? 'Super Admin' : 'Admin') },
+    { key: 'role', label: t('Peran', 'Role'), render: (u) => (u.role === 'super_admin' ? 'Super Admin' : 'Admin') },
     {
       key: 'permissions',
       label: t('Modul akses', 'Modules'),
@@ -253,8 +253,8 @@ export default function AdminUsers() {
       <AdminPageHead
         title={t('Akun Admin', 'Admin Accounts')}
         desc={t(
-          'Kelola akun back-office, hak akses per modul, dan petunjuk penggunaan aplikasi.',
-          'Manage back-office accounts, module permissions, and the application help guide.',
+          'Kelola akun admin, hak akses per modul, dan petunjuk penggunaan aplikasi.',
+          'Manage admin accounts, module permissions, and the application help guide.',
         )}
         action={tab === 'users' && isSuperAdmin ? { label: t('Tambah akun', 'Add account'), icon: 'plus', onClick: () => openForm(null) } : undefined}
       />
@@ -285,8 +285,8 @@ export default function AdminUsers() {
         <AdminCard title={t('Petunjuk penggunaan aplikasi', 'Application help guide')}>
           <p className="admin-note" style={{ marginBottom: 18 }}>
             {t(
-              'Dibuka saat admin mengklik "Petunjuk Penggunaan" di menu profil. Bisa berupa tautan URL atau dokumen (PDF).',
-              'Opened when admins click "Help & User Manual" in the profile menu. Either a URL or an uploaded document (PDF).',
+              'Dibuka saat admin mengklik "Petunjuk penggunaan" di menu profil. Isi dengan tautan atau unggah dokumen PDF.',
+              'Opened when admins click "Help & user manual" in the profile menu. Use a link or upload a PDF document.',
             )}
           </p>
           {guideError && (
@@ -377,7 +377,7 @@ export default function AdminUsers() {
                 {firstError(formErrors, 'password') && <small className="cms-field-error">{firstError(formErrors, 'password')}</small>}
               </label>
               <label>
-                <span className="field-label">Role</span>
+                <span className="field-label">{t('Peran', 'Role')}</span>
                 <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as AdminRole })}>
                   <option value="admin">{t('Admin (akses per modul)', 'Admin (per-module access)')}</option>
                   <option value="super_admin">{t('Super Admin (akses penuh)', 'Super Admin (full access)')}</option>

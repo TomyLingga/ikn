@@ -700,8 +700,8 @@ export const paymentMethodTypeLabels: Record<PaymentMethodType, { id: string; en
 
 /** Label cara serah terima untuk laporan (kode delivery_terms bawaan; kode lain tampil apa adanya). */
 export const deliveryTermReportLabels: Record<string, { id: string; en: string }> = {
-  loco: { id: 'Loco (ambil di pabrik)', en: 'Loco (plant pickup)' },
-  franco: { id: 'Franco (dikirim)', en: 'Franco (delivered)' },
+  loco: { id: 'Loco (ambil di pabrik)', en: 'Loco (factory pickup)' },
+  franco: { id: 'Franco (diantar ke alamat)', en: 'Franco (delivered to address)' },
   fob: { id: 'FOB Belawan', en: 'FOB Belawan' },
   cif: { id: 'CIF (pelabuhan tujuan)', en: 'CIF (destination port)' },
 };
@@ -711,7 +711,7 @@ export const stockMovementLabels: Record<StockMovementType, StatusLabel> = {
   adjust: { id: 'Penyesuaian', en: 'Adjustment', tone: 'info' },
   reserve: { id: 'Dipesan (reservasi)', en: 'Reserved', tone: 'warn' },
   release: { id: 'Reservasi dilepas', en: 'Released', tone: 'info' },
-  commit: { id: 'Terjual (keluar)', en: 'Committed (out)', tone: 'bad' },
+  commit: { id: 'Terjual (keluar)', en: 'Sold (out)', tone: 'bad' },
 };
 
 export const exchangeRateSourceLabels: Record<ExchangeRateSource, StatusLabel> = {
@@ -779,7 +779,7 @@ export const audienceLabels: Record<Audience, { id: string; en: string }> = {
 export function audienceSummary(row: { audience: Audience; customers: CustomerOption[] }, lang: 'id' | 'en'): string {
   if (row.audience !== 'customers') return audienceLabels.all[lang];
   const names = row.customers.map((c) => c.company || c.name);
-  if (names.length === 0) return lang === 'en' ? 'No customer selected' : 'Belum ada customer';
+  if (names.length === 0) return lang === 'en' ? 'No customer selected' : 'Belum ada customer dipilih';
   const shown = names.slice(0, 2).join(', ');
   return names.length > 2 ? `${shown} +${names.length - 2}` : shown;
 }

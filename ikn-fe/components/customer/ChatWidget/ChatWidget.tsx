@@ -311,10 +311,10 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
       <Image src="/img/rubin-logo.png" alt="" width={36} height={36} />
     </span>
   );
-  const status = t('Biasanya membalas dalam beberapa menit', 'Usually replies within minutes');
+  const status = t('Tim marketing', 'Sales team');
 
   return (
-    <section className={styles.panel} role="dialog" aria-label={t('Chat dengan penjual', 'Chat with the seller')}>
+    <section className={styles.panel} role="dialog" aria-label={t('Chat dengan PT IKN', 'Chat with PT IKN')}>
       {stage === 'welcome' ? (
         <div className={styles.welcome}>
           <div className={styles.welcomeTop}>
@@ -323,14 +323,14 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
               <Icon name="close" size={20} />
             </button>
           </div>
-          <h2>{t('Hai, kami siap membantu Anda', 'Hi, we are here to help')}</h2>
-          <p>{t('Tanyakan harga, stok, atau spesifikasi produk. Tim marketing kami membalas langsung di sini.', 'Ask about prices, stock or product specs. Our sales team replies right here.')}</p>
+          <h2>{t('Halo, ada yang bisa kami bantu?', 'Hi, how can we help?')}</h2>
+          <p>{t('Tanyakan harga, stok, atau spesifikasi produk. Tim marketing kami membalas di jendela ini.', 'Ask about prices, stock or product specs. Our sales team replies in this window.')}</p>
           <button type="button" className={styles.startCard} onClick={() => setStage('form')}>
             <span className={styles.startText}>
-              <strong>{t('Kami sedang online', 'We are online')}</strong>
-              <small>{status}</small>
+              <strong>{t('Tim marketing PT IKN', 'PT IKN sales team')}</strong>
+              <small>{t('Balasan muncul di jendela ini', 'Replies appear in this window')}</small>
               <em>
-                {t('Mulai Percakapan', 'Start a conversation')} <Icon name="arrow" size={16} />
+                {t('Mulai percakapan', 'Start a conversation')} <Icon name="arrow" size={16} />
               </em>
             </span>
             <span className={styles.startAvatar}>
@@ -360,7 +360,7 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
 
           {stage === 'form' ? (
             <form className={styles.form} onSubmit={startGuest}>
-              <p className={styles.formLead}>{t('Perkenalkan diri Anda dan mulai chat', 'Introduce yourself and start chatting')}</p>
+              <p className={styles.formLead}>{t('Isi nama dan email Anda, lalu tulis pertanyaan', 'Enter your name and email, then write your question')}</p>
               <label>
                 <span className="sr-only">{t('Nama', 'Name')}</span>
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t('Nama Anda', 'Your name')} autoComplete="name" required />
@@ -394,7 +394,7 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
                 </p>
               )}
               <button type="submit" className={styles.submit} disabled={sending}>
-                {sending ? t('Mengirim…', 'Sending…') : t('Mulai Percakapan', 'Start a conversation')}
+                {sending ? t('Mengirim…', 'Sending…') : t('Mulai percakapan', 'Start a conversation')}
               </button>
             </form>
           ) : (
@@ -410,8 +410,8 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
                 onLoadOlder={() => void loadOlder()}
                 otherName="PT IKN"
                 emptyText={t(
-                  'Halo! Ada yang bisa kami bantu? Tanyakan stok, harga, atau status pesanan Anda di sini.',
-                  'Hello! How can we help? Ask about stock, pricing, or your order status here.',
+                  'Tanyakan stok, harga, atau status pesanan Anda di sini.',
+                  'Ask about stock, pricing, or your order status here.',
                 )}
               />
               {error && (

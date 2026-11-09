@@ -138,7 +138,7 @@ export default function NotificationBell({ unread }: NotificationBellProps) {
             {!error && items.length === 0 && (
               <div className={styles.empty}>
                 <Icon name="bell" size={30} strokeWidth={1.3} />
-                <p>{loading ? <Spinner label={t('Memuat notifikasi…', 'Loading notifications…')} /> : t('Belum ada notifikasi. Update pesanan dan akun Anda akan muncul di sini.', 'No notifications yet. Updates on your orders and account will show up here.')}</p>
+                <p>{loading ? <Spinner label={t('Memuat notifikasi…', 'Loading notifications…')} /> : t('Belum ada notifikasi. Kabar terbaru tentang pesanan dan akun Anda akan muncul di sini.', 'No notifications yet. Updates on your orders and account will show up here.')}</p>
               </div>
             )}
             {items.map((item) => (

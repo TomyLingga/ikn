@@ -303,7 +303,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
           <label>
             <span className="field-label">{t('Kategori', 'Category')} *</span>
             <Select value={form.categoryId} onChange={(e) => update('categoryId', e.target.value)} required>
-              {categories.length === 0 && <option value="">{t('— Belum ada kategori —', '— No categories yet —')}</option>}
+              {categories.length === 0 && <option value="">{t('Belum ada kategori', 'No categories yet')}</option>}
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {tr(category.name, lang)}
@@ -464,7 +464,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
           {(() => {
             const volume = (Number(form.lengthCm) || 0) * (Number(form.widthCm) || 0) * (Number(form.heightCm) || 0);
             return volume > 0
-              ? t(`Volume per satuan ${(volume / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 4 })} m³ — dipakai untuk ongkir per m³.`, `Volume per unit ${(volume / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 4 })} m³ — used for per-m³ shipping.`)
+              ? t(`Volume per satuan ${(volume / 1_000_000).toLocaleString('id-ID', { maximumFractionDigits: 4 })} m³, dipakai untuk ongkir per m³.`, `Volume per unit ${(volume / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 4 })} m³, used for per-m³ shipping.`)
               : t('Isi ketiga dimensi kemasan per satuan jual agar volume ikut dihitung di ongkir; kosong = volume tidak dihitung.', 'Fill in all three package dimensions per sale unit so volume counts toward shipping; empty = volume ignored.');
           })()}
         </p>
@@ -485,7 +485,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
             <span className="field-label">{t('Status stok', 'Stock status')}</span>
             <Select value={form.stockStatus} onChange={(e) => update('stockStatus', e.target.value as '' | 'made_to_order')}>
               <option value="">{t('Otomatis dari stok tersedia', 'Automatic from available stock')}</option>
-              <option value="made_to_order">{t('Pre-order / made to order (manual)', 'Made to order (manual)')}</option>
+              <option value="made_to_order">{t('Pre-order, dibuat sesuai pesanan (manual)', 'Made to order (manual)')}</option>
             </Select>
             <small className="admin-field-hint">{t('Jumlah stok diubah lewat tombol "Stok" pada daftar produk.', 'Stock quantity is changed via the "Stock" button on the product list.')}</small>
           </label>
@@ -498,7 +498,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
           </label>
           <label className="cms-check">
             <input type="checkbox" checked={form.isPublished} onChange={(e) => update('isPublished', e.target.checked)} />
-            <span>{t('Tampilkan di katalog (publish)', 'Show in catalog (published)')}</span>
+            <span>{t('Tampilkan di katalog', 'Show in catalog')}</span>
           </label>
         </div>
 

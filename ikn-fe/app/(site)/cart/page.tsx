@@ -199,11 +199,11 @@ export default function CartPage() {
                 {quoteError && <p className="form-error" role="alert">{quoteError}</p>}
                 {!customer && authReady && (
                   <p className="form-note" style={{ marginTop: 10 }}>
-                    {t('Login untuk melihat harga berlaku dan melanjutkan checkout.', 'Log in to see current pricing and continue to checkout.')}
+                    {t('Masuk untuk melihat harga yang berlaku dan lanjut ke checkout.', 'Log in to see current pricing and continue to checkout.')}
                   </p>
                 )}
                 <Link href={checkoutHref} className="btn btn-solid btn-block" style={{ marginTop: 18 }}>
-                  {customer ? t('Lanjut ke checkout', 'Proceed to checkout') : t('Login untuk checkout', 'Log in to checkout')} <Icon name="arrow" />
+                  {customer ? t('Lanjut ke checkout', 'Proceed to checkout') : t('Masuk untuk checkout', 'Log in to check out')} <Icon name="arrow" />
                 </Link>
                 <Link href="/catalog" className="link" style={{ marginTop: 16, justifyContent: 'center' }}>
                   {t('Lanjut belanja', 'Continue shopping')}

@@ -35,7 +35,7 @@ export default function PickupPointCard({ label, address, lat, lng, lang, title,
             </>
           )}
           <br />
-          <small>{address || t('Alamat titik ambil belum diatur penjual.', 'The seller has not set the pickup address yet.')}</small>
+          <small>{address || t('Alamat titik ambil belum tersedia. Hubungi kami untuk detailnya.', 'The pickup address is not available yet. Contact us for details.')}</small>
           {items && items.length > 0 && (
             <>
               <br />

@@ -55,9 +55,9 @@ function AuthCard() {
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [notice, setNotice] = useState<Notice | null>(() => {
     const verified = searchParams.get('verified');
-    if (verified === '1') return { tone: 'ok', text: t('Email berhasil diverifikasi. Silakan login; akun Anda menunggu persetujuan admin.', 'Email verified. Please log in; your account is awaiting admin approval.') };
-    if (verified === '0') return { tone: 'bad', text: t('Tautan verifikasi tidak valid atau sudah kedaluwarsa. Login untuk meminta tautan baru.', 'The verification link is invalid or has expired. Log in to request a new one.') };
-    if (searchParams.get('reset') === '1') return { tone: 'ok', text: t('Password berhasil diubah. Silakan login dengan password baru.', 'Password updated. Please log in with your new password.') };
+    if (verified === '1') return { tone: 'ok', text: t('Email sudah terverifikasi. Silakan masuk. Akun Anda masih menunggu persetujuan tim kami.', 'Email verified. You can log in now. Your account is still awaiting approval from our team.') };
+    if (verified === '0') return { tone: 'bad', text: t('Tautan verifikasi tidak valid atau sudah kedaluwarsa. Masuk untuk meminta tautan baru.', 'The verification link is invalid or has expired. Log in to request a new one.') };
+    if (searchParams.get('reset') === '1') return { tone: 'ok', text: t('Kata sandi sudah diganti. Silakan masuk dengan kata sandi baru.', 'Password updated. Please log in with your new password.') };
     return null;
   });
 
@@ -107,7 +107,7 @@ function AuthCard() {
       if (status === 'inactive') {
         return { tone: 'bad', text: t('Akun Anda dinonaktifkan. Hubungi tim kami untuk mengaktifkan kembali.', 'Your account is inactive. Contact our team to reactivate it.') };
       }
-      return { tone: 'warn', text: t('Akun Anda masih menunggu persetujuan admin.', 'Your account is awaiting admin approval.') };
+      return { tone: 'warn', text: t('Akun Anda masih menunggu persetujuan tim kami.', 'Your account is still awaiting approval from our team.') };
     }
     return null;
   }
@@ -187,7 +187,7 @@ function AuthCard() {
       setRegistered(email);
     } catch (err) {
       setErrors(fieldErrors(err));
-      setError(errorMessage(err, t('Registrasi gagal. Periksa kembali data Anda.', 'Registration failed. Please check your details.')));
+      setError(errorMessage(err, t('Pendaftaran gagal. Periksa kembali data Anda.', 'Registration failed. Please check your details.')));
     } finally {
       setBusy(false);
     }
@@ -218,13 +218,13 @@ function AuthCard() {
         <div className={styles.formInner} key={registered ? 'done' : mode}>
       {(customer || admin) ? (
         <div className={styles.loggedIn}>
-          <p>{t('Anda sudah login sebagai', 'You are logged in as')} <strong>{customer?.name || admin?.name}</strong></p>
+          <p>{t('Anda sudah masuk sebagai', 'You are logged in as')} <strong>{customer?.name || admin?.name}</strong></p>
           <button
             type="button"
             className={styles.primaryButton}
             onClick={() => router.replace(admin ? '/admin' : redirectParam && !redirectParam.startsWith('/admin') ? redirectParam : '/dashboard')}
           >
-            {t('Ke Dashboard', 'Go to dashboard')} <Icon name="arrow" size={18} />
+            {t('Ke dashboard', 'Go to dashboard')} <Icon name="arrow" size={18} />
           </button>
         </div>
       ) : registered ? (
@@ -247,18 +247,18 @@ function AuthCard() {
             )}
           </p>
           <button type="button" className={styles.primaryButton} style={{ marginTop: 18 }} onClick={() => { setRegistered(null); changeMode('login'); }}>
-            {t('Ke halaman login', 'Go to login')} <Icon name="arrow" size={18} />
+            {t('Ke halaman masuk', 'Go to login')} <Icon name="arrow" size={18} />
           </button>
         </div>
       ) : (
         <>
           <div className={styles.heading}>
-            <span className={styles.eyebrow}>{mode === 'login' ? t('Portal customer', 'Customer portal') : t('Akun perusahaan baru', 'New company account')}</span>
+            <span className={styles.eyebrow}>{mode === 'login' ? t('Portal pelanggan', 'Customer portal') : t('Akun perusahaan baru', 'New company account')}</span>
             <h1 id="auth-title">{mode === 'login' ? t('Selamat datang kembali', 'Welcome back') : t('Buat akun', 'Create an account')}</h1>
             <p>
               {mode === 'login'
                 ? t('Masuk untuk memesan, membayar, dan melacak pesanan Anda.', 'Sign in to order, pay, and track your orders.')
-                : t('Daftarkan perusahaan Anda untuk mulai memesan produk PT IKN secara online.', 'Register your company to start ordering PT IKN products online.')}
+                : t('Daftarkan perusahaan Anda untuk memesan produk PT IKN secara online.', 'Register your company to order PT IKN products online.')}
             </p>
           </div>
 
@@ -295,7 +295,7 @@ function AuthCard() {
               {redirectParam && !notice && (
                 <div className={styles.redirectNote}>
                   <Icon name="shieldCheck" size={18} />
-                  <span>{t('Silakan login untuk melanjutkan.', 'Please log in to continue.')}</span>
+                  <span>{t('Silakan masuk untuk melanjutkan.', 'Please log in to continue.')}</span>
                 </div>
               )}
 
@@ -345,7 +345,7 @@ function AuthCard() {
                   <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
                   <span>{t('Ingat saya', 'Remember me')}</span>
                 </label>
-                <Link href="/forgot-password" className={styles.subtleLink}>{t('Lupa password?', 'Forgot password?')}</Link>
+                <Link href="/forgot-password" className={styles.subtleLink}>{t('Lupa kata sandi?', 'Forgot password?')}</Link>
               </div>
 
               <button type="submit" className={styles.primaryButton} disabled={busy || !ready}>

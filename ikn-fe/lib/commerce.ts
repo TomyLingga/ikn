@@ -31,9 +31,9 @@ export const stockLabels: Record<StockStatus, StatusLabel> = {
 
 export const orderStatus: Record<OrderStatusKey, StatusLabel> = {
   // Order CIF (ASUMSI A-89): ongkir ditawarkan admin dulu; payment dan batas bayar dibuat setelah disepakati.
-  awaiting_freight: { id: 'Menunggu Penawaran Ongkir', en: 'Awaiting Freight Quote', tone: 'warn' },
-  pending_payment: { id: 'Menunggu Pembayaran', en: 'Awaiting Payment', tone: 'warn' },
-  payment_review: { id: 'Verifikasi Pembayaran', en: 'Payment Review', tone: 'warn' },
+  awaiting_freight: { id: 'Menunggu penawaran ongkir', en: 'Awaiting freight quote', tone: 'warn' },
+  pending_payment: { id: 'Menunggu pembayaran', en: 'Awaiting payment', tone: 'warn' },
+  payment_review: { id: 'Verifikasi pembayaran', en: 'Payment review', tone: 'warn' },
   paid: { id: 'Dibayar', en: 'Paid', tone: 'ok' },
   processing: { id: 'Diproses', en: 'Processing', tone: 'info' },
   shipped: { id: 'Dikirim', en: 'Shipped', tone: 'info' },
@@ -44,8 +44,8 @@ export const orderStatus: Record<OrderStatusKey, StatusLabel> = {
 };
 
 export const paymentStatus: Record<PaymentStatusKey, StatusLabel> = {
-  pending: { id: 'Belum Dibayar', en: 'Unpaid', tone: 'warn' },
-  awaiting_verification: { id: 'Menunggu Verifikasi', en: 'Awaiting Verification', tone: 'warn' },
+  pending: { id: 'Belum dibayar', en: 'Unpaid', tone: 'warn' },
+  awaiting_verification: { id: 'Menunggu verifikasi', en: 'Awaiting verification', tone: 'warn' },
   paid: { id: 'Dibayar', en: 'Paid', tone: 'ok' },
   rejected: { id: 'Ditolak', en: 'Rejected', tone: 'bad' },
   expired: { id: 'Kedaluwarsa', en: 'Expired', tone: 'bad' },
@@ -214,7 +214,7 @@ export function freightLineLabel(label: string | I18n | null | undefined, lang: 
 
 /** Teks warning quote `freight_quote_pending` (ringkasan checkout CIF). */
 export const freightQuotePendingText: StatusLabel = {
-  id: 'Ongkir CIF: ditawarkan admin setelah pesanan dibuat',
+  id: 'Ongkir CIF: kami tawarkan setelah pesanan dibuat',
   en: 'CIF freight: quoted by our team after the order is placed',
   tone: 'info',
 };

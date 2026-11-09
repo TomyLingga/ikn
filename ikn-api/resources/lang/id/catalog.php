@@ -12,11 +12,11 @@ return [
     'setting_invalid' => 'Nilai tidak valid (rentang :min–:max).',
     'shipping_rate_zone_mismatch' => 'Tarif tidak termasuk zona ini.',
     'delivery_term_in_use' => 'Cara serah terima masih dipakai oleh order.',
-    'delivery_term_code_immutable' => 'Kode cara serah terima tidak dapat diubah.',
+    'delivery_term_code_immutable' => 'Kode cara serah terima tidak bisa diubah.',
     // Lokasi pabrik (ASUMSI A-90).
     'factory_location_in_use' => 'Pabrik ini masih dipakai produk. Pindahkan produk tersebut ke pabrik lain lebih dulu.',
     'factory_location_last' => 'Minimal harus ada satu lokasi pabrik.',
-    'factory_location_code_immutable' => 'Kode pabrik tidak dapat diubah.',
+    'factory_location_code_immutable' => 'Kode pabrik tidak bisa diubah.',
     'swift_code_invalid' => 'Kode SWIFT/BIC harus 8 atau 11 huruf/angka.',
 
     'voucher' => [
@@ -29,7 +29,7 @@ return [
         'min_subtotal' => 'Minimum belanja untuk voucher ini belum terpenuhi.',
         'scope' => 'Voucher tidak berlaku untuk produk di keranjang.',
         'not_eligible' => 'Voucher ini tidak berlaku untuk akun Anda.',
-        'currency' => 'Voucher hanya berlaku untuk order dalam rupiah.',
+        'currency' => 'Voucher hanya berlaku untuk pesanan dalam rupiah.',
     ],
 
     'quote' => [
@@ -37,8 +37,8 @@ return [
         'product_not_found' => 'Produk tidak ditemukan atau tidak tersedia.',
         'product_quote_only' => 'Produk :product hanya tersedia lewat permintaan penawaran.',
         'product_no_price_currency' => 'Produk :product belum punya harga :currency.',
-        'payment_method_currency' => 'Order :currency hanya bisa dibayar lewat transfer bank manual.',
-        'below_moq' => 'Minimum pemesanan :product adalah :moq.',
+        'payment_method_currency' => 'Pesanan :currency hanya bisa dibayar lewat transfer bank manual.',
+        'below_moq' => 'Minimum pembelian :product adalah :moq.',
         'qty_min' => 'Jumlah minimal 1.',
         'shipping_rate_invalid' => 'Tarif pengiriman tidak berlaku untuk alamat ini.',
         'payment_method_invalid' => 'Metode pembayaran tidak tersedia.',

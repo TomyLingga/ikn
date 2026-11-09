@@ -91,7 +91,7 @@ export default function FieldInput({ label, def, value, onChange, icons = [], er
             {text !== '' && icons.includes(text) ? <Icon name={text as IconName} size={18} /> : null}
           </span>
           <Select value={text} onChange={(e) => onChange(e.target.value)}>
-            <option value="">— pilih ikon —</option>
+            <option value="">Tanpa ikon</option>
             {icons.map((name) => (
               <option key={name} value={name}>
                 {name}

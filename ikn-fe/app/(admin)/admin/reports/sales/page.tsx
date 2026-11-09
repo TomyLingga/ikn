@@ -437,7 +437,7 @@ export default function AdminSalesReport() {
           </div>
 
           <div className="rp-grid-2">
-            <AdminCard title={t('Wilayah tujuan', 'Destination regions')} desc={t('Provinsi alamat kirim; order ambil di pabrik dikelompokkan tersendiri.', 'Province of the delivery address; plant pickups are grouped separately.')}>
+            <AdminCard title={t('Wilayah tujuan', 'Destination regions')} desc={t('Provinsi alamat kirim; order ambil di pabrik dikelompokkan tersendiri.', 'Province of the delivery address; factory pickup orders are grouped separately.')}>
               <BarList
                 rows={(report.byRegion ?? []).map((row) => ({ key: row.region, label: regionLabel(row.region), value: row.revenue, sub: `${row.orders} order`, color: CHART_COLORS[1] }))}
                 format={formatIDR}

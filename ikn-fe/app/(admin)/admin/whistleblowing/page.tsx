@@ -155,7 +155,7 @@ export default function AdminWhistleblowing() {
     <div style={{ display: 'grid', gap: 24 }}>
       <AdminPageHead
         title={t('Pelaporan WBS', 'WBS Reports')}
-        desc={t('Tindak lanjut laporan whistle blowing dan dokumen SOP WBS untuk publik.', 'Follow up whistle blowing reports and manage the public WBS SOP document.')}
+        desc={t('Tindak lanjut laporan whistleblowing (WBS) dan dokumen SOP WBS yang dibuka publik.', 'Follow up whistleblowing (WBS) reports and manage the public WBS SOP document.')}
       />
 
       {notice && (

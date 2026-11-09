@@ -182,7 +182,7 @@ export function DataTable<T extends object>({
                 : `Menampilkan ${startIndex + 1}–${Math.min(startIndex + pageSize, totalRows)} dari ${totalRows} data`}
             </span>
             <label className="admin-filter" style={{ padding: '4px 8px', fontSize: '0.74rem', marginBottom: 0 }}>
-              <span>{lang === 'en' ? 'Per page:' : 'Per hal:'}</span>
+              <span>{lang === 'en' ? 'Per page:' : 'Per halaman:'}</span>
               <Select
                 value={pageSize}
                 onChange={(e) => {
@@ -204,7 +204,7 @@ export function DataTable<T extends object>({
               disabled={validPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             >
-              {lang === 'en' ? '‹ Prev' : '‹ Sebelum'}
+              {lang === 'en' ? '‹ Prev' : '‹ Sebelumnya'}
             </button>
 
             {Array.from({ length: totalPages }, (_, idx) => idx + 1)

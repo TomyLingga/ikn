@@ -112,7 +112,7 @@ export default function AdminAuditLogs() {
     <div>
       <AdminPageHead
         title="Audit Log"
-        desc={t('Jejak semua aksi tulis admin dan perubahan status otomatis sistem (scheduler, webhook).', 'Trail of every admin write action and automatic system status changes (scheduler, webhook).')}
+        desc={t('Catatan setiap perubahan data oleh admin dan perubahan status yang dilakukan sistem secara otomatis (jadwal otomatis, notifikasi gateway pembayaran).', 'A record of every data change made by admins and of status changes the system makes automatically (scheduled jobs, payment gateway notifications).')}
       />
 
       {error && <p className="form-error">{error}</p>}

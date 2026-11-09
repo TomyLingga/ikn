@@ -400,7 +400,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     return (
       <SessionLoader
         message={lang === 'en' ? 'Loading admin session...' : 'Memuat sesi admin...'}
-        portalName={lang === 'en' ? 'Admin Backoffice' : 'Back-office Admin'}
+        portalName={lang === 'en' ? 'Admin panel' : 'Panel admin'}
       />
     );
   }
@@ -446,7 +446,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             />
             <div className={styles.brandMeta}>
               <strong>PT Industri Karet Nusantara</strong>
-              <small>{lang === 'en' ? 'Admin Portal' : 'Panel Administrasi'}</small>
+              <small>{lang === 'en' ? 'Admin panel' : 'Panel admin'}</small>
             </div>
           </Link>
         </div>
@@ -537,7 +537,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             closeLabel={
               isMobile
                 ? lang === 'en' ? 'Close admin menu' : 'Tutup menu admin'
-                : lang === 'en' ? 'Collapse admin sidebar' : 'Ciutkan sidebar admin'
+                : lang === 'en' ? 'Collapse sidebar' : 'Ciutkan bilah samping'
             }
           />
           <div className={styles.topActions}>
@@ -552,7 +552,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 className={styles.user}
                 onClick={() => setProfileOpen((v) => !v)}
                 style={{ background: 'transparent', border: 0, cursor: 'pointer', padding: 0 }}
-                title={lang === 'en' ? 'View Admin Profile' : 'Lihat Profil Admin'}
+                title={lang === 'en' ? 'View admin profile' : 'Lihat profil admin'}
               >
                 <span className={styles.avatar}>{initials}</span>
                 <span className={styles.userMeta}>
@@ -624,7 +624,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                       }}
                       onClick={() => void openHelpGuide()}
                     >
-                      <Icon name="compass" size={16} /> {lang === 'en' ? 'Help & User Manual' : 'Petunjuk Penggunaan'}
+                      <Icon name="compass" size={16} /> {lang === 'en' ? 'Help & user manual' : 'Petunjuk penggunaan'}
                     </button>
                     <Link
                       href="/"
@@ -656,7 +656,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                       }}
                       onClick={() => setProfileOpen(false)}
                     >
-                      <Icon name="arrow" size={16} /> {lang === 'en' ? 'View Public Site' : 'Lihat Situs Publik'}
+                      <Icon name="arrow" size={16} /> {lang === 'en' ? 'View public site' : 'Lihat situs publik'}
                     </Link>
                   </div>
                 </div>
@@ -672,20 +672,20 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         <div className="admin-modal-backdrop" onClick={() => setHelpModalOpen(false)}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
             <div className="admin-modal-head">
-              <h2>{helpGuideData?.title || (lang === 'en' ? 'Help & User Manual' : 'Petunjuk Penggunaan Aplikasi')}</h2>
+              <h2>{helpGuideData?.title || (lang === 'en' ? 'Help & user manual' : 'Petunjuk penggunaan aplikasi')}</h2>
               <button type="button" className="admin-modal-close" onClick={() => setHelpModalOpen(false)}>✕</button>
             </div>
             <div style={{ padding: 20 }}>
               <p className="admin-note" style={{ lineHeight: 1.6, marginBottom: 16 }}>
                 {lang === 'en'
-                  ? 'The user guide or application documentation has not been configured by the Super Admin yet.'
-                  : 'Petunjuk penggunaan atau dokumentasi aplikasi belum diatur oleh Super Admin.'}
+                  ? 'The Super Admin has not set up the user guide yet.'
+                  : 'Super Admin belum mengatur petunjuk penggunaan.'}
               </p>
               {admin.role === 'super_admin' && (
                 <p className="admin-note" style={{ color: 'var(--green)', fontWeight: 600 }}>
                   {lang === 'en'
-                    ? 'As a Super Admin, you can set the URL link or upload a PDF manual under "Admin Accounts" > "Help guide".'
-                    : 'Sebagai Super Admin, Anda dapat mengatur tautan URL atau mengunggah manual PDF di menu "Akun Admin" > "Petunjuk penggunaan".'}
+                    ? 'Add a link or upload a PDF manual under "Admin Accounts" > "Help guide".'
+                    : 'Isi tautan atau unggah manual PDF di menu "Akun Admin", tab "Petunjuk penggunaan".'}
                 </p>
               )}
               <div className="admin-modal-actions" style={{ marginTop: 20 }}>

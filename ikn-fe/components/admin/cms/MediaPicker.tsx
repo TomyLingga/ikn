@@ -154,7 +154,7 @@ export default function MediaPicker({
             )}
             {onFrameChange && summary && (isImageMedia(summary) || isVideoMedia(summary)) && (
               <button type="button" className="btn btn-line btn-sm" onClick={() => setFrameOpen(true)}>
-                {isVideoMedia(summary) ? t('Atur bingkai & durasi', 'Framing & duration') : t('Atur bingkai', 'Adjust framing')}
+                {isVideoMedia(summary) ? t('Atur bingkai & durasi', 'Adjust framing & duration') : t('Atur bingkai', 'Adjust framing')}
               </button>
             )}
             {id && (

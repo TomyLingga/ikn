@@ -278,7 +278,7 @@ export default function AdminNewsEditor({ params }: { params: { id: string } }) 
                 <label>
                   <span className="field-label">{t('Kategori', 'Category')}</span>
                   <Select value={form.categoryId ?? ''} onChange={(e) => setForm({ ...form, categoryId: e.target.value ? Number(e.target.value) : null })}>
-                    <option value="">{t('— Tanpa kategori —', '— No category —')}</option>
+                    <option value="">{t('Tanpa kategori', 'No category')}</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {tr(cat.name, lang)}

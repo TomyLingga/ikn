@@ -230,8 +230,8 @@ export default function AdminExchangeRates() {
               <Icon name="clock" size={18} />
               <span>
                 {t(
-                  `Data belum diperbarui ${data.staleDays} hari kerja. Cek scheduler (rates:fetch) atau isi kurs manual.`,
-                  `Data has not been updated for ${data.staleDays} working days. Check the scheduler (rates:fetch) or add a manual rate.`,
+                  `Data belum diperbarui ${data.staleDays} hari kerja. Minta tim TI memeriksa pengambilan kurs otomatis, atau isi kurs manual.`,
+                  `Data has not been updated for ${data.staleDays} working days. Ask the IT team to check the automatic rate download, or add a manual rate.`,
                 )}
               </span>
             </div>

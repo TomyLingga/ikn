@@ -243,8 +243,8 @@ export default function AdminPaymentMethods() {
 
       <p className="cms-hint" style={{ marginTop: 18 }}>
         {t(
-          'Metode gateway (QRIS dinamis, virtual account, e-wallet) memakai driver Xendit. Kunci rahasia gateway tidak pernah disimpan lewat panel ini: isi XENDIT_SECRET_KEY dan XENDIT_CALLBACK_TOKEN di berkas .env server, lalu aktifkan metodenya di sini.',
-          'Gateway methods (dynamic QRIS, virtual account, e-wallet) use the Xendit driver. Gateway secrets are never stored through this panel: set XENDIT_SECRET_KEY and XENDIT_CALLBACK_TOKEN in the server .env file, then activate the method here.',
+          'Metode gateway (QRIS dinamis, virtual account, e-wallet) diproses lewat Xendit. Kunci rahasia Xendit tidak diisi di panel ini; tim TI memasangnya di server. Setelah kunci terpasang, aktifkan metodenya di sini.',
+          'Gateway methods (dynamic QRIS, virtual account, e-wallet) are processed by Xendit. Xendit secret keys are not entered in this panel; the IT team installs them on the server. Once the keys are in place, activate the method here.',
         )}
       </p>
 
@@ -260,7 +260,7 @@ export default function AdminPaymentMethods() {
               <label>
                 <span className="field-label">{t('Kode', 'Code')} *</span>
                 <input value={form.code} onChange={(e) => update('code', e.target.value.toLowerCase())} placeholder="manual_transfer" required pattern="[a-z0-9_]+" disabled={!!editing} />
-                <small className="admin-field-hint">{t('Huruf kecil, angka, _; dipakai sebagai id di checkout.', 'Lowercase letters, digits, _; used as the id at checkout.')}</small>
+                <small className="admin-field-hint">{t('Huruf kecil, angka, dan garis bawah (_). Dipakai sistem sebagai pengenal metode di checkout.', 'Lowercase letters, digits, and underscores (_). The system uses it to identify the method at checkout.')}</small>
                 {firstError(formErrors, 'code') && <small className="cms-field-error">{firstError(formErrors, 'code')}</small>}
               </label>
               <label>
@@ -337,7 +337,7 @@ export default function AdminPaymentMethods() {
                   </label>
                 </div>
                 <small className="admin-field-hint">
-                  {t('Kunci API Xendit (XENDIT_SECRET_KEY, XENDIT_CALLBACK_TOKEN) diatur di .env server; metode gateway baru bisa diaktifkan setelah kunci terpasang.', 'Xendit API keys (XENDIT_SECRET_KEY, XENDIT_CALLBACK_TOKEN) are set in the server .env; gateway methods can be activated once the keys are in place.')}
+                  {t('Kunci rahasia Xendit dipasang tim TI di server. Metode gateway baru bisa diaktifkan setelah kunci terpasang.', 'The IT team installs the Xendit secret keys on the server. Gateway methods can be activated once the keys are in place.')}
                 </small>
               </div>
             )}

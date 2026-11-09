@@ -180,8 +180,8 @@ export default function RegionPicker({ value, onChange, error }: RegionPickerPro
       <span className="field-label">{t('Cakupan wilayah', 'Coverage regions')}</span>
       <small className="admin-field-hint">
         {t(
-          'Alamat customer dicocokkan dari wilayah paling spesifik (desa → kecamatan → kabupaten → provinsi). Zona tanpa wilayah atau bertanda default menjadi zona cadangan.',
-          'Customer addresses are matched from the most specific region (village → district → regency → province). A zone with no regions or marked default acts as the fallback.',
+          'Alamat customer dicocokkan mulai dari wilayah paling spesifik (desa → kecamatan → kabupaten → provinsi). Zona tanpa wilayah, atau zona yang diberi aksi "Jadikan cadangan", menjadi zona cadangan.',
+          'Customer addresses are matched starting from the most specific region (village → district → regency → province). A zone with no regions, or one set with "Set as fallback", acts as the fallback zone.',
         )}
       </small>
       {error && <small className="cms-field-error">{error}</small>}

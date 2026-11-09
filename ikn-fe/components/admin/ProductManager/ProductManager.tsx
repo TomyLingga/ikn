@@ -229,7 +229,7 @@ export default function ProductManager() {
     <div>
       <AdminPageHead
         title={t('Produk', 'Products')}
-        desc={t('Kelola katalog produk: data, harga & promo, gambar, dan stok (ledger).', 'Manage the product catalog: details, pricing & promos, images, and stock (ledger).')}
+        desc={t('Kelola katalog produk: data, harga dan promo, gambar, serta stok.', 'Manage the product catalog: details, pricing and promos, images, and stock.')}
         action={{ label: t('Tambah produk', 'Add product'), icon: 'plus', onClick: () => setModal({ type: 'form', product: null }) }}
       />
 
@@ -328,8 +328,8 @@ export default function ProductManager() {
             </p>
             <p className="admin-confirm-note">
               {t(
-                'Produk diarsipkan (soft delete): hilang dari katalog dan tidak bisa dipesan, tetapi riwayat order, ulasan, dan ledger stok tetap tersimpan. Untuk sekadar menyembunyikan, gunakan "Sembunyikan".',
-                'The product is archived (soft delete): removed from the catalog and no longer orderable, while order, review, and stock history are kept. To only hide it, use "Unpublish".',
+                'Produk diarsipkan: hilang dari katalog dan tidak bisa dipesan, tetapi riwayat order, ulasan, dan mutasi stok tetap tersimpan. Untuk sekadar menyembunyikan, gunakan "Sembunyikan".',
+                'The product is archived: removed from the catalog and no longer orderable, while order, review, and stock history are kept. To only hide it, use "Unpublish".',
               )}
             </p>
             <footer className="admin-modal-actions">

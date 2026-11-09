@@ -16,14 +16,14 @@ export default function AccountStatusBanner({ context = 'dashboard' }: { context
   const isPending = customer.status === 'pending';
   const tone = isPending ? 'warn' : 'bad';
   const title = isPending
-    ? t('Akun menunggu persetujuan admin', 'Account awaiting admin approval')
+    ? t('Akun menunggu persetujuan', 'Account awaiting approval')
     : customer.status === 'rejected'
       ? t('Pendaftaran akun ditolak', 'Account registration rejected')
       : t('Akun nonaktif', 'Account inactive');
   const body = isPending
     ? context === 'checkout'
-      ? t('Checkout baru bisa dilakukan setelah akun disetujui. Anda tetap bisa menyusun keranjang dan mengelola alamat.', 'Checkout becomes available once your account is approved. You can still build your cart and manage addresses.')
-      : t('Kami sedang meninjau data perusahaan Anda. Anda akan menerima email begitu akun disetujui dan bisa mulai memesan.', 'We are reviewing your company details. You will get an email once your account is approved and you can start ordering.')
+      ? t('Anda bisa checkout setelah akun disetujui. Sambil menunggu, Anda tetap bisa mengisi keranjang dan mengatur alamat.', 'You can check out once your account is approved. Meanwhile you can still fill your cart and manage addresses.')
+      : t('Kami sedang memeriksa data perusahaan Anda. Kami kirim email begitu akun disetujui dan Anda bisa mulai memesan.', 'We are reviewing your company details. We will email you once your account is approved and you can start ordering.')
     : customer.status === 'rejected'
       ? customer.rejectionReason
         ? `${t('Alasan', 'Reason')}: ${customer.rejectionReason}`

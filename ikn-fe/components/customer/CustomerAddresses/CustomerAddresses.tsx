@@ -72,7 +72,7 @@ export default function CustomerAddresses() {
       <div className="acct-section-head">
         <div>
           <h2 className="h3">{t('Alamat pengiriman', 'Shipping addresses')}</h2>
-          <p className="form-note">{t('Alamat utama dipakai otomatis saat checkout; ongkir dihitung per alamat.', 'The default address is preselected at checkout; shipping is calculated per address.')}</p>
+          <p className="form-note">{t('Alamat utama otomatis dipilih saat checkout. Ongkir dihitung per alamat.', 'The default address is preselected at checkout. Shipping is calculated per address.')}</p>
         </div>
         <button type="button" className="btn btn-line btn-sm" onClick={() => { setShowForm((v) => !v); setEditingId(null); }}>
           <Icon name={showForm ? 'close' : 'plus'} size={17} /> {showForm ? t('Batal', 'Cancel') : t('Tambah alamat', 'Add address')}
@@ -129,7 +129,7 @@ export default function CustomerAddresses() {
         ))}
       </div>
       {addresses.length === 0 && !showForm && (
-        <p className="form-note">{t('Belum ada alamat. Tambahkan alamat untuk mempermudah checkout.', 'No addresses yet. Add one to speed up checkout.')}</p>
+        <p className="form-note">{t('Belum ada alamat. Tambahkan alamat agar checkout lebih cepat.', 'No addresses yet. Add one to speed up checkout.')}</p>
       )}
     </div>
   );

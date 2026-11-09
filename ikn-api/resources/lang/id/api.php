@@ -2,7 +2,7 @@
 
 return [
     'validation_error' => 'Data yang dikirim tidak valid.',
-    'unauthenticated' => 'Anda belum login.',
+    'unauthenticated' => 'Anda belum masuk.',
     'forbidden' => 'Anda tidak memiliki akses.',
     'module_forbidden' => 'Anda tidak memiliki akses ke modul :module.',
     'not_found' => 'Data tidak ditemukan.',
@@ -15,7 +15,7 @@ return [
     'server_error' => 'Terjadi kesalahan pada server.',
     'login_failed' => 'Email atau kata sandi salah.',
     'account_inactive' => 'Akun Anda tidak aktif.',
-    'account_not_approved' => 'Akun Anda belum disetujui admin.',
+    'account_not_approved' => 'Akun Anda belum disetujui.',
     'email_not_verified' => 'Email belum diverifikasi.',
     'not_admin' => 'Akun ini bukan akun admin.',
     'logged_out' => 'Anda telah keluar.',
@@ -33,6 +33,6 @@ return [
     'mail_test_failed' => 'Email uji gagal dikirim: :reason',
     'mail_disabled' => 'Pengiriman email sedang dimatikan (mode "Tidak kirim email").',
     'mail_via_server' => 'konfigurasi server',
-    'cannot_deactivate_self' => 'Anda tidak dapat menonaktifkan akun sendiri.',
+    'cannot_deactivate_self' => 'Anda tidak bisa menonaktifkan akun sendiri.',
     'menu_location_unknown' => 'Lokasi menu tidak dikenal.',
 ];

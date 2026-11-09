@@ -39,7 +39,7 @@ export default function BusinessProducts({ products: all }: { products: Product[
             {lang === 'en' ? 'Open the full catalog & order online' : 'Buka katalog lengkap & pesan online'} <Icon name="arrow" />
           </SmartLink>
           <span className="biz-products-note">
-            {lang === 'en' ? 'Prices and stock appear after logging in as a business customer.' : 'Harga dan stok tampil setelah login sebagai pelanggan perusahaan.'}
+            {lang === 'en' ? 'Prices and stock appear after logging in as a business customer.' : 'Harga dan stok tampil setelah Anda masuk sebagai pelanggan perusahaan.'}
           </span>
         </div>
       </div>

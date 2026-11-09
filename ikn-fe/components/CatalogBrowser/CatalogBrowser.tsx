@@ -153,15 +153,15 @@ export default function CatalogBrowser({ products, meta, categories, query, base
             <li>
               <span><Icon name="tag" size={17} /></span>
               <div>
-                <strong>{t('Harga khusus customer', 'Customer pricing')}</strong>
+                <strong>{t('Harga khusus pelanggan', 'Customer pricing')}</strong>
                 <small>{t('Termasuk harga promo yang sedang berlaku', 'Including active promo prices')}</small>
               </div>
             </li>
             <li>
               <span><Icon name="package" size={17} /></span>
               <div>
-                <strong>{t('Stok real-time', 'Live stock')}</strong>
-                <small>{t('Jumlah tersedia dan minimum order per produk', 'Available quantity and minimum order')}</small>
+                <strong>{t('Stok terkini', 'Current stock')}</strong>
+                <small>{t('Jumlah tersedia dan minimum pembelian per produk', 'Available quantity and minimum order per product')}</small>
               </div>
             </li>
             <li>

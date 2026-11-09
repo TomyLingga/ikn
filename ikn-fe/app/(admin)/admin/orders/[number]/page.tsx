@@ -235,8 +235,8 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
       setModal(null);
       setActionOk(
         wasExisting
-          ? t('Proforma disimpan sebagai revisi baru; customer menerima email dan notifikasi.', 'Proforma saved as a new revision; the customer has been emailed and notified.')
-          : t('Proforma invoice dibuat; customer menerima email dan notifikasi.', 'Proforma invoice created; the customer has been emailed and notified.'),
+          ? t('Proforma disimpan sebagai revisi baru. Customer dikirimi email dan notifikasi.', 'Proforma saved as a new revision. The customer has been emailed and notified.')
+          : t('Proforma invoice dibuat. Customer dikirimi email dan notifikasi.', 'Proforma invoice created. The customer has been emailed and notified.'),
       );
     } catch (err) {
       // 422: pesan per field di bawah isian; 409 PROFORMA_NOT_ALLOWED (order batal/kedaluwarsa) dan galat lain di atas tombol.
@@ -335,7 +335,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
       refreshAdminBadges();
       await refresh();
       setModal(null);
-      setActionOk(t('Penawaran ongkir dikirim; customer menerima email dan notifikasi.', 'Freight quote sent; the customer has been emailed and notified.'));
+      setActionOk(t('Penawaran ongkir dikirim. Customer dikirimi email dan notifikasi.', 'Freight quote sent. The customer has been emailed and notified.'));
     } catch (err) {
       // 422: pesan per field (lines.N.label/amount, validUntil, note) di bawah isian; 409 FREIGHT_QUOTE_NOT_ALLOWED di atas tombol.
       if (err instanceof ApiError && err.status === 422 && err.errors) {
@@ -362,19 +362,19 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     }
     void run(
       () => api(`${orderPath}/freight-quotes/${modal.quote.id}/extend`, { method: 'PUT', body: { validUntil: fqValidUntil } }),
-      t('Masa berlaku penawaran diperpanjang; customer diberi tahu.', 'Quote validity extended; the customer has been notified.'),
+      t('Masa berlaku penawaran diperpanjang. Customer sudah diberi tahu.', 'Quote validity extended. The customer has been notified.'),
     );
   }
 
   async function acceptCounter(quote: FreightQuote) {
     const ok = await confirmDialog(
       t(
-        `Terima harga balasan customer ${formatIDR(quote.total)}? Total order dihitung ulang, payment dan batas bayar dibuat, dan order menjadi Menunggu Pembayaran.`,
-        `Accept the customer counter price of ${formatIDR(quote.total)}? The order total is recalculated, a payment and deadline are created, and the order moves to Awaiting Payment.`,
+        `Terima harga balasan customer ${formatIDR(quote.total)}? Total order dihitung ulang, pembayaran dan batas bayar dibuat, lalu order berstatus Menunggu pembayaran.`,
+        `Accept the customer counter price of ${formatIDR(quote.total)}? The order total is recalculated, a payment and deadline are created, and the order moves to Awaiting payment.`,
       ),
     );
     if (!ok) return;
-    void run(() => api(`${orderPath}/freight-quotes/${quote.id}/accept`, { method: 'POST' }), t('Harga balasan diterima; order menunggu pembayaran.', 'Counter price accepted; the order is awaiting payment.'));
+    void run(() => api(`${orderPath}/freight-quotes/${quote.id}/accept`, { method: 'POST' }), t('Harga balasan diterima. Order menunggu pembayaran.', 'Counter price accepted. The order is awaiting payment.'));
   }
 
   function changeStatus(status: 'processing' | 'shipped' | 'delivered' | 'completed', extra: Record<string, string | null> = {}) {
@@ -452,7 +452,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     }
     setActionOk(
       uploaded > 0
-        ? t(`${marked}; ${uploaded} lampiran diunggah dan customer diberi tahu.`, `${marked}; ${uploaded} attachment(s) uploaded and the customer notified.`)
+        ? t(`${marked}. ${uploaded} lampiran diunggah dan customer sudah diberi tahu.`, `${marked}. ${uploaded} attachment(s) uploaded and the customer notified.`)
         : `${marked}.`,
     );
   }
@@ -468,7 +468,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         setAttachFile(null);
         setAttachLabel('');
       },
-      t('Lampiran diunggah; customer mendapat notifikasi.', 'Attachment uploaded; the customer has been notified.'),
+      t('Lampiran diunggah. Customer sudah diberi tahu.', 'Attachment uploaded. The customer has been notified.'),
     );
   }
 
@@ -487,7 +487,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     }
     void run(
       () => api(`${orderPath}/tracking`, { method: 'POST', body: { note: value } }).then(() => setTrackNote('')),
-      t('Catatan perjalanan ditambahkan; customer menerima notifikasi.', 'Shipping note added; the customer has been notified.'),
+      t('Catatan perjalanan ditambahkan. Customer sudah diberi tahu.', 'Shipping note added. The customer has been notified.'),
     );
   }
 
@@ -532,7 +532,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     setActionError('');
     refreshAdminBadges();
     await refresh();
-    setActionOk(t('Pembayaran diterima; order berstatus dibayar.', 'Payment accepted; order is now paid.'));
+    setActionOk(t('Pembayaran diterima. Order kini berstatus Dibayar.', 'Payment accepted. The order is now paid.'));
   }
 
   function submitReject(event: FormEvent<HTMLFormElement>) {
@@ -544,7 +544,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     }
     void run(
       () => api(`/admin/payments/${modal.payment.id}/reject`, { method: 'POST', body: { reason: reason.trim() } }),
-      t('Bukti pembayaran ditolak; customer dapat mengunggah ulang.', 'Payment proof rejected; the customer can upload again.'),
+      t('Bukti pembayaran ditolak. Customer bisa mengunggah ulang.', 'Payment proof rejected. The customer can upload again.'),
     );
   }
 
@@ -953,7 +953,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
       </div>
 
       <div className="admin-grid-2" style={{ marginTop: 20 }}>
-        <AdminCard title={t('Pembayaran', 'Payments')} desc={t('Setiap percobaan bayar tercatat terpisah; yang aktif ditandai.', 'Each payment attempt is recorded separately; the active one is highlighted.')}>
+        <AdminCard title={t('Pembayaran', 'Payments')} desc={t('Setiap percobaan bayar tercatat terpisah. Yang aktif ditandai.', 'Each payment attempt is recorded separately. The active one is highlighted.')}>
           {order.payments.length === 0 && <p className="admin-field-hint">{t('Belum ada percobaan pembayaran.', 'No payment attempts yet.')}</p>}
           <div className={styles.paymentList}>
             {[...order.payments].reverse().map((payment) => {
@@ -1056,7 +1056,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
           )}
           {awaitingFreight && (
             <p className="admin-field-hint" style={{ marginTop: 12 }}>
-              {t('Order CIF: payment, batas bayar, dan instruksi pembayaran dibuat otomatis setelah penawaran ongkir disepakati.', 'CIF order: the payment, deadline, and payment instructions are created automatically once the freight quote is agreed.')}
+              {t('Order CIF: tagihan, batas bayar, dan instruksi pembayaran dibuat otomatis setelah penawaran ongkir disepakati.', 'CIF order: the bill, payment deadline, and payment instructions are created automatically once the freight quote is agreed.')}
               {order.pendingPaymentMethod?.code ? ` ${t('Metode yang dipilih customer', 'Method chosen by the customer')}: ${order.pendingPaymentMethod.code}.` : ''}
             </p>
           )}
@@ -1533,7 +1533,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                 onChange={(e) => setShipFiles(Array.from(e.target.files || []))}
               />
               <small className="admin-field-hint">
-                {t('Faktur pajak, surat jalan, atau dokumen lain (dokumen PDF atau gambar JPG/PNG/WebP, maks. 10 MB per berkas). Customer dapat mengunduhnya dari detail pesanan dan mendapat notifikasi.', 'Tax invoice, delivery note, or other documents (PDF documents or JPG/PNG/WebP images, max. 10 MB each). The customer can download them from the order details and gets a notification.')}
+                {t('Faktur pajak, surat jalan, atau dokumen lain (PDF atau gambar JPG/PNG/WebP, maks. 10 MB per berkas). Customer bisa mengunduhnya dari detail pesanan dan akan menerima notifikasi.', 'Tax invoice, delivery note, or other documents (PDF documents or JPG/PNG/WebP images, max. 10 MB each). The customer can download them from the order details and gets a notification.')}
               </small>
               {shipFiles.length > 0 && (
                 <small className="admin-field-hint">
@@ -1570,8 +1570,8 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                     `Saved as ${order.proforma.number} Rev.${order.proforma.revision + 1}; the number stays the same. The customer is emailed and notified about the revision.`,
                   )
                 : t(
-                    `Nomor PI/${order.number} tetap untuk semua revisi. Field yang kosong diisi bawaan server dari term serah terima dan syarat pembayaran order.`,
-                    `The number PI/${order.number} stays the same for every revision. Empty fields get server defaults from the delivery term and the order's payment terms.`,
+                    `Nomor PI/${order.number} tetap untuk semua revisi. Isian yang dikosongkan diisi otomatis dari cara serah terima dan syarat pembayaran order.`,
+                    `The number PI/${order.number} stays the same for every revision. Empty fields are filled automatically from the order's delivery term and payment terms.`,
                   )}
             </p>
             <div className="admin-form-row">
@@ -1718,7 +1718,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
           <form className="admin-form" onSubmit={submitReject}>
             <p className="admin-field-hint">
               {t('Pembayaran', 'Payment')} #{modal.payment.id} · {formatMoney(modal.payment.amount, modal.payment.currency || order.currency)} · {paymentMethodSummary(modal.payment, lang)}.{' '}
-              {t('Order kembali ke "Menunggu Pembayaran" dan customer diminta mengunggah ulang.', 'The order returns to "Awaiting Payment" and the customer is asked to upload again.')}
+              {t('Order kembali ke "Menunggu pembayaran" dan customer diminta mengunggah ulang.', 'The order returns to "Awaiting payment" and the customer is asked to upload again.')}
             </p>
             <label>
               <span className="field-label">{t('Alasan penolakan', 'Rejection reason')} *</span>
@@ -1828,7 +1828,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
             <p className="admin-field-hint">
               {t('Putaran', 'Round')} {modal.quote.round} · {formatIDR(modal.quote.total)}
               {modal.quote.validUntil ? ` · ${t('berlaku sampai', 'valid until')} ${formatDateTime(modal.quote.validUntil, lang)}` : ''}.{' '}
-              {t('Penawaran kembali bisa disetujui customer sampai tanggal baru; customer menerima email dan notifikasi.', 'The customer can accept the quote again until the new date and is emailed and notified.')}
+              {t('Customer bisa menyetujui penawaran lagi sampai tanggal baru dan akan menerima email serta notifikasi.', 'The customer can accept the quote again until the new date and is emailed and notified.')}
             </p>
             <label>
               <span className="field-label">{t('Berlaku sampai', 'Valid until')}</span>

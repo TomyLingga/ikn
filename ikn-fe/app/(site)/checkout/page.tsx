@@ -333,7 +333,7 @@ export default function CheckoutPage() {
         setVoucherCode('');
         setSubmitError(err.message);
       } else if (err instanceof ApiError && err.code === 'ACCOUNT_NOT_APPROVED') {
-        setSubmitError(t('Akun Anda belum disetujui untuk melakukan checkout.', 'Your account is not yet approved for checkout.'));
+        setSubmitError(t('Akun Anda belum disetujui, jadi belum bisa membuat pesanan.', 'Your account is not approved yet, so you cannot place orders.'));
       } else if (err instanceof ApiError && err.status === 422) {
         // Pesan per field (paymentTermCode wajib untuk ekspor, rekening tidak se-mata-uang, metode tidak sah, dsb.).
         const errors = fieldErrors(err);
@@ -371,9 +371,9 @@ export default function CheckoutPage() {
           <div className="container">
             <EmptyState
               icon="bag"
-              title={t('Login diperlukan', 'Login required')}
-              body={t('Masuk atau daftar sebagai customer untuk menyelesaikan pemesanan. Keranjang Anda tetap tersimpan.', 'Log in or register as a customer to complete your order. Your cart is kept.')}
-              action={{ href: '/login?next=/checkout', label: t('Login / Daftar', 'Login / Register') }}
+              title={t('Masuk dulu', 'Please log in')}
+              body={t('Masuk atau daftar untuk menyelesaikan pesanan. Isi keranjang Anda tetap tersimpan.', 'Log in or register to complete your order. Your cart is kept.')}
+              action={{ href: '/login?next=/checkout', label: t('Masuk / Daftar', 'Log in / Register') }}
             />
           </div>
         </section>
@@ -690,12 +690,12 @@ export default function CheckoutPage() {
                     <p className="co-ship-warn" role="status">
                       {unsetFactoryNames
                         ? t(
-                            `Sebagian tarif berbasis jarak belum bisa dihitung karena titik lokasi ${unsetFactoryNames} belum diatur penjual. Pilih tarif lain atau hubungi kami.`,
-                            `Some distance-based rates are unavailable because the seller has not pinned the location of ${unsetFactoryNames} yet. Choose another rate or contact us.`,
+                            `Sebagian tarif berbasis jarak belum bisa dihitung karena lokasi ${unsetFactoryNames} belum ditandai di peta. Pilih tarif lain atau hubungi kami.`,
+                            `Some distance-based rates are unavailable because ${unsetFactoryNames} has no map location yet. Choose another rate or contact us.`,
                           )
                         : t(
-                            'Sebagian tarif berbasis jarak belum bisa dihitung karena titik lokasi pabrik belum diatur penjual. Pilih tarif lain atau hubungi kami.',
-                            'Some distance-based rates are unavailable because the seller has not pinned the factory location yet. Choose another rate or contact us.',
+                            'Sebagian tarif berbasis jarak belum bisa dihitung karena lokasi pabrik belum ditandai di peta. Pilih tarif lain atau hubungi kami.',
+                            'Some distance-based rates are unavailable because the factory has no map location yet. Choose another rate or contact us.',
                           )}
                     </p>
                   )}
@@ -761,7 +761,7 @@ export default function CheckoutPage() {
                         ))}
                       </div>
                       <p className="qty-moq" style={{ marginTop: 10 }}>
-                        {t('Syarat ini dicetak di proforma dan commercial invoice. Aplikasi mencatat satu pembayaran sebesar total pesanan; tahapan pembayaran dicocokkan tim keuangan.', 'These terms are printed on the proforma and commercial invoice. The app records one payment for the order total; instalments are matched by our finance team.')}
+                        {t('Syarat ini dicetak di proforma dan commercial invoice. Sistem mencatat satu pembayaran sebesar total pesanan, lalu tim keuangan kami mencocokkan pembayaran bertahapnya.', 'These terms are printed on the proforma and commercial invoice. The app records one payment for the order total; instalments are matched by our finance team.')}
                       </p>
                       {fieldError('paymentTermCode')}
                     </div>
@@ -800,7 +800,7 @@ export default function CheckoutPage() {
                           {config && banks.length === 0 && <p className="form-error">{t(`Belum ada rekening ${currency} yang aktif. Hubungi kami.`, `No active ${currency} bank account yet. Please contact us.`)}</p>}
                         </div>
                         {usd && (
-                          <p className="pay-bank-note">{t('Biaya bank di luar negeri (termasuk bank koresponden) ditanggung pembeli; jumlah yang diterima dicatat saat verifikasi.', 'Bank charges abroad (including correspondent banks) are borne by the buyer; the amount received is recorded at verification.')}</p>
+                          <p className="pay-bank-note">{t('Biaya bank di luar negeri (termasuk bank koresponden) ditanggung pembeli. Jumlah yang kami terima dicatat saat verifikasi.', 'Bank charges abroad (including correspondent banks) are borne by the buyer. The amount we receive is recorded at verification.')}</p>
                         )}
                         {fieldError('bankAccountId')}
                       </>
@@ -951,7 +951,7 @@ export default function CheckoutPage() {
                           <>{selectedRate ? <>{tr(selectedRate.label, lang)}{selectedRate.eta ? ` · ${tr(selectedRate.eta, lang)}` : ''} · {fmt(selectedRate.amount)}</> : '—'} <button type="button" className="link" onClick={() => setStep('shipping')}>{t('ubah', 'change')}</button></>
                         ) : (
                           quotedFreight ? (
-                            <>{t('Ongkir CIF ditawarkan admin setelah pesanan dibuat; belum masuk total ini.', 'CIF freight is quoted by our team after the order is placed; not yet in this total.')}</>
+                            <>{t('Ongkir CIF kami tawarkan setelah pesanan dibuat dan belum masuk total ini.', 'CIF freight is quoted by our team after the order is placed and is not in this total yet.')}</>
                           ) : (
                             <>{isPickup ? t('Ambil di pabrik', 'Pickup at the factory') : isPort ? t('Termasuk harga (FOB)', 'Included in price (FOB)') : t('Tanpa ongkir terpisah', 'No separate shipping charge')} · {fmt(0)}</>
                           )
@@ -1073,8 +1073,8 @@ export default function CheckoutPage() {
               {usd && (
                 <p className="qty-moq">
                   {quotedFreight
-                    ? t('Harga FOB Belawan; ongkos kapal dan asuransi sampai pelabuhan tujuan ditambahkan setelah penawaran ongkir disepakati.', 'FOB Belawan prices; ocean freight and insurance to the destination port are added once the freight quote is agreed.')
-                    : t('Harga FOB Belawan; pengangkutan laut dan asuransi di luar total ini.', 'FOB Belawan prices; ocean freight and insurance are not part of this total.')}
+                    ? t('Harga FOB Belawan. Ongkos kapal dan asuransi sampai pelabuhan tujuan ditambahkan setelah penawaran ongkir disepakati.', 'FOB Belawan prices. Ocean freight and insurance to the destination port are added once the freight quote is agreed.')
+                    : t('Harga FOB Belawan. Ongkos kapal dan asuransi tidak termasuk dalam total ini.', 'FOB Belawan prices. Ocean freight and insurance are not part of this total.')}
                 </p>
               )}
               {quoteError && <p className="form-error" role="alert">{quoteError}</p>}

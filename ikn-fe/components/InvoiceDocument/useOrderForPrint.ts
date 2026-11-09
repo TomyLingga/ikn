@@ -21,7 +21,7 @@ export function useOrderForPrint(number: string, preloaded?: Order | null): { or
     if (preloaded || !ready) return;
     const t = (id: string, en: string) => (lang === 'en' ? en : id);
     if (!customer && !admin) {
-      setError(t('Login dulu untuk membuka dokumen ini.', 'Please log in to open this document.'));
+      setError(t('Masuk dulu untuk membuka dokumen ini.', 'Please log in to open this document.'));
       return;
     }
     let active = true;

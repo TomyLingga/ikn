@@ -41,16 +41,49 @@ export default function TimelineSection({ section }: { section: PageSection }) {
     };
   }, [items.length, startNewest]);
 
+  // Geser otomatis satu tonggak tiap AUTOPLAY_MS searah titik mulai ('oldest' ke kanan, 'newest' ke kiri), kembali ke awal di ujung.
+  // Berhenti saat kursor/fokus/sentuhan di linimasa, section tidak terlihat, tab tersembunyi; mati bila reduced-motion.
+  const hold = useRef(0);
+  useEffect(() => {
+    const el = track.current;
+    if (!el || items.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let visible = false;
+    const io = new IntersectionObserver(([entry]) => { visible = !!entry?.isIntersecting; }, { threshold: 0.3 });
+    io.observe(el);
+    const dir = startNewest ? -1 : 1;
+    const timer = window.setInterval(() => {
+      if (!visible || document.hidden || Date.now() < hold.current) return;
+      if (el.scrollWidth <= el.clientWidth + 4) return; // semua muat atau tata letak vertikal (ponsel)
+      const atEnd = dir > 0 ? el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 : el.scrollLeft <= 4;
+      if (atEnd) el.scrollTo({ left: dir > 0 ? 0 : el.scrollWidth, behavior: 'smooth' });
+      else el.scrollBy({ left: dir * stopStep(el), behavior: 'smooth' });
+    }, AUTOPLAY_MS);
+    return () => {
+      window.clearInterval(timer);
+      io.disconnect();
+    };
+  }, [items.length, startNewest]);
+
+  // Interaksi pengunjung menunda geser otomatis; Infinity = selama kursor/fokus masih di dalam.
+  const pause = (ms = Infinity) => { hold.current = Date.now() + ms; };
+  const resume = () => { hold.current = Date.now() + AUTOPLAY_MS; };
+
   function scrollBy(direction: -1 | 1) {
     const el = track.current;
     if (!el) return;
-    const step = el.querySelector<HTMLElement>('.road-stop')?.offsetWidth ?? 320;
-    el.scrollBy({ left: direction * step * 2, behavior: 'smooth' });
+    el.scrollBy({ left: direction * stopStep(el) * 2, behavior: 'smooth' });
   }
 
   return (
     <section className="section-tight" id={ANCHOR_BY_TYPE.timeline}>
-      <div className="container">
+      <div
+        className="container"
+        onMouseEnter={() => pause()}
+        onMouseLeave={resume}
+        onFocus={() => pause()}
+        onBlur={resume}
+        onTouchStart={() => pause(AUTOPLAY_MS * 2)}
+      >
         <div className="road-head">
           <SecHead label={tr(c.label, lang)} heading={tr(c.heading, lang)} reveal={false} />
           {items.length > 2 && (
@@ -115,6 +148,15 @@ export default function TimelineSection({ section }: { section: PageSection }) {
       </div>
     </section>
   );
+}
+
+const AUTOPLAY_MS = 4000;
+
+// Jarak antar tonggak (lebar kolom + celah), cadangan 320px bila belum terukur.
+function stopStep(el: HTMLElement): number {
+  const [a, b] = el.querySelectorAll<HTMLElement>('.road-stop');
+  if (a && b) return b.offsetLeft - a.offsetLeft;
+  return a?.offsetWidth ?? 320;
 }
 
 // Jalur gelombang lembut: tiap pin (tengah kolom ke-i) dilewati pada y 50, di antara pin jalan turun sedikit.

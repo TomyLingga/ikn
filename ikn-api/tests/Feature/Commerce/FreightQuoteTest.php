@@ -267,7 +267,7 @@ class FreightQuoteTest extends TestCase
             ->assertJsonPath('data.activePayment.currency', 'USD')->assertJsonPath('data.activePayment.amount', 209000)->assertJsonPath('data.activePayment.method', 'manual_transfer')
             ->assertJsonPath('data.activePayment.bankAccount.currency', 'USD')->assertJsonPath('data.activePayment.bankAccount.accountNumber', $this->usdBank->account_number)
             ->assertJsonPath('data.timeline.1.status', 'pending_payment')->assertJsonPath('data.timeline.1.fromStatus', 'awaiting_freight')
-            ->assertJsonPath('data.timeline.1.note', 'Freight of USD 815.00 agreed; awaiting payment.')
+            ->assertJsonPath('data.timeline.1.note', 'Freight of USD 815.00 agreed, awaiting payment.')
             ->assertJsonPath('data.timeline.1.meta.quoteId', $quote->id)->assertJsonPath('data.timeline.1.meta.freightTotal', 81500)->assertJsonPath('data.timeline.1.meta.acceptedBy', 'customer')
             ->assertJsonPath('data.timeline.1.actor.id', $this->exporter->id);
         $this->assertNotNull($response->json('data.freightQuotes.0.respondedAt'));

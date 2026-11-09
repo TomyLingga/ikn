@@ -155,7 +155,7 @@ export default function AdminPayments() {
     setActionError('');
     try {
       await api(`/admin/payments/${detail.id}/reject`, { method: 'POST', body: { reason: reason.trim() } });
-      setNotice(t('Bukti pembayaran ditolak; customer dapat mengunggah ulang.', 'Payment proof rejected; the customer can upload again.'));
+      setNotice(t('Bukti pembayaran ditolak. Customer bisa mengunggah ulang.', 'Payment proof rejected. The customer can upload again.'));
       setDetail(null);
       refreshAdminBadges();
       await refresh();
@@ -482,7 +482,7 @@ export default function AdminPayments() {
                           <br />
                           <small className={amountMismatch ? 'admin-warn-text' : undefined}>
                             {t('Total order', 'Order total')}: {formatMoney(detail.order.grandTotal, detail.order.currency || detail.currency)}
-                            {amountMismatch && ` — ${t('berbeda dari jumlah percobaan ini', 'differs from this attempt')}`}
+                            {amountMismatch && ` (${t('berbeda dari jumlah percobaan ini', 'differs from this attempt')})`}
                           </small>
                         </>
                       )}

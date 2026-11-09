@@ -51,7 +51,7 @@ function ResetForm() {
     } catch (err) {
       const fe = fieldErrors(err);
       setErrors(fe);
-      setError(fe.token || errorMessage(err, t('Reset password gagal.', 'Password reset failed.')));
+      setError(fe.token || errorMessage(err, t('Kata sandi gagal diatur ulang.', 'Password reset failed.')));
       setBusy(false);
     }
   }
@@ -59,7 +59,7 @@ function ResetForm() {
   if (!token) {
     return (
       <div className={styles.loggedIn}>
-        <p>{t('Tautan reset tidak lengkap. Minta tautan baru dari halaman lupa password.', 'The reset link is incomplete. Request a new one from the forgot password page.')}</p>
+        <p>{t('Tautan atur ulang tidak lengkap. Minta tautan baru dari halaman lupa kata sandi.', 'The reset link is incomplete. Request a new one from the forgot password page.')}</p>
         <Link href="/forgot-password" className={styles.primaryButton}>
           {t('Minta tautan baru', 'Request a new link')} <Icon name="arrow" size={18} />
         </Link>
@@ -76,7 +76,7 @@ function ResetForm() {
         {emailError(email, lang) ? <small className={styles.fieldError} role="alert">{emailError(email, lang)}</small> : errors.email && <small className="form-error">{errors.email}</small>}
       </label>
       <label className={styles.field}>
-        <span>{t('Password baru', 'New password')}</span>
+        <span>{t('Kata sandi baru', 'New password')}</span>
         <span className={styles.passwordField}>
           <input
             name="password"
@@ -96,7 +96,7 @@ function ResetForm() {
         {errors.password && <small className="form-error">{errors.password}</small>}
       </label>
       <label className={styles.field}>
-        <span>{t('Ulangi password baru', 'Confirm new password')}</span>
+        <span>{t('Ulangi kata sandi baru', 'Confirm new password')}</span>
         <input name="passwordConfirmation" type={show ? 'text' : 'password'} autoComplete="new-password" required minLength={8} value={confirm} onChange={(e) => setConfirm(e.target.value)} aria-invalid={!!confirmError(password, confirm, lang)} className={confirmError(password, confirm, lang) ? styles.invalid : confirm ? styles.valid : undefined} />
         {confirmError(password, confirm, lang) ? (
           <small className={styles.fieldError} role="alert">{confirmError(password, confirm, lang)}</small>
@@ -105,7 +105,7 @@ function ResetForm() {
         )}
       </label>
       <button type="submit" className={styles.primaryButton} disabled={busy || !ready}>
-        {busy ? t('Menyimpan…', 'Saving…') : t('Simpan password baru', 'Save new password')} <Icon name="arrow" size={18} />
+        {busy ? t('Menyimpan…', 'Saving…') : t('Simpan kata sandi baru', 'Save new password')} <Icon name="arrow" size={18} />
       </button>
     </form>
   );
@@ -117,9 +117,9 @@ export default function ResetPasswordPage() {
   return (
     <AuthPage
       eyebrow={t('Pemulihan akun', 'Account recovery')}
-      title={t('Atur ulang password', 'Reset password')}
-      lead={t('Buat password baru untuk akun Anda.', 'Create a new password for your account.')}
-      footer={<Link href="/login">{t('Kembali ke login', 'Back to login')}</Link>}
+      title={t('Atur ulang kata sandi', 'Reset password')}
+      lead={t('Buat kata sandi baru untuk akun Anda.', 'Create a new password for your account.')}
+      footer={<Link href="/login">{t('Kembali ke halaman masuk', 'Back to login')}</Link>}
     >
       <Suspense fallback={<p className={styles.loading}>{t('Memuat…', 'Loading…')}</p>}>
         <ResetForm />

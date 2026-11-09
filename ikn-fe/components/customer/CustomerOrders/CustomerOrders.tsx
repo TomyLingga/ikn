@@ -66,9 +66,9 @@ function emptyCopy(tab: TabKey, t: (id: string, en: string) => string): { title:
     case 'completed':
       return { title: t('Belum ada pesanan selesai', 'No completed orders'), body: t('Pesanan selesai pada rentang tanggal ini akan muncul di sini.', 'Orders completed within this date range will show up here.') };
     case 'cancelled':
-      return { title: t('Tidak ada pesanan dibatalkan', 'No cancelled orders'), body: t('Bagus! Tidak ada pesanan yang dibatalkan atau kedaluwarsa pada rentang ini.', 'Good news: no cancelled or expired orders in this range.') };
+      return { title: t('Tidak ada pesanan dibatalkan', 'No cancelled orders'), body: t('Tidak ada pesanan yang dibatalkan atau kedaluwarsa pada rentang ini.', 'No cancelled or expired orders in this range.') };
     default:
-      return { title: t('Belum ada pesanan', 'No orders yet'), body: t('Mulai belanja produk karet industri PT IKN; pesanan Anda akan tercatat di sini.', 'Start shopping PT IKN industrial rubber products; your orders will be listed here.') };
+      return { title: t('Belum ada pesanan', 'No orders yet'), body: t('Pesanan yang Anda buat akan tercatat di sini.', 'Orders you place will be listed here.') };
   }
 }
 
@@ -227,8 +227,8 @@ export default function CustomerOrders() {
                 order,
                 '/confirm-received',
                 pickup
-                  ? t(`Konfirmasi bahwa pesanan ${order.number} sudah Anda ambil?`, `Confirm that you have picked up order ${order.number}?`)
-                  : t(`Konfirmasi bahwa pesanan ${order.number} sudah Anda terima?`, `Confirm that you have received order ${order.number}?`),
+                  ? t(`Pesanan ${order.number} sudah Anda ambil?`, `Have you picked up order ${order.number}?`)
+                  : t(`Pesanan ${order.number} sudah Anda terima?`, `Have you received order ${order.number}?`),
                 pickup ? t('Terima kasih, pesanan ditandai sudah diambil.', 'Thank you, the order is marked as picked up.') : t('Terima kasih, pesanan ditandai diterima.', 'Thank you, the order is marked as received.'),
               ),
           });
@@ -309,7 +309,7 @@ export default function CustomerOrders() {
               <span className={styles.attnIcon}><Icon name="wallet" size={18} /></span>
               <span>
                 <strong>{unpaidCount} {t('pesanan menunggu pembayaran', unpaidCount === 1 ? 'order awaiting payment' : 'orders awaiting payment')}</strong>
-                <small>{t('Bayar sebelum batas waktu agar stok tetap dipesan untuk Anda.', 'Pay before the deadline to keep the stock reserved.')}</small>
+                <small>{t('Bayar sebelum batas waktu agar stok tetap disisihkan untuk Anda.', 'Pay before the deadline to keep the stock reserved.')}</small>
               </span>
               <Icon name="chevronRight" size={18} />
             </button>
@@ -508,7 +508,7 @@ export default function CustomerOrders() {
                   </div>
                   <div className={styles.actions}>
                     <button type="button" className={styles.ghostBtn} onClick={() => openChat({ type: 'order', number: order.number, label: order.number })}>
-                      <Icon name="chat" size={16} /> {t('Tanya penjual', 'Ask seller')}
+                      <Icon name="chat" size={16} /> {t('Chat dengan kami', 'Chat with us')}
                     </button>
                     <Link href={detail} className={styles.lineBtn}>
                       {t('Detail', 'Details')}

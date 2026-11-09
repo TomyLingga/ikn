@@ -28,7 +28,7 @@ export default function Pager({ meta, onPage, disabled = false }: PagerProps) {
           disabled={disabled || meta.page <= 1}
           onClick={() => onPage(meta.page - 1)}
         >
-          {lang === 'en' ? '‹ Prev' : '‹ Sebelum'}
+          {lang === 'en' ? '‹ Prev' : '‹ Sebelumnya'}
         </button>
         <span className="pagination-info">
           {meta.page} / {meta.lastPage}

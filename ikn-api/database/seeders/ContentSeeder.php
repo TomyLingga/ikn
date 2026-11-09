@@ -160,10 +160,10 @@ class ContentSeeder extends Seeder
         }
 
         $images = [
-            ['kantor-direksi.png', 'Kantor Direksi PT IKN', 'PT IKN Head Office'],
-            ['karet-1-1-scaled.jpg', 'Pengolahan Karet Alam', 'Natural Rubber Processing'],
-            ['pabrik-2-1.png', 'Kompleks Pabrik Hilir', 'Downstream Plant Complex'],
-            ['produksi-karet-1.webp', 'Aktivitas Pemotongan Slab Karet', 'Rubber Slab Cutting Activity'],
+            ['kantor-direksi.png', 'Kantor pusat PT IKN', 'PT IKN head office'],
+            ['karet-1-1-scaled.jpg', 'Getah karet alam', 'Natural rubber latex'],
+            ['pabrik-2-1.png', 'Foto udara kompleks pabrik PT IKN', 'Aerial view of a PT IKN plant complex'],
+            ['produksi-karet-1.webp', 'Pemotongan slab karet', 'Cutting rubber slabs'],
             // Foto aktivitas pabrik dari berkas klien (doc/IKN/BAHAN FOTO IKN).
             ['pabrik-udara-1.jpg', 'Foto udara kompleks pabrik PT IKN', 'Aerial view of a PT IKN plant'],
             ['gedung-kantor-udara.jpg', 'Foto udara gedung PT Industri Karet Nusantara', 'Aerial view of the PT Industri Karet Nusantara building'],
@@ -208,7 +208,7 @@ class ContentSeeder extends Seeder
         Certificate::create([
             'name' => ['id' => 'ISO 37001:2016', 'en' => 'ISO 37001:2016'],
             'material' => ['id' => 'Anti-penyuapan (SMAP)', 'en' => 'Anti-bribery (ABMS)'],
-            'description' => ['id' => 'Sertifikasi kepatuhan anti-penyuapan berstandar internasional.', 'en' => 'International-standard anti-bribery compliance certification.'],
+            'description' => ['id' => 'Sertifikat sistem manajemen anti-penyuapan (SMAP) menurut standar ISO 37001:2016.', 'en' => 'Anti-bribery management system (ABMS) certificate under ISO 37001:2016.'],
             'standard' => 'ISO 37001:2016', 'status' => 'active',
             'media_id' => MediaSeeder::id('iso-37001.pdf'), 'is_published' => true, 'sort_order' => 0,
         ]);

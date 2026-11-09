@@ -39,7 +39,7 @@ class CmsPageSeeder extends Seeder
             ],
             'bisnis' => [
                 'title' => $t('Resiprene 35 & Barang Karet Industri | PT IKN', 'Resiprene 35 & Industrial Rubber Goods | PT IKN'),
-                'description' => $t('Resiprene 35 (karet siklis) untuk cat, tinta, dan coating, serta barang karet untuk perkebunan dan pabrik kelapa sawit. Spesifikasi, cara pesan, dan tanya jawab.', 'Resiprene 35 (cyclised rubber) for paints, inks and coatings, plus rubber goods for plantations and palm oil mills. Specifications, how to order and FAQ.'),
+                'description' => $t('Resiprene 35 (karet siklis) untuk cat, tinta, dan coating, serta barang karet untuk perkebunan dan pabrik sawit. Spesifikasi, cara pesan, dan tanya jawab.', 'Resiprene 35 (cyclised rubber) for paints, inks and coatings, plus rubber goods for plantations and palm oil mills. Specifications, how to order and FAQ.'),
             ],
             'kualitas' => [
                 'title' => $t('Kualitas & Inovasi: Uji Mutu dan Sertifikat | PT IKN', 'Quality & Innovation: Testing and Certificates | PT IKN'),
@@ -59,11 +59,11 @@ class CmsPageSeeder extends Seeder
             ],
             'berita' => [
                 'title' => $t('Berita & Artikel Industri Karet | PT IKN', 'Rubber Industry News & Articles | PT IKN'),
-                'description' => $t('Kabar perusahaan dan artikel tentang Resiprene 35, barang karet industri, serta cara memesan produk dari PT Industri Karet Nusantara di Medan.', 'Company news and articles on Resiprene 35, industrial rubber goods and how to order products from PT Industri Karet Nusantara in Medan.'),
+                'description' => $t('Kabar perusahaan dan artikel tentang Resiprene 35, barang karet industri, serta cara memesan produk dari PT Industri Karet Nusantara di Medan.', 'Company news and articles on Resiprene 35, industrial rubber goods and how to order products online from PT Industri Karet Nusantara in Medan.'),
             ],
             'galeri' => [
                 'title' => $t('Galeri Foto & Video Pabrik Karet | PT IKN', 'Rubber Plant Photo & Video Gallery | PT IKN'),
-                'description' => $t('Foto dan video pabrik barang karet di Tanjung Morawa, pabrik Resiprene di Sei Bamban, dan kegiatan PT Industri Karet Nusantara.', 'Photos and videos of the rubber goods plant in Tanjung Morawa, the Resiprene plant in Sei Bamban and PT Industri Karet Nusantara activities.'),
+                'description' => $t('Foto dan video pabrik barang karet di Tanjung Morawa, pabrik Resiprene di Sei Bamban, perkebunan karet, dan kegiatan kerja PT Industri Karet Nusantara.', 'Photos and videos of the rubber goods plant in Tanjung Morawa, the Resiprene plant in Sei Bamban, rubber plantations and PT Industri Karet Nusantara at work.'),
             ],
             'kontak' => [
                 'title' => $t('Hubungi Kami: Kantor Pusat & Lokasi Pabrik | PT IKN', 'Contact Us: Head Office & Factory Locations | PT IKN'),
@@ -231,7 +231,7 @@ class CmsPageSeeder extends Seeder
                 'vision_tag' => $t('Visi', 'Vision'),
                 'vision' => $t('Menjadi perusahaan hilir karet terdepan yang memenuhi kebutuhan pelanggan melalui tata kelola yang kuat dan daya saing global.', 'To be the leading downstream rubber company that meets customer needs through strong governance and global competitiveness.'),
                 'vision_highlight' => $t('perusahaan hilir karet terdepan', 'leading downstream rubber company'),
-                'mission_lead' => $t('Lima komitmen yang memandu setiap keputusan di IKN.', 'Five commitments that guide every decision at IKN.'),
+                'mission_lead' => $t('Lima misi yang kami jalankan untuk mencapai visi itu.', 'Five missions we pursue to reach that vision.'),
                 'mission_tag' => $t('Misi', 'Mission'),
                 'missions' => [
                     ['text' => $t('Memproduksi produk hilir karet bermutu sesuai standar dan harapan pelanggan.', 'Produce downstream rubber products to agreed standards and customer expectations.')],
@@ -244,7 +244,7 @@ class CmsPageSeeder extends Seeder
             ['key' => 'values', 'type' => 'values', 'content' => [
                 'label' => $t('Nilai inti', 'Core values'),
                 'heading' => $t('Tata Nilai', 'Our Values'),
-                'lead' => $t('Tata nilai AKHLAK menjadi pedoman perilaku insan IKN dalam melayani pelanggan, membangun kolaborasi, menjaga kepercayaan, dan merespons perubahan.', 'The AKHLAK values guide how IKN people serve customers, build collaboration, keep trust and respond to change.'),
+                'lead' => $t('Enam nilai AKHLAK menjadi pedoman perilaku karyawan IKN, baik saat melayani pelanggan maupun saat bekerja dengan rekan.', 'The six AKHLAK values set out how IKN employees are expected to work, with customers and with each other.'),
                 'items' => [
                     ['title' => $t('Amanah', 'Amanah (Trust)'), 'body' => $t('Memegang teguh kepercayaan yang diberikan.', 'Holding firmly to the trust given.')],
                     ['title' => $t('Kompeten', 'Kompeten (Competence)'), 'body' => $t('Terus belajar dan mengembangkan kapabilitas.', 'Continuously learning and developing capabilities.')],
@@ -296,7 +296,7 @@ class CmsPageSeeder extends Seeder
             ['key' => 'cta', 'type' => 'cta', 'content' => [
                 'label' => $t('/ Bekerja sama dengan IKN', '/ Work with IKN'),
                 'title' => $t('Bicarakan kebutuhan karet Anda dengan kami.', 'Talk to us about your rubber requirements.'),
-                'body' => $t('Tim marketing kami siap menjelaskan spesifikasi, harga, dan jadwal pengiriman.', 'Our marketing team can walk you through specifications, pricing and delivery schedules.'),
+                'body' => $t('Tanyakan spesifikasi, harga, atau jadwal pengiriman kepada tim marketing kami.', 'Ask our marketing team about specifications, pricing or delivery schedules.'),
                 'button_label' => $t('Hubungi kami', 'Contact us'),
                 'button_url' => '/kontak',
                 'secondary_label' => $t('Kemitraan', 'Partnership'),
@@ -524,16 +524,16 @@ class CmsPageSeeder extends Seeder
                 'bg_media' => MediaSeeder::id('kebun-karet-2.jpg'), 'bg_opacity' => 14, 'bg_tone' => 'light',
                 'items' => [
                     ['key' => 'lingkungan', 'icon' => 'leaf', 'title' => $t('Tanggung jawab lingkungan', 'Environmental responsibility'), 'body' => $t(
-                        'Karet alam adalah bahan baku utama kami. Kami berupaya memakainya secara efisien dan mengelola limbah produksi secara terkendali di kedua pabrik.',
-                        'Natural rubber is our main raw material. We aim to use it efficiently and to manage production waste in a controlled way at both plants.'
+                        'Karet alam adalah bahan baku utama kami, dan Resiprene 35 dibuat dari 100% karet alam. Kedua pabrik memiliki petugas pemeliharaan lingkungan di tim teknisnya.',
+                        'Natural rubber is our main raw material, and Resiprene 35 is made from 100% natural rubber. Both plants have environmental maintenance staff in their technical teams.'
                     ), 'points' => []],
                     ['key' => 'manufaktur-berkelanjutan', 'icon' => 'factory', 'title' => $t('Manufaktur berkelanjutan', 'Sustainable manufacturing'), 'body' => $t(
-                        'Pabrik kami dekat dengan bahan bakunya: pabrik Resiprene berjarak 36 km dari sumber karet di Gunung Para. Kami berupaya menjaga efisiensi energi dan bahan pada proses hilir.',
-                        'Our plants are close to their raw material: the Resiprene plant is 36 km from its rubber source at Gunung Para. We work to keep energy and material use efficient in downstream processing.'
+                        'Pabrik Resiprene berdiri 36 km dari sumber karetnya di Gunung Para, sehingga bahan baku tidak perlu diangkut jauh sebelum diolah.',
+                        'The Resiprene plant stands 36 km from its rubber source at Gunung Para, so raw material does not travel far before processing.'
                     ), 'points' => []],
                     ['key' => 'k3', 'icon' => 'shieldCheck', 'title' => $t('Keselamatan & kesehatan kerja', 'Occupational health & safety'), 'body' => $t(
-                        'Kami berupaya mewujudkan tempat kerja yang sehat dan aman. Pabrik Tanjung Morawa juga membuat alat pelindung diri bagi pekerja kebun, seperti sarung egrek, sarung kampak, dan sepatu boots.',
-                        'We work toward a healthy and safe workplace. The Tanjung Morawa plant also makes protective equipment for plantation workers, such as sickle covers, axe sheaths and boots.'
+                        'Tim produksi memakai alat pelindung diri saat menangani bahan baku. Pabrik Tanjung Morawa juga membuat APD untuk pekerja kebun, seperti sarung egrek, sarung kampak, dan sepatu boots.',
+                        'Production staff wear protective equipment when handling raw material. The Tanjung Morawa plant also makes protective gear for plantation workers, such as sickle covers, axe sheaths and boots.'
                     ), 'points' => []],
                     ['key' => 'masyarakat', 'icon' => 'users', 'title' => $t('Karyawan & masyarakat', 'People & community'), 'body' => $t(
                         'Kami mengembangkan karyawan berlandaskan nilai inti AKHLAK dan bekerja sama dengan perkebunan serta mitra lokal di Sumatera Utara.',
@@ -578,9 +578,9 @@ class CmsPageSeeder extends Seeder
             ]],
             ['key' => 'cta', 'type' => 'cta', 'content' => [
                 'label' => $t('/ Hubungi kami', '/ Contact us'),
-                'title' => $t('Mari membangun solusi industri yang lebih baik bersama.', "Let's Build Better Industrial Solutions Together."),
+                'title' => $t('Mari bersama membangun solusi industri yang lebih baik.', "Let's Build Better Industrial Solutions Together."),
                 'body' => $t(
-                    'Temukan bagaimana IKN dapat mendukung kebutuhan industri Anda melalui produk berbasis karet dan kemampuan manufaktur kami.',
+                    'Lihat bagaimana produk berbasis karet dan kemampuan manufaktur IKN dapat mendukung kebutuhan industri Anda.',
                     'Discover how IKN can support your industrial needs through our rubber-based products and manufacturing capabilities.'
                 ),
                 'button_label' => $t('Hubungi Tim Kami', 'Contact Our Team'),
@@ -851,10 +851,10 @@ class CmsPageSeeder extends Seeder
         return [
             ['key' => 'header', 'type' => 'page_header', 'content' => [
                 'label' => $t('/ Kualitas & Inovasi', '/ Quality & Innovation'),
-                'title' => $t('Terspesifikasi, teruji, dan terdokumentasi.', 'Specified, tested and documented.'),
+                'title' => $t('Spesifikasi tertulis untuk setiap lini produk.', 'A written specification for every product line.'),
                 'lead' => $t(
-                    'Setiap lini produk IKN dipasok sesuai spesifikasi tertulis. Halaman ini menjelaskan cara kami menjaga mutu, mengembangkan produk untuk aplikasi tertentu, dan mendokumentasikan kepatuhan.',
-                    'Every IKN product line is supplied against a written specification. This page explains how we control quality, develop products for specific applications and document compliance.'
+                    'Pembeli dapat memeriksa spesifikasi produk sebelum memesan dan membandingkannya dengan hasil uji laboratorium mereka sendiri. Di bawah ini: cara kami menjaga mutu, parameter uji Resiprene 35, dan sertifikat yang kami pegang.',
+                    'Buyers can check a product’s specification before they order and compare it with their own laboratory results. Below: how we control quality, the Resiprene 35 test parameters and the certificates we hold.'
                 ),
                 'media' => self::headerMedia(['bahan-baku-gudang.jpg', 'pengemasan-muat-2.jpg']),
                 'interval' => 6,
@@ -958,8 +958,8 @@ class CmsPageSeeder extends Seeder
                 'label' => $t('/ Tanggung jawab lingkungan', '/ Environmental responsibility'),
                 'heading' => $t('Karet alam, dipakai dengan cermat.', 'Natural rubber, used with care.'),
                 'body' => $t(
-                    "Karet alam adalah bahan baku terbarukan dan menjadi dasar semua produk IKN. Resiprene 35 dibuat dari 100% karet alam, dan pabrik Resiprene berjarak 36 km dari sumber karetnya di Gunung Para, sehingga jarak angkut bahan baku tetap pendek.\n\nKedua pabrik memiliki petugas pemeliharaan lingkungan di tim teknisnya. Kami berupaya memakai bahan baku secara efisien, mengelola limbah produksi secara terkendali, dan menjaga efisiensi energi pada proses hilir.",
-                    "Natural rubber is a renewable raw material and the basis of every IKN product. Resiprene 35 is made from 100% natural rubber, and the Resiprene plant sits 36 km from its rubber source at Gunung Para, which keeps raw material transport short.\n\nBoth plants have environmental maintenance staff in their technical teams. We aim to use raw material efficiently, manage production waste in a controlled way and keep energy use efficient in downstream processing."
+                    "Karet alam adalah bahan baku terbarukan dan menjadi dasar semua produk IKN. Resiprene 35 dibuat dari 100% karet alam, dan pabrik Resiprene berjarak 36 km dari sumber karetnya di Gunung Para, sehingga jarak angkut bahan baku tetap pendek.\n\nKedua pabrik memiliki petugas pemeliharaan lingkungan di tim teknisnya.",
+                    "Natural rubber is a renewable raw material and the basis of every IKN product. Resiprene 35 is made from 100% natural rubber, and the Resiprene plant sits 36 km from its rubber source at Gunung Para, which keeps raw material transport short.\n\nBoth plants have environmental maintenance staff in their technical teams."
                 ),
                 'button_label' => $t('', ''),
                 'button_url' => '',
@@ -973,8 +973,8 @@ class CmsPageSeeder extends Seeder
                 'label' => $t('/ Keselamatan & kesehatan kerja', '/ Occupational health & safety'),
                 'heading' => $t('Kerja aman, di pabrik dan di kebun.', 'Safe work, on the plant floor and in the field.'),
                 'body' => $t(
-                    "Kami berupaya mewujudkan tempat kerja yang sehat dan aman di kedua pabrik. Tim produksi bekerja dengan alat pelindung diri, termasuk helm, masker, dan sarung tangan, saat menangani bahan baku.\n\nIKN juga membuat alat pelindung diri bagi pekerja kebun: sarung egrek, sarung dodos dan kampak, pelindung stick alloy pemanen dari kabel listrik, serta sepatu boots. Safety boots kami tersertifikasi CE EN 20345:2011 dengan toe cap 200 joule.",
-                    "We work toward a healthy and safe workplace at both plants. Our production teams handle raw material in protective equipment, including helmets, masks and gloves.\n\nIKN also makes protective equipment for plantation workers: sickle covers, dodos and axe sheaths, guards that protect alloy harvesting poles from power lines, and rubber boots. Our safety boots are CE EN 20345:2011 approved with a 200 joule toe cap."
+                    "Tim produksi kami memakai alat pelindung diri seperti helm, masker, dan sarung tangan saat menangani bahan baku.\n\nIKN juga membuat alat pelindung diri bagi pekerja kebun: sarung egrek, sarung dodos dan kampak, pelindung stick alloy pemanen dari kabel listrik, serta sepatu boots. Safety boots kami tersertifikasi CE EN 20345:2011 dengan toe cap 200 joule.",
+                    "Our production staff wear protective equipment such as helmets, masks and gloves when they handle raw material.\n\nIKN also makes protective equipment for plantation workers: sickle covers, dodos and axe sheaths, guards that protect alloy harvesting poles from power lines, and rubber boots. Our safety boots are CE EN 20345:2011 approved with a 200 joule toe cap."
                 ),
                 'button_label' => $t('', ''),
                 'button_url' => '',
@@ -986,7 +986,7 @@ class CmsPageSeeder extends Seeder
             ]],
             ['key' => 'tata-kelola', 'type' => 'pillars', 'content' => [
                 'label' => $t('/ Tata kelola perusahaan yang baik', '/ Good corporate governance'),
-                'heading' => $t('Struktur yang jelas, pelaporan yang terbuka.', 'Clear structure, open reporting.'),
+                'heading' => $t('Pengawasan dan saluran pelaporan.', 'Oversight and reporting channels.'),
                 'items' => [
                     ['key' => 'organ', 'icon' => 'compass', 'title' => $t('Organ perusahaan', 'Governing bodies'), 'body' => $t('IKN dijalankan oleh RUPS, Dewan Komisaris yang mencakup komisaris independen, dan Direktur, mengikuti standar induk usahanya, PT Perkebunan Nusantara III (Persero).', 'IKN is governed by the General Meeting of Shareholders, a Board of Commissioners that includes an independent commissioner, and a Director, following the standards of its parent, PT Perkebunan Nusantara III (Persero).'), 'points' => []],
                     ['key' => 'spi', 'icon' => 'search', 'title' => $t('Pengawasan intern', 'Internal audit'), 'body' => $t('Satuan Pengawasan Intern (SPI) melapor langsung kepada Direktur.', 'The Internal Audit Unit (Satuan Pengawasan Intern) reports directly to the Director.'), 'points' => []],
@@ -996,17 +996,17 @@ class CmsPageSeeder extends Seeder
             ]],
             ['key' => 'esg', 'type' => 'pillars', 'content' => [
                 'label' => $t('/ Inisiatif ESG', '/ ESG initiatives'),
-                'heading' => $t('Komitmen lingkungan, sosial, dan tata kelola.', 'Our environmental, social and governance commitments.'),
+                'heading' => $t('Lingkungan, sosial, dan tata kelola.', 'Environment, social and governance.'),
                 'items' => [
-                    ['key' => 'lingkungan', 'icon' => 'leaf', 'title' => $t('Lingkungan', 'Environment'), 'body' => $t('Mengolah karet alam secara bertanggung jawab di setiap tahap produksi.', 'Processing natural rubber responsibly at every production stage.'), 'points' => self::textItems($t, [
+                    ['key' => 'lingkungan', 'icon' => 'leaf', 'title' => $t('Lingkungan', 'Environment'), 'body' => $t('Bahan baku terbarukan yang diolah dekat dengan sumbernya.', 'A renewable raw material, processed close to its source.'), 'points' => self::textItems($t, [
                         ['Bahan baku karet alam dari Sumatera Utara', 'Natural rubber raw material from North Sumatra'],
-                        ['Pengelolaan limbah produksi yang terkendali', 'Controlled production waste management'],
-                        ['Efisiensi energi pada proses hilir', 'Energy efficiency in downstream processing'],
+                        ['Pabrik Resiprene 36 km dari sumber karetnya', 'Resiprene plant 36 km from its rubber source'],
+                        ['Petugas pemeliharaan lingkungan di kedua pabrik', 'Environmental maintenance staff at both plants'],
                     ])],
                     ['key' => 'sosial', 'icon' => 'handshake', 'title' => $t('Sosial', 'Social'), 'body' => $t('Mengembangkan karyawan dan bekerja sama dengan perkebunan serta mitra lokal.', 'Developing our people and working with plantations and local partners.'), 'points' => self::textItems($t, [
                         ['Pengembangan SDM berlandaskan nilai AKHLAK', 'People development based on the AKHLAK values'],
                         ['Kemitraan dengan perkebunan dan mitra lokal', 'Partnerships with plantations and local partners'],
-                        ['Tempat kerja yang sehat dan aman', 'A healthy and safe workplace'],
+                        ['Alat pelindung diri untuk pekerja pabrik dan kebun', 'Protective equipment for plant and field workers'],
                     ])],
                     ['key' => 'tata-kelola', 'icon' => 'gear', 'title' => $t('Tata Kelola', 'Governance'), 'body' => $t('Menjalankan Good Corporate Governance sebagai anak perusahaan PTPN III.', 'Practising Good Corporate Governance as a PTPN III subsidiary.'), 'points' => self::textItems($t, [
                         ['Prinsip Good Corporate Governance (GCG)', 'Good Corporate Governance (GCG) principles'],
@@ -1035,7 +1035,7 @@ class CmsPageSeeder extends Seeder
             ]],
             ['key' => 'pelanggan', 'type' => 'customer_logos', 'content' => [
                 'label' => $t('/ Pelanggan Kami', '/ Our Customers'),
-                'heading' => $t('Mitra di perkebunan dan industri.', 'Partners in plantations and industry.'),
+                'heading' => $t('Pelanggan di perkebunan dan pabrik kelapa sawit.', 'Customers in plantations and palm oil mills.'),
                 'lead' => $t(
                     'Barang karet kami dipasok ke unit kebun dan pabrik PT Perkebunan Nusantara II, III, IV, dan V serta PT Socfin Indonesia. Daftar lengkapnya ada di halaman Kemitraan.',
                     'Our rubber articles are supplied to estate and mill units of PT Perkebunan Nusantara II, III, IV and V and PT Socfin Indonesia. The full list is on the Partnership page.'
@@ -1142,7 +1142,7 @@ class CmsPageSeeder extends Seeder
             ]],
             ['key' => 'pelanggan', 'type' => 'customer_logos', 'content' => [
                 'label' => $t('/ Pelanggan Rubber Articles', '/ Rubber Articles customers'),
-                'heading' => $t('Dipercaya grup perkebunan di Sumatera.', 'Trusted by plantation groups across Sumatra.'),
+                'heading' => $t('Pemasok bagi grup perkebunan di Sumatera.', 'Supplying plantation groups across Sumatra.'),
                 'lead' => $t(
                     'Barang karet kami dipasok ke unit kebun dan pabrik PT Perkebunan Nusantara II, III, IV, dan V serta PT Socfin Indonesia.',
                     'Our rubber articles are supplied to estate and mill units of PT Perkebunan Nusantara II, III, IV and V and PT Socfin Indonesia.'
@@ -1336,7 +1336,7 @@ class CmsPageSeeder extends Seeder
                 'media' => MediaSeeder::id('sejarah-ban-sepeda.jpg'),
                 'name' => $t('Pabrik Ban Sepeda TAVIP (DATAK Sumatera Utara)', 'TAVIP Bicycle Tyre Factory (DATAK North Sumatra)'),
                 'title' => $t('1965–1968', '1965–1968'),
-                'body' => $t('Sejak didirikan, pengelolaannya oleh DATAK (Dana Tanaman Keras) Sumatera Utara dengan nama Pabrik Ban Sepeda TAVIP.', 'Since its founding, managed by DATAK (Dana Tanaman Keras) North Sumatra under the name TAVIP Bicycle Tyre Factory.'),
+                'body' => $t('Sejak didirikan, pabrik ini dikelola DATAK (Dana Tanaman Keras) Sumatera Utara dengan nama Pabrik Ban Sepeda TAVIP.', 'From its founding, the plant was run by DATAK (Dana Tanaman Keras) North Sumatra as the TAVIP Bicycle Tyre Factory.'),
                 'products' => $t('Ban sepeda luar dan dalam', 'Bicycle tyres and inner tubes'),
             ],
             [
@@ -1368,7 +1368,7 @@ class CmsPageSeeder extends Seeder
                 'media' => MediaSeeder::id('sejarah-conveyor-belt.jpg'),
                 'name' => $t('Proyek Industri Karet PT Perkebunan III', 'Rubber Industry Project of PT Perkebunan III'),
                 'title' => $t('1982–1989', '1982–1989'),
-                'body' => $t('Peralihan nama menjadi Proyek Industri Karet PT Perkebunan III.', 'Renamed the Rubber Industry Project of PT Perkebunan III.'),
+                'body' => $t('Namanya diubah menjadi Proyek Industri Karet PT Perkebunan III.', 'Renamed the Rubber Industry Project of PT Perkebunan III.'),
                 'products' => $t('Rubber articles, karet gelang, compound, conveyor belt, dock fender, dan sarung tangan', 'Rubber articles, rubber bands, compound, conveyor belts, dock fenders and gloves'),
             ],
             [

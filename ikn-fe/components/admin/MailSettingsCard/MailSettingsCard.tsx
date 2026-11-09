@@ -48,7 +48,7 @@ export default function MailSettingsCard({ value, onChange, errors }: Props) {
         body: { to, mail: value },
         raw: true,
       });
-      const via = result.data.mode === 'smtp' ? `SMTP ${result.data.host}` : t('konfigurasi server', 'server configuration');
+      const via = result.data.mode === 'smtp' ? `SMTP ${result.data.host}` : t('pengaturan server', 'server settings');
       setTestNotice({ ok: true, text: `${result.message ?? t('Email uji terkirim.', 'Test email sent.')} (${via})` });
     } catch (err) {
       const text =
@@ -85,13 +85,13 @@ export default function MailSettingsCard({ value, onChange, errors }: Props) {
           <span className="field-label">{t('Pengiriman email', 'Email delivery')}</span>
           <Select value={value.mode} onChange={(e) => onChange({ mode: e.target.value as MailMode })}>
             <option value="smtp">{t('SMTP sendiri (email webmail perusahaan)', 'Own SMTP (company webmail)')}</option>
-            <option value="server">{t('Ikuti konfigurasi server (.env)', 'Use the server configuration (.env)')}</option>
+            <option value="server">{t('Ikuti pengaturan server (dari tim TI)', 'Use the server settings (from IT)')}</option>
             <option value="off">{t('Tidak kirim email (hanya notifikasi di aplikasi)', 'Do not send email (in-app notifications only)')}</option>
           </Select>
           <small className="admin-field-hint">
             {t(
-              'Pilih "SMTP sendiri" lalu isi data akun email webmail (mis. noreply@ptikn.com) dari hosting. Perubahan berlaku segera setelah disimpan, tanpa restart server.',
-              'Choose "Own SMTP" and fill in the webmail account (e.g. noreply@ptikn.com) from the hosting panel. Changes apply right after saving, no server restart needed.',
+              'Pilih "SMTP sendiri" lalu isi data akun email webmail dari hosting (mis. noreply@ptikn.com). Perubahan langsung berlaku setelah disimpan.',
+              'Choose "Own SMTP" and fill in the webmail account from the hosting panel (e.g. noreply@ptikn.com). Changes apply as soon as you save.',
             )}
           </small>
           {fieldError('mode') && <small className="cms-field-error">{fieldError('mode')}</small>}

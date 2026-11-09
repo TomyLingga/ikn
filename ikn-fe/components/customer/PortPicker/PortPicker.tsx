@@ -166,7 +166,7 @@ export default function PortPicker({ value, onChange, lang, showErrors = false, 
       <div className="co-full addr-map-block">
         <span className="label">{t('Cari pelabuhan', 'Search port')}</span>
         <small className="addr-map-why">
-          {t('Ongkos kapal dan asuransi dihitung sampai titik ini; pin wajib ada sebelum lanjut dan bisa digeser.', 'Ocean freight and insurance are quoted up to this point; the pin is required before continuing and can be dragged.')}
+          {t('Ongkos kapal dan asuransi dihitung sampai titik ini. Pin wajib dipasang sebelum lanjut dan bisa digeser.', 'Ocean freight and insurance are quoted up to this point. The pin is required before you continue and can be dragged.')}
         </small>
         <div className="addr-geo-search">
           <input
@@ -204,7 +204,7 @@ export default function PortPicker({ value, onChange, lang, showErrors = false, 
         <AddressMap lat={value.lat} lng={value.lng} onChange={setPin} focusKey={focusKey} defaultCenter={WORLD_CENTER} defaultZoom={WORLD_ZOOM} focusZoom={PORT_ZOOM} />
         <div className="addr-map-foot">
           <span className="qty-moq">
-            {hasPin ? `${value.lat}, ${value.lng}` : t('Klik peta atau pilih hasil pencarian untuk menandai pelabuhan; marker bisa digeser.', 'Click the map or pick a search result to mark the port; the marker can be dragged.')}
+            {hasPin ? `${value.lat}, ${value.lng}` : t('Klik peta atau pilih hasil pencarian untuk menandai pelabuhan. Pin bisa digeser.', 'Click the map or pick a search result to mark the port. You can drag the pin.')}
           </span>
           {hasPin && (
             <button type="button" className="link" onClick={() => onChange({ ...value, lat: null, lng: null })}>

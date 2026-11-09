@@ -134,7 +134,7 @@ export default function CustomerShell({ children }: { children: ReactNode }) {
           <div className={styles.sidebarHeader}>
             <Link href="/dashboard" className={styles.brand}>
               <Image src="/img/rubin-logo.png" alt="PT IKN" width={38} height={38} priority />
-              <span className={styles.brandText}><strong>PT IKN</strong><small>Portal Customer</small></span>
+              <span className={styles.brandText}><strong>PT IKN</strong><small>{lang === 'en' ? 'Customer portal' : 'Portal pelanggan'}</small></span>
             </Link>
             <SidebarToggle
               expanded={mobileOpen}
@@ -156,7 +156,7 @@ export default function CustomerShell({ children }: { children: ReactNode }) {
                 openLabel="Buka menu dashboard"
                 closeLabel={isMobile ? 'Tutup menu dashboard' : 'Ciutkan sidebar'}
               />
-              <div className={styles.pageTitle}><small>Portal Customer</small><strong>{pageTitle(pathname, lang === 'en')}</strong></div>
+              <div className={styles.pageTitle}><small>{lang === 'en' ? 'Customer portal' : 'Portal pelanggan'}</small><strong>{pageTitle(pathname, lang === 'en')}</strong></div>
               <div className={styles.topActions}>
                 <LangToggle />
                 <ThemeToggle />

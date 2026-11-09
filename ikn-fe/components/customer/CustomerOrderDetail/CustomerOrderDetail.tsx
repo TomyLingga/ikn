@@ -185,7 +185,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
     setCounterError('');
     void runFreight(
       () => api(path('/freight-quotes/counter'), { method: 'POST', body: { amount, note: counterNote.trim() || undefined } }),
-      t('Harga balasan terkirim; admin akan menanggapinya.', 'Your counter price has been sent; our team will respond.'),
+      t('Harga balasan terkirim. Tim kami akan menanggapinya.', 'Your counter price has been sent. Our team will respond.'),
     );
   }
 
@@ -324,7 +324,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
             <StatusBadge label={pay[lang]} tone={pay.tone} />
           </div>
           <button type="button" className={styles.chatBtn} onClick={() => openChat({ type: 'order', number: order.number, label: order.number })}>
-            <Icon name="chat" size={16} /> {t('Tanya penjual', 'Ask seller')}
+            <Icon name="chat" size={16} /> {t('Chat dengan kami', 'Chat with us')}
           </button>
         </div>
       </header>
@@ -339,8 +339,8 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
             {awaitingFreight ? (
               <p>
                 {t(
-                  `Stok sudah direservasi. Tim kami menyiapkan penawaran ongkir CIF${order.destinationPort ? ` ke ${order.destinationPort.name}` : ''}; Anda akan diberi tahu lewat email dan notifikasi untuk menyetujui atau mengajukan harga lain. Instruksi pembayaran menyusul setelah disepakati.`,
-                  `Stock is reserved. Our team is preparing the CIF freight quote${order.destinationPort ? ` to ${order.destinationPort.name}` : ''}; you will be notified by email and in-app to accept it or propose another price. Payment instructions follow once agreed.`,
+                  `Stok sudah kami sisihkan untuk pesanan ini. Tim kami sedang menyiapkan penawaran ongkir CIF${order.destinationPort ? ` ke ${order.destinationPort.name}` : ''}. Kami kabari lewat email dan notifikasi saat penawaran siap, lalu Anda bisa menyetujuinya atau mengajukan harga lain. Instruksi pembayaran menyusul setelah ongkir disepakati.`,
+                  `Stock is reserved for this order. Our team is preparing the CIF freight quote${order.destinationPort ? ` to ${order.destinationPort.name}` : ''}. We will notify you by email and in the portal when it is ready, so you can accept it or propose another price. Payment instructions follow once the freight is agreed.`,
                 )}
               </p>
             ) : (
@@ -410,7 +410,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                     <p className={styles.muted} style={{ marginTop: 0 }}>
                       {activeQuote.proposedBy === 'admin'
                         ? t('Rincian ongkos kapal dan asuransi sampai pelabuhan tujuan dari tim kami.', 'Ocean freight and insurance to your destination port, from our team.')
-                        : t('Harga balasan Anda sedang menunggu tanggapan admin.', 'Your counter price is waiting for a response from our team.')}
+                        : t('Harga balasan Anda sedang menunggu tanggapan tim kami.', 'Your counter price is waiting for a response from our team.')}
                     </p>
                     <table className={styles.freightLines}>
                       <tbody>
@@ -440,7 +440,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                     {activeQuote.note && <p className={styles.freightNote}>{activeQuote.note}</p>}
                     {activeQuote.expired && activeQuote.proposedBy === 'admin' && (
                       <p className={styles.muted}>
-                        {t('Penawaran ini sudah lewat masa berlaku dan tidak bisa disetujui lagi. Tim kami akan memperpanjang atau mengirim penawaran baru.', 'This quote has lapsed and can no longer be accepted. Our team will extend it or send a new quote.')}
+                        {t('Masa berlaku penawaran ini sudah lewat, jadi tidak bisa disetujui lagi. Tim kami akan memperpanjangnya atau mengirim penawaran baru.', 'This quote has expired and can no longer be accepted. Our team will extend it or send a new quote.')}
                       </p>
                     )}
                     {(canAcceptQuote || canCounterQuote || canCancel(order)) && (
@@ -503,7 +503,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                           <textarea rows={2} maxLength={500} value={counterNote} onChange={(e) => setCounterNote(e.target.value)} placeholder={t('Alasan atau rujukan harga, mis. penawaran forwarder lain.', 'Reason or price reference, e.g. another forwarder quote.')} />
                         </label>
                         <p className={styles.muted} style={{ margin: 0 }}>
-                          {t('Harga balasan menggantikan penawaran admin saat ini; admin dapat menerimanya atau mengirim penawaran baru.', 'Your counter price replaces the current quote; our team can accept it or send a new quote.')}
+                          {t('Harga balasan menggantikan penawaran yang berlaku sekarang. Tim kami bisa menerimanya atau mengirim penawaran baru.', 'Your counter price replaces the current quote. Our team can accept it or send a new quote.')}
                         </p>
                         {counterError && <p className="form-error" role="alert">{counterError}</p>}
                         <div className={styles.inlineActions}>
@@ -520,7 +520,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                 ) : (
                   <>
                     <p className={styles.muted} style={{ marginTop: 0 }}>
-                      {t('Admin sedang menyiapkan penawaran ongkir. Anda akan menerima email dan notifikasi begitu penawaran tersedia.', 'Our team is preparing the freight quote. You will receive an email and a notification once it is ready.')}
+                      {t('Tim kami sedang menyiapkan penawaran ongkir. Anda akan menerima email dan notifikasi begitu penawaran siap.', 'Our team is preparing the freight quote. You will receive an email and a notification once it is ready.')}
                     </p>
                     {canCancel(order) && (
                       <div className={styles.freightActions}>
@@ -550,7 +550,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                         return (
                           <li key={q.id} className={styles.freightRound}>
                             <span>
-                              {t('Putaran', 'Round')} {q.round} · {q.proposedBy === 'admin' ? t('Admin', 'Our team') : t('Anda', 'You')} <small>{formatDateTime(q.createdAt, lang)}</small>
+                              {t('Putaran', 'Round')} {q.round} · {q.proposedBy === 'admin' ? t('Tim kami', 'Our team') : t('Anda', 'You')} <small>{formatDateTime(q.createdAt, lang)}</small>
                             </span>
                             <span>
                               <strong>{formatIDR(q.total)}</strong> <StatusBadge label={ql[lang]} tone={ql.tone} small />
@@ -612,7 +612,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                       className={styles.primaryBtn}
                       disabled={busy}
                       onClick={async () => {
-                        const question = pickup ? t('Konfirmasi bahwa pesanan sudah Anda ambil di pabrik?', 'Confirm that you have picked up this order at the factory?') : t('Konfirmasi bahwa pesanan sudah Anda terima?', 'Confirm that you have received this order?');
+                        const question = pickup ? t('Pesanan ini sudah Anda ambil di pabrik?', 'Have you picked up this order at the factory?') : t('Pesanan ini sudah Anda terima?', 'Have you received this order?');
                         if (await confirmDialog(question)) {
                           void run(() => api(path('/confirm-received'), { method: 'POST' }), pickup ? t('Pesanan ditandai sudah diambil.', 'Order marked as picked up.') : t('Pesanan ditandai diterima.', 'Order marked as received.'));
                         }
@@ -862,7 +862,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
           {(order.attachments || []).length > 0 && (
             <section className={`${styles.card} no-print`}>
               <h2 className={styles.cardTitle}>
-                {t('Dokumen dari penjual', 'Documents from the seller')} <small>{order.attachments?.length}</small>
+                {t('Dokumen dari PT IKN', 'Documents from PT IKN')} <small>{order.attachments?.length}</small>
               </h2>
               <div className={styles.cardBody}>
                 <ul className={styles.files}>
@@ -1097,7 +1097,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
             <section className={styles.card}>
               <h2 className={styles.cardTitle}>{t('Batalkan pesanan', 'Cancel order')}</h2>
               <div className={styles.cardBody}>
-                <p className={styles.muted}>{t('Pesanan yang belum dibayar dapat dibatalkan; stok yang direservasi dikembalikan.', 'Unpaid orders can be cancelled; reserved stock is released.')}</p>
+                <p className={styles.muted}>{t('Pesanan yang belum dibayar bisa dibatalkan. Stok yang disisihkan untuk pesanan ini akan dilepas.', 'Unpaid orders can be cancelled. Stock reserved for the order is released.')}</p>
                 <button
                   type="button"
                   className={styles.dangerBtn}

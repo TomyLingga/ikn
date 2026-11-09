@@ -32,7 +32,7 @@ export default function PaymentProof({
       <div className={styles.done}>
         <Icon name="check" size={18} />
         <span>
-          {t('Bukti pembayaran sudah diunggah. Menunggu verifikasi admin.', 'Payment proof uploaded. Awaiting admin verification.')}
+          {t('Bukti pembayaran sudah diunggah dan sedang kami periksa.', 'Payment proof uploaded. We are checking it.')}
           {payment?.proof?.uploadedAt && <> ({formatDateTime(payment.proof.uploadedAt, lang)})</>}
         </span>
       </div>
@@ -73,7 +73,7 @@ export default function PaymentProof({
           <span>
             {t('Bukti sebelumnya ditolak', 'Previous proof was rejected')}
             {rejected.rejectReason ? `: ${rejected.rejectReason}` : '.'}{' '}
-            {t('Silakan unggah ulang bukti yang benar.', 'Please upload the correct proof again.')}
+            {t('Unggah ulang bukti yang benar.', 'Please upload the correct proof.')}
           </span>
         </div>
       )}
@@ -85,7 +85,7 @@ export default function PaymentProof({
       )}
 
       <p className={styles.note}>
-        {t('Unggah bukti transfer / pembayaran (JPG, PNG, atau PDF, maks. 5 MB) untuk verifikasi admin.', 'Upload the transfer / payment receipt (JPG, PNG or PDF, max 5 MB) for admin verification.')}
+        {t('Unggah bukti transfer atau pembayaran (JPG, PNG, atau PDF, maks. 5 MB). Tim kami akan memeriksanya.', 'Upload the transfer or payment receipt (JPG, PNG or PDF, max 5 MB). Our team will check it.')}
       </p>
 
       <label className={styles.dropzone}>

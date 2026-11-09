@@ -112,7 +112,7 @@ export default function ProductDetail({ product, reviewPageSize = 10 }: Props) {
             : t('Stok habis', 'Out of stock'),
       tone: quote ? undefined : stock.tone === 'ok' ? 'ok' : stock.tone === 'warn' ? 'warn' : 'bad',
     },
-    ...(!quote ? [{ label: t('Minimum order', 'Minimum order'), value: `${moq.toLocaleString('id-ID')} ${product.unit}` }] : []),
+    ...(!quote ? [{ label: t('Minimum pembelian', 'Minimum order'), value: `${moq.toLocaleString('id-ID')} ${product.unit}` }] : []),
     { label: t('Satuan', 'Unit'), value: product.unit },
     ...(product.weightGram > 0
       ? [{ label: t('Berat / satuan', 'Weight / unit'), value: product.weightGram >= 1000 ? `${(product.weightGram / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg` : `${product.weightGram} g` }]

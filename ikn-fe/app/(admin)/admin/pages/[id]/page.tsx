@@ -274,8 +274,8 @@ export default function AdminPageEditor({ params }: { params: { id: string } }) 
           )}
           <code>{publicHref}</code>
           {t(
-            ' dijawab 404 di situs publik. Ubah Status menjadi Terbit pada kartu Pengaturan halaman, lalu klik Simpan pengaturan.',
-            ' returns 404 on the public site. Set Status to Published in the Page settings card, then click Save settings.',
+            ' menampilkan halaman tidak ditemukan (404) di situs publik. Ubah Status menjadi Terbit pada kartu Pengaturan halaman, lalu klik Simpan pengaturan.',
+            ' shows a page-not-found error (404) on the public site. Set Status to Published in the Page settings card, then click Save settings.',
           )}
         </p>
       )}
@@ -470,7 +470,7 @@ export default function AdminPageEditor({ params }: { params: { id: string } }) 
             />
           ) : (
             <div className="admin-confirm">
-              <p>{t('Tipe section ini tidak dikenal oleh server.', 'This section type is unknown to the server.')}</p>
+              <p>{t('Tipe section ini tidak dikenali sistem.', 'The system does not recognise this section type.')}</p>
             </div>
           )}
         </AdminModal>

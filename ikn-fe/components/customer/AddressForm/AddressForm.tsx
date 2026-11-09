@@ -268,7 +268,7 @@ export default function AddressForm({ initial, onSaved, onCancel, defaults, subm
 
         <div className="co-full addr-map-block">
           <span className="label">{t('Titik lokasi (disarankan)', 'Map location (recommended)')}</span>
-          <small className="addr-map-why">{t('Ongkir dihitung dari jarak gudang ke titik ini; tanpa titik, tarif berbasis jarak tidak tersedia.', 'Shipping is calculated from our warehouse to this point; without it, distance-based rates are unavailable.')}</small>
+          <small className="addr-map-why">{t('Ongkir dihitung dari jarak pabrik ke titik ini. Tanpa titik, tarif berbasis jarak tidak tersedia.', 'Shipping is calculated from the factory to this point. Without a pin, distance-based rates are unavailable.')}</small>
           <div className="addr-geo-search">
             <input
               value={geoQuery}
@@ -308,7 +308,7 @@ export default function AddressForm({ initial, onSaved, onCancel, defaults, subm
             <span className="qty-moq">
               {form.lat != null && form.lng != null
                 ? `${form.lat}, ${form.lng}`
-                : t('Klik peta atau cari alamat untuk menandai lokasi; marker bisa digeser.', 'Click the map or search to place a pin; the marker can be dragged.')}
+                : t('Klik peta atau cari alamat untuk menandai lokasi. Pin bisa digeser.', 'Click the map or search to place a pin. You can drag the pin.')}
             </span>
             <div className="addr-map-actions">
               <button type="button" className="btn btn-line btn-sm" onClick={useMapLocation} disabled={geoBusy || form.lat == null}>

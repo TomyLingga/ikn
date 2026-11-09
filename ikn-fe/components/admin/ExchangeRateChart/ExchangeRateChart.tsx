@@ -235,7 +235,7 @@ export default function ExchangeRateChart({ data, average = null, granularity = 
           <path d="M4 40 C 24 40, 30 18, 50 22 S 80 36, 96 14 L 116 8" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 5" strokeLinecap="round" />
         </svg>
         <strong>{t('Belum ada data kurs pada rentang ini.', 'No rate data in this range.')}</strong>
-        <span>{t('Jalankan rates:fetch atau tambah kurs manual.', 'Run rates:fetch or add a manual rate.')}</span>
+        <span>{t('Tunggu pengambilan kurs otomatis berikutnya atau tambah kurs manual.', 'Wait for the next automatic rate download or add a manual rate.')}</span>
       </div>
     );
   }

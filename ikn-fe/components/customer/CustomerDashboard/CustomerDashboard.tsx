@@ -172,13 +172,13 @@ export default function CustomerDashboard() {
     // Order CIF (ASUMSI A-89): belum ada payment; admin menawarkan ongkir ke pelabuhan tujuan dulu.
     if (order.status === 'awaiting_freight') return `${t('Menunggu penawaran ongkir', 'Awaiting freight quote')}${order.destinationPort ? ` · CIF ${order.destinationPort}` : ''}`;
     if (order.status === 'pending_payment' && order.paymentDueAt) return `${t('Bayar sebelum', 'Pay before')} ${formatDateTime(order.paymentDueAt, lang)}`;
-    if (order.status === 'payment_review') return t('Bukti pembayaran sedang diverifikasi admin', 'Your payment proof is being verified');
+    if (order.status === 'payment_review') return t('Bukti pembayaran sedang kami periksa', 'Your payment proof is being verified');
     if (order.status === 'shipped' && isPickupOrder(order)) return t('Barang siap diambil di pabrik', 'Goods are ready for pickup at the factory');
     // Order FOB/CIF (ASUMSI A-88): kolom resi berisi nomor B/L.
     if (order.status === 'shipped' && isPortOrder(order)) return order.trackingNumber ? `${t('Dimuat ke kapal', 'Shipped on board')} · B/L ${order.trackingNumber}` : t('Barang dimuat ke kapal', 'Goods shipped on board');
     if (order.status === 'shipped') return order.trackingNumber ? `${order.courier || ''} ${order.trackingNumber}`.trim() : t('Pesanan dalam perjalanan', 'Your order is on its way');
-    if (order.status === 'delivered' && isPickupOrder(order)) return t('Barang sudah diambil; konfirmasi selesai bila sesuai', 'Goods picked up; confirm completion if all is in order');
-    if (order.status === 'delivered') return t('Barang sudah sampai; konfirmasi selesai bila sesuai', 'Goods have arrived; confirm completion if all is in order');
+    if (order.status === 'delivered' && isPickupOrder(order)) return t('Barang sudah diambil. Selesaikan pesanan bila semuanya sesuai', 'Goods picked up. Complete the order if everything is right');
+    if (order.status === 'delivered') return t('Barang sudah sampai. Selesaikan pesanan bila semuanya sesuai', 'Goods have arrived. Complete the order if everything is right');
     return t('Pesanan sedang kami siapkan', 'We are preparing your order');
   }
 
@@ -188,11 +188,11 @@ export default function CustomerDashboard() {
 
       <section className={styles.hero}>
         <div className={styles.heroText}>
-          <span className={styles.heroEyebrow}>{customer.company || t('Portal customer', 'Customer portal')}</span>
+          <span className={styles.heroEyebrow}>{customer.company || t('Portal pelanggan', 'Customer portal')}</span>
           <h1>
             {t('Selamat datang,', 'Welcome,')} {firstName}.
           </h1>
-          <p>{t('Pantau pesanan, selesaikan pembayaran, dan belanja lagi dari satu tempat.', 'Track orders, settle payments, and reorder from one place.')}</p>
+          <p>{t('Pantau pesanan dan pembayaran Anda di sini.', 'Track your orders and payments here.')}</p>
           <div className={styles.heroActions}>
             <Link href="/dashboard/katalog" className={styles.heroPrimary}>
               <Icon name="store" size={18} /> {t('Belanja produk', 'Shop products')}

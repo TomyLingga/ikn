@@ -13,7 +13,7 @@ return [
         ],
         'payment_rejected' => [
             'title' => 'Bukti pembayaran ditolak',
-            'body' => 'Bukti pembayaran pesanan :number ditolak: :reason. Silakan unggah ulang.',
+            'body' => 'Bukti pembayaran pesanan :number ditolak: :reason. Unggah ulang bukti yang benar.',
         ],
         'payment_reminder' => [
             'title' => 'Segera selesaikan pembayaran',
@@ -49,10 +49,10 @@ return [
         ],
         'attachment' => [
             'title' => 'Dokumen pesanan baru',
-            'body' => 'Admin melampirkan ":label" pada pesanan :number.',
+            'body' => 'Kami melampirkan ":label" pada pesanan :number.',
         ],
         'tracking' => [
-            'title' => 'Update pengiriman',
+            'title' => 'Kabar pengiriman',
             'body' => 'Pesanan :number: :note',
         ],
         'delivered' => [
@@ -92,7 +92,7 @@ return [
     'account' => [
         'approved' => [
             'title' => 'Akun disetujui',
-            'body' => 'Akun Anda sudah aktif. Anda sekarang dapat membuat pesanan.',
+            'body' => 'Akun Anda sudah aktif. Sekarang Anda bisa membuat pesanan.',
         ],
         'rejected' => [
             'title' => 'Pendaftaran ditolak',
@@ -106,7 +106,7 @@ return [
         ],
     ],
 
-    'tracking_not_allowed' => 'Catatan perjalanan hanya dapat diubah saat pesanan berstatus dikirim.',
+    'tracking_not_allowed' => 'Catatan perjalanan hanya bisa diubah saat order berstatus dikirim.',
     'chat_context_invalid' => 'Produk atau pesanan yang dirujuk tidak ditemukan.',
     'chat_customer_invalid' => 'Customer tidak ditemukan.',
 

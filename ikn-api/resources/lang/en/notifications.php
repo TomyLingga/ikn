@@ -49,7 +49,7 @@ return [
         ],
         'attachment' => [
             'title' => 'New order document',
-            'body' => 'An admin attached ":label" to order :number.',
+            'body' => 'We attached ":label" to order :number.',
         ],
         'tracking' => [
             'title' => 'Shipping update',

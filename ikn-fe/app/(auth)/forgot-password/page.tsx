@@ -42,14 +42,14 @@ export default function ForgotPasswordPage() {
   return (
     <AuthPage
       eyebrow={t('Pemulihan akun', 'Account recovery')}
-      title={t('Lupa password', 'Forgot password')}
+      title={t('Lupa kata sandi', 'Forgot password')}
       lead={t(
         'Masukkan email akun Anda. Kami akan mengirim tautan untuk mengatur ulang password.',
         'Enter your account email. We will send a link to reset your password.',
       )}
       footer={
         <>
-          {t('Ingat password Anda?', 'Remember your password?')} <Link href="/login">{t('Kembali ke login', 'Back to login')}</Link>
+          {t('Ingat kata sandi Anda?', 'Remember your password?')} <Link href="/login">{t('Kembali ke halaman masuk', 'Back to login')}</Link>
         </>
       }
     >
@@ -73,7 +73,7 @@ export default function ForgotPasswordPage() {
             {emailTouched && emailError(email, lang) && <small className={styles.fieldError} role="alert">{emailError(email, lang)}</small>}
           </label>
           <button type="submit" className={styles.primaryButton} disabled={busy || !ready}>
-            {busy ? t('Mengirim…', 'Sending…') : t('Kirim tautan reset', 'Send reset link')} <Icon name="arrow" size={18} />
+            {busy ? t('Mengirim…', 'Sending…') : t('Kirim tautan atur ulang', 'Send reset link')} <Icon name="arrow" size={18} />
           </button>
         </form>
       )}

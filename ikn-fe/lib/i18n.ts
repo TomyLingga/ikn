@@ -214,7 +214,7 @@ export const t: Record<Lang, UIStrings> = {
       quick: { title: 'Menu Utama', catalog: 'Buka katalog', catalogDesc: 'Cari produk dan mulai pemesanan.', orders: 'Pesanan saya', ordersDesc: 'Lihat pembayaran dan pengiriman.', address: 'Kelola alamat', addressDesc: 'Atur tujuan pengiriman utama.', profile: 'Perbarui profil', profileDesc: 'Pastikan data PIC selalu terbaru.' }
     },
     navAccount: {
-      shop: 'Belanja Produk',
+      shop: 'Belanja produk',
       dashboard: 'Dashboard',
       orders: 'Pesanan saya',
       settings: 'Pengaturan',
@@ -254,14 +254,14 @@ export const t: Record<Lang, UIStrings> = {
       quick: { title: 'Main Menu', catalog: 'Open catalog', catalogDesc: 'Find products and start ordering.', orders: 'My orders', ordersDesc: 'View payments and shipments.', address: 'Manage address', addressDesc: 'Set primary shipping destination.', profile: 'Update profile', profileDesc: 'Ensure PIC data is up to date.' }
     },
     navAccount: {
-      shop: 'Shop Products',
+      shop: 'Shop products',
       dashboard: 'Dashboard',
-      orders: 'My Orders',
+      orders: 'My orders',
       settings: 'Settings',
-      profile: 'My Profile',
+      profile: 'My profile',
       company: 'Company',
       address: 'Address',
-      logout: 'Logout',
+      logout: 'Log out',
     }
   },
 };

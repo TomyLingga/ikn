@@ -140,7 +140,7 @@ export default function AdminSiteSettings() {
       ['dark_base', t('Warna dominan (latar)', 'Dominant colour (background)'), t('Latar halaman, kartu, dan pita, sekitar 60%. Bawaan navy.', 'Page, card and band background, about 60%. Default navy.')],
       ['dark_ink', t('Warna kedua (teks)', 'Second colour (text)'), t('Teks, judul, dan tombol utama, sekitar 30%. Bawaan cream.', 'Text, headings and main buttons, about 30%. Default cream.')],
       ['dark_accent', t('Warna aksen', 'Accent colour'), t('Ikon, label kecil, tombol CTA, penanda menu aktif, sekitar 10%. Bawaan coral.', 'Icons, small labels, CTA buttons, active menu marker, about 10%. Default coral.')],
-      ['dark_deep', t('Latar terdalam', 'Deepest background'), t('Latar panel admin, sidebar, dan bilah atas di mode gelap. Bawaan navy hampir hitam.', 'Admin panel, sidebar and top bar background in dark mode. Default near-black navy.')],
+      ['dark_deep', t('Latar terdalam', 'Deepest background'), t('Latar panel admin, bilah samping, dan bilah atas di mode gelap. Bawaan navy hampir hitam.', 'Admin panel, sidebar and top bar background in dark mode. Default near-black navy.')],
     ]],
   ];
   const themeField = (key: keyof ThemeSettings, label: string, hint: string) => (

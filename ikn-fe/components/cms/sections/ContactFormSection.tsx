@@ -22,7 +22,7 @@ const ui = {
     send: 'Kirim pesan',
     sending: 'Mengirim…',
     successTitle: 'Terima kasih.',
-    successBody: 'Pesan Anda sudah tercatat. Tim kami akan menghubungi Anda secepatnya.',
+    successBody: 'Pesan Anda sudah kami terima dan akan ditindaklanjuti tim kami.',
   },
   en: {
     name: 'Name',
@@ -35,7 +35,7 @@ const ui = {
     send: 'Send message',
     sending: 'Sending…',
     successTitle: 'Thank you.',
-    successBody: 'Your message has been recorded. Our team will get back to you shortly.',
+    successBody: 'We have received your message and our team will follow up.',
   },
 };
 

@@ -142,7 +142,7 @@ export default function AdminCheckoutSettings() {
                 <span>
                   {t('Kode unik transfer manual', 'Unique code for manual transfer')}
                   <small className="admin-field-hint" style={{ display: 'block' }}>
-                    {t('Menambahkan 1–999 rupiah ke total agar transfer mudah dicocokkan.', 'Adds Rp 1–999 to the total so transfers are easy to match.')}
+                    {t('Menambahkan 1-999 rupiah ke total agar transfer mudah dicocokkan.', 'Adds Rp 1-999 to the total so transfers are easy to match.')}
                   </small>
                 </span>
               </label>
@@ -177,7 +177,7 @@ export default function AdminCheckoutSettings() {
                 <input value={String(settings.invoicePrefix)} onChange={(e) => setSettings({ ...settings, invoicePrefix: e.target.value })} maxLength={40} />
                 <small className="admin-field-hint">
                   {t('Nomor lengkap:', 'Full number:')} <span className="mono">{String(settings.invoicePrefix).trim().replace(/\/+$/, '') || 'PMS/X/INV/RA'}/{'{urut}'}/{ROMAN[new Date().getMonth()]}/{new Date().getFullYear()}</span>{' '}
-                  {t('— urutan dimulai dari 1 tiap bulan dan diterbitkan saat pembayaran diverifikasi; invoice yang sudah terbit tidak berubah.', '— the sequence restarts at 1 every month and is issued when the payment is verified; existing invoices do not change.')}
+                  {t('Urutan dimulai dari 1 tiap bulan. Nomor diberikan saat pembayaran diverifikasi; invoice yang sudah terbit tidak berubah.', 'The sequence restarts at 1 every month. A number is assigned when the payment is verified; issued invoices do not change.')}
                 </small>
                 {firstError(settingsErrors, 'invoicePrefix') && <small className="form-error">{firstError(settingsErrors, 'invoicePrefix')}</small>}
               </label>
