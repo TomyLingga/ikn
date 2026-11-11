@@ -196,7 +196,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [ready, target, staleKey, retryTick]);
 
   const value = useMemo<CartContextValue>(() => {
-    const count = items.reduce((n, i) => n + i.qty, 0);
+    // Badge = number of distinct products in the cart, not the summed quantity (25 kg Resiprene counts as 1).
+    const count = items.length;
     const subtotal = items.reduce((n, i) => n + (i.unitPrice || 0) * i.qty, 0);
     const currency: Currency = items.find((i) => i.currency === 'USD') ? 'USD' : 'IDR';
     return { items, add, updateQty, remove, clear, syncQuote, count, subtotal, currency, notice, dismissNotice, ready };

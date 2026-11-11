@@ -54,9 +54,9 @@ export default function CustomerCart() {
         type="button"
         className={styles.cartBtn}
         onClick={() => setIsOpen(true)}
-        aria-label={`${t('Keranjang', 'Cart')} (${count} item)`}
+        aria-label={`${t('Keranjang', 'Cart')} (${count} ${t('produk', 'products')})`}
       >
-        <Icon name="bag" size={20} />
+        <Icon name="bag" size={21} strokeWidth={2} />
         {count > 0 && <span className={styles.badge}>{count > 9 ? '9+' : count}</span>}
       </button>
 

@@ -152,7 +152,7 @@ export default function CartPage() {
                 {quote ? (
                   <>
                     <div className="summary-row">
-                      <span>Subtotal ({count} {t('item', 'items')})</span>
+                      <span>Subtotal ({count} {t('produk', count === 1 ? 'product' : 'products')})</span>
                       <span>{formatIDR(quote.subtotal)}</span>
                     </div>
                     {quote.discountTotal > 0 && (
@@ -183,7 +183,7 @@ export default function CartPage() {
                 ) : (
                   <>
                     <div className="summary-row">
-                      <span>Subtotal ({count} {t('item', 'items')})</span>
+                      <span>Subtotal ({count} {t('produk', count === 1 ? 'product' : 'products')})</span>
                       <span>{formatIDR(subtotal)}</span>
                     </div>
                     <div className="summary-row summary-muted">

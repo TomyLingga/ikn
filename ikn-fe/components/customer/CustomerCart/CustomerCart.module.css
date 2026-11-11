@@ -21,8 +21,9 @@
   position: absolute;
   top: 2px;
   right: 2px;
-  background: var(--amber);
-  color: var(--on-accent);
+  /* Same colors as the NotificationBell badge so both top-bar counters read alike. */
+  background: var(--red);
+  color: #fff;
   font-family: var(--font-mono);
   font-size: 0.6rem;
   font-weight: 600;

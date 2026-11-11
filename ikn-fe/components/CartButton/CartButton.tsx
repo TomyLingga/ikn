@@ -8,8 +8,8 @@ import styles from '@/components/Navbar/Navbar.module.css';
 export default function CartButton() {
   const { count } = useCart();
   return (
-    <Link href="/cart" className={styles.cart} aria-label={`Keranjang (${count} item)`}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <Link href="/cart" className={styles.cart} aria-label={`Keranjang (${count} produk)`}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="9" cy="20" r="1.4" />
         <circle cx="18" cy="20" r="1.4" />
         <path d="M2 3h3l2.2 12.4a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.2L21.5 7H6" />

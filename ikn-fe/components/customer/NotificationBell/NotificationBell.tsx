@@ -120,7 +120,7 @@ export default function NotificationBell({ unread }: NotificationBellProps) {
   return (
     <div className={styles.wrap} ref={wrap}>
       <button type="button" className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`} aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <Icon name="bell" size={20} />
+        <Icon name="bell" size={21} strokeWidth={2} />
         {unread > 0 && <span className={styles.badge}>{unread > 99 ? '99+' : unread}</span>}
       </button>
 
