@@ -115,14 +115,20 @@ function Stop-Preview {
     if (Test-Path $PidFile) {
         $pids = Get-Content $PidFile -Raw | ConvertFrom-Json
         foreach ($p in $pids.PSObject.Properties) {
-            if (Get-Process -Id $p.Value -ErrorAction SilentlyContinue) { & taskkill.exe /T /F /PID $p.Value 2>&1 | Out-Null }
+            if (Get-Process -Id $p.Value -ErrorAction SilentlyContinue) { Stop-Tree $p.Value }
         }
         Remove-Item $PidFile -Force
     }
     # Anything still holding the preview ports (e.g. a crashed supervisor's children).
     foreach ($port in @($FePort, $ApiPort, $ProxyPort)) {
         Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
-            & taskkill.exe /T /F /PID $_.OwningProcess 2>&1 | Out-Null
+            Stop-Tree $_.OwningProcess
         }
     }
+}
+
+# Kill a process tree. Redirect inside cmd: in PS 5.1 `taskkill ... 2>&1` turns "process not found" (a child that
+# already died with its parent) into a terminating error under $ErrorActionPreference = 'Stop'.
+function Stop-Tree([int]$processId) {
+    & cmd.exe /c "taskkill /T /F /PID $processId >nul 2>&1"
 }

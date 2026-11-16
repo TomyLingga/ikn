@@ -83,7 +83,8 @@ if ($newDb -or $Fresh) {
     if ($LASTEXITCODE -ne 0) { Write-Warning 'Kurs JISDOR gagal diambil (bisa dicoba lagi nanti); aplikasi tetap jalan.' }
     Pop-Location
 }
-Push-Location $Api; & $cfg.php artisan storage:link 2>&1 | Out-Null; Pop-Location
+# cmd redirect: a "link already exists" message on stderr must not stop the script (PS 5.1 + ErrorActionPreference Stop)
+Push-Location $Api; & cmd.exe /c "`"$($cfg.php)`" artisan storage:link >nul 2>&1"; Pop-Location
 
 Write-Step 'Jalan otomatis saat PC menyala (Task Scheduler)'
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$(Join-Path $PreviewDir 'run.ps1')`""
