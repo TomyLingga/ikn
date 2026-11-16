@@ -169,6 +169,7 @@ export function TrendChart({
   formatShortMoney,
   lang,
   height = 260,
+  fill = false,
 }: {
   points: TrendPoint[];
   granularity: 'day' | 'week' | 'month';
@@ -176,23 +177,29 @@ export function TrendChart({
   formatShortMoney: (n: number) => string;
   lang: 'id' | 'en';
   height?: number;
+  /** Isi sisa tinggi kontainer flex (min. `height`), mis. panel yang disejajarkan dengan panel lebih tinggi. */
+  fill?: boolean;
 }) {
   const id = useId().replace(/:/g, '');
   const ref = useRef<SVGSVGElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
-  // Lebar viewBox = lebar nyata kontainer agar teks sumbu tidak meregang dan tinggi tetap `height` px.
+  // Ukuran viewBox = ukuran nyata kontainer agar teks sumbu tidak meregang.
   const [W, setW] = useState(960);
+  const [fillH, setFillH] = useState(height);
   useEffect(() => {
     const el = wrap.current;
     if (!el) return;
-    const update = () => setW(Math.max(320, Math.round(el.clientWidth)));
+    const update = () => {
+      setW(Math.max(320, Math.round(el.clientWidth)));
+      if (fill) setFillH(Math.max(height, Math.round(el.clientHeight)));
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-  const H = height;
+  }, [fill, height]);
+  const H = fill ? fillH : height;
   const pad = { l: 56, r: 16, t: 16, b: 30 };
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
@@ -235,11 +242,12 @@ export function TrendChart({
   const weekText = lang === 'en' ? 'Week of' : 'Pekan mulai';
 
   return (
-    <div className="ach-trend" ref={wrap}>
+    <div className={`ach-trend${fill ? ' ach-trend-fill' : ''}`} ref={wrap} style={fill ? { minHeight: height } : undefined}>
       <svg
         ref={ref}
         viewBox={`0 0 ${W} ${H}`}
-        style={{ height: H }}
+        // fill: the svg is taken out of flow so the wrapper height comes from the flex parent, not from the svg
+        style={fill ? { position: 'absolute', inset: 0, width: '100%', height: '100%' } : { height: H }}
         preserveAspectRatio="none"
         tabIndex={0}
         role="img"

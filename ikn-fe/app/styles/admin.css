@@ -4363,8 +4363,11 @@ div.media-thumb {
 .admin-app .ach-empty { margin: 0; padding: 22px 0; font-size: 0.88rem; color: var(--ink-soft); text-align: center; }
 
 /* Donat + legenda berdampingan bila muat (masing-masing >= 200px), selain itu bertumpuk. */
-.admin-app .ach-donut { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px 22px; align-items: center; }
-.admin-app .ach-donut-ring { position: relative; aspect-ratio: 1; width: 100%; max-width: 200px; justify-self: center; }
+/* Ring ~160px, the legend the rest; wrapping is decided by the flex-basis sum (160 + 20 + 200), so the pair stays side
+   by side down to a ~380px wide card and stacks below that. */
+.admin-app .ach-donut { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px 20px; align-items: center; }
+.admin-app .ach-donut-ring { position: relative; aspect-ratio: 1; flex: 0 1 160px; min-width: 140px; max-width: 200px; }
+.admin-app .ach-donut > .ach-legend { flex: 1 1 200px; }
 .admin-app .ach-donut-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .admin-app .ach-donut-track { fill: none; stroke: color-mix(in srgb, var(--ink) 7%, transparent); stroke-width: 12; }
 .admin-app .ach-donut-seg { fill: none; stroke-width: 12; stroke-linecap: butt; cursor: pointer; transition: opacity 0.2s var(--ease), stroke-width 0.2s var(--ease); }
@@ -4374,7 +4377,7 @@ div.media-thumb {
 .admin-app .ach-donut-center strong { font-size: clamp(1.05rem, 1.6vw, 1.35rem); font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.15; }
 .admin-app .ach-donut-center span { margin-top: 2px; font-size: 0.72rem; color: var(--ink-soft); line-height: 1.25; }
 .admin-app .ach-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-width: 0; }
-.admin-app .ach-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; transition: background 0.15s var(--ease); }
+.admin-app .ach-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 8px; transition: background 0.15s var(--ease); }
 .admin-app .ach-legend li.is-active,
 .admin-app .ach-legend li:hover { background: var(--adm-hover); }
 .admin-app .ach-dot { width: 10px; height: 10px; border-radius: 3px; }
@@ -4382,9 +4385,10 @@ div.media-thumb {
 .admin-app .ach-legend-label small,
 .admin-app .ach-legend-value small { display: block; font-size: 0.72rem; font-weight: 500; color: var(--ink-soft); }
 .admin-app .ach-legend-value { text-align: right; font-size: 0.86rem; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+/* percentage on the same line as the value: one line per legend row keeps the donut panel short */
+.admin-app .ach-legend-value small { display: inline-block; min-width: 3.4em; margin-left: 8px; }
 @media (max-width: 520px) {
-  .admin-app .ach-donut { grid-template-columns: minmax(0, 1fr); }
-  .admin-app .ach-donut-ring { max-width: 200px; justify-self: center; width: 100%; }
+  .admin-app .ach-donut > .ach-legend { flex-basis: 100%; }
 }
 
 .admin-app .ach-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }

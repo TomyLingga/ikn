@@ -205,9 +205,10 @@ export default function AdminDashboard() {
           href="/admin/reports/sales"
           linkLabel={t('Laporan', 'Report')}
           meta={<TrendSummary points={trend30} t={t} />}
+          fill
         >
           {trend30.some((p) => p.total > 0) ? (
-            <TrendChart points={trend30} granularity="day" formatMoney={formatIDR} formatShortMoney={shortIDR} lang={lang} height={230} />
+            <TrendChart points={trend30} granularity="day" formatMoney={formatIDR} formatShortMoney={shortIDR} lang={lang} height={230} fill />
           ) : (
             <EmptyState icon="trendUp" text={t('Belum ada order dibayar dalam 30 hari terakhir.', 'No paid orders in the last 30 days.')} />
           )}
@@ -580,12 +581,12 @@ function ExportKpiRow({ kpis, outstanding, periodText, t }: { kpis: DashboardExp
   // Termin (ASUMSI A-97): sisa tagihan order yang baru dibayar sebagian. Pendapatan di kartu pertama sudah menghitung
   // order itu secara penuh sejak termin pertamanya diverifikasi, jadi kartu ini menunjukkan berapa yang belum masuk.
   const due = (outstanding || []).find((row) => row.currency === kpis.currency);
-  const cards: Array<{ key: string; label: string; hint: string; icon: IconName; value: number; money?: boolean; href: string }> = [
+  const cards: Array<{ key: string; label: string; hint: string; title?: string; icon: IconName; value: number; money?: boolean; href: string }> = [
     { key: 'revenue', label: t('Pendapatan USD', 'USD revenue'), hint: t('dibayar pada periode ini', 'paid in this period'), icon: 'globe', value: kpis.revenue, money: true, href: '/admin/reports/sales' },
     { key: 'paid', label: t('Order dibayar', 'Paid orders'), hint: t('pada periode ini', 'in this period'), icon: 'paymentCheck', value: kpis.paidOrders, href: '/admin/reports/sales' },
     { key: 'created', label: t('Order dibuat', 'Orders created'), hint: t('periode ini, semua status', 'this period, any status'), icon: 'orders', value: kpis.orders, href: '/admin/orders?status=all' },
     { key: 'freight', label: t('Menunggu penawaran ongkir', 'Awaiting freight quote'), hint: t('order CIF saat ini', 'CIF orders right now'), icon: 'truck', value: kpis.awaitingFreight, href: '/admin/orders?status=awaiting_freight' },
-    { key: 'pending', label: t('Menunggu pembayaran', 'Awaiting payment'), hint: t('order USD saat ini; daftar memuat semua mata uang', 'USD orders right now; the list shows all currencies'), icon: 'clock', value: kpis.pendingPayment, href: '/admin/orders?status=pending_payment' },
+    { key: 'pending', label: t('Menunggu pembayaran', 'Awaiting payment'), hint: t('order USD saat ini', 'USD orders right now'), title: t('Daftar order memuat semua mata uang', 'The order list shows all currencies'), icon: 'clock', value: kpis.pendingPayment, href: '/admin/orders?status=pending_payment' },
     ...(due && due.total > 0
       ? [
           {
@@ -610,9 +611,9 @@ function ExportKpiRow({ kpis, outstanding, periodText, t }: { kpis: DashboardExp
         </div>
         <span className={styles.queueSub}>{t(`Periode ${periodText}; tidak dikonversi ke rupiah.`, `Period ${periodText}; not converted to rupiah.`)}</span>
       </div>
-      <div className={styles.exportGrid}>
+      <div className={styles.exportGrid} style={{ '--n': cards.length } as CSSProperties}>
         {cards.map((card, i) => (
-          <Link key={card.key} href={card.href} className={styles.kpiCard} style={{ '--i': i + 4 } as CSSProperties}>
+          <Link key={card.key} href={card.href} title={card.title} className={styles.kpiCard} style={{ '--i': i + 4 } as CSSProperties}>
             <span className={styles.kpiLabel}>
               <Icon name={card.icon} size={18} strokeWidth={1.8} /> {card.label}
             </span>
@@ -670,20 +671,27 @@ function WorkQueue({ queue, t }: { queue: DashboardWorkQueue; t: T }) {
             : t('Semua selesai. Tidak ada yang menunggu.', 'All clear. Nothing waiting.')}
         </span>
       </div>
-      <div className={styles.queueGrid}>
+      {/* Layar lebar: kolom = setengah jumlah ubin (maks. 5), jadi dua baris penuh. Layar sedang: 3 kolom bila jumlahnya
+          habis dibagi 3, selain itu 2, agar baris terakhir tidak menyisakan ubin sendirian. */}
+      <div
+        className={styles.queueGrid}
+        style={{ '--cols': Math.min(5, Math.ceil(visible.length / 2)), '--cols-mid': visible.length % 3 === 0 ? 3 : 2 } as CSSProperties}
+      >
         {visible.map((item) => {
           const count = queue[item.key] || 0;
           const tone = count === 0 ? styles.qDone : item.urgent ? styles.qUrgent : styles.qActive;
           return (
             <Link key={item.key} href={item.href} className={`${styles.qTile} ${tone}`}>
-              <span className={styles.qIcon}>
-                <Icon name={item.icon} size={18} strokeWidth={1.8} />
+              <span className={styles.qTop}>
+                <span className={styles.qIcon}>
+                  <Icon name={item.icon} size={18} strokeWidth={1.8} />
+                </span>
+                <strong className={styles.qCount}>{count}</strong>
               </span>
               <span className={styles.qText}>
                 <span className={styles.qLabel}>{item.label}</span>
                 <small>{count === 0 ? t('Selesai', 'Clear') : item.hint}</small>
               </span>
-              <strong className={styles.qCount}>{count}</strong>
             </Link>
           );
         })}
@@ -699,6 +707,7 @@ function Panel({
   linkLabel,
   warning,
   meta,
+  fill,
   children,
 }: {
   eyebrow: string;
@@ -707,10 +716,12 @@ function Panel({
   linkLabel: string;
   warning?: boolean;
   meta?: ReactNode;
+  /** Isi panel meregang mengikuti tinggi baris kisi (grafik tren di samping donat). */
+  fill?: boolean;
   children: ReactNode;
 }) {
   return (
-    <section className={`${styles.panel} ${warning ? styles.panelWarn : ''}`}>
+    <section className={`${styles.panel} ${warning ? styles.panelWarn : ''} ${fill ? styles.panelFill : ''}`}>
       <div className={styles.panelHead}>
         <div className={styles.panelTitle}>
           <span className={styles.eyebrow}>{eyebrow}</span>
