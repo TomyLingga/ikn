@@ -15,6 +15,7 @@ import { currencyStep, formatMoney, fromMinorInput, toMinorInput } from '@/lib/f
 import type { Currency } from '@/lib/types';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
+import NumberInput from '@/components/NumberInput';
 
 interface FeeForm {
   name: I18n;
@@ -298,12 +299,12 @@ export default function AdminAdditionalFees() {
               </label>
               <label>
                 <span className="field-label">{t(`Nominal (${form.currency})`, `Amount (${form.currency})`)} *</span>
-                <input type="number" min={0} step={currencyStep(form.currency)} inputMode="decimal" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+                <NumberInput currency={form.currency} min={0} step={currencyStep(form.currency)} inputMode="decimal" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
                 {firstError(formErrors, 'amount') && <small className="cms-field-error">{firstError(formErrors, 'amount')}</small>}
               </label>
               <label>
                 <span className="field-label">{t('Urutan', 'Order')}</span>
-                <input type="number" min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
+                <NumberInput min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
               </label>
             </div>
             <div className="cms-field">

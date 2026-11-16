@@ -2,43 +2,45 @@
 
 namespace App\Http\Controllers\Api\V1\Customer;
 
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Api\V1\ApiController;
+use App\Http\Requests\Chat\EditChatMessageRequest;
 use App\Http\Requests\Chat\SendChatMessageRequest;
+use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Services\Chat\ChatService;
 use Illuminate\Http\Request;
 
 // Live chat sisi customer (ASUMSI A-73): satu percakapan dengan penjual, dibuat saat pesan pertama dikirim.
+// Customer tidak bisa menghapus atau mengarsipkan percakapannya; ia hanya bisa mengedit/menarik pesannya sendiri
+// selama jendela edit (ASUMSI A-99).
 class ChatController extends ApiController
 {
     public function __construct(private ChatService $chat)
     {
     }
 
-    /** ?after={id} untuk polling pesan baru, ?before={id} untuk memuat pesan lama. */
+    /**
+     * Tanpa parameter = halaman pesan terbaru. ?before={id} = halaman lebih lama. ?after={id}&rev={revisi} =
+     * polling: pesan baru + `changed` (pesan lama yang diedit/ditarik sejak revisi itu).
+     */
     public function show(Request $request)
     {
-        $request->validate([
+        $query = $request->validate([
             'after' => ['nullable', 'integer', 'min:0'],
             'before' => ['nullable', 'integer', 'min:1'],
+            'rev' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $conversation = $this->chat->find($request->user());
         if (! $conversation) {
-            return $this->data(['conversation' => null, 'messages' => [], 'hasMore' => false]);
+            return $this->data($this->chat->emptyThread());
         }
 
-        [$messages, $hasMore] = $this->chat->messages(
-            $conversation,
-            $request->filled('after') ? (int) $request->query('after') : null,
-            $request->filled('before') ? (int) $request->query('before') : null
+        return $this->data(
+            ['conversation' => $this->chat->presentForCustomer($conversation)]
+            + $this->chat->threadPayload($conversation, $query, false)
         );
-
-        return $this->data([
-            'conversation' => $this->chat->presentForCustomer($conversation),
-            'messages' => $messages->map(fn (ChatMessage $m) => $this->chat->presentMessage($m, false))->values()->all(),
-            'hasMore' => $hasMore,
-        ]);
     }
 
     public function send(SendChatMessageRequest $request)
@@ -54,6 +56,27 @@ class ChatController extends ApiController
             'conversation' => $this->chat->presentForCustomer($conversation->fresh()),
             'message' => $this->chat->presentMessage($message, false),
         ]);
+    }
+
+    /** Edit pesan sendiri selama jendela edit; lewat batas → 409 CHAT_EDIT_WINDOW_PASSED. */
+    public function update(EditChatMessageRequest $request, $message)
+    {
+        $conversation = $this->conversation($request);
+        $edited = $this->chat->edit(
+            $this->chat->ownMessage($conversation, (int) $message, ChatMessage::ROLE_CUSTOMER),
+            $request->validated()['body']
+        );
+
+        return $this->changed($conversation, $edited);
+    }
+
+    /** Tarik pesan sendiri selama jendela edit; pesan tetap tampil sebagai "Pesan ditarik". */
+    public function retract(Request $request, $message)
+    {
+        $conversation = $this->conversation($request);
+        $retracted = $this->chat->retract($this->chat->ownMessage($conversation, (int) $message, ChatMessage::ROLE_CUSTOMER));
+
+        return $this->changed($conversation, $retracted);
     }
 
     /** Tamu yang baru login: ambil alih percakapan tamunya (token dari browser) ke akun ini. */
@@ -74,5 +97,23 @@ class ChatController extends ApiController
         }
 
         return $this->data(['unread' => 0]);
+    }
+
+    private function conversation(Request $request): ChatConversation
+    {
+        $conversation = $this->chat->find($request->user());
+        if (! $conversation) {
+            throw ApiException::notFound();
+        }
+
+        return $conversation;
+    }
+
+    private function changed(ChatConversation $conversation, ChatMessage $message)
+    {
+        return $this->data([
+            'conversation' => $this->chat->presentForCustomer($conversation->fresh()),
+            'message' => $this->chat->presentMessage($message, false),
+        ]);
     }
 }

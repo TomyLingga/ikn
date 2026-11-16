@@ -12,6 +12,7 @@ import { emptyI18n, tr, type I18n } from '@/lib/cms';
 import { numberOrNull, paymentMethodConfig, paymentMethodTypeLabels, type PaymentDriver, type PaymentMethodRow } from '@/lib/admin';
 import type { PaymentMethodType } from '@/lib/types';
 import Select from '@/components/Select';
+import NumberInput from '@/components/NumberInput';
 
 interface MethodForm {
   code: string;
@@ -327,12 +328,12 @@ export default function AdminPaymentMethods() {
                 <div className="admin-form-row">
                   <label>
                     <span className="field-label">{t('Biaya gateway (%)', 'Gateway fee (%)')}</span>
-                    <input type="number" min={0} max={100} step={0.01} value={form.feePercent} onChange={(e) => update('feePercent', e.target.value)} />
+                    <NumberInput min={0} max={100} step={0.01} value={form.feePercent} onChange={(e) => update('feePercent', e.target.value)} />
                     {firstError(formErrors, 'config.feePercent') && <small className="cms-field-error">{firstError(formErrors, 'config.feePercent')}</small>}
                   </label>
                   <label>
                     <span className="field-label">{t('Biaya gateway tetap (Rp)', 'Fixed gateway fee (Rp)')}</span>
-                    <input type="number" min={0} step={1} value={form.feeFixed} onChange={(e) => update('feeFixed', e.target.value)} />
+                    <NumberInput currency="IDR" min={0} step={1} value={form.feeFixed} onChange={(e) => update('feeFixed', e.target.value)} />
                     {firstError(formErrors, 'config.feeFixed') && <small className="cms-field-error">{firstError(formErrors, 'config.feeFixed')}</small>}
                   </label>
                 </div>
@@ -345,7 +346,7 @@ export default function AdminPaymentMethods() {
             <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Urutan tampil', 'Display order')}</span>
-                <input type="number" min={0} value={form.sortOrder} onChange={(e) => update('sortOrder', e.target.value)} />
+                <NumberInput min={0} value={form.sortOrder} onChange={(e) => update('sortOrder', e.target.value)} />
               </label>
               <label className="cms-check" style={{ alignSelf: 'end' }}>
                 <input type="checkbox" checked={form.isActive} onChange={(e) => update('isActive', e.target.checked)} />

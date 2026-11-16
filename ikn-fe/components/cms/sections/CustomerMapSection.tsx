@@ -8,13 +8,16 @@ import SecHead from './SecHead';
 import { asList, asText, type CustomerMapContent } from '../utils';
 
 // Key sama dengan SectionDefinitions::CUSTOMER_REGIONS; kawasan baru = tambah di sana + warna di sini.
-const REGIONS: Record<string, { id: string; en: string; color: string }> = {
-  asia: { id: 'Asia', en: 'Asia', color: '#42a5d5' },
-  europe: { id: 'Eropa', en: 'Europe', color: '#1769aa' },
-  middle_east: { id: 'Timur Tengah', en: 'Middle East', color: '#7a6fd0' },
-  africa: { id: 'Afrika', en: 'Africa', color: '#d08a2e' },
-  americas: { id: 'Amerika Utara & Selatan', en: 'North & South America', color: '#2e9e8f' },
-  oceania: { id: 'Oseania', en: 'Oceania', color: '#c0577a' },
+// color = teks di kartu pelanggan (latar terang); map = titik, rute, legenda, dan penanda kawasan. Peta dasarnya
+// citra satelit (2026-11-15), jadi warna `map` dibuat terang supaya terbaca di laut dan daratan yang gelap. Eropa
+// memakai kuning karena biru tua tidak terlihat di laut dan biru terang terlalu mirip Asia.
+const REGIONS: Record<string, { id: string; en: string; color: string; map: string }> = {
+  asia: { id: 'Asia', en: 'Asia', color: '#42a5d5', map: '#5ecbff' },
+  europe: { id: 'Eropa', en: 'Europe', color: '#b38600', map: '#ffd84d' },
+  middle_east: { id: 'Timur Tengah', en: 'Middle East', color: '#7a6fd0', map: '#b9a8ff' },
+  africa: { id: 'Afrika', en: 'Africa', color: '#d08a2e', map: '#ffa94d' },
+  americas: { id: 'Amerika Utara & Selatan', en: 'North & South America', color: '#2e9e8f', map: '#4be0bd' },
+  oceania: { id: 'Oseania', en: 'Oceania', color: '#c0577a', map: '#ff8fb8' },
 };
 
 const coord = (g?: { lat: number | null; lng: number | null } | null) => {
@@ -53,7 +56,8 @@ export default function CustomerMapSection({ section }: { section: PageSection }
   const heading = tr(c.heading, lang);
   const lead = tr(c.lead, lang);
   const regions = Object.keys(REGIONS).filter((r) => items.some((i) => i.region === r));
-  const color = (r: string) => REGIONS[r]?.color ?? '#1769aa';
+  const color = (r: string) => REGIONS[r]?.color ?? REGIONS.asia!.color;
+  const mapColor = (r: string) => REGIONS[r]?.map ?? REGIONS.asia!.map;
 
   const points: MapPoint[] = items.flatMap((i) => {
     const own = i.customers.filter((cu) => cu.at);
@@ -61,14 +65,14 @@ export default function CustomerMapSection({ section }: { section: PageSection }
     const out: MapPoint[] = own.map((cu) => ({
       key: `${i.country}-${cu.name}`,
       ...cu.at!,
-      color: color(i.region),
+      color: mapColor(i.region),
       title: cu.name,
       subtitle: i.country,
       logo: cu.logo,
       size: 'sm',
     }));
     if (i.at && (rest.length > 0 || own.length === 0)) {
-      out.push({ key: i.country, ...i.at, color: color(i.region), title: i.country, subtitle: rest.map((cu) => cu.name).join(', '), logo: null, size: 'md' });
+      out.push({ key: i.country, ...i.at, color: mapColor(i.region), title: i.country, subtitle: rest.map((cu) => cu.name).join(', '), logo: null, size: 'md' });
     }
     return out;
   });
@@ -88,7 +92,7 @@ export default function CustomerMapSection({ section }: { section: PageSection }
           <ul className="cmap-legend">
             {regions.map((r) => (
               <li key={r}>
-                <span style={{ background: color(r) }} />
+                <span style={{ background: mapColor(r) }} />
                 {REGIONS[r]![lang]}
               </li>
             ))}
@@ -98,7 +102,7 @@ export default function CustomerMapSection({ section }: { section: PageSection }
           {regions.map((r) => (
             <div key={r} className="cmap-region">
               <h3>
-                <span style={{ background: color(r) }} />
+                <span style={{ background: mapColor(r) }} />
                 {REGIONS[r]![lang]}
               </h3>
               <dl>

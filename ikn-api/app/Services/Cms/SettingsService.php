@@ -4,8 +4,10 @@ namespace App\Services\Cms;
 
 use App\Models\Media;
 use App\Models\Setting;
+use App\Services\Geo\MapConfigService;
 use App\Support\I18n;
 use App\Support\MediaFrame;
+use App\Support\TileUrlTemplate;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Crypt;
@@ -16,8 +18,9 @@ use Illuminate\Validation\ValidationException;
  * Skema settings: kunci "group.name" → tipe, publik/privat, default.
  * GET mengembalikan bentuk bersarang { company: { name: ... } }.
  *
- * Tipe: text, i18n, media, json, color, whatsapp_contacts, media_slides, bool, int (min/max), enum (options),
- * email, secret (dienkripsi di DB, output selalu SECRET_MASK bila terisi; kirim balik mask = tidak mengubah).
+ * Tipe: text (max opsional), i18n, media, json, color, whatsapp_contacts, media_slides, bool, int (min/max),
+ * enum (options), email, tile_url (templat tile XYZ https, lihat App\Support\TileUrlTemplate),
+ * secret (dienkripsi di DB, output selalu SECRET_MASK bila terisi; kirim balik mask = tidak mengubah).
  */
 class SettingsService
 {
@@ -26,6 +29,7 @@ class SettingsService
 
     public const MAIL_MODES = ['server', 'smtp', 'off'];
     public const MAIL_ENCRYPTIONS = ['ssl', 'tls', ''];
+    public const MAP_PROVIDERS = [MapConfigService::PROVIDER_DEFAULT, MapConfigService::PROVIDER_GOOGLE, MapConfigService::PROVIDER_CUSTOM];
 
     public const SCHEMA = [
         'company.name' => ['type' => 'text', 'public' => true, 'default' => 'PT Industri Karet Nusantara'],
@@ -82,6 +86,15 @@ class SettingsService
         'mail.password' => ['type' => 'secret', 'public' => false, 'default' => ''],
         'mail.from_address' => ['type' => 'email', 'public' => false, 'default' => ''],
         'mail.from_name' => ['type' => 'text', 'public' => false, 'default' => 'PT Industri Karet Nusantara'],
+        // Penyedia tile untuk semua peta (ASUMSI A-98), privat: publik hanya melihat hasil jadinya lewat
+        // GET /geo/map-config (App\Services\Geo\MapConfigService). default = OSM + Esri tanpa key;
+        // google = Map Tiles API (key wajib); custom = templat XYZ (minimal satu URL, yang kosong memakai bawaan).
+        'maps.provider' => ['type' => 'enum', 'options' => self::MAP_PROVIDERS, 'public' => false, 'default' => MapConfigService::PROVIDER_DEFAULT],
+        'maps.google_api_key' => ['type' => 'secret', 'public' => false, 'default' => ''],
+        'maps.custom_street_url' => ['type' => 'tile_url', 'public' => false, 'default' => ''],
+        'maps.custom_satellite_url' => ['type' => 'tile_url', 'public' => false, 'default' => ''],
+        'maps.custom_attribution' => ['type' => 'text', 'max' => 300, 'public' => false, 'default' => ''],
+        'maps.custom_max_zoom' => ['type' => 'int', 'min' => 1, 'max' => 22, 'public' => false, 'default' => 19],
     ];
 
     /** Kunci setting bertipe media (nilai = id media), dipakai MediaService untuk melindungi berkas dari hapus. */
@@ -167,6 +180,7 @@ class SettingsService
         }
 
         $errors += $this->validateMailGroup($pending);
+        $errors += $this->validateMapsGroup($pending, $errors);
 
         if ($errors) {
             throw ValidationException::withMessages($errors);
@@ -178,6 +192,10 @@ class SettingsService
                 $clean = Crypt::encryptString($clean);
             }
             Setting::putValue($key, $clean, explode('.', $key)[0], $def['public']);
+        }
+
+        if (array_filter(array_keys($pending), fn ($key) => str_starts_with($key, 'maps.'))) {
+            MapConfigService::forget(); // GET /geo/map-config langsung memakai penyedia baru
         }
 
         return $this->all();
@@ -214,11 +232,52 @@ class SettingsService
         return $errors;
     }
 
+    /**
+     * Penyedia google butuh API key; custom butuh minimal satu URL tile (nilai tersimpan dihitung bila tidak dikirim).
+     * Dilewati bila ada kunci maps yang sudah gagal divalidasi agar pesannya tidak bertumpuk.
+     */
+    private function validateMapsGroup(array $pending, array $errors): array
+    {
+        $touched = fn (array $keys) => (bool) array_filter($keys, fn ($key) => str_starts_with($key, 'maps.'));
+        if (! $touched(array_keys($pending)) || $touched(array_keys($errors))) {
+            return [];
+        }
+
+        $provider = $pending['maps.provider'] ?? ($this->get('maps.provider') ?: MapConfigService::PROVIDER_DEFAULT);
+        $value = fn (string $key) => trim((string) (array_key_exists($key, $pending) ? $pending[$key] : $this->get($key)));
+
+        if ($provider === MapConfigService::PROVIDER_GOOGLE) {
+            $key = array_key_exists('maps.google_api_key', $pending) ? trim((string) $pending['maps.google_api_key']) : $this->secret('maps.google_api_key');
+
+            return $key === '' ? ['maps.google_api_key' => [__('maps.google_key_required')]] : [];
+        }
+        if ($provider === MapConfigService::PROVIDER_CUSTOM && $value('maps.custom_street_url') === '' && $value('maps.custom_satellite_url') === '') {
+            return ['maps.custom_street_url' => [__('maps.custom_required')]];
+        }
+
+        return [];
+    }
+
     private function clean(array $def, $value, string $key = ''): array
     {
         switch ($def['type']) {
             case 'text':
-                return [is_scalar($value) || $value === null ? trim((string) $value) : '', null];
+                $value = is_scalar($value) || $value === null ? trim((string) $value) : '';
+                if (isset($def['max']) && mb_strlen($value) > $def['max']) {
+                    return [null, __('validation.max.string', ['attribute' => $key, 'max' => $def['max']])];
+                }
+
+                return [$value, null];
+            case 'tile_url':
+                $value = is_scalar($value) || $value === null ? trim((string) $value) : null;
+                if ($value === '') {
+                    return ['', null];
+                }
+                if ($value === null || ! TileUrlTemplate::isValid($value)) {
+                    return [null, __('maps.tile_url_invalid', ['attribute' => $key])];
+                }
+
+                return [$value, null];
             case 'secret':
                 return [is_scalar($value) || $value === null ? (string) $value : '', null];
             case 'email':

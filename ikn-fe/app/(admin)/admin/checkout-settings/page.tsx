@@ -8,6 +8,7 @@ import { firstError, type FieldErrors } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import type { CommerceSettingsData } from '@/lib/admin';
+import NumberInput from '@/components/NumberInput';
 
 type SettingsForm = Record<keyof CommerceSettingsData, string | boolean>;
 
@@ -23,6 +24,8 @@ function settingsToForm(s: CommerceSettingsData): SettingsForm {
     exportPaymentDueHours: String(s.exportPaymentDueHours ?? 120),
     freightQuoteValidDays: String(s.freightQuoteValidDays ?? 7),
     freightQuoteMaxDays: String(s.freightQuoteMaxDays ?? 30),
+    installmentRemindBeforeDays: String(s.installmentRemindBeforeDays ?? 3),
+    installmentRemindOverdueDays: String(s.installmentRemindOverdueDays ?? 3),
     invoicePrefix: s.invoicePrefix ?? 'PMS/X/INV/RA',
     invoiceSignerName: s.invoiceSignerName ?? '',
     invoiceSignerTitle: s.invoiceSignerTitle ?? '',
@@ -83,6 +86,8 @@ export default function AdminCheckoutSettings() {
           exportPaymentDueHours: Number(settings.exportPaymentDueHours),
           freightQuoteValidDays: Number(settings.freightQuoteValidDays),
           freightQuoteMaxDays: Number(settings.freightQuoteMaxDays),
+          installmentRemindBeforeDays: Number(settings.installmentRemindBeforeDays),
+          installmentRemindOverdueDays: Number(settings.installmentRemindOverdueDays),
           invoicePrefix: String(settings.invoicePrefix).trim(),
           invoiceSignerName: String(settings.invoiceSignerName).trim(),
           invoiceSignerTitle: String(settings.invoiceSignerTitle).trim(),
@@ -108,7 +113,7 @@ export default function AdminCheckoutSettings() {
       <label>
         <span className="field-label">{label}</span>
         <div className="admin-input-suffix">
-          <input type="number" min={opts.min} max={opts.max} step={opts.step ?? 1} value={String(settings[key])} onChange={(e) => setSettings({ ...settings, [key]: e.target.value })} required />
+          <NumberInput min={opts.min} max={opts.max} step={opts.step ?? 1} value={String(settings[key])} onChange={(e) => setSettings({ ...settings, [key]: e.target.value })} required />
           {opts.suffix && <span>{opts.suffix}</span>}
         </div>
         <small className="admin-field-hint">{hint}</small>
@@ -166,6 +171,21 @@ export default function AdminCheckoutSettings() {
               {numberField('exportPaymentDueHours', t('Batas bayar ekspor', 'Export payment deadline'), t('Jam yang diberikan untuk transfer USD sebelum order kedaluwarsa (bawaan 120 jam karena transfer antarbank luar negeri lebih lama).', 'Hours allowed for the USD transfer before the order expires (default 120 hours because international transfers take longer).'), { min: 1, max: 720, suffix: t('jam', 'hours') })}
               {numberField('freightQuoteValidDays', t('Masa berlaku penawaran (hari)', 'Quote validity (days)'), t('Order CIF: masa berlaku bawaan penawaran ongkir admin bila tanggal "Berlaku sampai" dikosongkan (bawaan 7 hari). Admin masih bisa memperpanjang per penawaran.', 'CIF orders: default validity of an admin freight quote when "Valid until" is left empty (default 7 days). Admins can still extend each quote.'), { min: 1, max: 90, suffix: t('hari', 'days') })}
               {numberField('freightQuoteMaxDays', t('Batas tunggu penawaran (hari)', 'Quote waiting limit (days)'), t('Order CIF yang menunggu ongkir lebih lama dari ini tanpa penawaran yang masih berlaku dibatalkan sistem dan stoknya dilepas (bawaan 30 hari).', 'CIF orders waiting longer than this without a valid quote are cancelled by the system and the stock is released (default 30 days).'), { min: 1, max: 365, suffix: t('hari', 'days') })}
+
+              <h3 className="admin-subtitle" style={{ marginTop: 8 }}>{t('Termin pembayaran', 'Payment installments')}</h3>
+              <p className="admin-field-hint">
+                {t(
+                  'Berlaku untuk pesanan yang syarat pembayarannya bertahap, mis. uang muka 30% dan pelunasan 70%. Persen, kapan ditagih, dan jatuh tempo (hari) tiap termin diatur per syarat pembayaran. Termin yang terlambat tidak membatalkan pesanan.',
+                  'Applies to orders whose payment term is staged, e.g. 30% down payment and 70% balance. Percent, billing moment and due days of each installment are set per payment term. An overdue installment does not cancel the order.',
+                )}
+              </p>
+              <div>
+                <Link href="/admin/payment-terms" className="btn btn-line btn-sm">
+                  {t('Atur jadwal termin di Syarat Pembayaran', 'Edit installment schedules in Payment Terms')}
+                </Link>
+              </div>
+              {numberField('installmentRemindBeforeDays', t('Pengingat termin sebelum jatuh tempo', 'Installment reminder before due date'), t('Email dan notifikasi dikirim sekali, sekian hari sebelum termin jatuh tempo (bawaan 3; 0 = tanpa pengingat).', 'An email and notification are sent once, this many days before the installment is due (default 3; 0 = no reminder).'), { min: 0, max: 60, suffix: t('hari', 'days') })}
+              {numberField('installmentRemindOverdueDays', t('Pengingat termin terlambat', 'Overdue installment reminder'), t('Selama termin belum dibayar setelah jatuh tempo, pengingat dikirim ulang tiap sekian hari (bawaan 3; 0 = tanpa pengingat).', 'While an installment stays unpaid after its due date, the reminder is sent again every this many days (default 3; 0 = no reminder).'), { min: 0, max: 60, suffix: t('hari', 'days') })}
 
               <h3 className="admin-subtitle" style={{ marginTop: 8 }}>{t('Invoice', 'Invoice')}</h3>
               <p className="admin-field-hint">

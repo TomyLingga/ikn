@@ -1,0 +1,120 @@
+/* Kartu "Jadwal pembayaran" di detail pesanan customer (ASUMSI A-97). Warna dari token tema. */
+.wrap {
+  display: grid;
+  gap: 14px;
+}
+
+.progress {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.progress > div {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-2);
+}
+
+.progress dt {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.progress dd {
+  margin: 2px 0 0;
+  font-size: 0.98rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.rowOpen {
+  border-color: var(--warn);
+}
+
+.rowVoid {
+  opacity: 0.7;
+}
+
+.head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.seq {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title strong {
+  font-size: 0.94rem;
+  overflow-wrap: anywhere;
+}
+
+.title small {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.paid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ok);
+  font-size: 0.88rem;
+}
+
+.body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+@media (max-width: 420px) {
+  .head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}

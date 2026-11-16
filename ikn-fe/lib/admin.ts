@@ -15,10 +15,13 @@ import type {
   DeliveryTermMarket,
   DeliveryTermPricingMode,
   DeliveryTermTaxProfile,
+  InstallmentScheduleRow,
+  InstallmentTrigger,
   OrderStatusKey,
   OrderSummary,
   Payment,
   PaymentMethodType,
+  PaymentProgress,
   PaymentStatusKey,
   FactoryLocation,
   Product,
@@ -37,6 +40,8 @@ export interface AdminPaymentOrder {
   customer: { id: number; name: string; company: string | null; pic: string; email: string };
   currency: Currency;
   grandTotal: number;
+  /** Kemajuan pembayaran order (ASUMSI A-97): `partial` = order bertermin yang baru dibayar sebagian. */
+  paymentProgress?: PaymentProgress;
   uniqueCode: number;
   paymentDueAt: string | null;
   paidAt: string | null;
@@ -98,8 +103,18 @@ export interface DashboardWorkQueue {
   ordersInTransit: number | null;
   ordersDelivered: number | null;
   paymentsOverdue: number | null;
+  /** Termin lanjutan yang sedang ditagih, termasuk yang terlambat (ASUMSI A-97); null tanpa modul payments. */
+  installmentsDue?: number | null;
   customersToApprove: number | null;
   unreadChats: number | null;
+}
+
+/** Sisa tagihan termin per mata uang dari order yang sudah dibayar sebagian (GET /admin/dashboard, ASUMSI A-97). */
+export interface OutstandingInstallments {
+  currency: Currency;
+  total: number;
+  count: number;
+  overdue: number;
 }
 
 export interface DashboardTopProduct {
@@ -165,6 +180,8 @@ export interface DashboardData {
   lowStock: { total: number; rule: { min: number; moqFactor: number }; items: DashboardLowStockItem[] };
   paymentDue: { overdue: number; dueSoon: number; windowHours: number; items: OrderSummary[] };
   exportKpis: DashboardExportKpis | null;
+  /** [] bila tidak ada sisa tagihan termin; undefined pada server lama. */
+  outstandingInstallments?: OutstandingInstallments[];
   // Dashboard v3 (2026-11-04, additive).
   today?: { revenue: number; paidOrders: number; ordersCreated: number; yesterdayRevenue: number; yesterdayPaidOrders: number; yesterdayOrdersCreated: number };
   trend30?: TrendPoint[];
@@ -492,6 +509,9 @@ export interface CommerceSettingsData {
   /** Penawaran ongkir CIF (ASUMSI A-89): masa berlaku bawaan penawaran admin (hari, 1..90) dan batas tunggu order tanpa penawaran berlaku (hari, 1..365). */
   freightQuoteValidDays?: number;
   freightQuoteMaxDays?: number;
+  /** Termin (ASUMSI A-97): pengingat N hari sebelum jatuh tempo dan tiap N hari selama terlambat (0..60, 0 = mati). */
+  installmentRemindBeforeDays?: number;
+  installmentRemindOverdueDays?: number;
   /** Nomor invoice: {invoicePrefix}/{urut per bulan}/{bulan Romawi}/{tahun}. */
   invoicePrefix: string;
   invoiceSignerName: string;
@@ -611,13 +631,18 @@ export interface PaymentTermRow {
   market: DeliveryTermMarket;
   isActive: boolean;
   sortOrder: number;
+  /** Jadwal termin (ASUMSI A-97); [] = satu pembayaran penuh. */
+  installments?: InstallmentScheduleRow[];
   /** Jumlah order yang membekukan syarat ini; hapus ditolak 409 PAYMENT_TERM_IN_USE bila > 0. */
   ordersCount?: number;
   createdAt: string | null;
   updatedAt: string | null;
 }
 
-/** Body PaymentTermRequest: `code` hanya saat membuat (tidak bisa diubah). */
+/**
+ * Body PaymentTermRequest: `code` hanya saat membuat (tidak bisa diubah). `installments` tidak dikirim = jadwal lama
+ * dipertahankan; [] = satu pembayaran penuh. Aturan: maksimal 6 baris, persen berjumlah 100, baris pertama `order`.
+ */
 export interface PaymentTermPayload {
   code?: string;
   name: I18n;
@@ -625,6 +650,7 @@ export interface PaymentTermPayload {
   market: DeliveryTermMarket;
   isActive: boolean;
   sortOrder: number;
+  installments?: { key?: string; label: I18n; percent: number; trigger: InstallmentTrigger; dueDays: number }[];
 }
 
 export type VoucherType = 'percent' | 'fixed';
@@ -897,7 +923,15 @@ export interface AdminChatConversation {
   /** Pesan customer yang belum dibaca admin. */
   unread: number;
   lastMessagePreview: string | null;
+  /** Pesan terakhir ditarik pengirimnya: pratinjau kosong, tampilkan "Pesan ditarik". */
+  lastMessageRetracted?: boolean;
   lastSenderRole: 'customer' | 'admin' | null;
   lastMessageAt: string | null;
   createdAt: string | null;
+  /** Naik tiap kirim/edit/tarik; dikirim balik sebagai `rev` saat polling (ASUMSI A-99). */
+  revision?: number;
+  /** Diarsipkan admin: tidak tampil di kotak masuk bawaan, dock, dan badge. */
+  archived?: boolean;
+  archivedAt?: string | null;
+  archivedBy?: { id: number; name: string } | null;
 }

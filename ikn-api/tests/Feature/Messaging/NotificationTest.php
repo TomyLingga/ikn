@@ -32,8 +32,9 @@ class NotificationTest extends TestCase
         $sm->transition($order, Order::STATUS_COMPLETED, $this->buyer);
 
         $types = UserNotification::where('user_id', $this->buyer->id)->orderBy('id')->pluck('type')->all();
-        $this->assertSame(['order.placed', 'order.payment_accepted', 'order.shipped', 'order.delivered', 'order.completed'], $types);
-        $this->assertSame(0, UserNotification::where('user_id', $admin->id)->count());
+        $this->assertSame(['order.placed', 'order.payment_accepted', 'order.processing', 'order.shipped', 'order.delivered', 'order.completed'], $types);
+        // Admin hanya menerima notifikasi admin (lonceng panel admin), tidak pernah notifikasi milik customer.
+        $this->assertSame(0, UserNotification::where('user_id', $admin->id)->where('type', 'not like', 'admin.%')->count());
 
         $shipped = UserNotification::where('type', 'order.shipped')->first();
         $this->assertStringContainsString($order->number, $shipped->body['id']);

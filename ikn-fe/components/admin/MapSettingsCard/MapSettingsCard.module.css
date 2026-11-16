@@ -1,0 +1,104 @@
+/* Kartu "Peta" di Pengaturan Situs: hasil uji per lapisan dan peta pratinjau. */
+
+.results {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.result {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 12px;
+  border-radius: var(--adm-r, 8px);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.result strong {
+  display: block;
+  font-weight: 650;
+}
+
+.ok {
+  background: var(--ok-tint);
+  color: var(--ok);
+}
+
+.fail {
+  background: var(--red-tint);
+  color: var(--red);
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+
+.previewHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+
+.previewNote {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.kinds {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* z-index 0: pane Leaflet tidak boleh menimpa bilah atas admin atau dropdown di atas kartu. */
+.preview {
+  position: relative;
+  z-index: 0;
+  height: 260px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--adm-r-lg, 12px);
+  background: var(--paper-2);
+}
+
+.previewLoading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+
+.steps {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.steps code,
+.code {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .preview {
+    height: 220px;
+  }
+}

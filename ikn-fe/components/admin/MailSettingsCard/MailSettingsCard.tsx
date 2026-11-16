@@ -101,6 +101,7 @@ export default function MailSettingsCard({ value, onChange, errors }: Props) {
           {text('host', t('Server SMTP (host)', 'SMTP server (host)'), { placeholder: 'smtp.hostinger.com', className: 'mono', required: smtp })}
           <label>
             <span className="field-label">{t('Port', 'Port')}</span>
+            {/* eslint-disable-next-line no-restricted-syntax -- a port is an identifier, not a quantity: no thousands separators */}
             <input
               type="number"
               min={1}

@@ -13,6 +13,7 @@ import { emptyI18n, tr, type DocLinkData, type I18n, type MediaSummary, type Men
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
 import { FileLink } from '@/components/FileViewer';
+import NumberInput from '@/components/NumberInput';
 
 type MenuLocation = 'header' | 'footer';
 
@@ -386,7 +387,7 @@ export default function AdminNavigation() {
               </label>
               <label>
                 <span className="field-label">{t('Urutan', 'Sort order')}</span>
-                <input type="number" min={0} value={docForm.sortOrder} onChange={(e) => setDocForm({ ...docForm, sortOrder: Number(e.target.value) || 0 })} />
+                <NumberInput min={0} value={docForm.sortOrder} onChange={(e) => setDocForm({ ...docForm, sortOrder: Number(e.target.value) || 0 })} />
               </label>
             </div>
             <div>

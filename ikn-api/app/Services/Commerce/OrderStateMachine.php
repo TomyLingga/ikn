@@ -33,9 +33,10 @@ use InvalidArgumentException;
  * | pending_payment → expired                | release stok + voucher (idempoten), payment aktif expired, email     |
  * | pending_payment/payment_review → cancelled | release stok + voucher, payment aktif cancelled, email             |
  * | paid/processing → cancelled              | adjust +qty (key order:{id}:cancel-return:{product}), email (refund manual) |
- * | paid → processing → shipped → delivered → completed | histori; shipped wajib kurir + resi; email shipped/delivered/completed |
+ * | paid → processing → shipped → delivered → completed | histori; shipped wajib kurir + resi; email shipped/delivered/completed; processing hanya notifikasi dalam aplikasi |
  * | (order Loco, ASUMSI A-85)                | shipped tanpa kurir/resi = "siap diambil", delivered = "sudah diambil"      |
  * | (order FOB/CIF, ASUMSI A-88)             | shipped wajib nama kapal + nomor B/L (shipment_details, tracking_number = B/L) |
+ * | (order bertermin, ASUMSI A-97)           | termin pertama mengikuti payment_review/paid; paid/shipped/delivered menagih termin yang pemicunya tercapai (payment + notifikasi); completed ditolak 409 INSTALLMENTS_UNPAID selama ada termin belum lunas; expired/cancelled membatalkan termin yang belum lunas |
  */
 class OrderStateMachine
 {
@@ -59,6 +60,7 @@ class OrderStateMachine
         private InvoiceNumberGenerator $invoices,
         private OrderNotifier $notifier,
         private AuditLogger $audit,
+        private InstallmentService $installments,
     ) {
     }
 
@@ -70,7 +72,7 @@ class OrderStateMachine
     /**
      * @param  array  $meta  courier, trackingNumber, vesselName, voyage, blNumber, blDate, reason, paymentId, quoteId, freightTotal, acceptedBy, note, actorType (user|system|webhook), source
      *
-     * @throws ApiException 409 INVALID_TRANSITION meta {from,to}
+     * @throws ApiException 409 INVALID_TRANSITION meta {from,to} | 409 INSTALLMENTS_UNPAID (completed selagi termin belum lunas, ASUMSI A-97)
      * @throws ValidationException shipped tanpa kurir/resi (order darat) atau tanpa nama kapal/B/L (order FOB/CIF)
      */
     public function transition(Order $order, string $to, ?User $actor = null, array $meta = []): Order
@@ -235,6 +237,8 @@ class OrderStateMachine
                     break;
 
                 case Order::STATUS_COMPLETED:
+                    // Order bertermin tidak boleh selesai sebelum semua termin lunas, siapa pun pemicunya (ASUMSI A-97).
+                    $this->installments->assertSettled($locked);
                     $locked->completed_at = $now;
                     $note = $note ?? ($actorType === OrderStatusHistory::ACTOR_SYSTEM
                         ? __('commerce.note.auto_completed', ['days' => $meta['days'] ?? 0], $locale)
@@ -245,6 +249,9 @@ class OrderStateMachine
             $locked->status = $to;
             $locked->syncPaymentStatus();
             $locked->save();
+
+            // Termin (ASUMSI A-97): salin status termin pertama, tagih termin yang pemicunya tercapai, void saat batal.
+            $billed = $this->installments->onTransition($locked, $from, $to, $actor, $now);
 
             $locked->histories()->create([
                 'from_status' => $from,
@@ -260,18 +267,21 @@ class OrderStateMachine
                 $this->audit->log(null, 'order.'.$to.' ['.$actorType.']', $locked, ['status' => $from], ['status' => $to] + $historyMeta);
             }
 
-            return ['order' => $locked, 'from' => $from, 'wasPaid' => $wasPaid, 'meta' => $meta, 'actorType' => $actorType];
+            return ['order' => $locked, 'from' => $from, 'wasPaid' => $wasPaid, 'meta' => $meta, 'actorType' => $actorType, 'billed' => $billed];
         });
 
         /** @var Order $result */
         $result = $context['order'];
         $result->unsetRelation('histories');
         $result->unsetRelation('items');
-        $this->notify($result, $context['from'], $to, $context['meta'], $context['wasPaid'], $context['actorType']);
+        $this->notify($result, $context['from'], $to, $context['meta'], $context['wasPaid'], $context['actorType'], $actor);
+        foreach ($context['billed'] as $installment) {
+            $this->notifier->installmentDue($result, $installment);
+        }
 
         // Sinkronkan instance pemanggil agar controller/service melihat status terbaru.
         $order->setRawAttributes($result->getAttributes(), true);
-        foreach (['histories', 'items', 'payments', 'reviews'] as $relation) {
+        foreach (['histories', 'items', 'payments', 'reviews', 'installments'] as $relation) {
             if ($order->relationLoaded($relation)) {
                 $order->unsetRelation($relation);
             }
@@ -280,8 +290,11 @@ class OrderStateMachine
         return $order;
     }
 
-    private function notify(Order $order, ?string $from, string $to, array $meta, bool $wasPaid, string $actorType = OrderStatusHistory::ACTOR_USER): void
+    private function notify(Order $order, ?string $from, string $to, array $meta, bool $wasPaid, string $actorType = OrderStatusHistory::ACTOR_USER, ?User $actor = null): void
     {
+        // Aksi customer sendiri (batal, konfirmasi diterima, selesai) juga dikabarkan ke lonceng admin.
+        $byCustomer = $actor !== null && $actor->isCustomer();
+
         switch ($to) {
             case Order::STATUS_AWAITING_FREIGHT:
                 $this->notifier->freightRequested($order);
@@ -310,16 +323,19 @@ class OrderStateMachine
                 break;
             case Order::STATUS_CANCELLED:
                 // Batal otomatis karena batas tunggu penawaran ongkir terlewati memakai teks notifikasi tersendiri (A-89).
-                $this->notifier->orderCancelled($order, $meta['reason'] ?? null, $wasPaid, $from === Order::STATUS_AWAITING_FREIGHT && $actorType === OrderStatusHistory::ACTOR_SYSTEM);
+                $this->notifier->orderCancelled($order, $meta['reason'] ?? null, $wasPaid, $from === Order::STATUS_AWAITING_FREIGHT && $actorType === OrderStatusHistory::ACTOR_SYSTEM, $byCustomer);
+                break;
+            case Order::STATUS_PROCESSING:
+                $this->notifier->orderProcessing($order);
                 break;
             case Order::STATUS_SHIPPED:
                 $this->notifier->orderShipped($order);
                 break;
             case Order::STATUS_DELIVERED:
-                $this->notifier->orderDelivered($order);
+                $this->notifier->orderDelivered($order, $byCustomer);
                 break;
             case Order::STATUS_COMPLETED:
-                $this->notifier->orderCompleted($order);
+                $this->notifier->orderCompleted($order, $byCustomer);
                 break;
         }
     }

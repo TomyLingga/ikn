@@ -1,14 +1,15 @@
 'use client';
 
-// Peta Leaflet + tile OpenStreetMap (KEPUTUSAN: gratis tanpa API key). Selalu dimuat lewat
-// dynamic import ssr:false karena Leaflet menyentuh `window` saat diimpor.
+// Peta Leaflet + peta jalan (bawaan tile OpenStreetMap, gratis tanpa API key; penyedia bisa diganti admin, lihat
+// components/MapTiles). Selalu dimuat lewat dynamic import ssr:false karena Leaflet menyentuh `window` saat diimpor.
 import { useEffect } from 'react';
 import L from 'leaflet';
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import 'leaflet/dist/leaflet.css';
+import MapTiles from '@/components/MapTiles';
 
 // Ikon default Leaflet tidak ter-resolve oleh bundler; pasang eksplisit.
 const pinIcon = L.icon({
@@ -64,10 +65,7 @@ export default function AddressMap({ lat, lng, onChange, focusKey, defaultCenter
 
   return (
     <MapContainer center={center} zoom={hasPoint ? focusZoom : defaultZoom} scrollWheelZoom={false} className="addr-map">
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <MapTiles kind="street" />
       <Recenter lat={lat} lng={lng} focusKey={focusKey} focusZoom={focusZoom} />
       <ClickToPlace onChange={onChange} />
       {hasPoint && (

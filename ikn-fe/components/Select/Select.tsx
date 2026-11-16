@@ -16,6 +16,8 @@ interface Item {
   label: string;
   disabled: boolean;
   group: string;
+  /** Extra search terms from `data-keywords` on the <option> (e.g. the country name in the other language). */
+  keywords: string;
 }
 
 const PANEL_MIN_WIDTH = 240;
@@ -35,6 +37,7 @@ function readItems(select: HTMLSelectElement): Item[] {
     label: option.text.trim(),
     disabled: option.disabled,
     group: option.parentElement instanceof HTMLOptGroupElement ? option.parentElement.label : '',
+    keywords: option.dataset.keywords || '',
   }));
 }
 
@@ -77,7 +80,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select({ sear
   const filtered = useMemo(() => {
     const q = normalize(query);
     if (!q) return items;
-    return items.filter((item) => normalize(`${item.label} ${item.value} ${item.group}`).includes(q));
+    return items.filter((item) => normalize(`${item.label} ${item.value} ${item.group} ${item.keywords}`).includes(q));
   }, [items, query]);
 
   const place = useCallback(() => {

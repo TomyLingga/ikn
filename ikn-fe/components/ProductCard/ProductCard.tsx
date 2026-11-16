@@ -16,6 +16,7 @@ import { tr } from '@/lib/cms';
 import { useShopPaths } from '@/lib/shop';
 import type { Product } from '@/lib/types';
 import { frameStyle } from '@/lib/media-frame';
+import NumberInput from '@/components/NumberInput';
 
 /** Penanda harga USD: basis FOB Belawan (trucking ke pelabuhan dan biaya pelabuhan termasuk; ASUMSI A-86). */
 export function FobBadge({ lang }: { lang: 'id' | 'en' }) {
@@ -140,8 +141,7 @@ export default function ProductCard({ product }: { product: Product }) {
                   <button type="button" onClick={() => setQty((v) => clamp(v - 1))} disabled={qty <= moq} aria-label={t('Kurangi', 'Decrease')}>
                     <Icon name="minus" size={14} />
                   </button>
-                  <input
-                    type="number"
+                  <NumberInput
                     inputMode="numeric"
                     min={moq}
                     max={Number.isFinite(maxQty) ? maxQty : undefined}

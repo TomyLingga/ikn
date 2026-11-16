@@ -6,12 +6,15 @@ use App\Exceptions\ApiException;
 use App\Models\BankAccount;
 use App\Models\Media;
 use App\Models\Order;
+use App\Models\OrderInstallment;
 use App\Models\OrderStatusHistory;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\PaymentWebhookLog;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\Commerce\InstallmentService;
+use App\Services\Commerce\OrderNotifier;
 use App\Services\Commerce\OrderStateMachine;
 use App\Services\Commerce\UniqueCodeAllocator;
 use App\Services\Media\MediaService;
@@ -28,6 +31,10 @@ use Throwable;
 /**
  * Satu pintu siklus payment (state machine 7.2): buat percobaan bayar, bukti, accept/reject, ganti metode,
  * expiry, dan webhook gateway. Perubahan status order selalu lewat OrderStateMachine.
+ *
+ * Order bertermin (ASUMSI A-97): payment milik satu termin (installment_id) dan bernilai nominal termin itu. Termin
+ * pertama mengikuti alur order di atas. Termin lanjutan dibayar setelah order paid: bukti, accept, dan reject hanya
+ * mengubah payment + termin (InstallmentService), status order tetap.
  */
 class PaymentService
 {
@@ -37,22 +44,33 @@ class PaymentService
         private MediaService $media,
         private UniqueCodeAllocator $uniqueCodes,
         private AuditLogger $audit,
+        private InstallmentService $installments,
+        private OrderNotifier $notifier,
     ) {
     }
 
-    /** Buat payment pending baru untuk order (instruksi/objek gateway lewat driver). Dipanggil di dalam transaksi. */
-    public function create(Order $order, PaymentMethod $method, ?BankAccount $bank, ?User $by = null): Payment
+    /**
+     * Buat payment pending baru untuk order (instruksi/objek gateway lewat driver). Dipanggil di dalam transaksi.
+     * Order bertermin (ASUMSI A-97): nominal = nominal termin; tanpa $installment dipakai termin pertama yang belum
+     * lunas (checkout, ganti metode, unggah ulang setelah ditolak). Order tanpa termin = grand total seperti semula.
+     */
+    public function create(Order $order, PaymentMethod $method, ?BankAccount $bank, ?User $by = null, ?OrderInstallment $installment = null): Payment
     {
+        $installment = $installment ?? $this->installments->defaultFor($order);
+        $currency = $order->currencyCode();
+
         $payment = new Payment();
         $payment->forceFill([
             'order_id' => $order->id,
+            'installment_id' => $installment?->id,
             'payment_method_id' => $method->id,
             'method' => $method->code,
             'provider' => $method->driver,
-            'currency' => $order->currencyCode(),
-            'amount' => Money::fromMinor($order->grandTotalInt(), $order->currencyCode()),
+            'currency' => $currency,
+            'amount' => Money::fromMinor($installment ? $installment->amountInt() : $order->grandTotalInt(), $currency),
             'status' => Payment::STATUS_PENDING,
-            'expires_at' => $order->payment_due_at,
+            // Termin pertama/order tanpa termin: batas bayar order. Termin lanjutan: jatuh tempo termin (tidak membatalkan order).
+            'expires_at' => $installment && ! $installment->isFirst() ? $installment->due_at : $order->payment_due_at,
             'bank_account_id' => $method->isManualTransfer() ? $bank?->id : null,
         ])->save();
 
@@ -60,6 +78,7 @@ class PaymentService
         $payment->setRelation('order', $order);
         $payment->setRelation('paymentMethod', $method);
         $payment->setRelation('bankAccount', $bank);
+        $payment->setRelation('installment', $installment);
         $payment->payload = $this->gateways->for($method)->create($payment);
         $payment->save();
 
@@ -124,11 +143,17 @@ class PaymentService
      *
      * @throws ApiException 409 ORDER_EXPIRED | 409 INVALID_TRANSITION
      */
-    public function uploadProof(Order $order, UploadedFile $file, ?int $paymentId, User $user): Payment
+    public function uploadProof(Order $order, UploadedFile $file, ?int $paymentId, User $user, ?int $installmentId = null): Payment
     {
         $order->refresh();
-        $this->assertProofAllowed($order);
-        $payment = $this->resolveProofPayment($order, $paymentId, $user);
+        // Termin lanjutan (ASUMSI A-97): order sudah paid, status order tidak berubah. Null = alur order di bawah.
+        $installment = $this->installments->proofTarget($order, $paymentId, $installmentId);
+        if ($installment) {
+            $payment = $this->resolveInstallmentProofPayment($order, $installment, $paymentId, $user);
+        } else {
+            $this->assertProofAllowed($order);
+            $payment = $this->resolveProofPayment($order, $paymentId, $user);
+        }
 
         $media = $this->media->upload(
             $file,
@@ -142,9 +167,16 @@ class PaymentService
         return $this->attachProof($order, $payment, $media, $user);
     }
 
-    /** Tautkan media bukti (sudah tersimpan) ke payment dan pindahkan order ke payment_review. Dipakai uploadProof dan seeder. */
+    /**
+     * Tautkan media bukti (sudah tersimpan) ke payment dan pindahkan order ke payment_review. Dipakai uploadProof dan
+     * seeder. Payment termin lanjutan (ASUMSI A-97): termin → awaiting_verification dan admin diberi tahu, status order tetap.
+     */
     public function attachProof(Order $order, Payment $payment, Media $media, User $user): Payment
     {
+        if ($payment->isBalancePayment()) {
+            return $this->attachInstallmentProof($order, $payment, $media);
+        }
+
         return DB::transaction(function () use ($order, $payment, $media, $user) {
             $payment->forceFill([
                 'proof_media_id' => $media->id,
@@ -157,6 +189,80 @@ class PaymentService
 
             return $payment->fresh();
         });
+    }
+
+    private function attachInstallmentProof(Order $order, Payment $payment, Media $media): Payment
+    {
+        $payment = DB::transaction(function () use ($order, $payment, $media) {
+            // Kunci order + termin dan periksa ulang: dua unggahan bersamaan hanya satu yang lolos.
+            $installment = $this->installments->lockForProof($order, $payment->installment);
+            $fresh = Payment::whereKey($payment->id)->lockForUpdate()->first();
+            $this->assertPaymentStatus($fresh, Payment::STATUS_PENDING, Payment::STATUS_AWAITING_VERIFICATION);
+
+            $fresh->forceFill([
+                'proof_media_id' => $media->id,
+                'proof_uploaded_at' => now(),
+                'status' => Payment::STATUS_AWAITING_VERIFICATION,
+                'reject_reason' => null,
+            ])->save();
+            $this->installments->markAwaitingVerification($installment);
+            $this->syncOrderPaymentStatus($order);
+
+            return $fresh->fresh();
+        });
+
+        $order->refresh();
+        $this->notifier->paymentReceived($order, $payment);
+
+        return $payment;
+    }
+
+    /**
+     * Payment termin lanjutan yang akan menerima bukti: payment pending termin itu, atau payment baru (metode dan
+     * rekening sama) bila yang terakhir ditolak/tidak ada.
+     */
+    private function resolveInstallmentProofPayment(Order $order, OrderInstallment $installment, ?int $paymentId, User $user): Payment
+    {
+        return DB::transaction(function () use ($order, $installment, $paymentId, $user) {
+            $installment = $this->installments->lockForProof($order, $installment);
+            $payments = Payment::with(['paymentMethod', 'bankAccount'])->where('installment_id', $installment->id)->orderByDesc('id')->get();
+
+            $payment = $paymentId !== null ? $payments->firstWhere('id', $paymentId) : $payments->first(fn (Payment $p) => $p->isActive());
+            if ($paymentId !== null && ! $payment) {
+                throw ValidationException::withMessages(['paymentId' => [__('commerce.payment_not_found')]]);
+            }
+            if ($payment && $payment->status === Payment::STATUS_AWAITING_VERIFICATION) {
+                throw ApiException::conflict('PAYMENT_ALREADY_ACTIVE', __('commerce.payment_already_active'), ['paymentId' => $payment->id]);
+            }
+            if ($payment && $payment->status === Payment::STATUS_PENDING) {
+                if (! $payment->isManual()) {
+                    throw ValidationException::withMessages(['paymentId' => [__('commerce.proof_not_allowed')]]);
+                }
+
+                return $payment->setRelation('installment', $installment);
+            }
+
+            $base = $payment ?? $payments->first() ?? $order->latestPayment();
+            $method = $base?->paymentMethod;
+            if (! $method) {
+                throw ValidationException::withMessages(['paymentId' => [__('commerce.payment_method_required')]]);
+            }
+            if (! $method->isManual()) {
+                throw ValidationException::withMessages(['paymentId' => [__('commerce.proof_not_allowed')]]);
+            }
+
+            return $this->create($order, $method, $base->bankAccount, $user, $installment);
+        });
+    }
+
+    /** payment_status order = status payment terbaru (invarian 7.1) setelah perubahan payment termin lanjutan. */
+    private function syncOrderPaymentStatus(Order $order): void
+    {
+        $locked = Order::whereKey($order->id)->lockForUpdate()->first();
+        if ($locked) {
+            $locked->syncPaymentStatus();
+            $locked->save();
+        }
     }
 
     /** Payment yang akan menerima bukti (pending manual), atau payment baru bila yang lama rejected/tidak ada. */
@@ -239,6 +345,16 @@ class PaymentService
                 'received_note' => isset($received['receivedNote']) && trim((string) $received['receivedNote']) !== '' ? mb_substr(trim((string) $received['receivedNote']), 0, 255) : null,
             ])->save();
 
+            if ($payment->isBalancePayment()) {
+                // Termin lanjutan (ASUMSI A-97): termin lunas, status order tetap.
+                $installment = OrderInstallment::whereKey($payment->installment_id)->lockForUpdate()->first();
+                $fullyPaid = $this->installments->markPaid($installment, $payment->paid_at);
+                $this->syncOrderPaymentStatus($payment->order);
+                $this->notifier->installmentPaid($payment->order->fresh(), $installment, $fullyPaid);
+
+                return $payment->fresh();
+            }
+
             $this->stateMachine->transition($payment->order, Order::STATUS_PAID, $admin, ['paymentId' => $payment->id]);
 
             return $payment->fresh();
@@ -262,6 +378,16 @@ class PaymentService
                 'verified_at' => now(),
             ])->save();
 
+            if ($payment->isBalancePayment()) {
+                // Termin lanjutan (ASUMSI A-97): kembali ditagih, status order dan tanggal jatuh tempo tetap.
+                $installment = OrderInstallment::whereKey($payment->installment_id)->lockForUpdate()->first();
+                $this->installments->markRejected($installment);
+                $this->syncOrderPaymentStatus($payment->order);
+                $this->notifier->paymentRejected($payment->order->fresh(), $payment, $reason);
+
+                return $payment->fresh();
+            }
+
             $order = $this->stateMachine->transition($payment->order, Order::STATUS_PENDING_PAYMENT, $admin, [
                 'paymentId' => $payment->id,
                 'reason' => $reason,
@@ -272,6 +398,7 @@ class PaymentService
                 $order->payment_due_at = now()->addHours($grace);
                 $order->reminder_sent_at = null;
                 $order->save();
+                $this->installments->syncFirstDue($order);
             }
 
             return $payment->fresh();
@@ -347,6 +474,7 @@ class PaymentService
             Payment::where('order_id', $order->id)->whereIn('status', Payment::ACTIVE_STATUSES)->update([
                 'expires_at' => $dueAt->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
             ]);
+            $this->installments->syncFirstDue($order);
 
             return $order;
         });

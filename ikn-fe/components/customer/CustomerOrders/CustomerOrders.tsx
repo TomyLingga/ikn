@@ -11,8 +11,8 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage, type Envelope } from '@/lib/api';
 import { tr } from '@/lib/cms';
 import type { PagedMeta } from '@/lib/cms';
-import { isPickupOrder, isPortOrder, orderLabel, orderVariant } from '@/lib/commerce';
-import { formatDate, formatMoney } from '@/lib/format';
+import { installmentLabel, isPartiallyPaid, isPickupOrder, isPortOrder, orderLabel, orderVariant, partiallyPaidLabel } from '@/lib/commerce';
+import { formatDate, formatDateTime, formatMoney } from '@/lib/format';
 import { isoDay, monthToDate, openChat, shopPaths } from '@/lib/shop';
 import OrderProgress, { orderNextStep } from '@/components/customer/OrderProgress';
 import type { IconName, OrderGroupCounts, OrderGroupKey, OrderSummary } from '@/lib/types';
@@ -445,7 +445,11 @@ export default function CustomerOrders() {
                     </Link>
                     <span>{formatDate(order.date, lang)}</span>
                   </div>
-                  <StatusBadge label={status[lang]} tone={status.tone} />
+                  <span className={styles.badges}>
+                    <StatusBadge label={status[lang]} tone={status.tone} />
+                    {/* Order bertermin yang baru dibayar sebagian (ASUMSI A-97). */}
+                    {isPartiallyPaid(order) && <StatusBadge label={partiallyPaidLabel[lang]} tone={partiallyPaidLabel.tone} />}
+                  </span>
                 </div>
 
                 <div className={styles.progress}>
@@ -466,6 +470,18 @@ export default function CustomerOrders() {
                   <p className={styles.strip}>
                     <Icon name={port ? 'globe' : 'truck'} size={15} /> {order.courier ? `${order.courier} · ` : ''}
                     {port ? t('No. B/L', 'B/L no.') : t('Resi', 'Tracking no.')} <strong className="mono">{order.trackingNumber}</strong>
+                  </p>
+                )}
+                {order.nextInstallment && (
+                  <p className={styles.strip}>
+                    <Icon name="wallet" size={15} /> {tr(order.nextInstallment.label, lang)}: {installmentLabel(order.nextInstallment)[lang].toLowerCase()}
+                    {order.nextInstallment.status === 'due' && order.nextInstallment.dueAt ? `, ${t('jatuh tempo', 'due')} ${formatDateTime(order.nextInstallment.dueAt, lang)}` : ''}
+                    {order.nextInstallment.status === 'due' && (
+                      <>
+                        {' '}
+                        <Link href={`${detail}#payment`}>{t('Bayar', 'Pay')}</Link>
+                      </>
+                    )}
                   </p>
                 )}
                 {order.destinationPort && (

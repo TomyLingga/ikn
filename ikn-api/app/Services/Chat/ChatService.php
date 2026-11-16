@@ -2,6 +2,7 @@
 
 namespace App\Services\Chat;
 
+use App\Exceptions\ApiException;
 use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Models\Order;
@@ -20,12 +21,28 @@ use Illuminate\Validation\ValidationException;
  * Pembaruan di FE lewat polling `?after={id pesan terakhir}`; tidak ada websocket.
  * Pengunjung yang belum login (tamu) mengisi nama/email/telepon dulu; percakapannya dikenali lewat guest_token
  * acak yang disimpan browser, dan bisa diambil alih akunnya setelah login (claim).
+ *
+ * ASUMSI A-99: pengirim boleh mengedit atau menarik pesannya sendiri selama `ikn.chat.edit_window_seconds`.
+ * Tidak ada pesan atau percakapan yang dihapus: pesan yang ditarik tetap tersimpan (retracted_at) dan API tidak
+ * lagi mengirim isinya; percakapan hanya bisa diarsipkan admin. Setiap kirim/edit/tarik menaikkan `revision`
+ * percakapan dan mencatatnya pada pesan yang berubah, sehingga polling `?after=&rev=` juga membawa pesan lama
+ * yang diedit atau ditarik (`changed`).
  */
 class ChatService
 {
-    public const PAGE_SIZE = 50;
+    /** Pesan per halaman: muatan awal dan tiap halaman `before`. */
+    public const PAGE_SIZE = 30;
+
+    /** Batas pesan per polling (`after`) dan per daftar perubahan (`changed`). */
+    public const SYNC_LIMIT = 200;
 
     public const GUEST_TOKEN_LENGTH = 48;
+
+    /** Lama (detik) pesan masih boleh diedit/ditarik pengirimnya; 0 = fitur dimatikan. */
+    public static function editWindowSeconds(): int
+    {
+        return max(0, (int) config('ikn.chat.edit_window_seconds', 60));
+    }
 
     public function find(User $customer): ?ChatConversation
     {
@@ -62,28 +79,37 @@ class ChatService
     /**
      * Tamu yang kemudian login: percakapan tamunya menjadi milik akun bila akun itu belum punya percakapan;
      * bila sudah punya, pesan tamu dipindahkan ke percakapan akun. Mengembalikan percakapan akun.
+     * Baris percakapan tamu yang sudah kosong dilepas setelah pesannya dipindahkan; tidak ada pesan yang hilang.
      */
     public function claim(ChatConversation $guest, User $customer): ChatConversation
     {
         return DB::transaction(function () use ($guest, $customer) {
-            $existing = ChatConversation::where('user_id', $customer->id)->first();
+            $existing = ChatConversation::where('user_id', $customer->id)->lockForUpdate()->first();
             if (! $existing) {
                 $guest->forceFill(['user_id' => $customer->id, 'guest_token' => null])->save();
 
                 return $guest->fresh();
             }
 
-            ChatMessage::where('conversation_id', $guest->id)->update(['conversation_id' => $existing->id]);
-            ChatConversation::whereKey($existing->id)->update([
+            // Pesan pindahan diberi revisi baru agar admin yang sedang membuka percakapan akun menerimanya lewat `changed`.
+            $revision = max((int) $existing->revision, (int) $guest->revision) + 1;
+            $guestIsNewer = $guest->last_message_at && (! $existing->last_message_at || $guest->last_message_at->gt($existing->last_message_at));
+
+            ChatMessage::where('conversation_id', $guest->id)->update(['conversation_id' => $existing->id, 'revision' => $revision]);
+            $update = [
                 'customer_unread' => DB::raw('customer_unread + '.(int) $guest->customer_unread),
                 'admin_unread' => DB::raw('admin_unread + '.(int) $guest->admin_unread),
-                'last_message_preview' => $guest->last_message_at && (! $existing->last_message_at || $guest->last_message_at->gt($existing->last_message_at))
-                    ? $guest->last_message_preview : $existing->last_message_preview,
-                'last_sender_role' => $guest->last_message_at && (! $existing->last_message_at || $guest->last_message_at->gt($existing->last_message_at))
-                    ? $guest->last_sender_role : $existing->last_sender_role,
-                'last_message_at' => $guest->last_message_at && (! $existing->last_message_at || $guest->last_message_at->gt($existing->last_message_at))
-                    ? $guest->last_message_at : $existing->last_message_at,
-            ]);
+                'revision' => $revision,
+                'last_message_preview' => $guestIsNewer ? $guest->last_message_preview : $existing->last_message_preview,
+                'last_sender_role' => $guestIsNewer ? $guest->last_sender_role : $existing->last_sender_role,
+                'last_message_at' => $guestIsNewer ? $guest->last_message_at : $existing->last_message_at,
+            ];
+            if (! $guest->isArchived()) {
+                // Pesan tamu yang masih aktif tidak boleh tersembunyi di arsip percakapan akun.
+                $update['archived_at'] = null;
+                $update['archived_by'] = null;
+            }
+            ChatConversation::whereKey($existing->id)->update($update);
             $guest->delete();
 
             return $existing->fresh();
@@ -96,29 +122,151 @@ class ChatService
         $body = trim($body);
 
         return DB::transaction(function () use ($conversation, $sender, $role, $body, $context) {
+            $revision = (int) $this->lockConversation($conversation->id)->revision + 1;
+
             $message = ChatMessage::create([
                 'conversation_id' => $conversation->id,
                 'sender_id' => $sender?->id,
                 'sender_role' => $role,
                 'body' => $body,
                 'context' => $context,
+                'revision' => $revision,
             ]);
 
             // Pengirim dianggap sudah membaca pesan lawan; penghitung lawan naik satu (atomik di DB).
             $theirs = $role === ChatMessage::ROLE_CUSTOMER ? 'admin_unread' : 'customer_unread';
             $mine = $role === ChatMessage::ROLE_CUSTOMER ? 'customer_unread' : 'admin_unread';
-            ChatConversation::whereKey($conversation->id)->update([
+            $update = [
                 $theirs => DB::raw($theirs.' + 1'),
                 $mine => 0,
-                'last_message_preview' => Str::limit(preg_replace('/\s+/u', ' ', $body), 150),
+                'revision' => $revision,
+                'last_message_preview' => $this->preview($body),
                 'last_sender_role' => $role,
                 'last_message_at' => now(),
-            ]);
+            ];
+            if ($role === ChatMessage::ROLE_CUSTOMER) {
+                // Pesan baru dari customer/tamu mengeluarkan percakapan dari arsip; balasan admin tidak.
+                $update['archived_at'] = null;
+                $update['archived_by'] = null;
+            }
+            ChatConversation::whereKey($conversation->id)->update($update);
 
             $message->setRelation('sender', $sender);
 
             return $message->setRelation('conversation', $conversation);
         });
+    }
+
+    /**
+     * Pesan di percakapan ini yang boleh diubah pemanggil: customer/tamu = pesan sisi customer di percakapannya,
+     * admin = hanya pesan yang ia kirim sendiri.
+     *
+     * @throws ApiException 404 bila pesan bukan bagian percakapan ini, 403 bila pesan milik pihak lain
+     */
+    public function ownMessage(ChatConversation $conversation, int $messageId, string $role, ?User $admin = null): ChatMessage
+    {
+        $message = ChatMessage::with('sender')->where('conversation_id', $conversation->id)->whereKey($messageId)->first();
+        if (! $message) {
+            throw ApiException::notFound();
+        }
+        if (! $this->isOwn($message, $role === ChatMessage::ROLE_ADMIN, $admin)) {
+            throw ApiException::forbidden(__('notifications.chat_message_not_yours'));
+        }
+
+        return $message;
+    }
+
+    /**
+     * Ubah isi pesan selama jendela edit masih terbuka. Isi sebelumnya disimpan di edit_history.
+     *
+     * @throws ApiException 409 CHAT_EDIT_WINDOW_PASSED | CHAT_MESSAGE_RETRACTED
+     */
+    public function edit(ChatMessage $message, string $body): ChatMessage
+    {
+        $body = trim($body);
+
+        return DB::transaction(function () use ($message, $body) {
+            $revision = (int) $this->lockConversation($message->conversation_id)->revision + 1;
+            $message->refresh();
+            $this->assertChangeable($message);
+
+            if ($message->body === $body) {
+                return $message; // tidak ada yang berubah: tanpa tanda "diedit", tanpa revisi baru
+            }
+
+            $history = $message->edit_history ?? [];
+            $history[] = ['body' => $message->body, 'at' => now()->toIso8601String()];
+            $message->forceFill(['body' => $body, 'edited_at' => now(), 'edit_history' => $history, 'revision' => $revision])->save();
+
+            $update = ['revision' => $revision];
+            if ($this->isLatest($message)) {
+                $update['last_message_preview'] = $this->preview($body);
+            }
+            ChatConversation::whereKey($message->conversation_id)->update($update);
+
+            return $message;
+        });
+    }
+
+    /**
+     * Tarik pesan selama jendela edit masih terbuka. Barisnya tetap ada (retracted_at); API tidak lagi mengirim
+     * isinya. Bila pesan itu belum dibaca lawan, penghitung belum-dibaca lawan turun satu; bila itu pesan terakhir,
+     * pratinjau percakapan dikosongkan (daftar admin menampilkan "Pesan ditarik").
+     *
+     * @throws ApiException 409 CHAT_EDIT_WINDOW_PASSED | CHAT_MESSAGE_RETRACTED
+     */
+    public function retract(ChatMessage $message): ChatMessage
+    {
+        return DB::transaction(function () use ($message) {
+            $conversation = $this->lockConversation($message->conversation_id);
+            $revision = (int) $conversation->revision + 1;
+            $message->refresh();
+            $this->assertChangeable($message);
+
+            $update = ['revision' => $revision];
+
+            // Pesan belum dibaca lawan = termasuk N pesan terakhir (yang belum ditarik) dari pihak pengirim,
+            // N = penghitung belum-dibaca lawan.
+            $counter = $message->sender_role === ChatMessage::ROLE_CUSTOMER ? 'admin_unread' : 'customer_unread';
+            $unread = (int) $conversation->{$counter};
+            if ($unread > 0) {
+                $newer = ChatMessage::where('conversation_id', $message->conversation_id)
+                    ->where('sender_role', $message->sender_role)
+                    ->whereNull('retracted_at')
+                    ->where('id', '>', $message->id)
+                    ->count();
+                if ($newer < $unread) {
+                    $update[$counter] = DB::raw('GREATEST('.$counter.' - 1, 0)');
+                }
+            }
+            if ($this->isLatest($message)) {
+                $update['last_message_preview'] = null;
+            }
+
+            $message->forceFill(['retracted_at' => now(), 'revision' => $revision])->save();
+            ChatConversation::whereKey($message->conversation_id)->update($update);
+
+            return $message;
+        });
+    }
+
+    /** Arsipkan percakapan (admin). Bukan perubahan isi: revisi tidak naik. Mengarsipkan ulang tidak mengubah apa-apa. */
+    public function archive(ChatConversation $conversation, User $admin): ChatConversation
+    {
+        if (! $conversation->isArchived()) {
+            $conversation->forceFill(['archived_at' => now(), 'archived_by' => $admin->id])->save();
+        }
+
+        return $conversation;
+    }
+
+    public function unarchive(ChatConversation $conversation): ChatConversation
+    {
+        if ($conversation->isArchived()) {
+            $conversation->forceFill(['archived_at' => null, 'archived_by' => null])->save();
+        }
+
+        return $conversation;
     }
 
     /** Tandai semua pesan lawan sudah dibaca oleh pihak $readerRole. */
@@ -145,7 +293,7 @@ class ChatService
         $query = ChatMessage::with('sender')->where('conversation_id', $conversation->id);
 
         if ($after !== null) {
-            return [$query->where('id', '>', $after)->orderBy('id')->limit(200)->get(), false];
+            return [$query->where('id', '>', $after)->orderBy('id')->limit(self::SYNC_LIMIT)->get(), false];
         }
 
         $rows = $query->when($before !== null, fn ($q) => $q->where('id', '<', $before))
@@ -153,6 +301,59 @@ class ChatService
         $hasMore = $rows->count() > self::PAGE_SIZE;
 
         return [$rows->take(self::PAGE_SIZE)->reverse()->values(), $hasMore];
+    }
+
+    /**
+     * Pesan yang berubah (diedit, ditarik, atau dipindahkan dari percakapan tamu) setelah revisi `$revision`.
+     * `$upToId` membatasi pada pesan yang sudah dimiliki klien; pesan lebih baru datang lewat `after`.
+     *
+     * @return Collection<int, ChatMessage>
+     */
+    public function changedSince(ChatConversation $conversation, int $revision, ?int $upToId = null): Collection
+    {
+        if ($revision >= (int) $conversation->revision) {
+            return collect();
+        }
+
+        return ChatMessage::with('sender')
+            ->where('conversation_id', $conversation->id)
+            ->where('revision', '>', $revision)
+            ->when($upToId !== null, fn ($q) => $q->where('id', '<=', $upToId))
+            ->orderBy('id')->limit(self::SYNC_LIMIT)->get();
+    }
+
+    /**
+     * Isi respons GET utas yang sama untuk customer, tamu, dan admin: halaman pesan, tanda masih ada yang lebih
+     * lama, pesan yang berubah sejak revisi klien (`rev`), dan lama jendela edit.
+     *
+     * `$conversation` wajib dimuat SEBELUM pemanggilan ini dan revisinya yang dikirim ke klien: perubahan yang
+     * masuk setelah percakapan dibaca punya revisi lebih besar, jadi ikut pada polling berikutnya (tidak terlewat).
+     *
+     * @param  array  $query  nilai tervalidasi `after`, `before`, `rev` (boleh tidak ada)
+     * @param  User|null  $viewer  admin yang melihat (untuk menandai pesan miliknya); null di sisi customer/tamu
+     */
+    public function threadPayload(ChatConversation $conversation, array $query, bool $forAdmin, ?User $viewer = null): array
+    {
+        $int = fn (string $key) => isset($query[$key]) && $query[$key] !== '' ? (int) $query[$key] : null;
+        $after = $int('after');
+        $rev = $int('rev');
+
+        [$messages, $hasMore] = $this->messages($conversation, $after, $int('before'));
+        $changed = $rev === null ? collect() : $this->changedSince($conversation, $rev, $after);
+        $present = fn (ChatMessage $m) => $this->presentMessage($m, $forAdmin, $conversation->guest_name, $viewer);
+
+        return [
+            'messages' => $messages->map($present)->values()->all(),
+            'hasMore' => $hasMore,
+            'changed' => $changed->map($present)->values()->all(),
+            'editWindowSeconds' => self::editWindowSeconds(),
+        ];
+    }
+
+    /** Respons GET utas untuk customer yang belum punya percakapan. */
+    public function emptyThread(): array
+    {
+        return ['conversation' => null, 'messages' => [], 'hasMore' => false, 'changed' => [], 'editWindowSeconds' => self::editWindowSeconds()];
     }
 
     /**
@@ -203,9 +404,13 @@ class ChatService
 
     /**
      * Bentuk pesan di JSON. Nama admin hanya ditampilkan ke admin; customer melihat penjual sebagai satu pihak.
-     * Pesan tamu (sender null) memakai nama dari formulir tamu.
+     * Pesan tamu (sender null) memakai nama dari formulir tamu. Pesan yang ditarik dikirim tanpa isi dan rujukan.
+     * `editableSeconds` = sisa detik pemirsa masih boleh mengedit/menarik pesan ini (0 = bukan pesannya, sudah
+     * ditarik, atau lewat batas); FE menghitung tenggat dari saat respons diterima, jadi tidak bergantung jam browser.
+     *
+     * @param  User|null  $viewer  admin yang melihat; diabaikan di sisi customer/tamu
      */
-    public function presentMessage(ChatMessage $message, bool $forAdmin, ?string $guestName = null): array
+    public function presentMessage(ChatMessage $message, bool $forAdmin, ?string $guestName = null, ?User $viewer = null): array
     {
         $showName = $forAdmin || $message->sender_role === ChatMessage::ROLE_CUSTOMER;
         $name = null;
@@ -215,14 +420,19 @@ class ChatService
                 $name = $guestName;
             }
         }
+        $retracted = $message->isRetracted();
 
         return [
             'id' => $message->id,
             'role' => $message->sender_role,
-            'body' => $message->body,
-            'context' => $message->context,
+            'body' => $retracted ? '' : $message->body,
+            'context' => $retracted ? null : $message->context,
             'senderName' => $name,
             'createdAt' => optional($message->created_at)->toApiString(),
+            'editedAt' => $retracted ? null : optional($message->edited_at)->toApiString(),
+            'retracted' => $retracted,
+            'retractedAt' => optional($message->retracted_at)->toApiString(),
+            'editableSeconds' => $this->editableSeconds($message, $forAdmin, $viewer),
         ];
     }
 
@@ -237,13 +447,15 @@ class ChatService
             'id' => $conversation->id,
             'unread' => (int) $conversation->customer_unread,
             'lastMessageAt' => optional($conversation->last_message_at)->toApiString(),
+            'revision' => (int) $conversation->revision,
         ];
     }
 
-    /** Bentuk percakapan untuk kotak masuk admin (butuh with('customer.profile')); tamu → `guest` terisi, `customer` null. */
+    /** Bentuk percakapan untuk kotak masuk admin (butuh with('customer.profile', 'archiver')); tamu → `guest` terisi, `customer` null. */
     public function presentForAdmin(ChatConversation $conversation): array
     {
         $customer = $conversation->customer;
+        $archiver = $conversation->archived_by ? $conversation->archiver : null;
 
         return [
             'id' => $conversation->id,
@@ -262,15 +474,81 @@ class ChatService
             ] : null,
             'unread' => (int) $conversation->admin_unread,
             'lastMessagePreview' => $conversation->last_message_preview,
+            // Pesan terakhir ditarik pengirimnya: pratinjau kosong, FE menampilkan "Pesan ditarik".
+            'lastMessageRetracted' => $conversation->last_message_at !== null && $conversation->last_message_preview === null,
             'lastSenderRole' => $conversation->last_sender_role,
             'lastMessageAt' => optional($conversation->last_message_at)->toApiString(),
             'createdAt' => optional($conversation->created_at)->toApiString(),
+            'revision' => (int) $conversation->revision,
+            'archived' => $conversation->isArchived(),
+            'archivedAt' => optional($conversation->archived_at)->toApiString(),
+            'archivedBy' => $archiver ? ['id' => $archiver->id, 'name' => $archiver->name] : null,
         ];
     }
 
-    /** Jumlah percakapan yang punya pesan customer belum dibaca (badge sidebar admin). */
+    /** Jumlah percakapan aktif (tidak diarsipkan) yang punya pesan customer belum dibaca (badge sidebar admin). */
     public function adminUnreadConversations(): int
     {
-        return ChatConversation::where('admin_unread', '>', 0)->count();
+        return ChatConversation::whereNull('archived_at')->where('admin_unread', '>', 0)->count();
+    }
+
+    /** Jumlah percakapan di arsip (angka tab Arsip). */
+    public function archivedConversations(): int
+    {
+        return ChatConversation::whereNotNull('archived_at')->whereNotNull('last_message_at')->count();
+    }
+
+    /** Kunci baris percakapan sampai transaksi selesai: kirim/edit/tarik pada satu percakapan berjalan berurutan. */
+    private function lockConversation(int $id): object
+    {
+        $row = DB::table('chat_conversations')->where('id', $id)->lockForUpdate()->first();
+        if (! $row) {
+            throw ApiException::notFound();
+        }
+
+        return $row;
+    }
+
+    /** @throws ApiException pesan sudah ditarik atau jendela edit sudah lewat */
+    private function assertChangeable(ChatMessage $message): void
+    {
+        if ($message->isRetracted()) {
+            throw ApiException::conflict('CHAT_MESSAGE_RETRACTED', __('notifications.chat_message_retracted'));
+        }
+
+        $window = self::editWindowSeconds();
+        // Jendela 0 = fitur dimatikan: tolak juga pesan yang dikirim pada detik yang sama.
+        if ($window === 0 || ! $message->created_at || $message->created_at->copy()->addSeconds($window)->lt(now())) {
+            throw ApiException::conflict('CHAT_EDIT_WINDOW_PASSED', __('notifications.chat_edit_window_passed', ['seconds' => $window]), ['windowSeconds' => $window]);
+        }
+    }
+
+    /** Pesan milik pemirsa: sisi customer = semua pesan customer di percakapannya; admin = pesan yang ia kirim sendiri. */
+    private function isOwn(ChatMessage $message, bool $forAdmin, ?User $viewer): bool
+    {
+        if (! $forAdmin) {
+            return $message->sender_role === ChatMessage::ROLE_CUSTOMER;
+        }
+
+        return $message->sender_role === ChatMessage::ROLE_ADMIN && $viewer !== null && (int) $message->sender_id === (int) $viewer->id;
+    }
+
+    private function editableSeconds(ChatMessage $message, bool $forAdmin, ?User $viewer): int
+    {
+        if ($message->isRetracted() || ! $message->created_at || ! $this->isOwn($message, $forAdmin, $viewer)) {
+            return 0;
+        }
+
+        return max(0, $message->created_at->getTimestamp() + self::editWindowSeconds() - now()->getTimestamp());
+    }
+
+    private function isLatest(ChatMessage $message): bool
+    {
+        return ! ChatMessage::where('conversation_id', $message->conversation_id)->where('id', '>', $message->id)->exists();
+    }
+
+    private function preview(string $body): string
+    {
+        return Str::limit(preg_replace('/\s+/u', ' ', $body), 150);
     }
 }

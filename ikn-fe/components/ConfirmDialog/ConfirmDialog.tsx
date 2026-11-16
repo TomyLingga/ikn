@@ -91,9 +91,9 @@ export default function ConfirmHost() {
 
   return createPortal(
     <div className={styles.backdrop} onMouseDown={(event) => event.target === event.currentTarget && settle(false)}>
-      <div className={styles.dialog} role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
-        <span className={`${styles.icon} ${tone === 'danger' ? styles.iconDanger : ''}`}>
-          <Icon name={tone === 'danger' ? 'trash' : 'checkCircle'} size={22} />
+      <div className={`${styles.dialog} ${tone === 'danger' ? styles.dialogDanger : ''}`} role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+        <span className={`${styles.icon} ${tone === 'danger' ? styles.iconDanger : ''}`} aria-hidden="true">
+          <Icon name={isDelete ? 'trash' : tone === 'danger' ? 'alert' : 'help'} size={26} />
         </span>
         <h2 id="confirm-title">{title}</h2>
         <p id="confirm-message">{request.message}</p>

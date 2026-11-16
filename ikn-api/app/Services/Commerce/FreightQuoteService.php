@@ -22,6 +22,7 @@ use Throwable;
  * dengan rincian baris, customer menerima atau membalas dengan satu angka, admin menerima balasan atau menawar lagi.
  * Saat penawaran diterima: shipping_total + grand_total dihitung ulang (OrderCalculator::grandTotalOf), payment dibuat
  * dari pending_payment_method, payment_due_at ditetapkan, lalu awaiting_freight → pending_payment lewat OrderStateMachine.
+ * Syarat bayar berjadwal termin (ASUMSI A-97): termin dibuat di sini dari grand total final, payment = termin pertama.
  */
 class FreightQuoteService
 {
@@ -32,6 +33,7 @@ class FreightQuoteService
         private OrderNotifier $notifier,
         private AuditLogger $audit,
         private UniqueCodeAllocator $uniqueCodes,
+        private InstallmentService $installments,
     ) {
     }
 
@@ -237,6 +239,8 @@ class FreightQuoteService
             $locked->reminder_sent_at = null;
             $locked->save();
 
+            // Total sudah final: bekukan jadwal termin (bila ada), lalu payment pertama senilai termin pertama.
+            $this->installments->createForOrder($locked, $now);
             $this->payments->create($locked, $method, $bank, $actor);
 
             $this->stateMachine->transition($locked, Order::STATUS_PENDING_PAYMENT, $actor, [

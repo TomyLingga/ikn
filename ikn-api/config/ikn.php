@@ -65,6 +65,8 @@ return [
         'attachment_mimes' => ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
         // Sisa waktu minimum (jam) setelah bukti ditolak agar customer sempat unggah ulang (ASUMSI A-77).
         'reupload_grace_hours' => 12,
+        // Jeda minimum (jam) antara dua pengingat termin yang dikirim admin secara manual (ASUMSI A-97).
+        'installment_reminder_cooldown_hours' => 12,
         // Default settings commerce (tabel settings, grup "commerce"); admin mengubah lewat /admin/settings.
         'defaults' => [
             'payment_due_hours' => 24,
@@ -87,6 +89,9 @@ return [
             // Penawaran ongkir CIF (ASUMSI A-89): penawaran admin berlaku 7 hari; order tanpa kesepakatan 30 hari dibatalkan otomatis.
             'freight_quote_valid_days' => 7,
             'freight_quote_max_days' => 30,
+            // Termin pembayaran (ASUMSI A-97): pengingat 3 hari sebelum jatuh tempo, lalu tiap 3 hari selama terlambat.
+            'installment_remind_before_days' => 3,
+            'installment_remind_overdue_days' => 3,
         ],
         'order_number_prefix' => 'IKN',
     ],
@@ -108,6 +113,45 @@ return [
         'reverse_cache_days' => 30,
     ],
 
+    // Tile peta (ASUMSI A-98). Penyedia dipilih admin di Pengaturan Situs kartu "Peta" (settings grup maps);
+    // `default` di bawah = tile bawaan tanpa API key dan cadangan bila penyedia lain gagal. Nilainya wajib sama
+    // dengan DEFAULT_MAP_TILES di ikn-fe/lib/map-tiles.ts. `attribution` adalah HTML (dipasang Leaflet apa adanya).
+    'maps' => [
+        'default' => [
+            'street' => [
+                'url' => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                'attribution' => '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                'max_zoom' => 19,
+            ],
+            'satellite' => [
+                'url' => 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                'attribution' => 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
+                'max_zoom' => 19,
+            ],
+            // Nama jalan/tempat di atas citra satelit (lapisan transparan).
+            'satellite_labels' => [
+                'url' => 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+                'attribution' => '',
+                'max_zoom' => 19,
+            ],
+        ],
+        // Google Maps Platform, Map Tiles API (2D tiles). Token sesi dibuat di server dan disimpan di cache sampai
+        // `session_margin_seconds` sebelum kedaluwarsa. language/region menentukan bahasa label pada tile.
+        'google' => [
+            'base_url' => env('GOOGLE_TILES_BASE_URL', 'https://tile.googleapis.com'),
+            'language' => env('GOOGLE_TILES_LANGUAGE', 'id-ID'),
+            'region' => env('GOOGLE_TILES_REGION', 'ID'),
+            'timeout' => 10,
+            'session_margin_seconds' => 86400,
+            'max_zoom' => ['street' => 22, 'satellite' => 19, 'hybrid' => 19],
+        ],
+        // Lama cache respons GET /geo/map-config (detik). Saat penyedia gagal, tile bawaan disajikan dan penyedia
+        // dicoba lagi setelah `fallback_cache_seconds`.
+        'config_cache_seconds' => 21600,
+        'fallback_cache_seconds' => 300,
+        'probe_timeout' => 8,
+    ],
+
     // Web service kurs JISDOR Bank Indonesia (ASMX, XML DataSet). Server menolak koneksi tanpa User-Agent jelas (ASUMSI A-84).
     'jisdor' => [
         'base_url' => env('JISDOR_BASE_URL', 'https://www.bi.go.id/biwebservice/wskursbi.asmx'),
@@ -118,6 +162,11 @@ return [
     'wbs' => [
         'attachment_max_kb' => 10240,
         'attachment_mimes' => ['application/pdf', 'image/jpeg', 'image/png'],
+    ],
+
+    // Live chat (ASUMSI A-99): lama pengirim boleh mengedit atau menarik pesannya sendiri, dalam detik. 0 = dimatikan.
+    'chat' => [
+        'edit_window_seconds' => (int) env('CHAT_EDIT_WINDOW_SECONDS', 60),
     ],
 
     'seed' => [

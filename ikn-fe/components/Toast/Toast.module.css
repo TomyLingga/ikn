@@ -1,0 +1,163 @@
+/* Tumpukan toast: kanan atas di bawah top bar (pojok kanan bawah dipakai tombol melayang dan dock chat).
+   Di atas modal dan dock chat, di bawah penampil berkas (4000) dan dialog unggah (4500). */
+.stack {
+  --toast-dx: 28px;
+  --toast-dy: 0px;
+  position: fixed;
+  top: calc(var(--nav-h, 64px) + 14px);
+  right: 16px;
+  z-index: 3000;
+  width: min(380px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  --toast-tone: var(--tm-accent-ink);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: toastIn 0.3s var(--ease) backwards;
+}
+
+.success { --toast-tone: var(--ok); }
+.warning { --toast-tone: var(--warn); }
+.danger { --toast-tone: var(--red); }
+
+.leaving {
+  animation: toastOut 0.18s ease-in forwards;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(var(--toast-dx), var(--toast-dy)); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes toastOut {
+  to { opacity: 0; transform: translate(var(--toast-dx), var(--toast-dy)); }
+}
+
+.main {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 13px 4px 13px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.main {
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+
+button.main:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+button.main:focus-visible,
+.close:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--toast-tone) 14%, var(--surface));
+  color: var(--toast-tone);
+}
+
+/* Aturan tema global mewarnai ikon di luar tombol; di sini ikon mengikuti nada toast. */
+.icon svg,
+.close svg {
+  color: inherit;
+}
+
+.text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 1px;
+}
+
+.text strong {
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.text span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.close {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  margin: 9px 9px 0 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.close:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+
+/* Ponsel: selebar layar di bagian atas, masuk dari atas. */
+@media (max-width: 640px) {
+  .stack {
+    --toast-dx: 0px;
+    --toast-dy: -14px;
+    top: calc(var(--nav-h, 64px) + 8px);
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .leaving {
+    animation: none;
+  }
+
+  .leaving {
+    opacity: 0;
+  }
+}

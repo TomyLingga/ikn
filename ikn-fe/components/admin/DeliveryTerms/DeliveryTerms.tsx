@@ -20,6 +20,7 @@ import {
   type DeliveryTermPayload,
 } from '@/lib/admin';
 import type { DeliveryTermFamily, DeliveryTermMarket, DeliveryTermPricingMode, DeliveryTermTaxProfile } from '@/lib/types';
+import NumberInput from '@/components/NumberInput';
 
 interface TermForm {
   code: string;
@@ -295,7 +296,7 @@ export default function DeliveryTerms() {
               </label>
               <label>
                 <span className="field-label">{t('Urutan', 'Order')}</span>
-                <input type="number" min={-1000} max={1000} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />
+                <NumberInput min={-1000} max={1000} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />
                 {firstError(formErrors, 'sortOrder') && <small className="cms-field-error">{firstError(formErrors, 'sortOrder')}</small>}
               </label>
             </div>

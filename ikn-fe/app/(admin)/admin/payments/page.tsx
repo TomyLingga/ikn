@@ -11,7 +11,7 @@ import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/
 import AdminTabs, { type AdminTab, type AdminTabGroup } from '@/components/admin/AdminTabs';
 import { Pager } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
-import { paymentLabel, paymentStatus } from '@/lib/commerce';
+import { formatPercent, isPartiallyPaid, partiallyPaidLabel, paymentLabel, paymentStatus } from '@/lib/commerce';
 import { api, apiPaged, ApiError, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
 import { defaultDateRange, paymentMethodSummary, queryString, refreshAdminBadges, type AdminPayment, type CountsMeta, type PaymentMethodRow } from '@/lib/admin';
@@ -129,7 +129,12 @@ export default function AdminPayments() {
 
   async function accepted(payment: AdminPayment) {
     setAccepting(null);
-    setNotice(t(`Pembayaran ${payment.order?.number ?? ''} diterima; order berstatus dibayar.`, `Payment ${payment.order?.number ?? ''} accepted; order is now paid.`));
+    // Termin lanjutan (ASUMSI A-97): hanya terminnya yang lunas, status order tidak berubah.
+    setNotice(
+      (payment.installment?.seq ?? 1) > 1
+        ? t(`Pembayaran termin ${payment.order?.number ?? ''} diterima; status order tidak berubah.`, `Installment payment for ${payment.order?.number ?? ''} accepted; the order status does not change.`)
+        : t(`Pembayaran ${payment.order?.number ?? ''} diterima; order berstatus dibayar.`, `Payment ${payment.order?.number ?? ''} accepted; order is now paid.`),
+    );
     setDetail(null);
     refreshAdminBadges();
     await refresh();
@@ -214,6 +219,8 @@ export default function AdminPayments() {
             <span className="mono">#{p.id}</span>
           )}
           {p.order?.invoiceNumber && <small className="admin-cell-sub mono">{p.order.invoiceNumber}</small>}
+          {/* Order bertermin (ASUMSI A-97): termin mana yang dibayar percobaan ini. */}
+          {p.installment && <small className="admin-cell-sub">{tr(p.installment.label, lang)}</small>}
         </span>
       ),
     },
@@ -241,7 +248,12 @@ export default function AdminPayments() {
         <span>
           <strong>{formatMoney(p.amount, p.currency)}</strong>
           {p.currency === 'USD' && <small className="admin-cell-sub">USD</small>}
-          {p.order && p.order.grandTotal !== p.amount && <small className="admin-cell-sub">{t('order', 'order')} {formatMoney(p.order.grandTotal, p.order.currency || p.currency)}</small>}
+          {p.order && p.order.grandTotal !== p.amount && (
+            <small className="admin-cell-sub">
+              {p.installment ? `${formatPercent(p.installment.percent, lang)} ${t('dari', 'of')} ` : `${t('order', 'order')} `}
+              {formatMoney(p.order.grandTotal, p.order.currency || p.currency)}
+            </small>
+          )}
           {p.status === 'paid' && p.receivedAmount != null && p.receivedAmount !== p.amount && (
             <small className="admin-cell-sub">{t('diterima', 'received')} {formatMoney(p.receivedAmount, p.currency)}</small>
           )}
@@ -251,7 +263,16 @@ export default function AdminPayments() {
     {
       key: 'status',
       label: 'Status',
-      render: (p) => <StatusBadge label={paymentLabel(p.status)[lang]} tone={paymentLabel(p.status).tone} small />,
+      render: (p) => (
+        <span>
+          <StatusBadge label={paymentLabel(p.status)[lang]} tone={paymentLabel(p.status).tone} small />
+          {isPartiallyPaid(p.order) && (
+            <small className="admin-cell-sub">
+              {t('Order', 'Order')}: {partiallyPaidLabel[lang].toLowerCase()}
+            </small>
+          )}
+        </span>
+      ),
     },
     {
       key: 'date',
@@ -284,7 +305,8 @@ export default function AdminPayments() {
 
   const proofIsImage = detail?.proof?.mime?.startsWith('image/') ?? false;
   const proofUrl = detail?.proofUrl || detail?.proof?.url || null;
-  const amountMismatch = !!detail?.order && detail.order.grandTotal !== detail.amount;
+  // Payment termin memang lebih kecil dari total order: bukan selisih yang perlu diperingatkan.
+  const amountMismatch = !!detail?.order && !detail.installment && detail.order.grandTotal !== detail.amount;
 
   return (
     <div>
@@ -467,6 +489,23 @@ export default function AdminPayments() {
                           <>
                             <br />
                             <small>SWIFT <span className="mono">{detail.bankAccount.swiftCode}</span>{detail.bankAccount.correspondentBank ? ` · ${t('Bank koresponden', 'Correspondent bank')}: ${detail.bankAccount.correspondentBank}` : ''}</small>
+                          </>
+                        )}
+                      </dd>
+                    </div>
+                  )}
+                  {detail.installment && (
+                    <div>
+                      <dt>{t('Termin', 'Installment')}</dt>
+                      <dd>
+                        <strong>{tr(detail.installment.label, lang)}</strong> · {t('termin ke-', 'installment no. ')}
+                        {detail.installment.seq}, {formatPercent(detail.installment.percent, lang)} {t('dari total order', 'of the order total')}
+                        {isPartiallyPaid(detail.order) && detail.order?.paymentProgress && (
+                          <>
+                            <br />
+                            <small>
+                              {t('Order dibayar sebagian; sisa tagihan', 'Order partially paid; balance due')} {formatMoney(detail.order.paymentProgress.outstandingTotal, detail.order.paymentProgress.currency)}
+                            </small>
                           </>
                         )}
                       </dd>

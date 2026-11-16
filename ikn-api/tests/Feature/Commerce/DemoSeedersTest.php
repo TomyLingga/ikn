@@ -6,6 +6,7 @@ use App\Models\BankAccount;
 use App\Models\Fee;
 use App\Models\Order;
 use App\Models\OrderFreightQuote;
+use App\Models\OrderInstallment;
 use App\Models\OrderProforma;
 use App\Models\PaymentTerm;
 use App\Models\Product;
@@ -49,9 +50,9 @@ class DemoSeedersTest extends TestCase
         $this->assertSame(2, PaymentTerm::count());
 
         $usd = Order::where('user_id', $exporter->id)->get();
-        // Cakupan ekspor (2026-11-04): FOB & CIF di berbagai status, dua syarat bayar.
-        $this->assertCount(11, $usd);
-        $this->assertEqualsCanonicalizing(['pending_payment', 'payment_review', 'shipped', 'completed', 'expired'], $usd->where('delivery_term', 'fob')->pluck('status')->unique()->values()->all());
+        // Cakupan ekspor (2026-11-04): FOB & CIF di berbagai status, dua syarat bayar; + tiga order termin (2026-11-16).
+        $this->assertCount(14, $usd);
+        $this->assertEqualsCanonicalizing(['pending_payment', 'payment_review', 'processing', 'shipped', 'completed', 'expired'], $usd->where('delivery_term', 'fob')->pluck('status')->unique()->values()->all());
         $this->assertEqualsCanonicalizing(['awaiting_freight', 'pending_payment', 'completed', 'cancelled'], $usd->where('delivery_term', 'cif')->pluck('status')->unique()->values()->all());
         $this->assertEqualsCanonicalizing(['tt_advance', 'tt_30_70'], $usd->pluck('payment_term_code')->unique()->values()->all());
         $this->assertEqualsCanonicalizing(
@@ -94,6 +95,23 @@ class DemoSeedersTest extends TestCase
         $this->assertCount(3, $quote->lines);
         $this->assertSame(81500, $quote->totalMinor());
         $this->assertTrue($cif->canAcceptFreightQuote());
+
+        // Termin (ASUMSI A-97) pada syarat 30/70: lunas penuh, uang muka lunas + pelunasan belum ditagih, pelunasan
+        // ditagih, pelunasan menunggu verifikasi, dan uang muka menunggu verifikasi. Order CIF 30/70 yang masih menunggu
+        // ongkir belum punya termin; order 100% di muka tidak pernah punya.
+        $termin = $usd->where('payment_term_code', 'tt_30_70')->filter(fn (Order $o) => $o->installments()->exists())
+            ->map(fn (Order $o) => $o->status.':'.implode('/', $o->installments()->pluck('status')->all()))->values()->all();
+        $this->assertEqualsCanonicalizing([
+            'completed:paid/paid', 'processing:paid/scheduled', 'shipped:paid/due', 'shipped:paid/awaiting_verification', 'payment_review:awaiting_verification/scheduled',
+        ], $termin);
+        $this->assertSame(0, OrderInstallment::whereIn('order_id', $usd->where('payment_term_code', 'tt_advance')->pluck('id'))->count());
+        $this->assertSame(0, OrderInstallment::whereNotIn('order_id', $usd->pluck('id'))->count()); // order rupiah tanpa termin
+        foreach ($usd->filter(fn (Order $o) => $o->installments()->exists()) as $o) {
+            $this->assertSame($o->grandTotalInt(), $o->installments->sum(fn (OrderInstallment $row) => $row->amountInt()));
+        }
+        $settled = $usd->first(fn (Order $o) => $o->status === Order::STATUS_COMPLETED && $o->payment_term_code === 'tt_30_70');
+        $this->assertSame('paid', $settled->paymentProgress()['status']);
+        $this->assertSame(2, $settled->payments()->where('status', 'paid')->count());
 
         $orders = Order::count();
         $fees = Fee::count();

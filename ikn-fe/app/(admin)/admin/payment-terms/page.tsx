@@ -12,6 +12,9 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n } from '@/lib/cms';
 import { deliveryMarketLabels, type PaymentTermPayload, type PaymentTermRow } from '@/lib/admin';
 import type { DeliveryTermMarket } from '@/lib/types';
+import NumberInput from '@/components/NumberInput';
+import InstallmentEditor, { installmentPayload, installmentRowsFromSchedule, installmentScheduleValid, type InstallmentFormRow } from '@/components/admin/InstallmentEditor';
+import { formatPercent } from '@/lib/commerce';
 
 interface TermForm {
   code: string;
@@ -20,9 +23,10 @@ interface TermForm {
   market: DeliveryTermMarket;
   isActive: boolean;
   sortOrder: string;
+  installments: InstallmentFormRow[];
 }
 
-const emptyTerm = (sortOrder: number): TermForm => ({ code: '', name: emptyI18n(), description: emptyI18n(), market: 'export', isActive: true, sortOrder: String(sortOrder) });
+const emptyTerm = (sortOrder: number): TermForm => ({ code: '', name: emptyI18n(), description: emptyI18n(), market: 'export', isActive: true, sortOrder: String(sortOrder), installments: [] });
 
 const formFromRow = (row: PaymentTermRow): TermForm => ({
   code: row.code,
@@ -31,9 +35,11 @@ const formFromRow = (row: PaymentTermRow): TermForm => ({
   market: row.market,
   isActive: row.isActive,
   sortOrder: String(row.sortOrder),
+  installments: installmentRowsFromSchedule(row.installments),
 });
 
 // PUT membutuhkan body lengkap (name/market wajib), jadi toggle aktif mengirim baris apa adanya + patch.
+// `installments` tidak dikirim: server mempertahankan jadwal termin yang ada.
 const payloadFrom = (row: PaymentTermRow, patch: Partial<PaymentTermPayload> = {}): PaymentTermPayload => ({
   name: row.name,
   description: row.description ?? emptyI18n(),
@@ -46,6 +52,7 @@ const payloadFrom = (row: PaymentTermRow, patch: Partial<PaymentTermPayload> = {
 // Syarat pembayaran ekspor (ASUMSI A-87): GET/POST /admin/payment-terms, PUT/DELETE /admin/payment-terms/{id}
 // (modul payment_methods). Customer ekspor wajib memilih satu saat checkout; order membekukan snapshot-nya untuk
 // proforma dan commercial invoice. Hapus ditolak 409 PAYMENT_TERM_IN_USE bila sudah dipakai order.
+// Jadwal termin (ASUMSI A-97): `installments[]` kosong = satu pembayaran penuh; terisi = order ditagih bertahap.
 export default function AdminPaymentTerms() {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
@@ -102,6 +109,7 @@ export default function AdminPaymentTerms() {
       market: form.market,
       isActive: form.isActive,
       sortOrder: Number(form.sortOrder) || 0,
+      installments: installmentPayload(form.installments),
     };
     try {
       if (modal.term) await api(`/admin/payment-terms/${modal.term.id}`, { method: 'PUT', body });
@@ -165,6 +173,21 @@ export default function AdminPaymentTerms() {
       ),
     },
     { key: 'description', label: t('Keterangan', 'Description'), render: (row) => tr(row.description, lang) || '—' },
+    {
+      key: 'installments',
+      label: t('Jadwal termin', 'Payment schedule'),
+      render: (row) =>
+        row.installments && row.installments.length > 0 ? (
+          <span>
+            {row.installments.map((item) => formatPercent(item.percent, lang)).join(' + ')}
+            <small className="admin-cell-sub">
+              {row.installments.length} {t('termin', 'installments')}
+            </small>
+          </span>
+        ) : (
+          t('Bayar penuh', 'Full payment')
+        ),
+    },
     { key: 'market', label: t('Pasar', 'Market'), render: (row) => deliveryMarketLabels[row.market]?.[lang] || row.market },
     { key: 'sort', label: t('Urutan', 'Order'), align: 'right', render: (row) => String(row.sortOrder) },
     {
@@ -194,8 +217,8 @@ export default function AdminPaymentTerms() {
       <AdminPageHead
         title={t('Syarat Pembayaran', 'Payment Terms')}
         desc={t(
-          'Syarat pembayaran yang dipilih customer ekspor saat checkout dan dicetak di proforma serta commercial invoice. Aplikasi tetap mencatat satu pembayaran sebesar total order.',
-          'Payment terms export customers pick at checkout, printed on the proforma and commercial invoice. The app still records one payment for the order total.',
+          'Syarat pembayaran yang dipilih customer ekspor saat checkout dan dicetak di proforma serta commercial invoice. Syarat tanpa jadwal termin ditagih penuh saat pesanan dibuat; syarat berjadwal ditagih bertahap.',
+          'Payment terms export customers pick at checkout, printed on the proforma and commercial invoice. A term without a schedule is billed in full when the order is placed; a term with a schedule is billed in stages.',
         )}
         action={{ label: t('Tambah syarat', 'Add term'), icon: 'plus', onClick: () => openForm(null) }}
       />
@@ -216,7 +239,7 @@ export default function AdminPaymentTerms() {
       />
 
       {modal && (
-        <AdminModal title={modal.term ? `${t('Edit syarat pembayaran', 'Edit payment term')}: ${tr(modal.term.name, lang)}` : t('Tambah syarat pembayaran', 'Add payment term')} onClose={() => setModal(null)}>
+        <AdminModal title={modal.term ? `${t('Edit syarat pembayaran', 'Edit payment term')}: ${tr(modal.term.name, lang)}` : t('Tambah syarat pembayaran', 'Add payment term')} onClose={() => setModal(null)} width={760}>
           <form className="admin-form" onSubmit={(e) => void submit(e)}>
             {formError && (
               <p className="admin-form-error" role="alert">
@@ -232,7 +255,7 @@ export default function AdminPaymentTerms() {
               </label>
               <label>
                 <span className="field-label">{t('Urutan', 'Order')}</span>
-                <input type="number" min={-1000} max={1000} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />
+                <NumberInput min={-1000} max={1000} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />
                 {firstError(formErrors, 'sortOrder') && <small className="cms-field-error">{firstError(formErrors, 'sortOrder')}</small>}
               </label>
             </div>
@@ -255,11 +278,12 @@ export default function AdminPaymentTerms() {
                 <span>{t('Aktif', 'Active')}</span>
               </label>
             </div>
+            <InstallmentEditor rows={form.installments} onChange={(installments) => setForm({ ...form, installments })} errors={formErrors} disabled={form.market !== 'export'} />
             <div className="admin-modal-actions">
               <button type="button" className="btn btn-line btn-sm" onClick={() => setModal(null)}>
                 {t('Batal', 'Cancel')}
               </button>
-              <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={saving || !installmentScheduleValid(form.installments)}>
                 {saving ? t('Menyimpan...', 'Saving...') : modal.term ? t('Simpan perubahan', 'Save changes') : t('Tambah syarat', 'Add term')}
               </button>
             </div>

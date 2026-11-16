@@ -2,9 +2,15 @@
 
 @section('content')
     <p style="margin:0 0 16px;">{{ __('account.mail.greeting', ['name' => $order->customerPic() ?: $order->customerName()]) }}</p>
+    {{-- Order bertermin (ASUMSI A-97): selama sisa tagihan belum lunas pesanan tidak bisa diselesaikan (juga tidak otomatis). --}}
+    @php $progress = $order->paymentProgress(); @endphp
+    @if ($progress['outstandingTotal'] > 0 && $order->hasUnpaidInstallments())
+    <p style="margin:0 0 16px;">{{ __('commerce.mail.delivered.balance_due', ['outstanding' => \App\Mail\Commerce\OrderMailable::money($progress['outstandingTotal'], $progress['currency'])]) }}</p>
+    @else
     <p style="margin:0 0 16px;">{{ __($pickup ? 'commerce.mail.delivered.intro_pickup' : 'commerce.mail.delivered.intro') }}</p>
     @if ($autoCompleteDays > 0)
     <p style="margin:0 0 16px;color:#6b7280;">{{ __('commerce.mail.delivered.auto', ['days' => $autoCompleteDays]) }}</p>
+    @endif
     @endif
     @include('mail.commerce.partials.summary', ['order' => $order])
     @include('mail.partials.button', ['url' => $url, 'label' => __('commerce.mail.view_order')])

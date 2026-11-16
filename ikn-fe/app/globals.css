@@ -397,6 +397,18 @@ p { color: var(--ink-soft); }
    piksel tepi yang bertumpuk (jadi terang); tile dilebarkan setengah piksel dan ditumpuk biasa agar sambungan tertutup. */
 .leaflet-container img.leaflet-tile { width: 256.5px !important; height: 256.5px !important; mix-blend-mode: normal !important; }
 
+/* Leaflet: pane peta (z-index 400) dan kontrolnya (800–1000) tidak punya stacking context sendiri, jadi peta ikut
+   bersaing di tumpukan halaman dan menimpa navbar (z-index 100), laci menu ponsel, dropdown, dan tombol melayang.
+   Pembungkus peta dijadikan stacking context: isi peta tetap bertumpuk seperti biasa di dalamnya (termasuk tautan,
+   legenda, dan gradasi ber-z-index 500 yang sengaja ditaruh di atas pane peta), tetapi dari luar seluruh peta
+   setara z-index 0.
+   Baris kedua = pembungkus yang dikenal (untuk browser tanpa :has(), dan .cmap-frame yang legendanya berada di luar
+   induk langsung peta); baris ketiga = induk langsung peta mana pun, termasuk yang dibuat nanti. AddressMap
+   (.addr-map) adalah kontainer Leaflet itu sendiri, jadi dikurung langsung. */
+.addr-map { isolation: isolate; }
+.footer-map, .contact-map, .cmap-frame { isolation: isolate; }
+:where(:has(> .leaflet-container:not(.addr-map))) { isolation: isolate; }
+
 /* Video dari URL (YouTube/Vimeo/Google Drive, components/MediaVideo, ASUMSI A-92). Mode latar = memenuhi kotak induk
    seperti object-fit: cover (ukuran 16:9 dihitung dari kotak induk lewat container units). */
 .media-embed { position: relative; display: block; overflow: hidden; }

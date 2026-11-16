@@ -7,8 +7,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Bentuk Payment (kontrak bagian 9–10): id, method, status, currency, amount (satuan terkecil), instructions, bankAccount,
- * qrisImageUrl, proof ringkas, catatan verifikasi receivedAmount/bankCharges/receivedNote (ASUMSI A-86).
- * Butuh with(['paymentMethod', 'bankAccount', 'proof', 'verifier']).
+ * qrisImageUrl, proof ringkas, catatan verifikasi receivedAmount/bankCharges/receivedNote (ASUMSI A-86),
+ * installment { id, seq, key, label, percent, status } bila payment milik termin (ASUMSI A-97; null untuk order tanpa termin).
+ * Butuh with(['paymentMethod', 'bankAccount', 'proof', 'verifier', 'installment']).
  */
 class PaymentResource extends JsonResource
 {
@@ -35,6 +36,8 @@ class PaymentResource extends JsonResource
         return [
             'id' => $payment->id,
             'orderId' => $payment->order_id,
+            'installmentId' => $payment->installment_id,
+            'installment' => $payment->installment_id && $payment->installment ? $payment->installment->toBrief() : null,
             'method' => $payment->method,
             'methodName' => $method?->name,
             'type' => $method?->type ?? ($payload['type'] ?? null),
@@ -71,6 +74,6 @@ class PaymentResource extends JsonResource
 
     public static function eager(): array
     {
-        return ['paymentMethod', 'bankAccount', 'proof', 'verifier'];
+        return ['paymentMethod', 'bankAccount', 'proof', 'verifier', 'installment'];
     }
 }

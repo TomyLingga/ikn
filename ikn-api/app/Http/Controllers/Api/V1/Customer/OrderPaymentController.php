@@ -36,13 +36,22 @@ class OrderPaymentController extends ApiController
         ]);
     }
 
-    /** Multipart file (+ paymentId?) → payment awaiting_verification, order payment_review (kontrak bagian 9). */
+    /**
+     * Multipart file (+ paymentId?, installmentId?) → payment awaiting_verification, order payment_review (kontrak
+     * bagian 9). Termin lanjutan order bertermin (ASUMSI A-97): status order tetap, termin → awaiting_verification.
+     */
     public function proof(UploadProofRequest $request, Order $order, PaymentService $payments)
     {
         $order = $this->own($request, $order);
         $data = $request->validated();
 
-        $payment = $payments->uploadProof($order, $request->file('file'), isset($data['paymentId']) ? (int) $data['paymentId'] : null, $request->user());
+        $payment = $payments->uploadProof(
+            $order,
+            $request->file('file'),
+            isset($data['paymentId']) ? (int) $data['paymentId'] : null,
+            $request->user(),
+            isset($data['installmentId']) ? (int) $data['installmentId'] : null
+        );
         $order = $order->fresh();
 
         return $this->data([
@@ -50,6 +59,7 @@ class OrderPaymentController extends ApiController
                 'number' => $order->number,
                 'status' => $order->status,
                 'paymentStatus' => $order->payment_status,
+                'paymentProgress' => $order->paymentProgress(),
             ],
             'payment' => (new PaymentResource($payment->load(PaymentResource::eager())))->resolve(),
         ]);

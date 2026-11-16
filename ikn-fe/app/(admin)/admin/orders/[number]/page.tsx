@@ -17,12 +17,14 @@ import {
   destinationPortText,
   freightLineLabel,
   freightQuoteLabel,
+  isPartiallyPaid,
   isPickupOrder,
   isPortAddress,
   isPortOrder,
   isQuotedFreightOrder,
   orderLabel,
   orderVariant,
+  partiallyPaidLabel,
   paymentLabel,
   shipmentMetricsText,
   shippingBreakdownText,
@@ -35,13 +37,15 @@ import {
 } from '@/lib/commerce';
 import { api, apiUpload, ApiError, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { adminCancellableStatuses, dueEditableStatuses, fromDateTimeLocal, isoDate, paymentMethodSummary, refreshAdminBadges, type CommerceSettingsData } from '@/lib/admin';
+import { adminCancellableStatuses, dueEditableStatuses, fromDateTimeLocal, isoDate, paymentMethodSummary, refreshAdminBadges, toDateTimeLocal, type CommerceSettingsData } from '@/lib/admin';
 import { currencyStep, formatDate, formatDateTime, formatMoney, toMinorInput } from '@/lib/format';
-import type { FreightQuote, Order, OrderAttachment, Payment, ProformaPayload, TrackingUpdate } from '@/lib/types';
+import type { FreightQuote, Order, OrderAttachment, OrderInstallment, Payment, ProformaPayload, TrackingUpdate } from '@/lib/types';
+import InstallmentSchedule from '@/components/admin/InstallmentSchedule';
 import styles from './page.module.css';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
 import { FileLink } from '@/components/FileViewer';
+import NumberInput from '@/components/NumberInput';
 
 type Modal =
   | { type: 'cancel' }
@@ -53,6 +57,8 @@ type Modal =
   | { type: 'proforma' }
   | { type: 'freight' }
   | { type: 'freightExtend'; quote: FreightQuote }
+  // Termin (ASUMSI A-97): tagih termin yang belum ditagih (`change` false) atau ubah jatuh tempo yang sudah ditagih.
+  | { type: 'bill'; installment: OrderInstallment; change: boolean }
   | null;
 
 const EXTEND_OPTIONS = [6, 12, 24, 48, 72, 168];
@@ -125,6 +131,8 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
   const [fqNote, setFqNote] = useState('');
   const [fqErrors, setFqErrors] = useState<Record<string, string>>({});
   const [freightValidDays, setFreightValidDays] = useState<number | null>(null);
+  // Termin (ASUMSI A-97): tanggal jatuh tempo di modal Tagih / Ubah jatuh tempo (datetime-local; kosong = bawaan jadwal).
+  const [billDueAt, setBillDueAt] = useState('');
   // Order Loco (ASUMSI A-85): tanpa kurir/resi, label "Siap diambil"/"Sudah diambil", tanpa catatan perjalanan.
   const pickup = isPickupOrder(order);
   // Order FOB/CIF (ASUMSI A-86/A-88): serah terima di pelabuhan muat, snapshot alamat = identitas perusahaan pembeli, angka USD,
@@ -296,6 +304,15 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
     setFqErrors({});
     openModal({ type: 'freightExtend', quote });
   }
+
+  /** Quick chip: fill the first line whose description is still empty, else append a line (up to the limit). */
+  const addFreightLabel = (label: string) => {
+    setFqLines((prev) => {
+      const empty = prev.findIndex((line) => !line.label.trim());
+      if (empty >= 0) return prev.map((line, i) => (i === empty ? { ...line, label } : line));
+      return prev.length >= FREIGHT_MAX_LINES ? prev : [...prev, { label, amount: '' }];
+    });
+  };
 
   const setFqLine = (index: number, patch: Partial<FreightLineForm>) => {
     setFqLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
@@ -528,11 +545,49 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
   }
 
   async function paymentAccepted() {
+    // Termin lanjutan (ASUMSI A-97): status order tidak berubah, hanya terminnya yang lunas.
+    const balance = modal?.type === 'accept' && (modal.payment.installment?.seq ?? 1) > 1;
     setModal(null);
     setActionError('');
     refreshAdminBadges();
     await refresh();
-    setActionOk(t('Pembayaran diterima. Order kini berstatus Dibayar.', 'Payment accepted. The order is now paid.'));
+    setActionOk(
+      balance
+        ? t('Pembayaran termin diterima. Customer sudah diberi tahu.', 'Installment payment accepted. The customer has been notified.')
+        : t('Pembayaran diterima. Order kini berstatus Dibayar.', 'Payment accepted. The order is now paid.'),
+    );
+  }
+
+  // ---- Termin pembayaran (ASUMSI A-97) ----
+  function openBill(installment: OrderInstallment, change: boolean) {
+    setBillDueAt(change ? toDateTimeLocal(installment.dueAt) : '');
+    openModal({ type: 'bill', installment, change });
+  }
+
+  function submitBill(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (modal?.type !== 'bill') return;
+    const iso = fromDateTimeLocal(billDueAt);
+    if (billDueAt && !iso) {
+      setActionError(t('Tanggal jatuh tempo tidak valid.', 'Invalid due date.'));
+      return;
+    }
+    if (modal.change && !iso) {
+      setActionError(t('Isi tanggal jatuh tempo yang baru.', 'Enter the new due date.'));
+      return;
+    }
+    void run(
+      () => api(`${orderPath}/installments/${modal.installment.id}/bill`, { method: 'POST', body: iso ? { dueAt: iso } : {} }),
+      modal.change
+        ? t('Jatuh tempo termin diubah. Customer sudah diberi tahu.', 'Installment due date changed. The customer has been notified.')
+        : t('Termin ditagih. Customer dikirimi email dan notifikasi berisi instruksi bayar.', 'Installment billed. The customer has been emailed and notified with payment instructions.'),
+    );
+  }
+
+  async function remindInstallment(installment: OrderInstallment) {
+    const name = tr(installment.label, lang);
+    if (!(await confirmDialog(t(`Kirim pengingat pembayaran "${name}" ke customer lewat email dan notifikasi?`, `Send a payment reminder for "${name}" to the customer by email and notification?`)))) return;
+    void run(() => api(`${orderPath}/installments/${installment.id}/remind`, { method: 'POST' }), t('Pengingat dikirim ke customer.', 'Reminder sent to the customer.'));
   }
 
   function submitReject(event: FormEvent<HTMLFormElement>) {
@@ -575,7 +630,9 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
   }
 
   const status = orderLabel(order.status, variant);
-  const payStatus = paymentLabel(order.paymentStatus);
+  // Order bertermin yang baru dibayar sebagian (ASUMSI A-97): lencana "Dibayar sebagian" menggantikan status payment terakhir.
+  const payStatus = isPartiallyPaid(order) ? partiallyPaidLabel : paymentLabel(order.paymentStatus);
+  const hasInstallments = (order.installments?.length ?? 0) > 0;
   // Snapshot alamat order Loco = titik ambil (tanpa kode wilayah); blok alamat customer hanya untuk order diantar.
   const addr = deliveryAddress(order.shippingAddress);
   const portAddr = isPortAddress(order.shippingAddress) ? order.shippingAddress : null;
@@ -952,6 +1009,20 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         </AdminCard>
       </div>
 
+      {hasInstallments && (
+        <div style={{ marginTop: 20 }}>
+          <InstallmentSchedule
+            order={order}
+            busy={busy}
+            onBill={(row) => openBill(row, false)}
+            onChangeDue={(row) => openBill(row, true)}
+            onRemind={(row) => void remindInstallment(row)}
+            onAccept={acceptPayment}
+            onReject={(payment) => openModal({ type: 'reject', payment })}
+          />
+        </div>
+      )}
+
       <div className="admin-grid-2" style={{ marginTop: 20 }}>
         <AdminCard title={t('Pembayaran', 'Payments')} desc={t('Setiap percobaan bayar tercatat terpisah. Yang aktif ditandai.', 'Each payment attempt is recorded separately. The active one is highlighted.')}>
           {order.payments.length === 0 && <p className="admin-field-hint">{t('Belum ada percobaan pembayaran.', 'No payment attempts yet.')}</p>}
@@ -964,6 +1035,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                   <div className={styles.paymentHead}>
                     <strong>
                       #{payment.id} · {paymentMethodSummary(payment, lang)}
+                      {payment.installment ? ` · ${tr(payment.installment.label, lang)}` : ''}
                     </strong>
                     <StatusBadge label={label[lang]} tone={label.tone} small />
                   </div>
@@ -991,7 +1063,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
                     )}
                     {payment.expiresAt && payment.status === 'pending' && (
                       <span>
-                        {t('Kedaluwarsa', 'Expires')}: {formatDateTime(payment.expiresAt, lang)}
+                        {(payment.installment?.seq ?? 1) > 1 ? t('Jatuh tempo', 'Due') : t('Kedaluwarsa', 'Expires')}: {formatDateTime(payment.expiresAt, lang)}
                       </span>
                     )}
                     {payment.proof && (
@@ -1109,7 +1181,7 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
               </button>
             )}
             {order.status === 'delivered' && (
-              <button type="button" className="btn btn-solid btn-sm" disabled={busy} onClick={() => openModal({ type: 'note', status: 'completed' })}>
+              <button type="button" className="btn btn-solid btn-sm" disabled={busy || !order.canComplete} onClick={() => openModal({ type: 'note', status: 'completed' })}>
                 <Icon name="checkCircle" size={14} /> {t('Selesaikan order', 'Complete order')}
               </button>
             )}
@@ -1124,6 +1196,11 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
               </button>
             )}
           </div>
+          {order.status === 'delivered' && !order.canComplete && hasInstallments && (
+            <p className="admin-field-hint" style={{ marginTop: 12 }}>
+              {t('Order belum bisa diselesaikan karena masih ada termin pembayaran yang belum lunas.', 'The order cannot be completed yet because a payment installment is still unpaid.')}
+            </p>
+          )}
           {order.status === 'completed' && (
             <p className="admin-field-hint" style={{ marginTop: 12 }}>
               {t('Order selesai', 'Order completed')} {order.completedAt ? formatDateTime(order.completedAt, lang) : ''}.
@@ -1717,8 +1794,11 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         <AdminModal title={t('Tolak bukti pembayaran', 'Reject payment proof')} onClose={() => setModal(null)} small>
           <form className="admin-form" onSubmit={submitReject}>
             <p className="admin-field-hint">
-              {t('Pembayaran', 'Payment')} #{modal.payment.id} · {formatMoney(modal.payment.amount, modal.payment.currency || order.currency)} · {paymentMethodSummary(modal.payment, lang)}.{' '}
-              {t('Order kembali ke "Menunggu pembayaran" dan customer diminta mengunggah ulang.', 'The order returns to "Awaiting payment" and the customer is asked to upload again.')}
+              {t('Pembayaran', 'Payment')} #{modal.payment.id}
+              {modal.payment.installment ? ` (${tr(modal.payment.installment.label, lang)})` : ''} · {formatMoney(modal.payment.amount, modal.payment.currency || order.currency)} · {paymentMethodSummary(modal.payment, lang)}.{' '}
+              {(modal.payment.installment?.seq ?? 1) > 1
+                ? t('Termin kembali ditagih dan customer diminta mengunggah ulang. Status order tidak berubah.', 'The installment is billed again and the customer is asked to upload again. The order status does not change.')
+                : t('Order kembali ke "Menunggu pembayaran" dan customer diminta mengunggah ulang.', 'The order returns to "Awaiting payment" and the customer is asked to upload again.')}
             </p>
             <label>
               <span className="field-label">{t('Alasan penolakan', 'Rejection reason')} *</span>
@@ -1741,6 +1821,43 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
         <AcceptPaymentModal payment={modal.payment} orderNumber={order.number} onClose={() => setModal(null)} onAccepted={paymentAccepted} />
       )}
 
+      {modal?.type === 'bill' && (
+        <AdminModal title={`${modal.change ? t('Ubah jatuh tempo', 'Change due date') : t('Tagih termin', 'Bill installment')}: ${tr(modal.installment.label, lang)}`} onClose={() => setModal(null)} small>
+          <form className="admin-form" onSubmit={submitBill}>
+            <p className="admin-field-hint">
+              {formatMoney(modal.installment.amount, modal.installment.currency)}.{' '}
+              {modal.change
+                ? `${t('Jatuh tempo saat ini', 'Current due date')}: ${formatDateTime(modal.installment.dueAt, lang)}. ${t('Customer diberi tahu tanggal yang baru.', 'The customer is told the new date.')}`
+                : t(
+                    'Termin ditagih sekarang tanpa menunggu pemicunya. Customer menerima email dan notifikasi berisi instruksi bayar, lalu mengunggah bukti di halaman pesanan.',
+                    'The installment is billed now without waiting for its trigger. The customer gets an email and notification with payment instructions, then uploads the proof on the order page.',
+                  )}
+            </p>
+            <label>
+              <span className="field-label">
+                {t('Jatuh tempo termin', 'Installment due date')}
+                {modal.change ? ' *' : ''}
+              </span>
+              <input type="datetime-local" value={billDueAt} onChange={(e) => setBillDueAt(e.target.value)} required={modal.change} />
+              {!modal.change && (
+                <small className="admin-field-hint">
+                  {t(`Kosong = ${modal.installment.dueDays} hari dari sekarang, sesuai jadwal.`, `Empty = ${modal.installment.dueDays} days from now, as scheduled.`)}
+                </small>
+              )}
+            </label>
+            {actionError && <p className="admin-form-error">{actionError}</p>}
+            <div className="admin-modal-actions">
+              <button type="button" className="btn btn-line btn-sm" onClick={() => setModal(null)}>
+                {t('Batal', 'Cancel')}
+              </button>
+              <button type="submit" className="btn btn-solid btn-sm" disabled={busy}>
+                {busy ? t('Memproses...', 'Processing...') : modal.change ? t('Simpan jatuh tempo', 'Save due date') : t('Tagih termin', 'Bill installment')}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
       {modal?.type === 'freight' && (
         <AdminModal title={activeQuote ? t('Beri penawaran ongkir baru', 'Send a new freight quote') : t('Beri penawaran ongkir', 'Send freight quote')} onClose={() => setModal(null)}>
           <form className="admin-form" onSubmit={(e) => void submitFreight(e)}>
@@ -1752,39 +1869,64 @@ export default function AdminOrderDetail({ params }: { params: { number: string 
               {activeQuote ? ` ${t('Penawaran atau balasan yang masih terbuka diganti oleh penawaran ini.', 'The open quote or counter is superseded by this one.')}` : ''}
             </p>
             <div className="fq-editor">
+              {/* One heading row instead of a label per line; the description is free text, quick chips below fill it. */}
+              <div className="fq-editor-head" aria-hidden="true">
+                <span>{t('Keterangan biaya', 'Charge description')}</span>
+                <span>{t('Jumlah', 'Line amount')} ({order.currency})</span>
+                <span />
+              </div>
               {fqLines.map((line, i) => (
                 <div key={i} className="fq-editor-row">
-                  <label>
-                    <span className="field-label">{t('Keterangan biaya', 'Charge description')}</span>
-                    <input value={line.label} maxLength={80} list="fq-label-suggestions" onChange={(e) => setFqLine(i, { label: e.target.value })} placeholder={DEFAULT_FREIGHT_LINE_LABELS[i] || 'THC'} />
+                  <div>
+                    <input
+                      value={line.label}
+                      maxLength={80}
+                      onChange={(e) => setFqLine(i, { label: e.target.value })}
+                      placeholder={DEFAULT_FREIGHT_LINE_LABELS[i] || t('Mis. THC', 'e.g. THC')}
+                      aria-label={`${t('Keterangan biaya baris', 'Charge description, line')} ${i + 1}`}
+                    />
                     {fqErrors[`lines.${i}.label`] && <small className="admin-form-error">{fqErrors[`lines.${i}.label`]}</small>}
-                  </label>
-                  <label>
-                    <span className="field-label">{t('Jumlah', 'Line amount')} ({order.currency})</span>
-                    <input type="number" inputMode="decimal" min={0} step={currencyStep(order.currency)} value={line.amount} onChange={(e) => setFqLine(i, { amount: e.target.value })} placeholder={order.currency === 'USD' ? '0.00' : '0'} className="mono" />
+                  </div>
+                  <div className="fq-amount">
+                    <NumberInput
+                      currency={order.currency}
+                      inputMode="decimal"
+                      min={0}
+                      step={currencyStep(order.currency)}
+                      value={line.amount}
+                      onChange={(e) => setFqLine(i, { amount: e.target.value })}
+                      placeholder={order.currency === 'USD' ? '0.00' : '0'}
+                      className="mono"
+                      aria-label={`${t('Jumlah baris', 'Amount, line')} ${i + 1} (${order.currency})`}
+                    />
                     {fqErrors[`lines.${i}.amount`] && <small className="admin-form-error">{fqErrors[`lines.${i}.amount`]}</small>}
-                  </label>
+                  </div>
                   <button
                     type="button"
-                    className="row-act fq-remove"
+                    className="fq-remove"
                     disabled={fqLines.length <= 1}
                     onClick={() => setFqLines((prev) => prev.filter((_, idx) => idx !== i))}
-                    aria-label={t('Hapus baris', 'Remove line')}
+                    aria-label={`${t('Hapus baris', 'Remove line')} ${i + 1}`}
                     title={t('Hapus baris', 'Remove line')}
                   >
-                    ×
+                    <Icon name="trash" size={16} />
                   </button>
                 </div>
               ))}
-              <datalist id="fq-label-suggestions">
-                {FREIGHT_LINE_SUGGESTIONS.map((label) => (
-                  <option key={label} value={label} />
-                ))}
-              </datalist>
-              <div>
+              <div className="fq-editor-tools">
                 <button type="button" className="btn btn-line btn-sm" disabled={fqLines.length >= FREIGHT_MAX_LINES} onClick={() => setFqLines((prev) => [...prev, { label: '', amount: '' }])}>
                   <Icon name="plus" size={14} /> {t('Tambah baris', 'Add line')}
                 </button>
+                {FREIGHT_LINE_SUGGESTIONS.some((label) => !fqLines.some((l) => l.label.trim().toLowerCase() === label.toLowerCase())) && (
+                  <div className="fq-quick">
+                    <span>{t('Isi cepat:', 'Quick fill:')}</span>
+                    {FREIGHT_LINE_SUGGESTIONS.filter((label) => !fqLines.some((l) => l.label.trim().toLowerCase() === label.toLowerCase())).map((label) => (
+                      <button key={label} type="button" className="fq-chip" onClick={() => addFreightLabel(label)}>
+                        <Icon name="plus" size={12} /> {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="fq-editor-total">
                 <span>

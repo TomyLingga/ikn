@@ -10,6 +10,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type GalleryItemData, type I18n, type MediaSummary } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
+import NumberInput from '@/components/NumberInput';
 
 type GalleryType = GalleryItemData['type'];
 
@@ -237,7 +238,7 @@ export default function AdminGallery() {
               </label>
               <label>
                 <span className="field-label">{t('Urutan', 'Sort order')}</span>
-                <input type="number" min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
+                <NumberInput min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
               </label>
             </div>
             {form.type === 'image' ? (

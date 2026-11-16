@@ -42,6 +42,9 @@ Route::prefix('admin')
             // Alias kompatibilitas FE lama (by nomor order): accept/reject payment aktif.
             Route::post('orders/{order:number}/payments/accept', [Admin\PaymentController::class, 'acceptByOrder']);
             Route::post('orders/{order:number}/payments/reject', [Admin\PaymentController::class, 'rejectByOrder']);
+            // Termin pembayaran (ASUMSI A-97, kontrak 11.13): tagih lebih awal / ubah jatuh tempo, kirim pengingat.
+            Route::post('orders/{order:number}/installments/{installment}/bill', [Admin\OrderInstallmentController::class, 'bill'])->where('installment', '[0-9]+');
+            Route::post('orders/{order:number}/installments/{installment}/remind', [Admin\OrderInstallmentController::class, 'remind'])->where('installment', '[0-9]+');
         });
 
         Route::middleware('module:dashboard')->group(function () {

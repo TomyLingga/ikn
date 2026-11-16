@@ -24,10 +24,11 @@ import {
   type VoucherScope,
   type VoucherType,
 } from '@/lib/admin';
-import { formatDateTime, formatIDR } from '@/lib/format';
+import { formatDateTime, formatIDR, formatNumber } from '@/lib/format';
 import type { Category } from '@/lib/types';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
+import NumberInput from '@/components/NumberInput';
 
 interface VoucherForm {
   code: string;
@@ -402,32 +403,32 @@ export default function AdminVouchers() {
               </label>
               <label>
                 <span className="field-label">{form.type === 'percent' ? t('Persentase (%)', 'Percentage (%)') : t('Nominal (Rp)', 'Amount (Rp)')} *</span>
-                <input type="number" min={0} max={form.type === 'percent' ? 100 : undefined} step={form.type === 'percent' ? 0.01 : 1} value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
+                <NumberInput currency={form.type === 'percent' ? undefined : 'IDR'} min={0} max={form.type === 'percent' ? 100 : undefined} step={form.type === 'percent' ? 0.01 : 1} value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
                 {firstError(formErrors, 'value') && <small className="cms-field-error">{firstError(formErrors, 'value')}</small>}
               </label>
             </div>
             <div className="admin-form-row admin-form-row-3">
               <label>
                 <span className="field-label">{t('Minimum subtotal (Rp)', 'Minimum subtotal (Rp)')}</span>
-                <input type="number" min={0} step={1} value={form.minSubtotal} onChange={(e) => setForm({ ...form, minSubtotal: e.target.value })} />
+                <NumberInput currency="IDR" min={0} step={1} value={form.minSubtotal} onChange={(e) => setForm({ ...form, minSubtotal: e.target.value })} />
                 {firstError(formErrors, 'minSubtotal') && <small className="cms-field-error">{firstError(formErrors, 'minSubtotal')}</small>}
               </label>
               <label>
                 <span className="field-label">{t('Maksimum diskon (Rp)', 'Maximum discount (Rp)')}</span>
-                <input type="number" min={0} step={1} value={form.maxDiscount} onChange={(e) => setForm({ ...form, maxDiscount: e.target.value })} placeholder={t('kosong = tanpa batas', 'empty = unlimited')} />
+                <NumberInput currency="IDR" min={0} step={1} value={form.maxDiscount} onChange={(e) => setForm({ ...form, maxDiscount: e.target.value })} placeholder={t('kosong = tanpa batas', 'empty = unlimited')} />
                 {firstError(formErrors, 'maxDiscount') && <small className="cms-field-error">{firstError(formErrors, 'maxDiscount')}</small>}
               </label>
               <label>
                 <span className="field-label">{t('Kuota total', 'Total quota')}</span>
-                <input type="number" min={0} step={1} value={form.quota} onChange={(e) => setForm({ ...form, quota: e.target.value })} placeholder={t('kosong = tanpa batas', 'empty = unlimited')} />
-                {editing && <small className="admin-field-hint">{t('Terpakai', 'Used')}: {editing.usedCount}</small>}
+                <NumberInput min={0} step={1} value={form.quota} onChange={(e) => setForm({ ...form, quota: e.target.value })} placeholder={t('kosong = tanpa batas', 'empty = unlimited')} />
+                {editing && <small className="admin-field-hint">{t('Terpakai', 'Used')}: {formatNumber(editing.usedCount, lang)}</small>}
                 {firstError(formErrors, 'quota') && <small className="cms-field-error">{firstError(formErrors, 'quota')}</small>}
               </label>
             </div>
             <div className="admin-form-row admin-form-row-3">
               <label>
                 <span className="field-label">{t('Batas per customer', 'Limit per customer')}</span>
-                <input type="number" min={0} step={1} value={form.perUserLimit} onChange={(e) => setForm({ ...form, perUserLimit: e.target.value })} placeholder={t('kosong = tanpa batas', 'empty = unlimited')} />
+                <NumberInput min={0} step={1} value={form.perUserLimit} onChange={(e) => setForm({ ...form, perUserLimit: e.target.value })} placeholder={t('kosong = tanpa batas', 'empty = unlimited')} />
                 {firstError(formErrors, 'perUserLimit') && <small className="cms-field-error">{firstError(formErrors, 'perUserLimit')}</small>}
               </label>
               <label>

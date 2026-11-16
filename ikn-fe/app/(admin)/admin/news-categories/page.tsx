@@ -7,6 +7,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n, type PostCategory } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import NumberInput from '@/components/NumberInput';
 
 interface CategoryForm {
   name: I18n;
@@ -178,7 +179,7 @@ export default function AdminNewsCategories() {
             </label>
             <label>
               <span className="field-label">{t('Urutan', 'Order')}</span>
-              <input type="number" min={0} max={1000} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
+              <NumberInput min={0} max={1000} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
               <small className="admin-field-hint">{t('Angka kecil tampil lebih dulu di filter.', 'Lower numbers appear first in the filter.')}</small>
             </label>
             <div className="row-actions">

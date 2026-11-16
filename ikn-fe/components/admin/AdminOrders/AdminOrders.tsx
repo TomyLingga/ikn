@@ -8,7 +8,9 @@ import { AdminPageHead, DataTable, RowActions, type Column } from '@/components/
 import AdminTabs, { type AdminTab, type AdminTabGroup } from '@/components/admin/AdminTabs';
 import { Pager } from '@/components/admin/cms';
 import { useLang } from '@/components/LanguageProvider';
-import { orderLabel, orderStatus, orderVariant, paymentLabel } from '@/lib/commerce';
+import Select from '@/components/Select';
+import { tr } from '@/lib/cms';
+import { installmentLabel, isPartiallyPaid, orderLabel, orderStatus, orderVariant, partiallyPaidLabel, paymentLabel } from '@/lib/commerce';
 import { apiPaged, errorMessage } from '@/lib/api';
 import { defaultDateRange, queryString, type CountsMeta } from '@/lib/admin';
 import { formatDateTime, formatMoney } from '@/lib/format';
@@ -37,11 +39,16 @@ const TAB_ICONS: Partial<Record<OrderStatusKey, IconName>> = {
 const PER_PAGE = 20;
 
 type StatusFilter = '' | OrderStatusKey; // '' = semua status
+// Filter termin (ASUMSI A-97, GET /admin/orders?installments=): dibayar sebagian, termin sedang ditagih, termin terlambat.
+type InstallmentFilter = '' | 'partial' | 'due' | 'overdue';
+const INSTALLMENT_FILTERS: InstallmentFilter[] = ['partial', 'due', 'overdue'];
 
 // Daftar order admin: GET /admin/orders?status&q&from&to&page&perPage (paginasi server); tab status dengan angka
 // dari meta.counts, dikelompokkan "Perlu diproses" (tanpa filter tanggal) dan "Riwayat" (Semua, Selesai, Dibatalkan,
 // Kedaluwarsa; rentang order dibuat bawaan awal bulan s.d. hari ini, dengan catatan "tampilkan semua tanggal" bila ada
 // order di luar rentang). Datang dengan ?status= memakai status itu; ?q= saja mencari di semua status dan tanggal.
+// ?installments=due|overdue|partial (tautan "Termin jatuh tempo" di dashboard) menyaring order bertermin di semua status
+// dan tanggal.
 export default function AdminOrders() {
   const router = useRouter();
   const params = useSearchParams();
@@ -50,15 +57,17 @@ export default function AdminOrders() {
 
   const paramStatus = params.get('status');
   const paramQuery = params.get('q') || '';
+  const paramInstallments = INSTALLMENT_FILTERS.includes(params.get('installments') as InstallmentFilter) ? (params.get('installments') as InstallmentFilter) : '';
   const initialStatus: StatusFilter = STATUS_KEYS.includes(paramStatus as OrderStatusKey)
     ? (paramStatus as OrderStatusKey)
-    : paramStatus === 'all' || paramQuery
+    : paramStatus === 'all' || paramQuery || paramInstallments
       ? ''
       : DEFAULT_STATUS;
   const [status, setStatus] = useState<StatusFilter>(initialStatus);
+  const [installments, setInstallments] = useState<InstallmentFilter>(paramInstallments);
   const [search, setSearch] = useState(paramQuery);
   const [q, setQ] = useState(paramQuery);
-  const [range, setRange] = useState(() => (paramQuery ? { from: '', to: '' } : defaultDateRange()));
+  const [range, setRange] = useState(() => (paramQuery || paramInstallments ? { from: '', to: '' } : defaultDateRange()));
   const dated = HISTORY_STATUSES.includes(status);
   const from = dated ? range.from : '';
   const to = dated ? range.to : '';
@@ -72,7 +81,7 @@ export default function AdminOrders() {
     let cancelled = false;
     setLoading(true);
     setError('');
-    apiPaged<OrderSummary>(`/admin/orders${queryString({ status, q, from, to, page, perPage: PER_PAGE })}`)
+    apiPaged<OrderSummary>(`/admin/orders${queryString({ status, installments, q, from, to, page, perPage: PER_PAGE })}`)
       .then((result) => {
         if (cancelled) return;
         setRows(result.items);
@@ -87,7 +96,17 @@ export default function AdminOrders() {
     return () => {
       cancelled = true;
     };
-  }, [status, q, from, to, page]);
+  }, [status, installments, q, from, to, page]);
+
+  // Filter termin berlaku lintas status dan tanggal: pindah ke tab "Semua" tanpa rentang tanggal.
+  function changeInstallments(next: InstallmentFilter) {
+    setInstallments(next);
+    if (next) {
+      setStatus('');
+      setRange({ from: '', to: '' });
+    }
+    setPage(1);
+  }
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,6 +116,7 @@ export default function AdminOrders() {
 
   function resetFilters() {
     setStatus(DEFAULT_STATUS);
+    setInstallments('');
     setSearch('');
     setQ('');
     setRange(defaultDateRange());
@@ -104,7 +124,13 @@ export default function AdminOrders() {
   }
 
   const defaults = defaultDateRange();
-  const filtersChanged = status !== DEFAULT_STATUS || !!q || (dated && (range.from !== defaults.from || range.to !== defaults.to));
+  const filtersChanged = status !== DEFAULT_STATUS || !!q || !!installments || (dated && (range.from !== defaults.from || range.to !== defaults.to));
+  const installmentFilterLabels: Record<InstallmentFilter, string> = {
+    '': t('Semua order', 'All orders'),
+    partial: t('Dibayar sebagian', 'Partially paid'),
+    due: t('Termin sedang ditagih', 'Installment billed'),
+    overdue: t('Termin terlambat', 'Installment overdue'),
+  };
   const counts = meta.counts || {};
   const allCount = STATUS_KEYS.reduce((sum, key) => sum + (counts[key] || 0), 0);
   // Tab antrean CIF berjudul pendek "Penawaran ongkir" (label status lengkapnya tetap dipakai di badge baris).
@@ -119,7 +145,7 @@ export default function AdminOrders() {
   ];
   // Jumlah tab = sepanjang waktu; bila daftar (dengan rentang tanggal, tanpa pencarian) lebih sedikit, ada order di luar rentang.
   const tabTotal = status === '' ? allCount : counts[status] || 0;
-  const outsideRange = !q && (from || to) ? Math.max(0, tabTotal - meta.total) : 0;
+  const outsideRange = !q && !installments && (from || to) ? Math.max(0, tabTotal - meta.total) : 0;
 
   const columns: Column<OrderSummary>[] = [
     {
@@ -166,9 +192,24 @@ export default function AdminOrders() {
     {
       key: 'payment',
       label: t('Pembayaran', 'Payment'),
-      render: (order) => (
-        <StatusBadge label={paymentLabel(order.paymentStatus)[lang]} tone={paymentLabel(order.paymentStatus).tone} small />
-      ),
+      // Order bertermin yang baru dibayar sebagian (ASUMSI A-97): "Dibayar sebagian" + sisa tagihan + termin yang sedang ditagih.
+      render: (order) =>
+        isPartiallyPaid(order) && order.paymentProgress ? (
+          <span>
+            <StatusBadge label={partiallyPaidLabel[lang]} tone={partiallyPaidLabel.tone} small />
+            <small className="admin-cell-sub">
+              {t('Sisa', 'Balance')} {formatMoney(order.paymentProgress.outstandingTotal, order.paymentProgress.currency)}
+            </small>
+            {order.nextInstallment && (
+              <small className="admin-cell-sub">
+                {tr(order.nextInstallment.label, lang)}: {installmentLabel(order.nextInstallment)[lang].toLowerCase()}
+                {order.nextInstallment.status === 'due' && order.nextInstallment.dueAt ? `, ${t('jatuh tempo', 'due')} ${formatDateTime(order.nextInstallment.dueAt, lang)}` : ''}
+              </small>
+            )}
+          </span>
+        ) : (
+          <StatusBadge label={paymentLabel(order.paymentStatus)[lang]} tone={paymentLabel(order.paymentStatus).tone} small />
+        ),
     },
     {
       key: 'status',
@@ -240,6 +281,16 @@ export default function AdminOrders() {
             </label>
           </>
         )}
+        <label className="admin-filter">
+          <span>{t('Termin', 'Installments')}</span>
+          <Select value={installments} onChange={(event) => changeInstallments(event.target.value as InstallmentFilter)}>
+            {(['', ...INSTALLMENT_FILTERS] as InstallmentFilter[]).map((key) => (
+              <option key={key || 'all'} value={key}>
+                {installmentFilterLabels[key]}
+              </option>
+            ))}
+          </Select>
+        </label>
         {filtersChanged && (
           <button type="button" className="row-act" onClick={resetFilters}>
             {t('Reset', 'Reset')}
@@ -250,6 +301,9 @@ export default function AdminOrders() {
         </span>
       </form>
       <p className="admin-field-hint admin-filter-note">
+        {installments
+          ? `${t('Filter termin', 'Installment filter')}: ${installmentFilterLabels[installments]}. ${t('Hanya order yang sudah dibayar sebagian dan masih berjalan.', 'Only orders that are partially paid and still in progress.')} `
+          : ''}
         {!dated
           ? t('Antrean ini menampilkan semua order pada status tersebut tanpa batas tanggal.', 'This queue shows every order in this status, with no date limit.')
           : from || to

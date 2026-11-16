@@ -1,0 +1,315 @@
+/* =====================================================================
+   LAPISAN RAPI LINTAS AREA (2026-11-15): tombol teks, toko publik, pemilih pelabuhan.
+   Dimuat dari root layout (sebelum CSS route), jadi tiap selektor diawali `html` agar menang atas commerce.css.
+   Aturan toko publik memakai :where() supaya tetap kalah dari `.cust-app ...` (portal punya gayanya sendiri).
+   Warna hanya dari token tema.
+   ===================================================================== */
+
+html {
+  --ui-r: 10px;
+  --ui-r-lg: 14px;
+  --ui-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+/* ---------------------------------------------------------------------
+   1. Tombol teks (button.link): "ubah", "Hapus titik", "Jadikan utama", "Sesuaikan keranjang".
+      Dulu tampil seperti teks biasa (dengan bingkai bawaan peramban). Sekarang pil berbingkai: jelas bisa diklik,
+      tetap lebih ringan daripada .btn. Tautan <a class="link"> tidak ikut berubah.
+   --------------------------------------------------------------------- */
+html :is(body, .cust-app, .site-v2, .admin-app, .admin-modal-backdrop) button.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 38%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+  color: var(--primary);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease), color 0.16s var(--ease), transform 0.12s var(--ease);
+}
+
+html :is(body, .cust-app, .site-v2, .admin-app, .admin-modal-backdrop) button.link:hover:not(:disabled) {
+  gap: 6px;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+  text-decoration: none;
+}
+
+html :is(body, .cust-app, .site-v2, .admin-app, .admin-modal-backdrop) button.link:active:not(:disabled) { transform: scale(0.97); }
+html :is(body, .cust-app, .site-v2, .admin-app, .admin-modal-backdrop) button.link:focus-visible { outline: 0; box-shadow: var(--ui-ring); }
+html :is(body, .cust-app, .site-v2, .admin-app, .admin-modal-backdrop) button.link:disabled { opacity: 0.5; cursor: not-allowed; }
+html :is(body, .cust-app, .site-v2, .admin-app, .admin-modal-backdrop) button.link svg { width: 13px; height: 13px; flex-shrink: 0; color: currentColor; }
+
+/* Aksi merusak (hapus alamat). */
+html :is(body, .cust-app) button.link.address-remove {
+  border-color: color-mix(in srgb, var(--red) 42%, var(--line));
+  background: var(--red-tint);
+  color: var(--red);
+}
+html :is(body, .cust-app) button.link.address-remove:hover:not(:disabled) { border-color: var(--red); background: var(--red); color: #fff; }
+
+/* Baris tinjauan checkout: isi di kiri, tombol "ubah" tidak menempel di teks. */
+html .co-review dd .link { margin-left: 10px; font-size: 0.78rem; }
+html .address-actions { gap: 8px; flex-wrap: wrap; }
+html .addr-map-foot { min-height: 30px; }
+
+/* Tombol teks lain yang dulu hanya bergaris bawah. */
+html .cart-remove,
+html .cat-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease), color 0.16s var(--ease);
+}
+html .cart-items .cart-remove { width: 32px; min-height: 32px; padding: 0; justify-content: center; }
+html .cart-remove:hover { border-color: var(--red); background: var(--red-tint); color: var(--red); }
+html .cat-clear { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 38%, var(--line)); }
+html .cat-clear:hover { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+
+/* ---------------------------------------------------------------------
+   2. Toko publik (/catalog, /cart, /checkout): kontrol membulat dan huruf sans seperti portal pelanggan.
+      Cakupan tombol: section setelah kepala halaman commerce. Kelas komponen commerce diatur langsung.
+   --------------------------------------------------------------------- */
+html :where(.commerce-head ~ .section-tight) .btn {
+  min-height: 46px;
+  padding: 0 22px;
+  gap: 9px;
+  border-radius: var(--ui-r);
+  font-family: var(--font-sans);
+  font-size: 0.93rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+html :where(.commerce-head ~ .section-tight) .btn.btn-sm { min-height: 38px; padding: 0 14px; font-size: 0.86rem; }
+html :where(.commerce-head ~ .section-tight) .btn:focus-visible { outline: 0; box-shadow: var(--ui-ring); }
+html :where(.commerce-head ~ .section-tight) a.link {
+  gap: 6px;
+  padding-bottom: 0;
+  border-bottom: 0;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 4px;
+}
+html :where(.commerce-head ~ .section-tight) a.link:hover { gap: 6px; text-decoration-color: currentColor; }
+html :where(.commerce-head ~ .section-tight) .label { font-family: var(--font-sans); font-size: 0.8rem; font-weight: 650; letter-spacing: 0; text-transform: none; }
+
+html .summary,
+html .co-block,
+html .pcard,
+html .cart-items,
+html .cart-list,
+html .spec-table,
+html .spec-grid,
+html .soltable,
+html .invoice,
+html .pd-media,
+html .dash-welcome {
+  border-radius: var(--ui-r-lg);
+}
+
+html .summary,
+html .co-block { background: var(--surface); box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent); }
+html .cart-items { background: var(--surface); }
+
+html .cart-thumb,
+html .pd-thumb,
+html .radio-card,
+html .co-ship-opt,
+html .bank-card,
+html .co-bank,
+html .upload-drop,
+html .pd-quote-box,
+html .pd-login-note,
+html .address-card,
+html .address-form,
+html .acct-stat,
+html .acct-order-row,
+html .acct-order-card,
+html .dash-alert,
+html .dash-quick-card,
+html .addr-map,
+html .addr-geo-results,
+html .qty,
+html .qty-ctl,
+html .cat-search,
+html .cat-sort,
+html .copy-btn,
+html .pcard-add,
+html .co-fields input,
+html .co-fields textarea,
+html .co-fields select,
+html .co-fields select.addr-select,
+html .review-form textarea,
+html .addr-geo-search input {
+  border-radius: var(--ui-r);
+}
+
+html .addr-map { overflow: hidden; }
+html .cat-filter-btn { border-radius: 8px; }
+html .pcard-code,
+html .pcard-promo,
+html .pd-promo-badge,
+html .pcard-promo-inline { border-radius: 999px; }
+
+html .co-fields input:focus,
+html .co-fields textarea:focus,
+html .co-fields select:focus,
+html .review-form textarea:focus,
+html .addr-geo-search input:focus,
+html .cat-search:focus-within {
+  outline: 0;
+  border-color: var(--primary);
+  box-shadow: var(--ui-ring);
+}
+
+html .radio-card,
+html .co-ship-opt { transition: border-color 0.18s var(--ease), background 0.18s var(--ease), box-shadow 0.18s var(--ease); }
+html .radio-card:hover,
+html .co-ship-opt:hover { border-color: var(--primary); }
+html .radio-card.is-sel,
+html .co-ship-opt.is-active { border-color: var(--primary); background: var(--primary-tint); box-shadow: 0 0 0 1px var(--primary) inset; }
+html .radio-card input,
+html .co-ship-opt input { accent-color: var(--primary); }
+
+html .stepper {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--ui-r-lg);
+  background: var(--surface);
+}
+html .step-label,
+html .cat-count,
+html .cat-sort,
+html .copy-btn,
+html .cat-filter-title,
+html .co-ship-price,
+html .cart-unit-price,
+html .cart-moq,
+html .qty-moq,
+html .pd-moq { font-family: var(--font-sans); letter-spacing: 0; }
+html .cat-filter-title { font-size: 0.8rem; font-weight: 650; text-transform: none; }
+html .step-label { font-size: 0.88rem; font-weight: 600; }
+html .copy-btn { font-size: 0.8rem; font-weight: 650; padding: 8px 14px; transition: border-color 0.16s var(--ease), background 0.16s var(--ease), color 0.16s var(--ease); }
+html .copy-btn:hover { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+html .qty input,
+html .qty-ctl input { font-family: var(--font-sans); font-variant-numeric: tabular-nums; font-weight: 600; }
+html .qty button:hover,
+html .qty-ctl button:hover { background: var(--primary-tint); color: var(--primary); }
+html .summary-row.is-total,
+html .summary-total { font-variant-numeric: tabular-nums; }
+html .cart-row { transition: background 0.16s var(--ease); }
+html .cart-row:hover { background: color-mix(in srgb, var(--primary) 4%, transparent); }
+
+/* ---------------------------------------------------------------------
+   3. Pemilih pelabuhan/bandara tujuan (components/customer/PortPicker): kolom cari bersaran.
+   --------------------------------------------------------------------- */
+html .port-combo { align-items: stretch; }
+html .port-combo-field { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
+html .port-combo-field > svg { position: absolute; left: 13px; color: var(--ink-soft); pointer-events: none; }
+html .port-combo .port-combo-field input { width: 100%; padding-left: 38px; }
+html .port-combo > .btn { flex-shrink: 0; min-height: 0; }
+
+html .port-suggest {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 330px;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--ui-r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+html .port-suggest button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+html .port-suggest li.is-active button { background: var(--primary-tint); }
+html .port-suggest-icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--primary) 11%, transparent);
+  color: var(--primary);
+}
+html .port-suggest-icon.is-airport { background: color-mix(in srgb, var(--tm-accent) 15%, transparent); color: var(--tm-accent-ink); }
+html .port-suggest-icon svg { color: currentColor; }
+html .port-suggest-text { display: grid; gap: 1px; min-width: 0; }
+html .port-suggest-text strong { overflow: hidden; font-size: 0.92rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+html .port-suggest-text small { color: var(--ink-soft); font-size: 0.78rem; }
+
+@media (max-width: 620px) {
+  html .port-combo { flex-direction: column; }
+  html .port-combo > .btn { min-height: 42px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html :is(body, .cust-app, .site-v2, .admin-app, .admin-modal-backdrop) button.link,
+  html .cart-row,
+  html .radio-card,
+  html .co-ship-opt { transition: none; }
+}
+
+/* ---------------------------------------------------------------------
+   4. Portal pelanggan: tautan teks bergaris bawah tipis agar terbaca sebagai tautan.
+   --------------------------------------------------------------------- */
+html .cust-app a.link {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 38%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+html .cust-app a.link:hover { text-decoration-color: currentColor; }
+
+/* Catatan form (penjelasan langkah checkout, alamat): sans, bukan mono. */
+html .cust-app .form-note,
+html :where(.commerce-head ~ .section-tight) .form-note { font-family: var(--font-sans); font-size: 0.88rem; line-height: 1.55; letter-spacing: 0; }

@@ -1,14 +1,17 @@
 'use client';
 
-// Peta lokasi kontak (Leaflet + citra satelit Esri World Imagery + lapisan nama tempat, tanpa API key). Selalu dimuat lewat dynamic import ssr:false
-// (lihat index.tsx) karena Leaflet menyentuh `window` saat diimpor.
+// Peta lokasi kontak (Leaflet + citra satelit dengan nama tempat; bawaan Esri World Imagery tanpa API key, penyedia
+// bisa diganti admin, lihat components/MapTiles). Selalu dimuat lewat dynamic import ssr:false (lihat index.tsx)
+// karena Leaflet menyentuh `window` saat diimpor.
 import { useEffect } from 'react';
 import L from 'leaflet';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, useMap } from 'react-leaflet';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import 'leaflet/dist/leaflet.css';
+import MapTiles, { useMapTiles } from '@/components/MapTiles';
+import { layersFor } from '@/lib/map-tiles';
 import { mapsUrl, type MapPoint } from '@/components/cms/utils';
 
 const pinIcon = L.icon({
@@ -44,7 +47,10 @@ function Fit({ points }: { points: MapPoint[] }) {
 
 export default function ContactMap({ points, compact = false, lang = 'id' }: ContactMapProps) {
   const first = points[0];
+  const tiles = useMapTiles();
   if (!first) return null;
+  // Penyedia tile yang mewajibkan atribusi (mis. Google) menampilkannya juga di peta kecil, di tepi bawah.
+  const credits = !!tiles && layersFor(tiles, 'hybrid').some((layer) => layer.brand || layer.attributionRequired);
   const openLabel = lang === 'en' ? 'Open in Google Maps' : 'Buka di Google Maps';
 
   return (
@@ -61,13 +67,9 @@ export default function ContactMap({ points, compact = false, lang = 'id' }: Con
         attributionControl={!compact}
         style={{ width: '100%', height: '100%' }}
       >
-        {/* Tampilan satelit (permintaan pemilik 2026-11-04); lapisan kedua menambah nama jalan/tempat di atas citra. */}
-        <TileLayer
-          attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics"
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
-        />
-        <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}" maxZoom={19} />
+        {/* Tampilan satelit (permintaan pemilik 2026-11-04) dengan nama jalan/tempat di atas citra. Footer: tautan
+            "Buka di Google Maps" menempati kiri bawah, jadi logo penyedia tile dipindah ke kiri atas. */}
+        <MapTiles kind="hybrid" maxZoom={19} brandPosition={compact ? 'topleft' : 'bottomleft'} />
         <Fit points={points} />
         {points.map((p) => (
           <Marker key={`${p.lat},${p.lng}`} position={[p.lat, p.lng]} icon={pinIcon} title={p.name}>
@@ -91,7 +93,7 @@ export default function ContactMap({ points, compact = false, lang = 'id' }: Con
       </MapContainer>
       {/* Lebih dari satu titik: tautan peta per lokasi ada di daftar alamat pemanggil (mis. footer). */}
       {compact && points.length === 1 && (
-        <a className="footer-map-link" href={mapsUrl(first.lat, first.lng)} target="_blank" rel="noreferrer">
+        <a className="footer-map-link" href={mapsUrl(first.lat, first.lng)} target="_blank" rel="noreferrer" style={credits ? { bottom: 46 } : undefined}>
           {openLabel} ↗
         </a>
       )}

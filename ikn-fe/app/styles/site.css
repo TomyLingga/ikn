@@ -887,8 +887,9 @@
   border-radius: 22px;
   box-shadow: 0 30px 60px -48px rgba(15, 30, 50, 0.55);
 }
-.site-v2 .cmap-map { height: clamp(320px, 46vw, 560px); border-radius: 14px; overflow: hidden; background: #f3f6fa; }
-.site-v2 .cmap-map .leaflet-container { background: #f3f6fa; font-family: var(--font-sans); }
+/* Peta dasar = citra satelit (2026-11-15): area di luar tile dan selagi tile dimuat berwarna gelap, bukan abu terang. */
+.site-v2 .cmap-map { height: clamp(320px, 46vw, 560px); border-radius: 14px; overflow: hidden; background: var(--c-deep); }
+.site-v2 .cmap-map .leaflet-container { background: var(--c-deep); font-family: var(--font-sans); }
 .site-v2 .cmap-origin-tip { font-weight: 650; color: #102d50; }
 .site-v2 .cmap-tip { max-width: 260px; white-space: normal; }
 .site-v2 .cmap-tip-logo { display: block; max-width: 120px; max-height: 40px; margin-bottom: 6px; object-fit: contain; }
@@ -896,7 +897,7 @@
 .site-v2 .cmap-legend li,
 .site-v2 .cmap-region h3 { display: inline-flex; align-items: center; gap: 8px; }
 .site-v2 .cmap-legend span,
-.site-v2 .cmap-region h3 span { width: 10px; height: 10px; border-radius: 50%; }
+.site-v2 .cmap-region h3 span { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(4, 16, 31, 0.3); }
 .site-v2 .cmap-regions { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px clamp(20px, 3vw, 40px); margin-top: clamp(24px, 3vw, 40px); }
 .site-v2 .cmap-region h3 { margin-bottom: 10px; font-size: 1.05rem; font-weight: 650; color: var(--hv-heading); }
 .site-v2 .cmap-region dl > div { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--hv-line); }

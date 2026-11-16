@@ -11,6 +11,7 @@ use App\Services\Notification\InAppNotifier;
 use Illuminate\Http\Request;
 
 // Lonceng notifikasi portal customer (ASUMSI A-71): daftar, penghitung badge, tandai dibaca.
+// index/read/readAll juga melayani lonceng panel admin (/admin/notifications*): keduanya hanya menyentuh baris milik user sesi.
 class NotificationController extends ApiController
 {
     public function index(Request $request, InAppNotifier $notifier)

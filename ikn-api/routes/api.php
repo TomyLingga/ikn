@@ -46,6 +46,9 @@ Route::prefix('content')->group(function () {
 // ---- Batas unggahan efektif (config dibatasi batas PHP); FE mengecek ukuran berkas sebelum mengirim ----
 Route::get('upload-limits', [PublicSite\UploadLimitsController::class, 'show']);
 
+// ---- Lapisan tile peta (penyedia dipilih admin, ASUMSI A-98); publik karena peta footer/Kontak tampil untuk tamu ----
+Route::get('geo/map-config', [PublicSite\MapConfigController::class, 'show']);
+
 // ---- Formulir publik ----
 Route::post('wbs', [PublicSite\WbsController::class, 'store'])->middleware('throttle:public-form');
 Route::get('wbs/{code}', [PublicSite\WbsController::class, 'show']);
@@ -82,6 +85,7 @@ Route::prefix('admin')
             Route::get('site-settings', [Admin\SettingController::class, 'index']);
             Route::put('site-settings', [Admin\SettingController::class, 'update']);
             Route::post('site-settings/mail-test', [Admin\SettingController::class, 'testMail']);
+            Route::post('site-settings/maps-test', [Admin\SettingController::class, 'testMaps']);
         });
 
         Route::middleware('module:users')->group(function () {

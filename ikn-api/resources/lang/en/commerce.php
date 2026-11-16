@@ -49,6 +49,23 @@ return [
     'freight_counter_not_allowed' => 'A counter offer can only be made on a quote that is still valid.',
     'freight_accept_not_allowed' => 'This quote is waiting for the other party to respond, so you cannot accept it yet.',
     'freight_counter_label' => 'Customer counter offer',
+    // Staged payments (ASUMSI A-97).
+    'installments' => [
+        'unpaid' => 'The order cannot be completed yet because some payment installments are still unpaid.',
+        'not_found' => 'Installment not found on this order.',
+        'not_due' => 'This installment is not currently billed.',
+        'not_billable' => 'This installment cannot be billed yet. Later installments are billed after the first one is paid and while the order is still in progress.',
+        'already_billed' => 'This installment has already been billed. Enter a new due date to change it.',
+        'reminder_too_soon' => 'A reminder for this installment was sent less than :hours hours ago.',
+        'due_in_past' => 'The due date must be in the future.',
+        'payment_unavailable' => 'No active manual transfer method is available to bill this installment.',
+        'too_many' => 'A payment schedule can have at most :max rows.',
+        'first_trigger' => 'The first installment must be billed when the order is placed.',
+        'percent_range' => 'Each installment percentage must be more than 0 and at most 100.',
+        'percent_sum' => 'The installment percentages must add up to exactly 100.',
+        'duplicate_key' => 'Installment keys must be unique.',
+        'export_only' => 'Payment schedules are only for export market payment terms.',
+    ],
     'freight_max_wait_reason' => 'The waiting period for a freight quote has passed.',
 
     'status' => [
@@ -127,6 +144,8 @@ return [
             'bank' => 'Destination account',
             'amount' => 'Transfer amount (including unique code)',
             'amount_plain' => 'Payment amount',
+            // Non-IDR orders have no unique code (ASUMSI A-86): replaces the payment method text, which is written for rupiah transfers.
+            'instructions_foreign' => 'Transfer the exact amount below to the account shown, then upload the transfer receipt on the order page.',
             'correspondent' => 'Correspondent bank',
         ],
         'placed_admin' => [
@@ -136,17 +155,67 @@ return [
         'payment_received' => [
             'subject' => 'Payment receipt :number awaiting verification',
             'intro' => ':customer uploaded a payment receipt for order :number (:method) worth :total. Please verify it in the admin panel.',
+            'intro_installment' => ':customer uploaded a payment receipt for :label of order :number (:method) worth :total. Please verify it in the admin panel.',
         ],
         'payment_accepted' => [
             'subject' => 'Payment for :number accepted',
             'intro' => 'We have received your payment and your order will be processed shortly.',
+            'intro_installment' => 'We have received the :label of :amount and your order will be processed shortly. The remaining balance follows the schedule below.',
             'invoice' => 'Invoice number: :invoice',
         ],
         'payment_rejected' => [
             'subject' => 'Payment receipt for :number rejected',
             'intro' => 'Unfortunately we could not accept your payment receipt.',
+            'intro_installment' => 'Unfortunately we could not accept your payment receipt for the :label.',
             'reason' => 'Reason:',
             'retry' => 'Please upload a new receipt before :due.',
+            'retry_installment' => 'Please upload a new receipt on the order page.',
+        ],
+        // Staged payments (ASUMSI A-97).
+        'installment' => [
+            'schedule_label' => 'Payment schedule',
+            'placed_intro' => 'This order is paid in stages. Due now: :label of :amount.',
+            'col_label' => 'Installment',
+            'col_amount' => 'Amount',
+            'col_due' => 'Due date',
+            'col_status' => 'Status',
+            'status' => [
+                'scheduled' => 'Not billed yet',
+                'due' => 'Awaiting payment',
+                'overdue' => 'Overdue',
+                'awaiting_verification' => 'Awaiting verification',
+                'paid' => 'Paid',
+                'void' => 'Void',
+            ],
+            'billed_on' => [
+                'order' => 'billed after the down payment is received',
+                'shipped' => 'billed when the order ships',
+                'delivered' => 'billed when the order is delivered',
+            ],
+            'paid_total' => 'Paid',
+            'outstanding' => 'Balance due',
+            'due_label' => 'Due date',
+            'due' => [
+                'subject' => ':label for order :number is due',
+                'intro' => 'The :label of :amount for your order can now be paid. It is due on :due.',
+                'upload' => 'After the transfer, upload the payment receipt on the order page.',
+            ],
+            'reminder' => [
+                'subject' => 'Reminder: :label for order :number is due on :due',
+                'intro' => 'The :label of :amount for your order has not been paid yet. It is due on :due.',
+            ],
+            'overdue' => [
+                'subject' => ':label for order :number is overdue',
+                'intro' => 'The :label of :amount for your order was due on :due. Please complete the payment as soon as possible.',
+            ],
+            'paid' => [
+                'subject' => 'Payment of :label for order :number received',
+                'intro' => 'We have received the :label of :amount. The remaining balance of :outstanding follows the schedule below.',
+            ],
+            'fully_paid' => [
+                'subject' => 'Order :number is fully paid',
+                'intro' => 'We have received the :label of :amount. Your order is now fully paid.',
+            ],
         ],
         'expired' => [
             'subject' => 'Order :number expired',
@@ -192,6 +261,8 @@ return [
             'auto' => 'The order will be completed automatically in :days days.',
             'subject_pickup' => 'Order :number picked up',
             'intro_pickup' => 'Your order is recorded as picked up. If everything is in order, complete the order and leave a product review.',
+            // Staged payments (ASUMSI A-97): replaces the "complete the order" and auto-complete lines while a balance is unpaid.
+            'balance_due' => 'The order can be completed once the remaining balance of :outstanding is paid. Payment instructions are on the order page.',
         ],
         'completed' => [
             'subject' => 'Order :number completed',
@@ -266,6 +337,16 @@ return [
         'voucherCode' => 'voucher code',
         'note' => 'note',
         'file' => 'receipt file',
+        'installmentId' => 'installment',
+        'dueAt' => 'due date',
+        'installments' => 'payment schedule',
+        'installments.*.key' => 'installment key',
+        'installments.*.label' => 'installment name',
+        'installments.*.label.id' => 'installment name (ID)',
+        'installments.*.label.en' => 'installment name (EN)',
+        'installments.*.percent' => 'installment percentage',
+        'installments.*.trigger' => 'installment billing time',
+        'installments.*.dueDays' => 'installment due days',
         'receivedAmount' => 'received amount',
         'bankCharges' => 'bank charges',
         'receivedNote' => 'receipt note',

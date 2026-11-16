@@ -148,7 +148,7 @@ export default function CustomerCompanyForm() {
             ) : (
               <Select name="countryCode" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} searchPlaceholder={t('Cari negara', 'Search country')}>
                 {(countries.length > 0 ? countries : [{ code: countryCode, name: { id: countryCode, en: countryCode } }]).map((c) => (
-                  <option key={c.code} value={c.code}>
+                  <option key={c.code} value={c.code} data-keywords={`${c.name.en} ${c.name.id}`}>
                     {c.name[lang] || c.name.id}
                   </option>
                 ))}

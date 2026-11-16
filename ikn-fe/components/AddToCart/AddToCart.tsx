@@ -9,9 +9,10 @@ import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { openCartDrawer, openChat, useShopPaths } from '@/lib/shop';
 import { tr } from '@/lib/cms';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatNumber } from '@/lib/format';
 import { priceUnavailable, productPrice } from '@/lib/commerce';
 import type { Product } from '@/lib/types';
+import NumberInput from '@/components/NumberInput';
 
 // Kontrol qty + tombol tambah keranjang di halaman detail produk.
 // Menghormati `moq` (minimum order) dan `available` (stok − reservasi).
@@ -140,8 +141,7 @@ export default function AddToCart({ product }: { product: Product }) {
         <span className="qty-label">{t('Jumlah', 'Quantity')} ({product.unit})</span>
         <div className="qty-ctl">
           <button type="button" onClick={() => setQty((v) => clamp(v - 1))} aria-label={t('Kurangi', 'Decrease')}>−</button>
-          <input
-            type="number"
+          <NumberInput
             min={moq}
             max={Number.isFinite(maxQty) ? maxQty : undefined}
             value={qty}
@@ -153,7 +153,7 @@ export default function AddToCart({ product }: { product: Product }) {
         </div>
       </div>
       <p className="qty-moq">
-        {moq > 1 && <>{t('Minimum pembelian', 'Minimum order')}: {moq} {product.unit}. </>}
+        {moq > 1 && <>{t('Minimum pembelian', 'Minimum order')}: {formatNumber(moq, lang)} {product.unit}. </>}
         {product.stockStatus === 'made_to_order'
           ? t('Dibuat sesuai pesanan.', 'Made to order.')
           : <>{t('Tersedia', 'Available')}: {product.available.toLocaleString('id-ID')} {product.unit}.</>}

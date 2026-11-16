@@ -467,4 +467,14 @@
   .userMeta {
     display: none;
   }
+
+  /* Lonceng notifikasi menambah satu tombol di bilah atas: tautan situs cukup dari menu profil
+     ("Lihat situs publik") dan jarak dirapatkan agar tetap muat di ponsel. */
+  .siteLink {
+    display: none;
+  }
+
+  .topActions {
+    gap: 10px;
+  }
 }

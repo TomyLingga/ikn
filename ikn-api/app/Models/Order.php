@@ -138,7 +138,23 @@ class Order extends Model
         return $this->hasMany(OrderFreightQuote::class)->orderByDesc('round')->orderByDesc('id');
     }
 
+    /** Termin pembayaran (ASUMSI A-97), urut seq; kosong = satu pembayaran penuh (alur lama). */
+    public function installments()
+    {
+        return $this->hasMany(OrderInstallment::class)->orderBy('seq');
+    }
+
     // ---- Scope ----
+
+    /** Order yang masih punya termin belum lunas (scheduled/due/awaiting_verification). */
+    public function scopeWithOpenInstallments(Builder $query, ?array $statuses = null): Builder
+    {
+        return $query->whereExists(function ($q) use ($statuses) {
+            $q->selectRaw('1')->from('order_installments')
+                ->whereColumn('order_installments.order_id', 'orders.id')
+                ->whereIn('order_installments.status', $statuses ?? OrderInstallment::OPEN_STATUSES);
+        });
+    }
 
     public function scopeOwnedBy(Builder $query, User $user): Builder
     {
@@ -247,9 +263,61 @@ class Order extends Model
         return $this->status === self::STATUS_SHIPPED;
     }
 
+    /** Selesai hanya dari delivered dan bila semua termin sudah lunas (ASUMSI A-97; state machine menolak 409 INSTALLMENTS_UNPAID). */
     public function canComplete(): bool
     {
-        return $this->status === self::STATUS_DELIVERED;
+        return $this->status === self::STATUS_DELIVERED && ! $this->hasUnpaidInstallments();
+    }
+
+    // ---- Termin pembayaran (ASUMSI A-97) ----
+
+    /** @return \Illuminate\Support\Collection<int, OrderInstallment> */
+    public function installmentRows()
+    {
+        return $this->relationLoaded('installments') ? $this->installments : $this->installments()->get();
+    }
+
+    public function hasInstallments(): bool
+    {
+        return $this->installmentRows()->isNotEmpty();
+    }
+
+    /** Masih ada termin yang belum lunas (void tidak dihitung). */
+    public function hasUnpaidInstallments(): bool
+    {
+        return $this->installmentRows()->contains(fn (OrderInstallment $row) => $row->isOpen());
+    }
+
+    public function firstInstallment(): ?OrderInstallment
+    {
+        return $this->installmentRows()->firstWhere('seq', 1);
+    }
+
+    /**
+     * Kemajuan pembayaran: { currency, paidTotal, outstandingTotal, status unpaid|partial|paid } dalam satuan terkecil.
+     * Order bertermin: paidTotal = termin lunas, outstandingTotal = termin yang belum lunas (void tidak dihitung).
+     * Order tanpa termin: lunas penuh begitu paid_at terisi; sebelum itu seluruh total masih terutang selama order
+     * belum dibatalkan/kedaluwarsa.
+     */
+    public function paymentProgress(): array
+    {
+        $grand = $this->grandTotalInt();
+        $rows = $this->installmentRows();
+        if ($rows->isEmpty()) {
+            $paid = $this->paid_at !== null ? $grand : 0;
+            $closed = in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_EXPIRED], true);
+            $outstanding = $paid > 0 || $closed ? 0 : $grand;
+        } else {
+            $paid = (int) $rows->where('status', OrderInstallment::STATUS_PAID)->sum(fn (OrderInstallment $row) => $row->amountInt());
+            $outstanding = (int) $rows->filter(fn (OrderInstallment $row) => $row->isOpen())->sum(fn (OrderInstallment $row) => $row->amountInt());
+        }
+
+        return [
+            'currency' => $this->currencyCode(),
+            'paidTotal' => $paid,
+            'outstandingTotal' => $outstanding,
+            'status' => $paid <= 0 ? 'unpaid' : ($paid >= $grand ? 'paid' : 'partial'),
+        ];
     }
 
     /** Admin boleh menambah/menghapus catatan perjalanan hanya selama kiriman di jalan (tidak untuk Loco). */
@@ -545,6 +613,8 @@ class Order extends Model
             'code' => $this->payment_term_code ?: ($snapshot['code'] ?? null),
             'name' => $snapshot['name'] ?? null,
             'description' => $snapshot['description'] ?? null,
+            // Jadwal termin yang dibekukan dari syarat pembayaran (ASUMSI A-97); [] = satu pembayaran penuh.
+            'installments' => is_array($snapshot['installments'] ?? null) ? array_values($snapshot['installments']) : [],
         ];
     }
 

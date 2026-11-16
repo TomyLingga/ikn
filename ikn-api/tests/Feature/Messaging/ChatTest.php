@@ -143,13 +143,16 @@ class ChatTest extends TestCase
             ChatMessage::create(['conversation_id' => $id, 'sender_id' => $admin->id, 'sender_role' => 'admin', 'body' => 'Pesan '.$i]);
         }
 
+        // Membuka utas hanya memuat halaman terbaru (30 pesan); halaman lama diminta dengan ?before.
         $page = $this->actingAs($admin)->getJson('/api/v1/admin/chats/'.$id)
-            ->assertOk()->assertJsonCount(50, 'data.messages')->assertJsonPath('data.hasMore', true)
-            ->assertJsonPath('data.messages.49.body', 'Pesan 55');
+            ->assertOk()->assertJsonCount(30, 'data.messages')->assertJsonPath('data.hasMore', true)
+            ->assertJsonPath('data.messages.0.body', 'Pesan 26')
+            ->assertJsonPath('data.messages.29.body', 'Pesan 55');
         $oldest = $page->json('data.messages.0.id');
         $this->actingAs($admin)->getJson('/api/v1/admin/chats/'.$id.'?before='.$oldest)
-            ->assertOk()->assertJsonCount(5, 'data.messages')->assertJsonPath('data.hasMore', false)
-            ->assertJsonPath('data.messages.0.body', 'Pesan 1');
+            ->assertOk()->assertJsonCount(25, 'data.messages')->assertJsonPath('data.hasMore', false)
+            ->assertJsonPath('data.messages.0.body', 'Pesan 1')
+            ->assertJsonPath('data.messages.24.body', 'Pesan 25');
         $this->assertSame(0, $conversation->fresh()->admin_unread);
     }
 

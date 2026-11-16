@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Order;
+use App\Models\OrderInstallment;
 use App\Models\OrderStatusHistory;
 use App\Services\Commerce\CommerceSettings;
 use App\Services\Commerce\OrderStateMachine;
@@ -10,6 +11,7 @@ use Illuminate\Console\Command;
 use Throwable;
 
 // Harian: delivered lebih dari auto_complete_days hari → completed (actor system). Setting 0 = nonaktif.
+// Order bertermin yang belum lunas dilewati (ASUMSI A-97); state machine juga menolaknya (409 INSTALLMENTS_UNPAID).
 class OrdersAutoComplete extends Command
 {
     protected $signature = 'orders:auto-complete';
@@ -28,6 +30,11 @@ class OrdersAutoComplete extends Command
         $query = Order::where('status', Order::STATUS_DELIVERED)
             ->whereNotNull('delivered_at')
             ->where('delivered_at', '<=', now()->subDays($days))
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')->from('order_installments')
+                    ->whereColumn('order_installments.order_id', 'orders.id')
+                    ->whereIn('order_installments.status', OrderInstallment::OPEN_STATUSES);
+            })
             ->orderBy('id');
 
         $count = 0;

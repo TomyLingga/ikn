@@ -5,6 +5,7 @@ namespace App\Services\Account;
 use App\Mail\Account\VerifyEmail;
 use App\Models\CustomerProfile;
 use App\Models\User;
+use App\Services\Notification\InAppNotifier;
 use App\Support\Countries;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -16,6 +17,10 @@ use Illuminate\Support\Facades\URL;
 class RegistrationService
 {
     public const VERIFY_TTL_MINUTES = 60;
+
+    public function __construct(private InAppNotifier $inApp)
+    {
+    }
 
     /** @param  array{name:string,email:string,password:string,phone?:?string,company?:?string,position?:?string,taxId?:?string,countryCode?:?string,companyAddress?:?string}  $data */
     public function register(array $data, string $locale): User
@@ -44,6 +49,16 @@ class RegistrationService
 
             return $user;
         });
+
+        // Lonceng admin modul customers: ada pendaftaran yang menunggu persetujuan.
+        $company = trim((string) ($data['company'] ?? ''));
+        $this->inApp->admins(
+            'customers',
+            'admin.customer_registered',
+            ['who' => $company !== '' ? $user->name.' ('.$company.')' : $user->name],
+            '/admin/customers',
+            ['customerId' => $user->id]
+        );
 
         $this->sendVerification($user);
 

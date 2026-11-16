@@ -9,6 +9,7 @@ use App\Http\Requests\Admin\UpdateOrderStatusRequest;
 use App\Http\Resources\OrderResource;
 use App\Http\Resources\OrderSummaryResource;
 use App\Models\Order;
+use App\Models\OrderInstallment;
 use App\Services\Commerce\OrderStateMachine;
 use App\Services\Payment\PaymentService;
 use Illuminate\Http\Request;
@@ -26,11 +27,15 @@ class OrderController extends ApiController
             'q' => ['nullable', 'string', 'max:120'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
+            // Termin (ASUMSI A-97): due = ada termin lanjutan yang sedang ditagih, overdue = lewat jatuh tempo,
+            // partial = dibayar sebagian (masih ada termin belum lunas pada order yang sudah dibayar).
+            'installments' => ['nullable', 'string', Rule::in(['due', 'overdue', 'partial'])],
         ]);
         $tz = config('app.timezone');
 
         $query = Order::with(OrderSummaryResource::eager())
             ->when($request->query('status') && $request->query('status') !== 'all', fn ($q) => $q->where('status', $request->query('status')))
+            ->when($request->query('installments'), fn ($q, $filter) => $this->filterInstallments($q, $filter))
             ->when($request->query('paymentStatus'), fn ($q, $s) => $q->where('payment_status', $s))
             ->when($request->query('from'), fn ($q, $from) => $q->where('created_at', '>=', Carbon::parse($from, $tz)->startOfDay()))
             ->when($request->query('to'), fn ($q, $to) => $q->where('created_at', '<=', Carbon::parse($to, $tz)->endOfDay()))
@@ -49,6 +54,23 @@ class OrderController extends ApiController
 
         // meta.counts = jumlah per status sepanjang waktu (angka pada tab), tidak ikut filter tanggal/pencarian.
         return $this->paginated($query->paginate($this->perPage()), OrderSummaryResource::class, ['counts' => $this->statusCounts(Order::query(), Order::STATUSES)]);
+    }
+
+    /** Filter ?installments= (ASUMSI A-97): hanya order yang sudah dibayar dan masih punya termin terbuka. */
+    private function filterInstallments($query, string $filter): void
+    {
+        $query->whereIn('orders.status', Order::PAID_STATUSES)->whereExists(function ($q) use ($filter) {
+            $q->selectRaw('1')->from('order_installments')->whereColumn('order_installments.order_id', 'orders.id');
+            if ($filter === 'partial') {
+                $q->whereIn('order_installments.status', OrderInstallment::OPEN_STATUSES);
+
+                return;
+            }
+            $q->where('order_installments.status', OrderInstallment::STATUS_DUE)->where('order_installments.seq', '>', 1);
+            if ($filter === 'overdue') {
+                $q->where('order_installments.due_at', '<', now());
+            }
+        });
     }
 
     public function show(Order $order)

@@ -6,6 +6,10 @@
       {
         "selector": "JSXOpeningElement[name.name='select']",
         "message": "Use <Select> from '@/components/Select' (searchable dropdown) instead of a raw <select>."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='input']:has(JSXAttribute[name.name='type'][value.value='number'])",
+        "message": "Use <NumberInput> from '@/components/NumberInput' (thousands separators while typing) instead of <input type=\"number\">."
       }
     ]
   },

@@ -3,6 +3,7 @@
 namespace App\Services\Auth;
 
 use App\Models\User;
+use Illuminate\Support\Collection;
 
 // Satu pintu pemeriksaan modul admin (ASUMSI A-4: role + permissions jsonb, tanpa package).
 class ModuleAccess
@@ -35,6 +36,18 @@ class ModuleAccess
         }
 
         return in_array($module, $user->permissions ?? [], true);
+    }
+
+    /**
+     * Admin aktif yang boleh mengakses modul (super_admin selalu termasuk): penerima email dan notifikasi admin.
+     *
+     * @return Collection<int, User>
+     */
+    public function adminsWith(string $module): Collection
+    {
+        return User::admins()->where('status', User::STATUS_ACTIVE)->orderBy('id')->get()
+            ->filter(fn (User $user) => $this->allows($user, $module))
+            ->values();
     }
 
     /** Daftar modul yang boleh diakses user; super_admin = semua. */

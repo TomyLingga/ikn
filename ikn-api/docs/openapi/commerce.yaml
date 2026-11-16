@@ -174,7 +174,7 @@ paths:
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/InvalidTransition' }
+        '409': { description: 'INVALID_TRANSITION | INSTALLMENTS_UNPAID (ASUMSI A-97: masih ada termin belum lunas; meta { currency, outstandingTotal, installmentIds }). Perintah orders:auto-complete melewati order seperti ini', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /customer/orders/{number}/reviews:
     post:
       tags: [orders]
@@ -223,6 +223,7 @@ paths:
       description: |
         `file` jpg/png/pdf ≤ 5 MB (disk private, diunduh lewat GET /files/{mediaId} oleh pemilik order dan admin).
         `paymentId` opsional (default payment aktif). Bila payment aktif rejected/tidak ada → payment baru dengan metode & rekening yang sama.
+        `installmentId` opsional (ASUMSI A-97, kontrak 11.13): termin yang dibayar. Kosong = termin pertama selama order belum dibayar, atau termin lanjutan pertama yang sedang ditagih. Bukti termin lanjutan tidak mengubah status order; termin menjadi `awaiting_verification`. 422 `installmentId` bila bukan termin order ini; 409 `INSTALLMENT_NOT_DUE` bila termin belum ditagih atau sudah lunas; 409 `PAYMENT_ALREADY_ACTIVE` bila bukti termin masih diverifikasi. Termin lanjutan yang terlambat tetap boleh dibayar.
         Setelah `paymentDueAt` → 409 ORDER_EXPIRED. Masih menunggu verifikasi → 409 PAYMENT_ALREADY_ACTIVE. Metode gateway → 422 paymentId.
       parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
       requestBody:
@@ -235,6 +236,7 @@ paths:
               properties:
                 file: { type: string, format: binary }
                 paymentId: { type: integer }
+                installmentId: { type: integer, description: 'ASUMSI A-97: id OrderInstallment' }
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/ProofResponse' } } } } } }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -274,6 +276,7 @@ paths:
         - { name: q, in: query, schema: { type: string }, description: 'ILIKE nomor order/invoice, nama/perusahaan/PIC/email customer (snapshot)' }
         - { name: from, in: query, schema: { type: string, format: date }, description: 'created_at >= (zona aplikasi)' }
         - { name: to, in: query, schema: { type: string, format: date }, description: 'created_at <= akhir hari' }
+        - { name: installments, in: query, schema: { type: string, enum: [partial, due, overdue] }, description: 'ASUMSI A-97: hanya order paid..delivered yang punya termin terbuka (partial), termin lanjutan sedang ditagih (due), atau yang lewat jatuh tempo (overdue)' }
         - { name: page, in: query, schema: { type: integer } }
         - { name: perPage, in: query, schema: { type: integer, default: 20, maximum: 100 } }
       responses:
@@ -292,7 +295,7 @@ paths:
     post:
       tags: [admin-orders]
       security: [{ cookieAuth: [] }]
-      summary: 'Ubah status: processing | shipped (wajib courier + trackingNumber; order Loco = siap diambil tanpa keduanya; order FOB/CIF = wajib vesselName + blNumber, dimuat ke kapal) | delivered (Loco = sudah diambil) | completed'
+      summary: 'Ubah status: processing | shipped (wajib courier + trackingNumber; order Loco = siap diambil tanpa keduanya; order FOB/CIF = wajib vesselName + blNumber, dimuat ke kapal) | delivered (Loco = sudah diambil) | completed. Order bertermin (ASUMSI A-97): shipped/delivered menagih termin yang pemicunya tercapai; completed ditolak 409 INSTALLMENTS_UNPAID (meta { currency, outstandingTotal, installmentIds }) selama ada termin belum lunas'
       parameters: [{ $ref: '#/components/parameters/OrderNumber' }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OrderStatusInput' } } } }
       responses:
@@ -372,6 +375,39 @@ paths:
         '404': { description: 'NOT_FOUND: penawaran bukan milik order ini', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '409': { description: 'FREIGHT_QUOTE_STALE (sudah ditutup / bukan putaran terakhir) | FREIGHT_QUOTE_NOT_ALLOWED (penawaran admin sendiri, atau order bukan awaiting_freight) | FREIGHT_PAYMENT_UNAVAILABLE (meta { currency, missing }: tidak ada metode transfer manual / rekening se-mata-uang yang aktif)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/orders/{number}/installments/{installment}/bill:
+    post:
+      tags: [admin-payments]
+      security: [{ cookieAuth: [] }]
+      summary: 'Tagih termin lebih awal, atau ubah jatuh tempo termin yang sudah ditagih (modul payments, diaudit; ASUMSI A-97, kontrak 11.13)'
+      description: |
+        Termin `scheduled` → `due`, payment pending baru dibuat (metode/rekening = payment terakhir order), customer diberi email + notifikasi `order.installment_due`.
+        Tanpa `dueAt`: jatuh tempo = sekarang + `dueDays` jadwal. Termin yang sudah `due` wajib `dueAt` (ubah jatuh tempo, pengingat dihitung ulang, notifikasi `order.installment_due_changed`).
+        Termin pertama tidak lewat sini (batas bayarnya = batas bayar order, `PUT /admin/orders/{number}/due`). Order harus paid, processing, shipped, atau delivered.
+      parameters:
+        - { $ref: '#/components/parameters/OrderNumber' }
+        - { name: installment, in: path, required: true, schema: { type: integer } }
+      requestBody: { required: false, content: { application/json: { schema: { type: object, properties: { dueAt: { type: string, format: date-time, description: 'harus di masa depan' } } } } } }
+      responses:
+        '200': { description: Order terbaru, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: 'NOT_FOUND: termin bukan milik order ini', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'INSTALLMENT_NOT_BILLABLE (termin pertama, sudah lunas/void, atau status order tidak memungkinkan; meta { installmentId, status, orderStatus }) | INSTALLMENT_ALREADY_BILLED (sudah ditagih dan dueAt tidak dikirim; meta { installmentId, status, dueAt })', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/orders/{number}/installments/{installment}/remind:
+    post:
+      tags: [admin-payments]
+      security: [{ cookieAuth: [] }]
+      summary: 'Kirim pengingat pembayaran termin yang sedang ditagih (email + notifikasi; modul payments, diaudit; ASUMSI A-97)'
+      description: 'Dibatasi sekali per `ikn.commerce.installment_reminder_cooldown_hours` (12 jam) sejak pengingat terakhir, manual maupun otomatis. Termin yang lewat jatuh tempo memakai teks terlambat.'
+      parameters:
+        - { $ref: '#/components/parameters/OrderNumber' }
+        - { name: installment, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Order terbaru, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/Order' } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: 'NOT_FOUND: termin bukan milik order ini', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'INSTALLMENT_NOT_DUE (termin tidak sedang ditagih) | INSTALLMENT_REMINDER_TOO_SOON (meta { installmentId, remindedAt, retryAt })', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /admin/orders/{number}/payments/accept:
     post:
       tags: [admin-payments]
@@ -643,7 +679,9 @@ components:
         provider: { type: string, enum: [manual, xendit] }
         externalId: { type: string, nullable: true, example: IKN-20260921-00043-51 }
         currency: { type: string, enum: [IDR, USD], description: 'sama dengan order (ASUMSI A-86)' }
-        amount: { type: integer, description: 'satuan terkecil currency = grandTotal order saat payment dibuat' }
+        amount: { type: integer, description: 'satuan terkecil currency = grandTotal order saat payment dibuat, atau nominal termin bila installmentId terisi (ASUMSI A-97)' }
+        installmentId: { type: integer, nullable: true, description: 'ASUMSI A-97: termin yang dibayar; null = order tanpa termin' }
+        installment: { allOf: [{ $ref: '#/components/schemas/InstallmentBrief' }], nullable: true }
         receivedAmount: { type: integer, nullable: true, description: 'jumlah diterima yang dicatat admin saat accept (informasi)' }
         bankCharges: { type: integer, nullable: true, description: 'biaya bank yang dicatat admin saat accept (informasi)' }
         receivedNote: { type: string, nullable: true }
@@ -686,6 +724,7 @@ components:
         paymentDueAt: { type: string, format: date-time, nullable: true }
         paidAt: { type: string, format: date-time, nullable: true }
         date: { type: string, format: date-time }
+        paymentProgress: { $ref: '#/components/schemas/PaymentProgress' }
     AdminPayment:
       allOf:
         - { $ref: '#/components/schemas/Payment' }
@@ -712,6 +751,9 @@ components:
         paymentMethod: { type: string, nullable: true, description: 'metode payment aktif/terakhir; order awaiting_freight memakai pendingPaymentMethod.code' }
         paymentDueAt: { type: string, format: date-time, nullable: true, description: 'null selama awaiting_freight' }
         paidAt: { type: string, format: date-time, nullable: true }
+        paymentProgress: { $ref: '#/components/schemas/PaymentProgress' }
+        hasInstallments: { type: boolean, description: 'ASUMSI A-97' }
+        nextInstallment: { allOf: [{ $ref: '#/components/schemas/NextInstallment' }], nullable: true, description: 'termin lanjutan paling awal yang sedang ditagih atau menunggu verifikasi' }
         courier: { type: string, nullable: true }
         trackingNumber: { type: string, nullable: true }
         destinationPort: { type: string, nullable: true, description: 'nama pelabuhan tujuan CIF (ASUMSI A-89); null untuk term lain' }
@@ -901,6 +943,8 @@ components:
         activePayment: { allOf: [{ $ref: '#/components/schemas/Payment' }], nullable: true, description: 'payment pending/awaiting_verification terbaru' }
         payment: { allOf: [{ $ref: '#/components/schemas/Payment' }], nullable: true, description: 'alias activePayment (contoh 201 kontrak bagian 9)' }
         payments: { type: array, items: { $ref: '#/components/schemas/Payment' } }
+        installments: { type: array, items: { $ref: '#/components/schemas/OrderInstallment' }, description: 'ASUMSI A-97: [] untuk order satu pembayaran penuh' }
+        paymentProgress: { $ref: '#/components/schemas/PaymentProgress' }
         timeline: { type: array, items: { $ref: '#/components/schemas/OrderTimelineEntry' } }
         trackingUpdates: { type: array, items: { $ref: '#/components/schemas/TrackingUpdate' } }
         canAddTracking: { type: boolean, description: 'true hanya saat status shipped dan bukan order Loco' }
@@ -916,6 +960,63 @@ components:
         canReview: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    InstallmentBrief:
+      type: object
+      description: 'Termin ringkas di Payment.installment (ASUMSI A-97)'
+      properties:
+        id: { type: integer }
+        seq: { type: integer, description: '1 = termin pertama (mengikuti alur order)' }
+        key: { type: string, example: balance }
+        label: { $ref: '#/components/schemas/I18n' }
+        percent: { type: number, example: 70 }
+        status: { $ref: '#/components/schemas/InstallmentStatus' }
+    NextInstallment:
+      allOf:
+        - { $ref: '#/components/schemas/InstallmentBrief' }
+        - type: object
+          properties:
+            amount: { type: integer }
+            currency: { type: string, enum: [IDR, USD] }
+            dueAt: { type: string, format: date-time, nullable: true }
+            overdue: { type: boolean }
+    InstallmentStatus:
+      type: string
+      enum: [scheduled, due, awaiting_verification, paid, void]
+      description: 'scheduled = pemicu belum tercapai; due = ditagih; awaiting_verification = bukti menunggu admin; paid; void = order dibatalkan atau kedaluwarsa sebelum lunas. Terlambat diturunkan (field overdue), tidak disimpan'
+    OrderInstallment:
+      type: object
+      description: 'Termin order (tabel order_installments, ASUMSI A-97): salinan jadwal syarat pembayaran yang dibekukan saat total final (checkout, atau saat penawaran ongkir CIF disepakati). amount = percent × grandTotal dibulatkan ke satuan terkecil; baris terakhir mengambil sisa sehingga jumlah amount = grandTotal'
+      properties:
+        id: { type: integer }
+        seq: { type: integer }
+        key: { type: string }
+        label: { $ref: '#/components/schemas/I18n' }
+        percent: { type: number }
+        amount: { type: integer, description: satuan terkecil currency }
+        currency: { type: string, enum: [IDR, USD] }
+        trigger: { type: string, enum: [order, shipped, delivered] }
+        dueDays: { type: integer }
+        status: { $ref: '#/components/schemas/InstallmentStatus' }
+        overdue: { type: boolean, description: 'status due dan dueAt sudah lewat' }
+        dueAt: { type: string, format: date-time, nullable: true, description: 'termin pertama = paymentDueAt order; lanjutan = saat ditagih + dueDays' }
+        billedAt: { type: string, format: date-time, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+        remindedAt: { type: string, format: date-time, nullable: true }
+        reminderCount: { type: integer }
+        activePayment: { allOf: [{ $ref: '#/components/schemas/Payment' }], nullable: true }
+        payments: { type: array, items: { $ref: '#/components/schemas/Payment' }, description: 'semua percobaan bayar termin ini, termasuk yang ditolak' }
+        canUploadProof: { type: boolean }
+        canBill: { type: boolean, description: 'admin: termin lanjutan scheduled pada order berjalan' }
+        canChangeDue: { type: boolean }
+        canRemind: { type: boolean }
+    PaymentProgress:
+      type: object
+      description: 'ASUMSI A-97. Order tanpa termin: unpaid sampai dibayar, lalu paid. Order bertermin: partial = sebagian termin lunas'
+      properties:
+        currency: { type: string, enum: [IDR, USD] }
+        paidTotal: { type: integer }
+        outstandingTotal: { type: integer }
+        status: { type: string, enum: [unpaid, partial, paid] }
     ProofResponse:
       type: object
       properties:
@@ -979,6 +1080,7 @@ components:
       properties:
         currency: { type: string, enum: [IDR] }
         exportKpis: { allOf: [{ $ref: '#/components/schemas/ExportKpis' }], nullable: true, description: 'Additive (Phase E6). Blok ekspor USD; null bila belum pernah ada order USD.' }
+        outstandingInstallments: { type: array, description: 'Additive (ASUMSI A-97). Sisa tagihan termin per mata uang dari order paid..delivered yang punya termin belum lunas; [] bila tidak ada. Pendapatan (kpis, exportKpis, laporan) tetap menghitung order penuh sejak termin pertama diverifikasi', items: { type: object, properties: { currency: { type: string, enum: [IDR, USD] }, total: { type: integer, description: satuan terkecil }, count: { type: integer }, overdue: { type: integer } } } }
         today: { type: object, description: 'Additive 2026-11-04. Hari ini s.d. sekarang vs kemarin s.d. jam yang sama; uang & order dibayar IDR, order dibuat semua mata uang.', properties: { revenue: { type: integer }, paidOrders: { type: integer }, ordersCreated: { type: integer }, yesterdayRevenue: { type: integer }, yesterdayPaidOrders: { type: integer }, yesterdayOrdersCreated: { type: integer } } }
         trend30: { type: array, description: 'Additive 2026-11-04. Pendapatan IDR per hari, 30 hari terakhir (hari kosong = 0).', items: { type: object, properties: { date: { type: string, format: date }, total: { type: integer }, orders: { type: integer } } } }
         statusBreakdown: { type: array, description: 'Additive 2026-11-04. Order dibuat bulan ini per status saat ini (semua mata uang), hanya status yang ada.', items: { type: object, properties: { status: { type: string }, count: { type: integer } } } }
@@ -1021,6 +1123,7 @@ components:
           properties:
             paymentsToVerify: { type: integer, nullable: true, description: 'payment awaiting_verification (modul payments)' }
             freightToQuote: { type: integer, nullable: true, description: 'order awaiting_freight tanpa penawaran admin proposed yang masih berlaku: order CIF baru, balasan customer, atau penawaran kedaluwarsa (modul orders, ASUMSI A-89)' }
+            installmentsDue: { type: integer, nullable: true, description: 'termin lanjutan yang sedang ditagih (termasuk terlambat) pada order paid..delivered; null tanpa modul payments (ASUMSI A-97). Tautan FE /admin/orders?installments=due' }
             ordersToProcess: { type: integer, nullable: true, description: 'order paid (modul orders)' }
             ordersToShip: { type: integer, nullable: true, description: 'order processing (modul orders)' }
             ordersInTransit: { type: integer, nullable: true, description: 'order shipped (modul orders)' }

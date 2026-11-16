@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Order;
+use App\Models\OrderInstallment;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -48,6 +49,11 @@ class OrderSummaryResource extends JsonResource
             ])->values()->all(),
             'subtotal' => $order->subtotalInt(),
             'grandTotal' => $order->grandTotalInt(),
+            // Kemajuan pembayaran (ASUMSI A-97): status partial = order bertermin yang baru dibayar sebagian; hasInstallments
+            // + nextInstallment (termin lanjutan yang sedang ditagih) untuk label dan tombol di daftar.
+            'paymentProgress' => $order->paymentProgress(),
+            'hasInstallments' => $order->hasInstallments(),
+            'nextInstallment' => self::nextInstallment($order),
             // Order awaiting_freight belum punya payment: tampilkan metode yang ditunda (pending_payment_method, A-89).
             'paymentMethod' => $active?->method ?? $order->latestPayment()?->method ?? ($order->pending_payment_method['code'] ?? null),
             'destinationPort' => $order->destinationPort()['name'] ?? null,
@@ -68,8 +74,23 @@ class OrderSummaryResource extends JsonResource
         ];
     }
 
+    /** Termin lanjutan yang sedang ditagih atau menunggu verifikasi (yang paling awal), ringkas untuk daftar. */
+    public static function nextInstallment(Order $order): ?array
+    {
+        $row = $order->installmentRows()->first(fn ($row) => ! $row->isFirst() && in_array($row->status, [
+            OrderInstallment::STATUS_DUE, OrderInstallment::STATUS_AWAITING_VERIFICATION,
+        ], true));
+
+        return $row ? $row->toBrief() + [
+            'amount' => $row->amountInt(),
+            'currency' => $row->currencyCode(),
+            'dueAt' => optional($row->due_at)->toApiString(),
+            'overdue' => $row->isOverdue(),
+        ] : null;
+    }
+
     public static function eager(): array
     {
-        return ['items', 'payments', 'reviews'];
+        return ['items', 'payments', 'reviews', 'installments'];
     }
 }

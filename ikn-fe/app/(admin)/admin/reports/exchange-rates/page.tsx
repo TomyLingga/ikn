@@ -13,6 +13,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { exchangeRateSourceLabels, isoDate, type ExchangeRatePoint, type ExchangeRateSummary } from '@/lib/admin';
 import { formatDate, formatDateTime, formatIDR } from '@/lib/format';
+import NumberInput from '@/components/NumberInput';
 
 // Rentang grafik (segmented control). Disimpan di URL (?range=3m) agar bisa dibagikan, dan di localStorage sebagai
 // pilihan terakhir admin bila URL tidak membawa range.
@@ -325,8 +326,8 @@ export default function AdminExchangeRates() {
             </label>
             <label>
               <span className="field-label">{t('Kurs (Rp per USD)', 'Rate (Rp per USD)')} *</span>
-              <input
-                type="number"
+              <NumberInput
+                currency="IDR"
                 min={1000}
                 max={1000000}
                 step={1}

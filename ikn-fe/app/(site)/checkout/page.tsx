@@ -19,6 +19,7 @@ import EmptyState from '@/components/EmptyState';
 import AddressForm from '@/components/customer/AddressForm';
 import AccountStatusBanner from '@/components/customer/AccountStatusBanner';
 import PickupPointCard from '@/components/customer/PickupPointCard';
+import InstallmentPlan from '@/components/customer/InstallmentPlan';
 import PortPicker, { EMPTY_PORT, completeDestinationPort, type DestinationPortDraft } from '@/components/customer/PortPicker';
 import { formatAddressLines } from '@/components/customer/CustomerAddresses';
 import { useCart } from '@/components/CartProvider';
@@ -275,6 +276,9 @@ export default function CheckoutPage() {
   const needsBank = selectedMethod?.type === 'manual_transfer';
   const termOk = terms.length === 0 || !!selectedTerm;
   const paymentTermOk = !needsPaymentTerm || !!selectedPaymentTerm;
+  // Jadwal termin syarat bayar terpilih (ASUMSI A-97): nominal dari quote bila quote sudah memakai syarat ini.
+  const quotePlan = quote?.paymentTerm?.code === paymentTermCode ? quote?.installments || [] : [];
+  const installmentPlan = quotePlan.length > 0 ? quotePlan : selectedPaymentTerm?.installments || [];
   const shippingOk = !usesZone || (!!addressId && !!shippingRateId);
   const canReview = termOk && portOk && shippingOk && paymentTermOk && !!paymentMethodCode && (!needsBank || !!bankAccountId) && !!quote;
   const dueHours = exportMarket || usd ? config?.exportPaymentDueHours ?? config?.paymentDueHours ?? 120 : config?.paymentDueHours ?? 24;
@@ -585,11 +589,11 @@ export default function CheckoutPage() {
               {/* 0b. Pelabuhan tujuan (hanya term CIF, ASUMSI A-89) */}
               {activeStep === 'port' && (
                 <div className="co-block">
-                  <h2 className="h3 pd-sec-title">{t('Pelabuhan tujuan', 'Destination port')}</h2>
+                  <h2 className="h3 pd-sec-title">{t('Pelabuhan atau bandara tujuan', 'Destination port or airport')}</h2>
                   <p className="form-note" style={{ marginBottom: 14 }}>
                     {t(
-                      'Tulis nama pelabuhan bongkar di negara Anda, pilih negaranya, lalu tandai lokasinya di peta. Ongkos kapal dan asuransi ditawarkan sampai titik ini.',
-                      'Enter the discharge port in your country, pick the country, then mark its location on the map. Ocean freight and insurance are quoted up to this point.',
+                      'Pilih pelabuhan bongkar atau bandara di negara Anda. Tim kami menawarkan ongkos angkut dan asuransi sampai titik itu setelah pesanan dibuat.',
+                      'Choose the discharge port or airport in your country. Our team quotes freight and insurance up to that point after the order is placed.',
                     )}
                   </p>
                   <PortPicker value={port} onChange={setPort} lang={lang} showErrors={portTouched} serverErrors={formErrors} />
@@ -761,8 +765,11 @@ export default function CheckoutPage() {
                         ))}
                       </div>
                       <p className="qty-moq" style={{ marginTop: 10 }}>
-                        {t('Syarat ini dicetak di proforma dan commercial invoice. Sistem mencatat satu pembayaran sebesar total pesanan, lalu tim keuangan kami mencocokkan pembayaran bertahapnya.', 'These terms are printed on the proforma and commercial invoice. The app records one payment for the order total; instalments are matched by our finance team.')}
+                        {installmentPlan.length > 0
+                          ? t('Pesanan ini dibayar bertahap. Setiap termin ditagih sesuai jadwal di bawah, dan Anda mengunggah bukti transfer untuk tiap termin.', 'This order is paid in stages. Each installment is billed on the schedule below, and you upload a transfer proof for each one.')
+                          : t('Syarat ini dicetak di proforma dan commercial invoice.', 'These terms are printed on the proforma and commercial invoice.')}
                       </p>
+                      {installmentPlan.length > 0 && <InstallmentPlan rows={installmentPlan} currency={currency} amountsPending={quotedFreight || quotePlan.length === 0} />}
                       {fieldError('paymentTermCode')}
                     </div>
                   )}
@@ -919,12 +926,12 @@ export default function CheckoutPage() {
                               <br />
                               <small>
                                 {t('Pelabuhan tujuan', 'Destination port')}: {destinationPort.name}, {destinationPort.country}{' '}
-                                <button type="button" className="link" onClick={() => setStep('port')}>{t('ubah', 'change')}</button>
+                                <button type="button" className="link" onClick={() => setStep('port')}><Icon name="edit" size={13} /> {t('Ubah', 'Change')}</button>
                               </small>
                             </>
                           ) : null}
                           {isPort && customer.profile?.companyAddress ? <><br /><small>{customer.profile.company || customer.name} · {customer.profile.companyAddress}</small></> : null}
-                          {' '}<button type="button" className="link" onClick={() => setStep('term')}>{t('ubah', 'change')}</button>
+                          {' '}<button type="button" className="link" onClick={() => setStep('term')}><Icon name="edit" size={13} /> {t('Ubah', 'Change')}</button>
                         </dd>
                       </div>
                     )}
@@ -934,21 +941,22 @@ export default function CheckoutPage() {
                         <dd>
                           {tr(selectedPaymentTerm.name, lang)}
                           {tr(selectedPaymentTerm.description, lang) ? <><br /><small>{tr(selectedPaymentTerm.description, lang)}</small></> : null}
-                          {' '}<button type="button" className="link" onClick={() => setStep('payment')}>{t('ubah', 'change')}</button>
+                          {' '}<button type="button" className="link" onClick={() => setStep('payment')}><Icon name="edit" size={13} /> {t('Ubah', 'Change')}</button>
+                          {installmentPlan.length > 0 && <InstallmentPlan rows={installmentPlan} currency={currency} amountsPending={quotedFreight || quotePlan.length === 0} />}
                         </dd>
                       </div>
                     )}
                     {usesZone && (
                       <div>
                         <dt>{t('Alamat', 'Address')}</dt>
-                        <dd>{selectedAddress ? <>{selectedAddress.recipientName} · {selectedAddress.phone}<br />{formatAddressLines(selectedAddress).join(', ')}</> : '—'} <button type="button" className="link" onClick={() => setStep('address')}>{t('ubah', 'change')}</button></dd>
+                        <dd>{selectedAddress ? <>{selectedAddress.recipientName} · {selectedAddress.phone}<br />{formatAddressLines(selectedAddress).join(', ')}</> : '—'} <button type="button" className="link" onClick={() => setStep('address')}><Icon name="edit" size={13} /> {t('Ubah', 'Change')}</button></dd>
                       </div>
                     )}
                     <div>
                       <dt>{t('Pengiriman', 'Shipping')}</dt>
                       <dd>
                         {usesZone ? (
-                          <>{selectedRate ? <>{tr(selectedRate.label, lang)}{selectedRate.eta ? ` · ${tr(selectedRate.eta, lang)}` : ''} · {fmt(selectedRate.amount)}</> : '—'} <button type="button" className="link" onClick={() => setStep('shipping')}>{t('ubah', 'change')}</button></>
+                          <>{selectedRate ? <>{tr(selectedRate.label, lang)}{selectedRate.eta ? ` · ${tr(selectedRate.eta, lang)}` : ''} · {fmt(selectedRate.amount)}</> : '—'} <button type="button" className="link" onClick={() => setStep('shipping')}><Icon name="edit" size={13} /> {t('Ubah', 'Change')}</button></>
                         ) : (
                           quotedFreight ? (
                             <>{t('Ongkir CIF kami tawarkan setelah pesanan dibuat dan belum masuk total ini.', 'CIF freight is quoted by our team after the order is placed and is not in this total yet.')}</>
@@ -964,7 +972,7 @@ export default function CheckoutPage() {
                         {selectedMethod ? tr(selectedMethod.name, lang) : '—'}
                         {needsBank && selectedBank ? ` · ${selectedBank.bankName} ${selectedBank.accountNumber}` : ''}
                         {needsBank && selectedBank && usd ? <><br /><BankDetails bank={selectedBank} t={t} /></> : null}
-                        {' '}<button type="button" className="link" onClick={() => setStep('payment')}>{t('ubah', 'change')}</button>
+                        {' '}<button type="button" className="link" onClick={() => setStep('payment')}><Icon name="edit" size={13} /> {t('Ubah', 'Change')}</button>
                       </dd>
                     </div>
                     {note.trim() && (
@@ -991,7 +999,7 @@ export default function CheckoutPage() {
                         })}
                       </ul>
                       {shop.portal ? (
-                        <button type="button" className="link" onClick={openCartDrawer}>{t('Sesuaikan keranjang', 'Adjust cart')}</button>
+                        <button type="button" className="link" onClick={openCartDrawer}><Icon name="edit" size={13} /> {t('Sesuaikan keranjang', 'Adjust cart')}</button>
                       ) : (
                         <Link href="/cart" className="link">{t('Sesuaikan keranjang', 'Adjust cart')}</Link>
                       )}

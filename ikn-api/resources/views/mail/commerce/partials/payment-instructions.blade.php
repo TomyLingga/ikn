@@ -5,6 +5,10 @@
     $payload = $payment?->payload ?? [];
     $instructions = $payload['instructions'] ?? null;
     $instructionText = is_array($instructions) ? ($instructions[$lang] ?? $instructions['id'] ?? '') : (string) $instructions;
+    // Teks metode transfer ditulis untuk rupiah (kode unik); order non-IDR memakai teks tetap tanpa kode unik (ASUMSI A-86).
+    if (! \App\Support\Money::isIdr($payment?->currencyCode() ?? $order->currencyCode())) {
+        $instructionText = __('commerce.mail.placed.instructions_foreign');
+    }
     $bank = $payload['bankAccount'] ?? null;
 @endphp
 @if ($payment)

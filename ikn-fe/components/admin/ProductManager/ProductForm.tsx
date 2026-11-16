@@ -21,6 +21,7 @@ import {
 import { fromMinorInput, isExponentInput, toMinorInput } from '@/lib/format';
 import type { Category, PriceMode } from '@/lib/types';
 import Select from '@/components/Select';
+import NumberInput from '@/components/NumberInput';
 
 interface ProductFormState {
   code: string;
@@ -371,7 +372,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
           </label>
           <label>
             <span className="field-label">{t('Harga (Rp, sebelum promo)', 'Price (Rp, before promo)')}</span>
-            <input type="number" min={0} step={1} value={form.price} onChange={(e) => update('price', e.target.value)} disabled={form.priceMode !== 'fixed'} required={form.priceMode === 'fixed'} />
+            <NumberInput currency="IDR" min={0} step={1} value={form.price} onChange={(e) => update('price', e.target.value)} disabled={form.priceMode !== 'fixed'} required={form.priceMode === 'fixed'} />
             {firstError(errors, 'price') && <small className="cms-field-error">{firstError(errors, 'price')}</small>}
           </label>
           <label>
@@ -385,7 +386,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
             <label>
               <span className="field-label">{t('Harga USD (FOB Belawan)', 'USD price (FOB Belawan)')}</span>
               <div className="admin-input-suffix">
-                <input type="number" min={0} step={0.01} inputMode="decimal" value={form.priceUsd} onChange={(e) => update('priceUsd', e.target.value)} placeholder={t('kosong = tidak dijual ke pasar ekspor', 'empty = not sold to the export market')} />
+                <NumberInput currency="USD" min={0} step={0.01} inputMode="decimal" value={form.priceUsd} onChange={(e) => update('priceUsd', e.target.value)} placeholder={t('kosong = tidak dijual ke pasar ekspor', 'empty = not sold to the export market')} />
                 <span>USD</span>
               </div>
               <small className="admin-field-hint">
@@ -400,7 +401,7 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
           <div className="admin-form-row admin-form-row-3">
             <label>
               <span className="field-label">{t('Harga promo (Rp)', 'Promo price (Rp)')}</span>
-              <input type="number" min={0} step={1} value={form.promoPrice} onChange={(e) => update('promoPrice', e.target.value)} placeholder={t('kosong = tanpa promo', 'empty = no promo')} />
+              <NumberInput currency="IDR" min={0} step={1} value={form.promoPrice} onChange={(e) => update('promoPrice', e.target.value)} placeholder={t('kosong = tanpa promo', 'empty = no promo')} />
               {firstError(errors, 'promoPrice') && <small className="cms-field-error">{firstError(errors, 'promoPrice')}</small>}
             </label>
             <label>
@@ -446,17 +447,17 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
         <div className="admin-form-row admin-form-row-3">
           <label>
             <span className="field-label">{t('Panjang kemasan (cm)', 'Package length (cm)')}</span>
-            <input type="number" min={0.1} step={0.1} value={form.lengthCm} onChange={(e) => update('lengthCm', e.target.value)} placeholder="40" />
+            <NumberInput min={0.1} step={0.1} value={form.lengthCm} onChange={(e) => update('lengthCm', e.target.value)} placeholder="40" />
             {firstError(errors, 'lengthCm') && <small className="cms-field-error">{firstError(errors, 'lengthCm')}</small>}
           </label>
           <label>
             <span className="field-label">{t('Lebar kemasan (cm)', 'Package width (cm)')}</span>
-            <input type="number" min={0.1} step={0.1} value={form.widthCm} onChange={(e) => update('widthCm', e.target.value)} placeholder="30" />
+            <NumberInput min={0.1} step={0.1} value={form.widthCm} onChange={(e) => update('widthCm', e.target.value)} placeholder="30" />
             {firstError(errors, 'widthCm') && <small className="cms-field-error">{firstError(errors, 'widthCm')}</small>}
           </label>
           <label>
             <span className="field-label">{t('Tinggi kemasan (cm)', 'Package height (cm)')}</span>
-            <input type="number" min={0.1} step={0.1} value={form.heightCm} onChange={(e) => update('heightCm', e.target.value)} placeholder="25" />
+            <NumberInput min={0.1} step={0.1} value={form.heightCm} onChange={(e) => update('heightCm', e.target.value)} placeholder="25" />
             {firstError(errors, 'heightCm') && <small className="cms-field-error">{firstError(errors, 'heightCm')}</small>}
           </label>
         </div>
@@ -472,12 +473,12 @@ export default function ProductForm({ product, categories, onClose, onSaved }: P
         <div className="admin-form-row admin-form-row-3">
           <label>
             <span className="field-label">{t('Minimum order (MOQ)', 'Minimum order (MOQ)')}</span>
-            <input type="number" min={1} step={1} value={form.moq} onChange={(e) => update('moq', e.target.value)} required />
+            <NumberInput min={1} step={1} value={form.moq} onChange={(e) => update('moq', e.target.value)} required />
             {firstError(errors, 'moq') && <small className="cms-field-error">{firstError(errors, 'moq')}</small>}
           </label>
           <label>
             <span className="field-label">{t('Berat per satuan (gram)', 'Weight per unit (gram)')}</span>
-            <input type="number" min={1} step={1} value={form.weightGram} onChange={(e) => update('weightGram', e.target.value)} required />
+            <NumberInput min={1} step={1} value={form.weightGram} onChange={(e) => update('weightGram', e.target.value)} required />
             <small className="admin-field-hint">{t('Dipakai untuk ongkir per kg.', 'Used for per-kg shipping.')}</small>
             {firstError(errors, 'weightGram') && <small className="cms-field-error">{firstError(errors, 'weightGram')}</small>}
           </label>

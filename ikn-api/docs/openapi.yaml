@@ -63,7 +63,7 @@ tags:
 - name: admin-audit
   description: Audit log (super_admin)
 - name: notifications
-  description: Notifikasi dalam aplikasi untuk customer (lonceng portal) dan penghitung badge
+  description: Notifikasi dalam aplikasi untuk customer (lonceng portal) dan admin (lonceng panel admin), serta penghitung badge
 - name: chat
   description: Live chat customer dengan penjual (polling, tanpa websocket)
 - name: admin-chat
@@ -156,6 +156,24 @@ paths:
           $ref: '#/components/responses/UserSession'
         '401':
           $ref: '#/components/responses/Unauthenticated'
+  /geo/map-config:
+    get:
+      tags:
+      - content
+      summary: 'Lapisan tile siap pakai untuk semua peta Leaflet (ASUMSI A-98). Publik (tanpa login). Penyedia dipilih admin di site-settings
+        grup maps: default (OSM + Esri), google (Map Tiles API 2D, token sesi dibuat server), custom (templat XYZ). Hasil di-cache server (bawaan
+        6 jam; 5 menit saat fallback) dan dikosongkan saat grup maps disimpan. Bila penyedia gagal, lapisan bawaan disajikan dengan fallback true;
+        alasan gagal tidak pernah dikirim ke publik.'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MapTileConfig'
   /upload-limits:
     get:
       tags:
@@ -933,6 +951,42 @@ paths:
                     type: string
         '422':
           description: ValidationError (to / mail.*), MAIL_TEST_FAILED (alasan dari server SMTP di message), MAIL_DISABLED (mode off)
+  /admin/site-settings/maps-test:
+    post:
+      tags:
+      - admin-settings
+      security:
+      - cookieAuth: []
+      summary: 'Uji penyedia tile peta (modul settings, ASUMSI A-98) memakai `maps` dari form (belum disimpan) atau pengaturan tersimpan bila
+        `maps` tidak dikirim; `maps.google_api_key` "********" = key tersimpan. google: buat token sesi (createSession) lalu ambil satu tile zoom
+        0 untuk tiap lapisan (street, satellite, hybrid). custom: ambil satu tile z=1 dari tiap URL yang diisi. default: tanpa permintaan keluar.
+        Selalu 200 bila input valid; lihat data.ok dan data.results. Tidak menyimpan apa pun dan tidak mengubah cache GET /geo/map-config.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maps:
+                  $ref: '#/components/schemas/SiteSettings/properties/maps'
+      responses:
+        '200':
+          description: '{ data: MapTestResult, message }'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MapTestResult'
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: FORBIDDEN (bukan admin atau tanpa modul settings)
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /admin/cms/section-types:
     get:
       tags:
@@ -4677,7 +4731,12 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/InvalidTransition'
+          description: 'INVALID_TRANSITION | INSTALLMENTS_UNPAID (ASUMSI A-97: masih ada termin belum lunas; meta { currency, outstandingTotal,
+            installmentIds }). Perintah orders:auto-complete melewati order seperti ini'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /customer/orders/{number}/reviews:
     post:
       tags:
@@ -4827,6 +4886,11 @@ paths:
 
         `paymentId` opsional (default payment aktif). Bila payment aktif rejected/tidak ada → payment baru dengan metode & rekening yang sama.
 
+        `installmentId` opsional (ASUMSI A-97, kontrak 11.13): termin yang dibayar. Kosong = termin pertama selama order belum dibayar, atau termin
+        lanjutan pertama yang sedang ditagih. Bukti termin lanjutan tidak mengubah status order; termin menjadi `awaiting_verification`. 422 `installmentId`
+        bila bukan termin order ini; 409 `INSTALLMENT_NOT_DUE` bila termin belum ditagih atau sudah lunas; 409 `PAYMENT_ALREADY_ACTIVE` bila bukti
+        termin masih diverifikasi. Termin lanjutan yang terlambat tetap boleh dibayar.
+
         Setelah `paymentDueAt` → 409 ORDER_EXPIRED. Masih menunggu verifikasi → 409 PAYMENT_ALREADY_ACTIVE. Metode gateway → 422 paymentId.
 
         '
@@ -4846,6 +4910,9 @@ paths:
                   format: binary
                 paymentId:
                   type: integer
+                installmentId:
+                  type: integer
+                  description: 'ASUMSI A-97: id OrderInstallment'
       responses:
         '200':
           description: OK
@@ -4974,6 +5041,16 @@ paths:
           type: string
           format: date
         description: created_at <= akhir hari
+      - name: installments
+        in: query
+        schema:
+          type: string
+          enum:
+          - partial
+          - due
+          - overdue
+        description: 'ASUMSI A-97: hanya order paid..delivered yang punya termin terbuka (partial), termin lanjutan sedang ditagih (due), atau
+          yang lewat jatuh tempo (overdue)'
       - name: page
         in: query
         schema:
@@ -5030,7 +5107,9 @@ paths:
       security:
       - cookieAuth: []
       summary: 'Ubah status: processing | shipped (wajib courier + trackingNumber; order Loco = siap diambil tanpa keduanya; order FOB/CIF = wajib
-        vesselName + blNumber, dimuat ke kapal) | delivered (Loco = sudah diambil) | completed'
+        vesselName + blNumber, dimuat ke kapal) | delivered (Loco = sudah diambil) | completed. Order bertermin (ASUMSI A-97): shipped/delivered
+        menagih termin yang pemicunya tercapai; completed ditolak 409 INSTALLMENTS_UNPAID (meta { currency, outstandingTotal, installmentIds })
+        selama ada termin belum lunas'
       parameters:
       - $ref: '#/components/parameters/OrderNumber'
       requestBody:
@@ -5300,6 +5379,109 @@ paths:
                 $ref: '#/components/schemas/Error'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /admin/orders/{number}/installments/{installment}/bill:
+    post:
+      tags:
+      - admin-payments
+      security:
+      - cookieAuth: []
+      summary: Tagih termin lebih awal, atau ubah jatuh tempo termin yang sudah ditagih (modul payments, diaudit; ASUMSI A-97, kontrak 11.13)
+      description: 'Termin `scheduled` → `due`, payment pending baru dibuat (metode/rekening = payment terakhir order), customer diberi email
+        + notifikasi `order.installment_due`.
+
+        Tanpa `dueAt`: jatuh tempo = sekarang + `dueDays` jadwal. Termin yang sudah `due` wajib `dueAt` (ubah jatuh tempo, pengingat dihitung
+        ulang, notifikasi `order.installment_due_changed`).
+
+        Termin pertama tidak lewat sini (batas bayarnya = batas bayar order, `PUT /admin/orders/{number}/due`). Order harus paid, processing,
+        shipped, atau delivered.
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/OrderNumber'
+      - name: installment
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dueAt:
+                  type: string
+                  format: date-time
+                  description: harus di masa depan
+      responses:
+        '200':
+          description: Order terbaru
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Order'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: 'NOT_FOUND: termin bukan milik order ini'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: INSTALLMENT_NOT_BILLABLE (termin pertama, sudah lunas/void, atau status order tidak memungkinkan; meta { installmentId,
+            status, orderStatus }) | INSTALLMENT_ALREADY_BILLED (sudah ditagih dan dueAt tidak dikirim; meta { installmentId, status, dueAt })
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /admin/orders/{number}/installments/{installment}/remind:
+    post:
+      tags:
+      - admin-payments
+      security:
+      - cookieAuth: []
+      summary: Kirim pengingat pembayaran termin yang sedang ditagih (email + notifikasi; modul payments, diaudit; ASUMSI A-97)
+      description: Dibatasi sekali per `ikn.commerce.installment_reminder_cooldown_hours` (12 jam) sejak pengingat terakhir, manual maupun otomatis.
+        Termin yang lewat jatuh tempo memakai teks terlambat.
+      parameters:
+      - $ref: '#/components/parameters/OrderNumber'
+      - name: installment
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Order terbaru
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Order'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: 'NOT_FOUND: termin bukan milik order ini'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: INSTALLMENT_NOT_DUE (termin tidak sedang ditagih) | INSTALLMENT_REMINDER_TOO_SOON (meta { installmentId, remindedAt, retryAt
+            })
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /admin/orders/{number}/payments/accept:
     post:
       tags:
@@ -5833,7 +6015,15 @@ paths:
       security:
       - cookieAuth: []
       summary: Percakapan customer dengan penjual (satu per customer; null bila belum pernah mengirim pesan)
-      description: 'Tanpa parameter = 50 pesan terakhir. `after` = pesan dengan id lebih besar (polling), `before` = halaman lebih lama.
+      description: 'Tanpa parameter = halaman terbaru (30 pesan) + `hasMore`. `before` = halaman lebih lama (30 pesan sebelum id itu;
+
+        FE memintanya saat pengguna menggulir ke puncak utas, sampai `hasMore` false).
+
+        `after` = pesan dengan id lebih besar (polling, maks. 200). Bila `rev` (revisi terakhir yang diketahui klien,
+
+        dari `conversation.revision`) ikut dikirim, respons juga memuat `changed`: pesan dengan id ≤ `after` yang diedit
+
+        atau ditarik sejak revisi itu (ASUMSI A-99). `conversation.revision` naik tiap kirim/edit/tarik.
 
         `senderName` pesan admin selalu null untuk customer (penjual tampil sebagai satu pihak).
 
@@ -5847,6 +6037,12 @@ paths:
         in: query
         schema:
           type: integer
+      - name: rev
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+        description: revisi percakapan terakhir yang diketahui klien; mengaktifkan `changed`
       responses:
         '200':
           description: OK
@@ -5912,6 +6108,102 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '429':
           description: Terlalu banyak pesan
+  /customer/chat/messages/{message}:
+    put:
+      tags:
+      - chat
+      security:
+      - cookieAuth: []
+      summary: Edit isi pesan sendiri selama jendela edit (ikn.chat.edit_window_seconds, bawaan 60 detik)
+      description: 'Hanya pesan sisi customer di percakapannya sendiri. Rujukan produk/order pada pesan tidak berubah. Isi yang sama
+
+        = tidak ada perubahan (tanpa tanda edit). Pesan lain di percakapan itu (milik admin) → 403; pesan percakapan
+
+        lain → 404. Tidak ada metode DELETE: chat tidak bisa dihapus (ASUMSI A-99).
+
+        '
+      parameters:
+      - name: message
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - body
+              properties:
+                body:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/CustomerChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 'CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds): batas waktu lewat; CHAT_MESSAGE_RETRACTED: pesan sudah ditarik'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /customer/chat/messages/{message}/retract:
+    post:
+      tags:
+      - chat
+      security:
+      - cookieAuth: []
+      summary: Tarik pesan sendiri selama jendela edit
+      description: 'Baris pesan tetap tersimpan (`retracted_at`); semua respons sesudahnya mengirim pesan itu dengan `retracted: true`,
+
+        `body` kosong, dan `context` null untuk kedua pihak. Bila pesan belum dibaca admin, penghitung belum-dibaca
+
+        admin turun satu; bila itu pesan terakhir, pratinjau percakapan dikosongkan (`lastMessageRetracted`).
+
+        '
+      parameters:
+      - name: message
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/CustomerChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED
   /customer/chat/read:
     post:
       tags:
@@ -6019,6 +6311,8 @@ paths:
                         $ref: '#/components/schemas/CustomerChatConversation'
                       message:
                         $ref: '#/components/schemas/ChatMessage'
+                      editWindowSeconds:
+                        type: integer
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
@@ -6026,7 +6320,7 @@ paths:
     get:
       tags:
       - chat
-      summary: Percakapan tamu (token wajib; salah → 404), parameter after/before seperti /customer/chat
+      summary: Percakapan tamu (token wajib; salah → 404), parameter after/before/rev seperti /customer/chat
       parameters:
       - name: token
         in: query
@@ -6041,6 +6335,11 @@ paths:
         in: query
         schema:
           type: integer
+      - name: rev
+        in: query
+        schema:
+          type: integer
+          minimum: 0
       responses:
         '200':
           description: OK
@@ -6092,6 +6391,98 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /chat/guest/messages/{message}:
+    put:
+      tags:
+      - chat
+      summary: Tamu mengedit pesannya sendiri selama jendela edit (aturan sama dengan sisi customer)
+      parameters:
+      - name: message
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - token
+              - body
+              properties:
+                token:
+                  type: string
+                body:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/CustomerChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Token salah, atau pesan bukan bagian percakapan token itu
+        '409':
+          description: CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /chat/guest/messages/{message}/retract:
+    post:
+      tags:
+      - chat
+      summary: Tamu menarik pesannya sendiri selama jendela edit (baris tetap tersimpan, isi tidak lagi dikirim)
+      parameters:
+      - name: message
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - token
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/CustomerChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Token salah, atau pesan bukan bagian percakapan token itu
+        '409':
+          description: CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED
   /chat/guest/read:
     post:
       tags:
@@ -6129,7 +6520,7 @@ paths:
       - admin-dashboard
       security:
       - cookieAuth: []
-      summary: Penghitung badge sidebar admin; null = admin tidak punya modulnya
+      summary: Penghitung badge sidebar dan lonceng admin; null = admin tidak punya modulnya
       responses:
         '200':
           description: OK
@@ -6141,6 +6532,9 @@ paths:
                   data:
                     type: object
                     properties:
+                      notifications:
+                        type: integer
+                        description: notifikasi milik admin ini yang belum dibaca (lonceng top bar; tidak bergantung modul)
                       orders:
                         type: integer
                         nullable: true
@@ -6157,9 +6551,121 @@ paths:
                       chat:
                         type: integer
                         nullable: true
-                        description: percakapan dengan pesan customer belum dibaca (modul chat)
+                        description: percakapan aktif (tidak diarsipkan) dengan pesan customer belum dibaca (modul chat)
         '403':
           $ref: '#/components/responses/Forbidden'
+  /admin/notifications:
+    get:
+      tags:
+      - notifications
+      security:
+      - cookieAuth: []
+      summary: Daftar notifikasi milik admin yang login (terbaru dulu); meta.unread = jumlah belum dibaca
+      description: 'Lonceng panel admin. Satu baris per admin aktif yang boleh mengakses modul kejadiannya (super_admin selalu):
+
+        modul orders = `admin.order_placed`, `admin.freight_requested`, `admin.freight_countered`, `admin.freight_accepted`,
+
+        `admin.freight_expired`, `admin.order_cancelled`, `admin.order_received`, `admin.order_completed`;
+
+        modul payments = `admin.payment_proof`; modul customers = `admin.customer_registered`.
+
+        `url` = path halaman admin (`/admin/orders/{number}`, `/admin/payments`, `/admin/customers`). Tanpa middleware audit.
+
+        '
+      parameters:
+      - name: unread
+        in: query
+        schema:
+          type: boolean
+        description: hanya yang belum dibaca
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: perPage
+        in: query
+        schema:
+          type: integer
+          default: 15
+          maximum: 50
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserNotification'
+                  meta:
+                    allOf:
+                    - $ref: '#/components/schemas/PageMeta'
+                    - type: object
+                      properties:
+                        unread:
+                          type: integer
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/notifications/read-all:
+    post:
+      tags:
+      - notifications
+      security:
+      - cookieAuth: []
+      summary: Tandai semua notifikasi admin ini sudah dibaca
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      updated:
+                        type: integer
+                      unread:
+                        type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/notifications/{id}/read:
+    post:
+      tags:
+      - notifications
+      security:
+      - cookieAuth: []
+      summary: Tandai satu notifikasi sudah dibaca (milik admin lain → 404)
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserNotification'
+                  meta:
+                    type: object
+                    properties:
+                      unread:
+                        type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
   /admin/chats:
     get:
       tags:
@@ -6167,6 +6673,11 @@ paths:
       security:
       - cookieAuth: []
       summary: Kotak masuk percakapan (pesan terbaru dulu); meta.unreadConversations untuk badge
+      description: 'Bawaan = percakapan aktif saja; `archived=1` = tab Arsip. Percakapan yang diarsipkan tidak dihitung di
+
+        `meta.unreadConversations` maupun badge `GET /admin/badges`. `meta.archivedConversations` = jumlah di arsip.
+
+        '
       parameters:
       - name: q
         in: query
@@ -6180,6 +6691,11 @@ paths:
         in: query
         schema:
           type: boolean
+      - name: archived
+        in: query
+        schema:
+          type: boolean
+        description: true = hanya percakapan yang diarsipkan; kosong/false = hanya yang aktif
       - name: page
         in: query
         schema:
@@ -6209,6 +6725,8 @@ paths:
                     - type: object
                       properties:
                         unreadConversations:
+                          type: integer
+                        archivedConversations:
                           type: integer
         '403':
           $ref: '#/components/responses/Forbidden'
@@ -6247,7 +6765,7 @@ paths:
       - admin-chat
       security:
       - cookieAuth: []
-      summary: Pesan dalam satu percakapan (after/before seperti sisi customer)
+      summary: Pesan dalam satu percakapan (after/before/rev seperti sisi customer; percakapan arsip tetap bisa dibuka)
       parameters:
       - name: conversation
         in: path
@@ -6262,6 +6780,11 @@ paths:
         in: query
         schema:
           type: integer
+      - name: rev
+        in: query
+        schema:
+          type: integer
+          minimum: 0
       responses:
         '200':
           description: OK
@@ -6281,6 +6804,12 @@ paths:
                           $ref: '#/components/schemas/ChatMessage'
                       hasMore:
                         type: boolean
+                      changed:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ChatMessage'
+                      editWindowSeconds:
+                        type: integer
         '404':
           $ref: '#/components/responses/NotFound'
   /admin/chats/{conversation}/messages:
@@ -6290,6 +6819,7 @@ paths:
       security:
       - cookieAuth: []
       summary: Balas customer (tidak dicatat audit log; pesan itu sendiri catatannya)
+      description: Membalas percakapan yang diarsipkan diperbolehkan dan tidak mengeluarkannya dari arsip.
       parameters:
       - name: conversation
         in: path
@@ -6325,6 +6855,171 @@ paths:
                         $ref: '#/components/schemas/ChatMessage'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /admin/chats/{conversation}/messages/{message}:
+    put:
+      tags:
+      - admin-chat
+      security:
+      - cookieAuth: []
+      summary: Edit pesan yang dikirim admin ini sendiri selama jendela edit
+      description: Pesan customer atau pesan admin lain → 403; pesan percakapan lain → 404. Tidak ada metode DELETE.
+      parameters:
+      - name: conversation
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: message
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - body
+              properties:
+                body:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/AdminChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /admin/chats/{conversation}/messages/{message}/retract:
+    post:
+      tags:
+      - admin-chat
+      security:
+      - cookieAuth: []
+      summary: Tarik pesan yang dikirim admin ini sendiri selama jendela edit (baris tetap tersimpan)
+      description: Bila pesan belum dibaca customer, penghitung belum-dibaca customer turun satu.
+      parameters:
+      - name: conversation
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: message
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversation:
+                        $ref: '#/components/schemas/AdminChatConversation'
+                      message:
+                        $ref: '#/components/schemas/ChatMessage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED
+  /admin/chats/{conversation}/archive:
+    post:
+      tags:
+      - admin-chat
+      security:
+      - cookieAuth: []
+      summary: Arsipkan percakapan (dicatat audit log); tidak ada endpoint hapus percakapan
+      description: 'Mengisi `archived_at` + `archived_by`. Percakapan hilang dari daftar bawaan, dock, dan badge, tetapi tetap bisa
+
+        dibuka dan dibalas dari tab Arsip. Pesan baru dari customer/tamu mengeluarkannya dari arsip otomatis.
+
+        Mengarsipkan ulang tidak mengubah pencatatnya.
+
+        '
+      parameters:
+      - name: conversation
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminChatConversation'
+                  meta:
+                    type: object
+                    properties:
+                      unreadConversations:
+                        type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/chats/{conversation}/unarchive:
+    post:
+      tags:
+      - admin-chat
+      security:
+      - cookieAuth: []
+      summary: Keluarkan percakapan dari arsip (dicatat audit log)
+      parameters:
+      - name: conversation
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminChatConversation'
+                  meta:
+                    type: object
+                    properties:
+                      unreadConversations:
+                        type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /admin/chats/{conversation}/read:
     post:
       tags:
@@ -7301,6 +7996,134 @@ components:
             from_name:
               type: string
               maxLength: 120
+        maps:
+          type: object
+          description: Penyedia tile peta (A-98), privat; publik hanya membaca hasil jadinya di GET /geo/map-config. provider google mewajibkan
+            google_api_key (422 maps.google_api_key); custom mewajibkan minimal satu URL (422 maps.custom_street_url). Menyimpan grup ini mengosongkan
+            cache GET /geo/map-config.
+          properties:
+            provider:
+              type: string
+              enum:
+              - default
+              - google
+              - custom
+              description: default = OpenStreetMap + Esri tanpa key; google = Google Maps Platform Map Tiles API; custom = layanan tile XYZ lain
+            google_api_key:
+              type: string
+              description: 'Tipe secret: disimpan terenkripsi (APP_KEY); respons selalu "********" bila terisi; PUT "********" = tidak mengubah,
+                "" = hapus. Key harus punya Map Tiles API aktif dan dibatasi HTTP referrer, karena ikut di URL tile yang dibaca browser.'
+            custom_street_url:
+              type: string
+              maxLength: 500
+              example: https://api.maptiler.com/maps/streets-v4/256/{z}/{x}/{y}.png?key=KEY
+              description: 'Templat tile peta jalan: https, wajib memuat {z} {x} {y}; boleh {s} (a/b/c) dan {r}; placeholder lain, host lokal/privat,
+                dan http ditolak. Tile 256 px. Kosong = lapisan bawaan.'
+            custom_satellite_url:
+              type: string
+              maxLength: 500
+              description: Templat tile citra satelit, aturan sama. Kosong = citra bawaan + label Esri.
+            custom_attribution:
+              type: string
+              maxLength: 300
+              description: Teks polos; di-escape server sebelum dikirim sebagai atribusi.
+            custom_max_zoom:
+              type: integer
+              minimum: 1
+              maximum: 22
+              default: 19
+    MapTileLayer:
+      type: object
+      properties:
+        url:
+          type: string
+          description: 'Templat tile Leaflet ({z}, {x}, {y}, opsional {s}/{r}). Google: https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=...&key=...'
+        attribution:
+          type: string
+          description: HTML atribusi siap pasang
+        maxZoom:
+          type: integer
+        subdomains:
+          type: string
+          nullable: true
+          example: abc
+        brand:
+          type: string
+          nullable: true
+          enum:
+          - google
+          - null
+          description: Merek yang wajib ditampilkan di atas peta (logo Google Maps)
+        attributionUrl:
+          type: string
+          nullable: true
+          description: Endpoint viewport penyedia; FE menambah zoom, north, south, east, west dan menampilkan field copyright dari jawabannya
+        attributionRequired:
+          type: boolean
+          description: Atribusi wajib tampil juga di peta kecil tanpa kontrol atribusi
+    MapTileConfig:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum:
+          - default
+          - google
+          - custom
+          description: Penyedia yang dipilih admin
+        fallback:
+          type: boolean
+          description: true = penyedia pilihan gagal dan layers berisi lapisan bawaan
+        layers:
+          type: object
+          properties:
+            street:
+              $ref: '#/components/schemas/MapTileLayer'
+            satellite:
+              $ref: '#/components/schemas/MapTileLayer'
+            satelliteLabels:
+              allOf:
+              - $ref: '#/components/schemas/MapTileLayer'
+              nullable: true
+              description: Lapisan transparan nama tempat di atas satellite; null untuk google dan custom satelit
+            hybrid:
+              allOf:
+              - $ref: '#/components/schemas/MapTileLayer'
+              nullable: true
+              description: Citra + label dalam satu tile (google); bila ada, menggantikan satellite + satelliteLabels
+    MapTestResult:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum:
+          - default
+          - google
+          - custom
+        ok:
+          type: boolean
+          description: true bila semua lapisan lolos
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              layer:
+                type: string
+                enum:
+                - street
+                - satellite
+                - hybrid
+              ok:
+                type: boolean
+              message:
+                type: string
+                description: Penjelasan untuk admin (bahasa mengikuti Accept-Language), mis. alasan penolakan dari Google; tidak pernah memuat
+                  API key
+        config:
+          allOf:
+          - $ref: '#/components/schemas/MapTileConfig'
+          description: 'Lapisan untuk pratinjau: milik penyedia yang diuji, atau bawaan (fallback true) bila gagal'
     MailTestResult:
       type: object
       properties:
@@ -9073,6 +9896,12 @@ components:
           - $ref: '#/components/schemas/PaymentTerm'
           nullable: true
           description: syarat pembayaran yang dikirim (ASUMSI A-87); null bila tidak dikirim
+        installments:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstallmentScheduleRow'
+          description: 'pratinjau termin syarat pembayaran dengan amount dari grandTotal quote (ASUMSI A-97); [] untuk bayar penuh dan order IDR.
+            CIF: belum termasuk ongkir, dihitung ulang saat penawaran ongkir disepakati'
         shipping:
           $ref: '#/components/schemas/ShippingRateQuote'
           nullable: true
@@ -9894,8 +10723,8 @@ components:
           default: 0
     PaymentTerm:
       type: object
-      description: Syarat pembayaran, bentuk publik (GET /commerce/config, QuoteResult.paymentTerm; ASUMSI A-87). Informasi untuk dokumen; aplikasi
-        tetap menerima satu pembayaran sebesar grand total
+      description: Syarat pembayaran, bentuk publik (GET /commerce/config, QuoteResult.paymentTerm; ASUMSI A-87). installments[] kosong = satu
+        pembayaran sebesar grand total; terisi = order ditagih bertahap (ASUMSI A-97, kontrak 11.13)
       properties:
         code:
           type: string
@@ -9910,6 +10739,52 @@ components:
           enum:
           - local
           - export
+        installments:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstallmentScheduleRow'
+          description: jadwal termin (ASUMSI A-97); [] = bayar penuh
+    InstallmentScheduleRow:
+      type: object
+      description: 'Satu baris jadwal termin (ASUMSI A-97). Aturan: 2..6 baris, percent > 0 dan jumlahnya tepat 100, baris pertama trigger order
+        (dueDays dipaksa 0, jatuh tempo = batas bayar order), key unik. Satu baris 100% = tanpa jadwal'
+      required:
+      - label
+      - percent
+      - trigger
+      properties:
+        key:
+          type: string
+          maxLength: 40
+          pattern: ^[A-Za-z0-9][A-Za-z0-9_-]*$
+          example: balance
+          description: kosong = dibuat dari label
+        label:
+          $ref: '#/components/schemas/I18n'
+          description: id wajib (maks 80), en diisi dari id bila kosong
+        percent:
+          type: number
+          minimum: 0.01
+          maximum: 100
+          multipleOf: 0.01
+          example: 70
+        trigger:
+          type: string
+          enum:
+          - order
+          - shipped
+          - delivered
+          description: 'kapan termin ditagih: saat order dibuat (termin lanjutan: setelah termin pertama lunas), saat dikirim/dimuat ke kapal,
+            saat diterima'
+        dueDays:
+          type: integer
+          minimum: 0
+          maximum: 365
+          example: 14
+          description: hari dari saat ditagih sampai jatuh tempo
+        amount:
+          type: integer
+          description: 'hanya di QuoteResult.installments: nominal satuan terkecil dari grandTotal quote; baris terakhir mengambil sisa pembulatan'
     AdminPaymentTerm:
       allOf:
       - $ref: '#/components/schemas/PaymentTerm'
@@ -9962,6 +10837,15 @@ components:
           minimum: -1000
           maximum: 1000
           default: 0
+        installments:
+          type: array
+          nullable: true
+          maxItems: 6
+          items:
+            $ref: '#/components/schemas/InstallmentScheduleRow'
+          description: ASUMSI A-97. Tidak dikirim = jadwal lama dipertahankan; [] atau null = bayar penuh. 422 installments bila jumlah persen
+            bukan 100, baris pertama bukan trigger order, key kembar, lebih dari 6 baris, atau syarat pasar local. Order yang sudah dibuat tidak
+            terpengaruh (jadwal dibekukan per order)
     ShippingBreakdown:
       type: object
       properties:
@@ -10347,6 +11231,18 @@ components:
           example: 30
           description: batas tunggu order awaiting_freight tanpa penawaran yang masih berlaku sebelum dibatalkan otomatis oleh orders:freight-expire
             (hari)
+        installmentRemindBeforeDays:
+          type: integer
+          minimum: 0
+          maximum: 60
+          example: 3
+          description: 'ASUMSI A-97: orders:installment-remind mengingatkan sekali N hari sebelum termin lanjutan jatuh tempo; 0 = mati'
+        installmentRemindOverdueDays:
+          type: integer
+          minimum: 0
+          maximum: 60
+          example: 3
+          description: 'ASUMSI A-97: selama termin terlambat, pengingat tiap N hari sejak pengingat terakhir; 0 = mati'
     OrderStatus:
       type: string
       description: awaiting_freight = order CIF menunggu penawaran ongkir disepakati (ASUMSI A-89, kontrak 11.12); belum ada payment maupun batas
@@ -10624,7 +11520,16 @@ components:
           description: sama dengan order (ASUMSI A-86)
         amount:
           type: integer
-          description: satuan terkecil currency = grandTotal order saat payment dibuat
+          description: satuan terkecil currency = grandTotal order saat payment dibuat, atau nominal termin bila installmentId terisi (ASUMSI
+            A-97)
+        installmentId:
+          type: integer
+          nullable: true
+          description: 'ASUMSI A-97: termin yang dibayar; null = order tanpa termin'
+        installment:
+          allOf:
+          - $ref: '#/components/schemas/InstallmentBrief'
+          nullable: true
         receivedAmount:
           type: integer
           nullable: true
@@ -10774,6 +11679,8 @@ components:
         date:
           type: string
           format: date-time
+        paymentProgress:
+          $ref: '#/components/schemas/PaymentProgress'
     AdminPayment:
       allOf:
       - $ref: '#/components/schemas/Payment'
@@ -10862,6 +11769,16 @@ components:
           type: string
           format: date-time
           nullable: true
+        paymentProgress:
+          $ref: '#/components/schemas/PaymentProgress'
+        hasInstallments:
+          type: boolean
+          description: ASUMSI A-97
+        nextInstallment:
+          allOf:
+          - $ref: '#/components/schemas/NextInstallment'
+          nullable: true
+          description: termin lanjutan paling awal yang sedang ditagih atau menunggu verifikasi
         courier:
           type: string
           nullable: true
@@ -11565,6 +12482,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Payment'
+        installments:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderInstallment'
+          description: 'ASUMSI A-97: [] untuk order satu pembayaran penuh'
+        paymentProgress:
+          $ref: '#/components/schemas/PaymentProgress'
         timeline:
           type: array
           items:
@@ -11611,6 +12535,146 @@ components:
         updatedAt:
           type: string
           format: date-time
+    InstallmentBrief:
+      type: object
+      description: Termin ringkas di Payment.installment (ASUMSI A-97)
+      properties:
+        id:
+          type: integer
+        seq:
+          type: integer
+          description: 1 = termin pertama (mengikuti alur order)
+        key:
+          type: string
+          example: balance
+        label:
+          $ref: '#/components/schemas/I18n'
+        percent:
+          type: number
+          example: 70
+        status:
+          $ref: '#/components/schemas/InstallmentStatus'
+    NextInstallment:
+      allOf:
+      - $ref: '#/components/schemas/InstallmentBrief'
+      - type: object
+        properties:
+          amount:
+            type: integer
+          currency:
+            type: string
+            enum:
+            - IDR
+            - USD
+          dueAt:
+            type: string
+            format: date-time
+            nullable: true
+          overdue:
+            type: boolean
+    InstallmentStatus:
+      type: string
+      enum:
+      - scheduled
+      - due
+      - awaiting_verification
+      - paid
+      - void
+      description: scheduled = pemicu belum tercapai; due = ditagih; awaiting_verification = bukti menunggu admin; paid; void = order dibatalkan
+        atau kedaluwarsa sebelum lunas. Terlambat diturunkan (field overdue), tidak disimpan
+    OrderInstallment:
+      type: object
+      description: 'Termin order (tabel order_installments, ASUMSI A-97): salinan jadwal syarat pembayaran yang dibekukan saat total final (checkout,
+        atau saat penawaran ongkir CIF disepakati). amount = percent × grandTotal dibulatkan ke satuan terkecil; baris terakhir mengambil sisa
+        sehingga jumlah amount = grandTotal'
+      properties:
+        id:
+          type: integer
+        seq:
+          type: integer
+        key:
+          type: string
+        label:
+          $ref: '#/components/schemas/I18n'
+        percent:
+          type: number
+        amount:
+          type: integer
+          description: satuan terkecil currency
+        currency:
+          type: string
+          enum:
+          - IDR
+          - USD
+        trigger:
+          type: string
+          enum:
+          - order
+          - shipped
+          - delivered
+        dueDays:
+          type: integer
+        status:
+          $ref: '#/components/schemas/InstallmentStatus'
+        overdue:
+          type: boolean
+          description: status due dan dueAt sudah lewat
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: termin pertama = paymentDueAt order; lanjutan = saat ditagih + dueDays
+        billedAt:
+          type: string
+          format: date-time
+          nullable: true
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        remindedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reminderCount:
+          type: integer
+        activePayment:
+          allOf:
+          - $ref: '#/components/schemas/Payment'
+          nullable: true
+        payments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payment'
+          description: semua percobaan bayar termin ini, termasuk yang ditolak
+        canUploadProof:
+          type: boolean
+        canBill:
+          type: boolean
+          description: 'admin: termin lanjutan scheduled pada order berjalan'
+        canChangeDue:
+          type: boolean
+        canRemind:
+          type: boolean
+    PaymentProgress:
+      type: object
+      description: 'ASUMSI A-97. Order tanpa termin: unpaid sampai dibayar, lalu paid. Order bertermin: partial = sebagian termin lunas'
+      properties:
+        currency:
+          type: string
+          enum:
+          - IDR
+          - USD
+        paidTotal:
+          type: integer
+        outstandingTotal:
+          type: integer
+        status:
+          type: string
+          enum:
+          - unpaid
+          - partial
+          - paid
     ProofResponse:
       type: object
       properties:
@@ -11807,6 +12871,25 @@ components:
           - $ref: '#/components/schemas/ExportKpis'
           nullable: true
           description: Additive (Phase E6). Blok ekspor USD; null bila belum pernah ada order USD.
+        outstandingInstallments:
+          type: array
+          description: Additive (ASUMSI A-97). Sisa tagihan termin per mata uang dari order paid..delivered yang punya termin belum lunas; []
+            bila tidak ada. Pendapatan (kpis, exportKpis, laporan) tetap menghitung order penuh sejak termin pertama diverifikasi
+          items:
+            type: object
+            properties:
+              currency:
+                type: string
+                enum:
+                - IDR
+                - USD
+              total:
+                type: integer
+                description: satuan terkecil
+              count:
+                type: integer
+              overdue:
+                type: integer
         today:
           type: object
           description: Additive 2026-11-04. Hari ini s.d. sekarang vs kemarin s.d. jam yang sama; uang & order dibayar IDR, order dibuat semua
@@ -11965,6 +13048,11 @@ components:
               nullable: true
               description: 'order awaiting_freight tanpa penawaran admin proposed yang masih berlaku: order CIF baru, balasan customer, atau penawaran
                 kedaluwarsa (modul orders, ASUMSI A-89)'
+            installmentsDue:
+              type: integer
+              nullable: true
+              description: termin lanjutan yang sedang ditagih (termasuk terlambat) pada order paid..delivered; null tanpa modul payments (ASUMSI
+                A-97). Tautan FE /admin/orders?installments=due
             ordersToProcess:
               type: integer
               nullable: true
@@ -12522,8 +13610,11 @@ components:
         type:
           type: string
           example: order.shipped
-          description: order.placed | order.payment_accepted | order.payment_rejected | order.payment_reminder | order.expired | order.cancelled
-            | order.shipped | order.tracking | order.delivered | order.completed | account.approved | account.rejected | voucher.assigned
+          description: 'customer: order.placed | order.payment_accepted | order.payment_rejected | order.payment_reminder | order.expired | order.cancelled
+            | order.processing | order.shipped | order.tracking | order.delivered | order.delivered_balance_due | order.picked_up_balance_due
+            | order.completed | account.approved | account.rejected | voucher.assigned (dan varian order lain di notifications.php); admin: admin.order_placed
+            | admin.freight_requested | admin.payment_proof | admin.freight_countered | admin.freight_accepted | admin.freight_expired | admin.order_cancelled
+            | admin.order_received | admin.order_completed | admin.customer_registered'
         title:
           $ref: '#/components/schemas/I18n'
         body:
@@ -12531,7 +13622,7 @@ components:
         url:
           type: string
           nullable: true
-          description: path FE tujuan
+          description: 'path FE tujuan: portal untuk customer, halaman admin untuk notifikasi admin.*'
           example: /dashboard/pesanan/IKN-20260922-00001
         data:
           type: object
@@ -12557,18 +13648,35 @@ components:
           - admin
         body:
           type: string
+          description: string kosong bila retracted (isi pesan yang ditarik tidak pernah dikirim lagi)
         context:
           type: object
           nullable: true
           description: 'snapshot rujukan: { type: product, slug, code, name, image, price (satuan terkecil currency), currency, unit } atau {
             type: order, number, status, grandTotal (satuan terkecil currency), currency, family (pickup|door|port, null untuk order lama) };
-            snapshot lama bisa tanpa currency/family (anggap IDR)'
+            snapshot lama bisa tanpa currency/family (anggap IDR); null bila retracted'
         senderName:
           type: string
           nullable: true
         createdAt:
           type: string
           format: date-time
+        editedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: terisi bila pengirim mengedit pesan (FE menampilkan tanda "diedit")
+        retracted:
+          type: boolean
+          description: pesan ditarik pengirimnya; tampil sebagai "Pesan ditarik" di kedua sisi
+        retractedAt:
+          type: string
+          format: date-time
+          nullable: true
+        editableSeconds:
+          type: integer
+          description: 'sisa detik pemirsa masih boleh mengedit/menarik pesan ini; 0 = bukan pesannya (admin: bukan ia pengirimnya), sudah ditarik,
+            atau lewat batas. FE menghitung tenggat dari saat respons diterima'
     CustomerChatConversation:
       type: object
       nullable: true
@@ -12582,6 +13690,10 @@ components:
           type: string
           format: date-time
           nullable: true
+        revision:
+          type: integer
+          description: naik tiap kirim/edit/tarik; dikirim balik sebagai `rev` saat polling. Klien mengambilnya dari respons GET, bukan dari respons
+            kirim/edit
     CustomerChat:
       type: object
       properties:
@@ -12593,6 +13705,16 @@ components:
             $ref: '#/components/schemas/ChatMessage'
         hasMore:
           type: boolean
+          description: masih ada pesan lebih lama dari halaman ini (selalu false pada polling `after`)
+        changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+          description: 'hanya terisi bila `rev` dikirim: pesan lama (id ≤ after) yang diedit/ditarik sejak revisi itu, maks. 200'
+        editWindowSeconds:
+          type: integer
+          example: 60
+          description: ikn.chat.edit_window_seconds (env CHAT_EDIT_WINDOW_SECONDS); 0 = edit/tarik dimatikan
     AdminChatConversation:
       type: object
       properties:
@@ -12636,6 +13758,10 @@ components:
         lastMessagePreview:
           type: string
           nullable: true
+          description: mengikuti isi terbaru bila pesan terakhir diedit; null bila pesan terakhir ditarik
+        lastMessageRetracted:
+          type: boolean
+          description: pesan terakhir ditarik pengirimnya (FE menampilkan "Pesan ditarik" sebagai pratinjau)
         lastSenderRole:
           type: string
           enum:
@@ -12650,6 +13776,24 @@ components:
           type: string
           format: date-time
           nullable: true
+        revision:
+          type: integer
+          description: naik tiap kirim/edit/tarik (lihat CustomerChatConversation.revision)
+        archived:
+          type: boolean
+        archivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        archivedBy:
+          type: object
+          nullable: true
+          description: admin yang mengarsipkan
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
   parameters:
     OrderNumber:
       name: number

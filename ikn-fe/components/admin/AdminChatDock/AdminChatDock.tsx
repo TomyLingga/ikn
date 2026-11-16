@@ -4,12 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/Icon';
 import Spinner from '@/components/Spinner';
-import { ChatComposer, ChatThread } from '@/components/chat';
+import { ChatComposer, ChatThread, useChatEditing, useChatMessages } from '@/components/chat';
 import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage, type Envelope } from '@/lib/api';
 import { queryString, refreshAdminBadges, type AdminChatConversation } from '@/lib/admin';
 import { timeAgo } from '@/lib/shop';
-import type { ChatMessage, Lang } from '@/lib/types';
+import type { ChatMessage, ChatThreadPage, Lang } from '@/lib/types';
 import styles from './AdminChatDock.module.css';
 
 const LIST_POLL_MS = 15000;
@@ -19,10 +19,8 @@ const STORAGE_KEY = 'ikn-admin-chat-dock';
 const PHONE_QUERY = '(max-width: 640px)';
 const NARROW_QUERY = '(max-width: 1100px)';
 
-interface ThreadResponse {
+interface ThreadResponse extends ChatThreadPage {
   conversation: AdminChatConversation;
-  messages: ChatMessage[];
-  hasMore: boolean;
 }
 
 interface DockWindow {
@@ -103,31 +101,31 @@ function countLabel(n: number): string {
   return n > 99 ? '99+' : String(n);
 }
 
-// One open conversation: initial load, `?after=` polling while active, older pages, sending, read receipts.
-function useAdminThread(id: number | null, active: boolean, onRead: (id: number) => void, onSent: () => void) {
+// One open conversation: newest page on open, `?after=&rev=` polling while active (new messages plus edits and
+// retractions from the other side), older pages on scroll, sending, editing/retracting own messages, read receipts.
+function useAdminThread(id: number | null, active: boolean, lang: Lang, onRead: (id: number) => void, onSent: () => void) {
   const [conversation, setConversation] = useState<AdminChatConversation | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [hasMore, setHasMore] = useState(false);
+  const { messages, hasMore, loadingOlder, editWindow, reset: resetMessages, token: threadToken, upsert, applyPage, pollQuery, loadOlder: loadOlderPage } = useChatMessages();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
-  const lastId = useRef(0);
   const unreadRef = useRef(0);
   const activeRef = useRef(active);
   activeRef.current = active;
 
-  const merge = useCallback((incoming: ChatMessage[], prepend = false) => {
-    if (incoming.length === 0) return;
-    setMessages((prev) => {
-      const known = new Set(prev.map((m) => m.id));
-      const fresh = incoming.filter((m) => !known.has(m.id));
-      if (fresh.length === 0) return prev;
-      const next = prepend ? [...fresh, ...prev] : [...prev, ...fresh];
-      lastId.current = Math.max(lastId.current, ...next.map((m) => m.id));
-      return next;
-    });
-  }, []);
+  // Own messages only, and only while the server-side edit window is open (the thread hides the buttons after it).
+  const messagePath = (messageId: number) => `/admin/chats/${id}/messages/${messageId}`;
+  const { editing, busy: editBusy, startEdit, cancelEdit, submitEdit, retract, resetEditing } = useChatEditing({
+    lang,
+    draft,
+    setDraft,
+    editRequest: async (message, body) => (await api<{ message: ChatMessage }>(messagePath(message.id), { method: 'PUT', body: { body } })).message,
+    retractRequest: async (message) => (await api<{ message: ChatMessage }>(`${messagePath(message.id)}/retract`, { method: 'POST' })).message,
+    onChanged: (message) => upsert([message]),
+    onError: setError,
+    onDone: onSent,
+  });
 
   const markRead = useCallback(
     async (conversationId: number) => {
@@ -147,21 +145,19 @@ function useAdminThread(id: number | null, active: boolean, onRead: (id: number)
   // Initial load whenever the conversation changes.
   useEffect(() => {
     setConversation(null);
-    setMessages([]);
-    setHasMore(false);
+    resetMessages();
+    resetEditing();
     setDraft('');
     setError('');
-    lastId.current = 0;
     unreadRef.current = 0;
     if (!id) return;
     let cancelled = false;
+    const forThread = threadToken();
     setLoading(true);
     api<ThreadResponse>(`/admin/chats/${id}`)
       .then((res) => {
-        if (cancelled) return;
+        if (cancelled || !applyPage(res, 'initial', forThread)) return;
         setConversation(res.conversation);
-        merge(res.messages);
-        setHasMore(res.hasMore);
         unreadRef.current = res.conversation.unread;
         if (res.conversation.unread > 0 && activeRef.current) void markRead(id);
       })
@@ -174,7 +170,7 @@ function useAdminThread(id: number | null, active: boolean, onRead: (id: number)
     return () => {
       cancelled = true;
     };
-  }, [id, merge, markRead]);
+  }, [id, resetMessages, resetEditing, threadToken, applyPage, markRead]);
 
   // Re-activated (un-minimized) with unread messages: mark them read.
   useEffect(() => {
@@ -187,9 +183,11 @@ function useAdminThread(id: number | null, active: boolean, onRead: (id: number)
     if (!id || !active || loading || !loaded) return;
     const tick = async () => {
       if (document.hidden) return;
+      const forThread = threadToken();
       try {
-        const res = await api<ThreadResponse>(`/admin/chats/${id}?after=${lastId.current}`);
-        merge(res.messages);
+        const res = await api<ThreadResponse>(`/admin/chats/${id}?${pollQuery()}`);
+        if (!applyPage(res, 'poll', forThread)) return;
+        setConversation((c) => (c && c.id === res.conversation.id ? res.conversation : c));
         if (res.messages.some((m) => m.role === 'customer')) void markRead(id);
       } catch {
         // Transient network failure: retry next tick.
@@ -197,19 +195,13 @@ function useAdminThread(id: number | null, active: boolean, onRead: (id: number)
     };
     const timer = window.setInterval(tick, THREAD_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [id, active, loading, loaded, merge, markRead]);
+  }, [id, active, loading, loaded, threadToken, pollQuery, applyPage, markRead]);
 
-  const loadOlder = useCallback(async () => {
-    const oldest = messages[0];
-    if (!id || !oldest || loading) return;
-    try {
-      const res = await api<ThreadResponse>(`/admin/chats/${id}?before=${oldest.id}`);
-      merge(res.messages, true);
-      setHasMore(res.hasMore);
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }, [id, messages, loading, merge]);
+  // Called by ChatThread when the reader scrolls to the top (and by its fallback button): one older page per call.
+  const loadOlder = useCallback(() => {
+    if (!id) return;
+    loadOlderPage((before) => api<ThreadResponse>(`/admin/chats/${id}?before=${before}`)).catch((err) => setError(errorMessage(err)));
+  }, [id, loadOlderPage]);
 
   const send = useCallback(async () => {
     const body = draft.trim();
@@ -218,7 +210,7 @@ function useAdminThread(id: number | null, active: boolean, onRead: (id: number)
     setError('');
     try {
       const res = await api<{ conversation: AdminChatConversation; message: ChatMessage }>(`/admin/chats/${id}/messages`, { method: 'POST', body: { body } });
-      merge([res.message]);
+      upsert([res.message]);
       setDraft('');
       setConversation(res.conversation);
       onSent();
@@ -228,9 +220,28 @@ function useAdminThread(id: number | null, active: boolean, onRead: (id: number)
     } finally {
       setSending(false);
     }
-  }, [id, draft, sending, merge, onSent]);
+  }, [id, draft, sending, upsert, onSent]);
 
-  return { conversation, messages, hasMore, loading, error, draft, setDraft, sending, send, loadOlder };
+  return {
+    conversation,
+    messages,
+    hasMore,
+    loading,
+    loadingOlder,
+    editWindow,
+    error,
+    draft,
+    setDraft,
+    sending: sending || editBusy,
+    send,
+    loadOlder,
+    editing,
+    editBusy,
+    startEdit,
+    cancelEdit,
+    submitEdit,
+    retract,
+  };
 }
 
 interface ThreadBodyProps {
@@ -252,19 +263,31 @@ function ThreadBody({ thread, lang, t }: ThreadBodyProps) {
         orderHref={(number) => `/admin/orders/${encodeURIComponent(number)}`}
         loading={thread.loading}
         hasMore={thread.hasMore}
-        onLoadOlder={() => void thread.loadOlder()}
+        loadingOlder={thread.loadingOlder}
+        onLoadOlder={thread.loadOlder}
+        onEdit={thread.startEdit}
+        onRetract={(message) => void thread.retract(message)}
+        editingId={thread.editing?.id ?? null}
+        actionsDisabled={thread.editBusy}
+        editWindowSeconds={thread.editWindow}
         otherName={other}
         emptyText={thread.error ? '' : t('Belum ada pesan. Tulis pesan pertama.', 'No messages yet. Write the first message.')}
       />
-      {thread.error && <p className={styles.error}>{thread.error}</p>}
+      {thread.error && (
+        <p className={styles.error} role="alert">
+          {thread.error}
+        </p>
+      )}
       <ChatComposer
         value={thread.draft}
         onChange={thread.setDraft}
-        onSend={() => void thread.send()}
+        onSend={() => void (thread.editing ? thread.submitEdit() : thread.send())}
         sending={thread.sending}
         disabled={!c}
         lang={lang}
         placeholder={t('Tulis balasan…', 'Write a reply…')}
+        editing={thread.editing}
+        onCancelEdit={thread.cancelEdit}
       />
     </>
   );
@@ -316,7 +339,7 @@ function ConversationList({ conversations, loading, error, query, activeIds, lan
               <span className={styles.rowBottom}>
                 <span className={styles.rowPreview}>
                   {c.lastSenderRole === 'admin' ? `${t('Anda', 'You')}: ` : ''}
-                  {c.lastMessagePreview || '—'}
+                  {c.lastMessageRetracted ? <i>{t('Pesan ditarik', 'Message retracted')}</i> : c.lastMessagePreview || '—'}
                 </span>
                 {unread && (
                   <em className={styles.count} aria-label={`${c.unread} ${t('belum dibaca', 'unread')}`}>
@@ -345,7 +368,7 @@ interface ChatWindowProps {
 
 // Docked chat window to the left of the conversation panel.
 function ChatWindow({ win, summary, lang, t, onToggle, onClose, onRead, onSent }: ChatWindowProps) {
-  const thread = useAdminThread(win.id, !win.minimized, onRead, onSent);
+  const thread = useAdminThread(win.id, !win.minimized, lang, onRead, onSent);
   const c = thread.conversation ?? summary ?? null;
   const name = c ? partyName(c, t) : thread.error ? t('Percakapan tidak tersedia', 'Conversation unavailable') : t('Memuat…', 'Loading…');
   const unread = win.minimized ? summary?.unread ?? 0 : 0;
@@ -389,7 +412,7 @@ function ChatWindow({ win, summary, lang, t, onToggle, onClose, onRead, onSent }
 
 // Full-screen thread inside the phone sheet.
 function SheetThread({ id, summary, lang, t, onBack, onClose, onRead, onSent }: { id: number; summary: AdminChatConversation | undefined; lang: Lang; t: Translate; onBack: () => void; onClose: () => void; onRead: (id: number) => void; onSent: () => void }) {
-  const thread = useAdminThread(id, true, onRead, onSent);
+  const thread = useAdminThread(id, true, lang, onRead, onSent);
   const c = thread.conversation ?? summary ?? null;
   const name = c ? partyName(c, t) : thread.error ? t('Percakapan tidak tersedia', 'Conversation unavailable') : t('Memuat…', 'Loading…');
   return (

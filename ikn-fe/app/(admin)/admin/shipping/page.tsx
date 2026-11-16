@@ -28,6 +28,7 @@ import {
 import { formatIDR } from '@/lib/format';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
+import NumberInput from '@/components/NumberInput';
 
 interface ZoneForm {
   name: I18n;
@@ -403,7 +404,7 @@ export default function AdminShipping() {
               {roadFactor === null ? (
                 <Spinner size={16} label={t('Memuat faktor jalan...', 'Loading road factor...')} />
               ) : (
-                <input type="number" min={1} max={3} step={0.05} value={roadFactor} required onChange={(e) => setRoadFactor(e.target.value)} />
+                <NumberInput min={1} max={3} step={0.05} value={roadFactor} required onChange={(e) => setRoadFactor(e.target.value)} />
               )}
               <small className="admin-field-hint">
                 {t('Jarak jalan ≈ jarak garis lurus × faktor ini (1,3 cocok untuk jalan darat Sumatra).', 'Road distance ≈ straight-line distance × this factor (1.3 suits overland roads).')}
@@ -561,7 +562,7 @@ export default function AdminShipping() {
             <div className="admin-form-row admin-form-row-3">
               <label>
                 <span className="field-label">{t('Prioritas', 'Priority')}</span>
-                <input type="number" min={-1000} max={1000} value={zoneForm.priority} onChange={(e) => setZoneForm({ ...zoneForm, priority: e.target.value })} />
+                <NumberInput min={-1000} max={1000} value={zoneForm.priority} onChange={(e) => setZoneForm({ ...zoneForm, priority: e.target.value })} />
                 <small className="admin-field-hint">{t('Angka lebih besar menang bila cakupan sama spesifik.', 'Higher number wins when coverage is equally specific.')}</small>
                 {firstError(formErrors, 'priority') && <small className="cms-field-error">{firstError(formErrors, 'priority')}</small>}
               </label>
@@ -609,12 +610,12 @@ export default function AdminShipping() {
               </label>
               <label>
                 <span className="field-label">{rateForm.type === 'flat' ? t('Tarif tetap (Rp)', 'Flat rate (Rp)') : t('Tarif dasar (Rp)', 'Base amount (Rp)')}</span>
-                <input type="number" min={0} step={1} value={rateForm.baseAmount} onChange={(e) => setRateForm({ ...rateForm, baseAmount: e.target.value })} required />
+                <NumberInput currency="IDR" min={0} step={1} value={rateForm.baseAmount} onChange={(e) => setRateForm({ ...rateForm, baseAmount: e.target.value })} required />
                 {firstError(formErrors, 'baseAmount') && <small className="cms-field-error">{firstError(formErrors, 'baseAmount')}</small>}
               </label>
               <label>
                 <span className="field-label">{t('Ongkir minimum (Rp)', 'Minimum charge (Rp)')}</span>
-                <input type="number" min={0} step={1} value={rateForm.minAmount} onChange={(e) => setRateForm({ ...rateForm, minAmount: e.target.value })} />
+                <NumberInput currency="IDR" min={0} step={1} value={rateForm.minAmount} onChange={(e) => setRateForm({ ...rateForm, minAmount: e.target.value })} />
                 <small className="admin-field-hint">{t('Hasil hitung di bawah ini dinaikkan ke minimum (berlaku per pabrik asal).', 'Calculated amounts below this are raised to the minimum (per factory).')}</small>
               </label>
             </div>
@@ -624,19 +625,19 @@ export default function AdminShipping() {
                 <div className="admin-form-row admin-form-row-3">
                   <label>
                     <span className="field-label">{t('Per km jarak (Rp)', 'Per km of distance (Rp)')}</span>
-                    <input type="number" min={0} step={1} value={rateForm.perKmAmount} onChange={(e) => setRateForm({ ...rateForm, perKmAmount: e.target.value })} />
+                    <NumberInput currency="IDR" min={0} step={1} value={rateForm.perKmAmount} onChange={(e) => setRateForm({ ...rateForm, perKmAmount: e.target.value })} />
                     <small className="admin-field-hint">{t('Dari pabrik asal produk ke titik peta alamat, dibulatkan ke atas per km. 0 = jarak tidak dihitung.', 'From the product factory to the address pin, rounded up per km. 0 = distance ignored.')}</small>
                     {firstError(formErrors, 'perKmAmount') && <small className="cms-field-error">{firstError(formErrors, 'perKmAmount')}</small>}
                   </label>
                   <label>
                     <span className="field-label">{t('Per kg berat (Rp)', 'Per kg of weight (Rp)')}</span>
-                    <input type="number" min={0} step={1} value={rateForm.perKgAmount} onChange={(e) => setRateForm({ ...rateForm, perKgAmount: e.target.value })} />
+                    <NumberInput currency="IDR" min={0} step={1} value={rateForm.perKgAmount} onChange={(e) => setRateForm({ ...rateForm, perKgAmount: e.target.value })} />
                     <small className="admin-field-hint">{t('Berat produk × qty, dibulatkan ke atas per kg.', 'Product weight × qty, rounded up per kg.')}</small>
                     {firstError(formErrors, 'perKgAmount') && <small className="cms-field-error">{firstError(formErrors, 'perKgAmount')}</small>}
                   </label>
                   <label>
                     <span className="field-label">{t('Per m³ volume (Rp)', 'Per m³ of volume (Rp)')}</span>
-                    <input type="number" min={0} step={1} value={rateForm.perM3Amount} onChange={(e) => setRateForm({ ...rateForm, perM3Amount: e.target.value })} />
+                    <NumberInput currency="IDR" min={0} step={1} value={rateForm.perM3Amount} onChange={(e) => setRateForm({ ...rateForm, perM3Amount: e.target.value })} />
                     <small className="admin-field-hint">{t('Dimensi kemasan produk × qty, dibulatkan ke atas per 0,01 m³.', 'Product package size × qty, rounded up per 0.01 m³.')}</small>
                     {firstError(formErrors, 'perM3Amount') && <small className="cms-field-error">{firstError(formErrors, 'perM3Amount')}</small>}
                   </label>
@@ -645,13 +646,13 @@ export default function AdminShipping() {
                   <span className="field-label">{t('Simulasi', 'Simulation')}</span>
                   <div className="ship-preview-inputs">
                     <label>
-                      <input type="number" min={0} value={preview.km} onChange={(e) => setPreview({ ...preview, km: e.target.value })} /> km
+                      <NumberInput min={0} value={preview.km} onChange={(e) => setPreview({ ...preview, km: e.target.value })} /> km
                     </label>
                     <label>
-                      <input type="number" min={0} value={preview.kg} onChange={(e) => setPreview({ ...preview, kg: e.target.value })} /> kg
+                      <NumberInput min={0} value={preview.kg} onChange={(e) => setPreview({ ...preview, kg: e.target.value })} /> kg
                     </label>
                     <label>
-                      <input type="number" min={0} step={0.01} value={preview.m3} onChange={(e) => setPreview({ ...preview, m3: e.target.value })} /> m³
+                      <NumberInput min={0} step={0.01} value={preview.m3} onChange={(e) => setPreview({ ...preview, m3: e.target.value })} /> m³
                     </label>
                   </div>
                   <p className="ship-preview-result">
@@ -665,7 +666,7 @@ export default function AdminShipping() {
             <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Gratis ongkir di atas subtotal (Rp)', 'Free shipping above subtotal (Rp)')}</span>
-                <input type="number" min={0} step={1} value={rateForm.freeAbove} onChange={(e) => setRateForm({ ...rateForm, freeAbove: e.target.value })} placeholder={t('kosong = tidak ada', 'empty = none')} />
+                <NumberInput currency="IDR" min={0} step={1} value={rateForm.freeAbove} onChange={(e) => setRateForm({ ...rateForm, freeAbove: e.target.value })} placeholder={t('kosong = tidak ada', 'empty = none')} />
                 {firstError(formErrors, 'freeAbove') && <small className="cms-field-error">{firstError(formErrors, 'freeAbove')}</small>}
               </label>
             </div>
@@ -673,7 +674,7 @@ export default function AdminShipping() {
             <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Urutan tampil', 'Display order')}</span>
-                <input type="number" min={0} value={rateForm.sortOrder} onChange={(e) => setRateForm({ ...rateForm, sortOrder: e.target.value })} />
+                <NumberInput min={0} value={rateForm.sortOrder} onChange={(e) => setRateForm({ ...rateForm, sortOrder: e.target.value })} />
               </label>
               <label className="cms-check" style={{ alignSelf: 'end' }}>
                 <input type="checkbox" checked={rateForm.isActive} onChange={(e) => setRateForm({ ...rateForm, isActive: e.target.checked })} />

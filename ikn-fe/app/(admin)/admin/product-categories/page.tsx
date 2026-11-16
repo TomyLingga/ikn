@@ -10,6 +10,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n, type MediaSummary } from '@/lib/cms';
 import type { Category } from '@/lib/types';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import NumberInput from '@/components/NumberInput';
 
 interface CategoryForm {
   name: I18n;
@@ -220,7 +221,7 @@ export default function AdminProductCategories() {
               </label>
               <label>
                 <span className="field-label">{t('Urutan tampil', 'Display order')}</span>
-                <input type="number" min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
+                <NumberInput min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
               </label>
             </div>
             <MediaPicker label={t('Gambar kategori', 'Category image')} value={form.image} onChange={(media) => setForm({ ...form, image: media })} accept="image" collection="categories" error={firstError(formErrors, 'imageMediaId')} />

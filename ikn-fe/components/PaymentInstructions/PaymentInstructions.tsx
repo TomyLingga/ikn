@@ -4,6 +4,8 @@
 // teks instruksi metode, dan hitung mundur batas waktu. Dipakai halaman sukses checkout dan detail order.
 // Order USD (ASUMSI A-86): angka dalam USD, hanya rekening USD beserta SWIFT/alamat bank/bank koresponden,
 // tanpa kode unik, plus catatan bahwa biaya bank di luar negeri ditanggung pembeli.
+// Order bertermin (ASUMSI A-97): dengan `installment` (termin lanjutan) nominal dan rekening diambil dari payment termin
+// itu dan batas waktu diganti tanggal jatuh tempo termin (tanpa hitung mundur: termin terlambat tidak membatalkan order).
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Icon from '@/components/Icon';
@@ -11,7 +13,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { tr } from '@/lib/cms';
 import { activePayment } from '@/lib/commerce';
 import { formatDateTime, formatMoney, fromMinorInput, isUsd } from '@/lib/format';
-import type { BankAccountInfo, CommerceConfig, Order } from '@/lib/types';
+import type { BankAccountInfo, CommerceConfig, Order, OrderInstallment } from '@/lib/types';
 
 function useCountdown(target: string | null | undefined) {
   const [now, setNow] = useState(() => Date.now());
@@ -50,12 +52,16 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-export default function PaymentInstructions({ order, config }: { order: Order; config?: CommerceConfig | null }) {
+export default function PaymentInstructions({ order, config, installment = null }: { order: Order; config?: CommerceConfig | null; installment?: OrderInstallment | null }) {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
-  const countdown = useCountdown(order.status === 'pending_payment' ? order.paymentDueAt : null);
+  // Termin lanjutan: status order sudah lewat pending_payment, jadi hitung mundur batas bayar order tidak dipakai.
+  const balance = !!installment && installment.seq > 1;
+  const countdown = useCountdown(!balance && order.status === 'pending_payment' ? order.paymentDueAt : null);
 
-  const payment = activePayment(order);
+  const payment = balance ? installment.activePayment || installment.payments[installment.payments.length - 1] || null : activePayment(order);
+  // Nama termin yang sedang ditagih (termin pertama: dari payment aktif order).
+  const stage = balance ? installment.label : payment?.installment?.label || null;
   const currency = payment?.currency || order.currency || 'IDR';
   const usd = isUsd(currency);
   const methodCode = payment?.method || '';
@@ -68,8 +74,11 @@ export default function PaymentInstructions({ order, config }: { order: Order; c
     : !isQris
       ? (config?.bankAccounts || []).filter((bank) => (bank.currency || 'IDR') === currency)
       : [];
-  const instructions = tr(payment?.instructions || methodInfo?.instructions, lang);
-  const amount = payment?.amount ?? order.grandTotal;
+  // Teks metode transfer ditulis untuk rupiah (menyebut kode unik); order USD tidak punya kode unik, jadi memakai teks tetap.
+  const instructions = usd
+    ? t('Transfer tepat sebesar nominal di atas ke rekening tujuan, lalu unggah bukti transfer di halaman pesanan.', 'Transfer the exact amount above to the account shown, then upload the transfer receipt on the order page.')
+    : tr(payment?.instructions || methodInfo?.instructions, lang);
+  const amount = payment?.amount ?? (balance ? installment.amount : order.grandTotal);
   const uniqueCode = usd ? 0 : order.uniqueCode || 0;
   // Nilai yang disalin: rupiah bulat, atau desimal USD ("1250.00") agar cocok dengan formulir transfer.
   const amountText = usd ? fromMinorInput(amount, currency) : String(amount);
@@ -80,7 +89,10 @@ export default function PaymentInstructions({ order, config }: { order: Order; c
   return (
     <div className="pay-box">
       <div className="pay-amount">
-        <span className="label">{t('Total yang harus dibayar', 'Amount due')}{usd ? ' (USD)' : ''}</span>
+        <span className="label">
+          {stage ? `${t('Yang harus dibayar sekarang', 'Amount due now')}: ${tr(stage, lang)}` : t('Total yang harus dibayar', 'Amount due')}
+          {usd ? ' (USD)' : ''}
+        </span>
         <strong>
           {highlightCode ? (
             <>
@@ -145,7 +157,17 @@ export default function PaymentInstructions({ order, config }: { order: Order; c
 
       {instructions && <p className="pd-quote-note">{instructions}</p>}
 
-      {order.paymentDueAt && order.status === 'pending_payment' && (
+      {balance && installment.dueAt && (
+        <div className={`pay-countdown ${installment.overdue ? 'is-expired' : ''}`}>
+          <Icon name="target" size={16} />
+          <span>
+            {t('Jatuh tempo', 'Due date')}: <strong>{formatDateTime(installment.dueAt, lang)}</strong>
+            {installment.overdue && <> · <span className="pay-timer">{t('terlambat', 'overdue')}</span></>}
+          </span>
+        </div>
+      )}
+
+      {!balance && order.paymentDueAt && order.status === 'pending_payment' && (
         <div className={`pay-countdown ${countdown?.expired ? 'is-expired' : ''}`}>
           <Icon name="target" size={16} />
           <span>

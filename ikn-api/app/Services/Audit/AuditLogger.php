@@ -13,7 +13,8 @@ use Throwable;
 // Pencatat audit aksi admin (ASUMSI A-17: tabel sendiri, tanpa package).
 class AuditLogger
 {
-    private const HIDDEN = ['password', 'password_confirmation', 'passwordConfirmation', 'current_password', 'currentPassword', 'token'];
+    // Kunci bertitik = rahasia bersarang di body pengaturan situs (Request::except memakai notasi titik).
+    private const HIDDEN = ['password', 'password_confirmation', 'passwordConfirmation', 'current_password', 'currentPassword', 'token', 'mail.password', 'maps.google_api_key'];
 
     public function log(?User $user, string $action, ?Model $subject = null, ?array $before = null, ?array $after = null, ?Request $request = null): ?AuditLog
     {

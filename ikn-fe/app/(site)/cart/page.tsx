@@ -11,8 +11,9 @@ import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage } from '@/lib/api';
 import { tr } from '@/lib/cms';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatNumber } from '@/lib/format';
 import type { QuoteResult } from '@/lib/types';
+import NumberInput from '@/components/NumberInput';
 
 // Keranjang: item dari localStorage; ringkasan (harga berlaku, diskon, pajak, biaya) dari
 // POST /cart/quote tanpa alamat untuk customer login. Tamu diarahkan login saat checkout.
@@ -120,17 +121,16 @@ export default function CartPage() {
                           {formatIDR(unitPrice)}/{it.unit}
                           {q?.promoApplied && <span className="pcard-promo-inline">{t('Promo', 'Promo')}</span>}
                         </span>
-                        {it.moq > 1 && <span className="cart-moq">{t('Min.', 'Min.')} {it.moq} {it.unit}</span>}
+                        {it.moq > 1 && <span className="cart-moq">{t('Min.', 'Min.')} {formatNumber(it.moq, lang)} {it.unit}</span>}
                         {overStock && (
                           <span className="cart-warn">
-                            {t('Stok tersedia', 'Available stock')}: {q?.available} {it.unit}
+                            {t('Stok tersedia', 'Available stock')}: {q ? formatNumber(q.available, lang) : ''} {it.unit}
                           </span>
                         )}
                       </div>
                       <div className="qty-ctl qty-ctl-sm">
                         <button type="button" onClick={() => updateQty(it.slug, it.qty - 1)} aria-label={t('Kurangi', 'Decrease')} disabled={it.qty <= it.moq}>−</button>
-                        <input
-                          type="number"
+                        <NumberInput
                           min={it.moq}
                           value={it.qty}
                           onChange={(e) => updateQty(it.slug, Number(e.target.value) || it.moq)}

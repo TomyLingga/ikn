@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\DB;
  * Mata uang order mengikuti pasar customer (ASUMSI A-86); angka ditulis ke DB lewat Money::fromMinor.
  * Term CIF (pricing_mode quoted, ASUMSI A-89): order dibuat awaiting_freight tanpa payment, kode unik, dan batas bayar;
  * metode bayar disimpan di pending_payment_method dan dipakai FreightQuoteService saat penawaran ongkir diterima.
+ * Syarat bayar berjadwal termin (ASUMSI A-97): baris order_installments dibuat sebelum payment pertama, sehingga
+ * payment pertama bernilai termin pertama; order CIF membuatnya saat penawaran ongkir diterima (total baru final di sana).
  */
 class CheckoutService
 {
@@ -40,6 +42,7 @@ class CheckoutService
         private OrderStateMachine $stateMachine,
         private DeliveryTermResolver $terms,
         private PaymentTermResolver $paymentTerms,
+        private InstallmentService $installments,
     ) {
     }
 
@@ -217,7 +220,9 @@ class CheckoutService
             return $order->fresh(['items', 'payments', 'histories']);
         }
 
-        // 6. Payment pertama (pending) + instruksi dari driver.
+        // 6. Termin dari syarat pembayaran (ASUMSI A-97; kosong untuk bayar penuh dan order rupiah), lalu payment
+        //    pertama (pending) + instruksi dari driver: senilai termin pertama, atau grand total bila tanpa termin.
+        $this->installments->createForOrder($order, $now);
         $this->payments->create($order, $method, $bank, $user);
 
         // 7. ∅ → pending_payment (histori + email).

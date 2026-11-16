@@ -7,6 +7,7 @@ import type { IconName } from '@/lib/types';
 import ColorInput from './ColorInput';
 import GeoPicker, { type GeoValue } from './GeoPicker';
 import Select from '@/components/Select';
+import NumberInput from '@/components/NumberInput';
 
 // Scalar inputs for schema fields: text, textarea, number, boolean, url, select, icon, color, geo.
 interface FieldInputProps {
@@ -64,8 +65,7 @@ export default function FieldInput({ label, def, value, onChange, icons = [], er
         break;
       }
       control = (
-        <input
-          type="number"
+        <NumberInput
           value={typeof value === 'number' ? String(value) : ''}
           onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
         />

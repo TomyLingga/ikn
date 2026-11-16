@@ -15,7 +15,7 @@ import { tr } from '@/lib/cms';
 import type { CSSProperties } from 'react';
 import { formatIDR, formatDate, formatDateTime, formatMoney } from '@/lib/format';
 import CountUp from '@/components/CountUp';
-import type { DashboardData, DashboardExportKpis, DashboardMetric, DashboardWorkQueue } from '@/lib/admin';
+import type { DashboardData, DashboardExportKpis, DashboardMetric, DashboardWorkQueue, OutstandingInstallments } from '@/lib/admin';
 import type { IconName, Lang, OrderSummary } from '@/lib/types';
 import styles from './AdminDashboard.module.css';
 
@@ -194,7 +194,7 @@ export default function AdminDashboard() {
         )}
       </p>
 
-      {exportKpis && <ExportKpiRow kpis={exportKpis} periodText={periodText} t={t} />}
+      {exportKpis && <ExportKpiRow kpis={exportKpis} outstanding={data.outstandingInstallments} periodText={periodText} t={t} />}
 
       <WorkQueue queue={workQueue} t={t} />
 
@@ -575,14 +575,30 @@ function Delta({ metric, t, lang }: { metric: DashboardMetric; t: T; lang: Lang 
  * Blok ekspor (Phase E6, kontrak 11.1): ringkasan order USD terpisah dari KPI IDR, hanya tampil bila server mengirimnya
  * (null = toko belum pernah menerima order USD). Tidak ada konversi kurs; kartu memakai markup dan stagger --i KPI utama.
  */
-function ExportKpiRow({ kpis, periodText, t }: { kpis: DashboardExportKpis; periodText: string; t: T }) {
+function ExportKpiRow({ kpis, outstanding, periodText, t }: { kpis: DashboardExportKpis; outstanding?: OutstandingInstallments[]; periodText: string; t: T }) {
   const formatUSD = (n: number) => formatMoney(n, kpis.currency);
+  // Termin (ASUMSI A-97): sisa tagihan order yang baru dibayar sebagian. Pendapatan di kartu pertama sudah menghitung
+  // order itu secara penuh sejak termin pertamanya diverifikasi, jadi kartu ini menunjukkan berapa yang belum masuk.
+  const due = (outstanding || []).find((row) => row.currency === kpis.currency);
   const cards: Array<{ key: string; label: string; hint: string; icon: IconName; value: number; money?: boolean; href: string }> = [
     { key: 'revenue', label: t('Pendapatan USD', 'USD revenue'), hint: t('dibayar pada periode ini', 'paid in this period'), icon: 'globe', value: kpis.revenue, money: true, href: '/admin/reports/sales' },
     { key: 'paid', label: t('Order dibayar', 'Paid orders'), hint: t('pada periode ini', 'in this period'), icon: 'paymentCheck', value: kpis.paidOrders, href: '/admin/reports/sales' },
     { key: 'created', label: t('Order dibuat', 'Orders created'), hint: t('periode ini, semua status', 'this period, any status'), icon: 'orders', value: kpis.orders, href: '/admin/orders?status=all' },
     { key: 'freight', label: t('Menunggu penawaran ongkir', 'Awaiting freight quote'), hint: t('order CIF saat ini', 'CIF orders right now'), icon: 'truck', value: kpis.awaitingFreight, href: '/admin/orders?status=awaiting_freight' },
     { key: 'pending', label: t('Menunggu pembayaran', 'Awaiting payment'), hint: t('order USD saat ini; daftar memuat semua mata uang', 'USD orders right now; the list shows all currencies'), icon: 'clock', value: kpis.pendingPayment, href: '/admin/orders?status=pending_payment' },
+    ...(due && due.total > 0
+      ? [
+          {
+            key: 'installments',
+            label: t('Sisa tagihan termin', 'Installments outstanding'),
+            hint: t(`${due.count} termin belum lunas${due.overdue > 0 ? `, ${due.overdue} terlambat` : ''}`, `${due.count} unpaid installment${due.count === 1 ? '' : 's'}${due.overdue > 0 ? `, ${due.overdue} overdue` : ''}`),
+            icon: 'wallet' as IconName,
+            value: due.total,
+            money: true,
+            href: '/admin/orders?installments=partial',
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -631,6 +647,8 @@ function WorkQueue({ queue, t }: { queue: DashboardWorkQueue; t: T }) {
     { key: 'ordersInTransit', label: t('Dalam pengiriman', 'In transit'), hint: t('Pantau resi', 'Track shipments'), icon: 'truck', href: '/admin/orders?status=shipped' },
     { key: 'ordersDelivered', label: t('Diterima customer', 'Delivered'), hint: t('Menunggu selesai', 'Awaiting completion'), icon: 'checkCircle', href: '/admin/orders?status=delivered' },
     { key: 'paymentsOverdue', label: t('Lewat jatuh tempo', 'Past due'), hint: t('Belum dibayar', 'Unpaid'), icon: 'clock', href: '/admin/orders?status=pending_payment', urgent: true },
+    // Termin lanjutan yang sedang ditagih, termasuk yang terlambat (ASUMSI A-97); hanya tampil bila ada.
+    { key: 'installmentsDue', label: t('Termin jatuh tempo', 'Installments due'), hint: t('Pelunasan menunggu customer', 'Balances awaiting the customer'), icon: 'wallet', href: '/admin/orders?installments=due', hideWhenZero: true },
     { key: 'customersToApprove', label: t('Persetujuan customer', 'Customer approval'), hint: t('Registrasi baru', 'New sign-ups'), icon: 'users', href: '/admin/customers?status=pending', urgent: true },
     { key: 'unreadChats', label: t('Chat belum dibaca', 'Unread chats'), hint: t('Live chat', 'Live chat'), icon: 'chat', href: '/admin/chat', urgent: true },
   ];

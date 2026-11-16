@@ -41,6 +41,18 @@ class Payment extends Model
         return $this->belongsTo(Order::class);
     }
 
+    /** Termin yang dibayar payment ini (ASUMSI A-97); null untuk order tanpa termin. */
+    public function installment()
+    {
+        return $this->belongsTo(OrderInstallment::class, 'installment_id');
+    }
+
+    /** Payment termin lanjutan (bukan termin pertama): diverifikasi tanpa mengubah status order. */
+    public function isBalancePayment(): bool
+    {
+        return $this->installment_id !== null && $this->installment !== null && ! $this->installment->isFirst();
+    }
+
     public function paymentMethod()
     {
         return $this->belongsTo(PaymentMethod::class);

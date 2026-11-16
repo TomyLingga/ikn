@@ -106,6 +106,18 @@ final class QuoteResult
         return $this;
     }
 
+    /** @return array<int, array{key:string, label:array, percent:int|float, trigger:string, dueDays:int, amount:int}> */
+    public function installmentPreview(): array
+    {
+        $rows = $this->paymentTerm?->installmentRows() ?? [];
+        if ($rows === [] || Money::isIdr($this->currency)) {
+            return [];
+        }
+        $amounts = InstallmentSchedule::amounts($this->grandTotal, $rows);
+
+        return array_map(fn (array $row, int $amount) => $row + ['amount' => $amount], $rows, $amounts);
+    }
+
     /** @return int[] id kategori item (unik) */
     public function categoryIds(): array
     {
@@ -123,6 +135,9 @@ final class QuoteResult
             'voucher' => $this->voucher ? $this->voucher->toSummary() : null,
             'deliveryTerm' => $this->deliveryTerm?->toPublicArray(),
             'paymentTerm' => $this->paymentTerm?->toPublicArray(),
+            // Pratinjau termin (ASUMSI A-97) dari grandTotal saat ini: [] untuk bayar penuh dan order rupiah. Untuk CIF
+            // nominalnya masih tanpa ongkir (warning freight_quote_pending) dan dihitung ulang saat ongkir disepakati.
+            'installments' => $this->installmentPreview(),
             'shipping' => $this->shipping,
             'availableShippingRates' => $this->availableShippingRates,
             'shippingTotal' => $this->shippingTotal,

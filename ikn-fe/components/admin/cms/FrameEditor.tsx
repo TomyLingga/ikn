@@ -6,6 +6,7 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import type { MediaFrame, MediaSummary } from '@/lib/cms';
 import { DEFAULT_FRAME, FRAME_ZOOM_MAX, formatSeconds, frameStyle, toFrame } from '@/lib/media-frame';
+import NumberInput from '@/components/NumberInput';
 
 // Editor bingkai per pemakaian (ASUMSI A-93): klik/geser titik fokus di pratinjau besar, atur zoom, lihat hasilnya di
 // tiga rasio frame (lebar, kotak, potret HP). Video: putar, lalu tetapkan detik mulai dan akhir yang dipakai.
@@ -160,7 +161,7 @@ export default function FrameEditor({
               <div className="frame-range">
                 <label>
                   <span className="field-label">{t('Mulai (detik)', 'Start (seconds)')}</span>
-                  <input type="number" min={0} step={0.1} value={frame.start ?? ''} onChange={(e) => setStart(e.target.value === '' ? null : Number(e.target.value))} placeholder="0" />
+                  <NumberInput min={0} step={0.1} value={frame.start ?? ''} onChange={(e) => setStart(e.target.value === '' ? null : Number(e.target.value))} placeholder="0" />
                   {!isEmbed && (
                     <button type="button" className="row-act" onClick={() => setStart(time)}>
                       {t('Pakai posisi sekarang', 'Use current position')}
@@ -169,7 +170,7 @@ export default function FrameEditor({
                 </label>
                 <label>
                   <span className="field-label">{t('Akhir (detik)', 'End (seconds)')}</span>
-                  <input type="number" min={0} step={0.1} value={frame.end ?? ''} onChange={(e) => setEnd(e.target.value === '' ? null : Number(e.target.value))} placeholder={t('sampai habis', 'to the end')} />
+                  <NumberInput min={0} step={0.1} value={frame.end ?? ''} onChange={(e) => setEnd(e.target.value === '' ? null : Number(e.target.value))} placeholder={t('sampai habis', 'to the end')} />
                   {!isEmbed && (
                     <button type="button" className="row-act" onClick={() => setEnd(time)}>
                       {t('Pakai posisi sekarang', 'Use current position')}

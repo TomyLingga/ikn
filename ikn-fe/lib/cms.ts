@@ -229,6 +229,8 @@ export interface SiteSettings {
   };
   /** Email notifikasi (ASUMSI A-82); hanya ada pada respons admin. */
   mail?: MailSettings;
+  /** Penyedia tile peta (ASUMSI A-98); hanya ada pada respons admin. Publik membaca GET /geo/map-config. */
+  maps?: import('@/lib/map-tiles').MapSettings;
 }
 
 export interface SiteData {

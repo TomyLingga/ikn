@@ -1,0 +1,56 @@
+/* Jadwal termin di ringkasan checkout (ASUMSI A-97). */
+.plan {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-2);
+}
+
+.caption {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.name small,
+.pending {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.amount {
+  font-weight: 650;
+  white-space: nowrap;
+}

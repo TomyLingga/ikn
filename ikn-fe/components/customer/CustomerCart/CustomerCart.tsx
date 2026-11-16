@@ -11,6 +11,7 @@ import { tr } from '@/lib/cms';
 import { formatMoney } from '@/lib/format';
 import { CART_OPEN_EVENT, shopPaths } from '@/lib/shop';
 import styles from './CustomerCart.module.css';
+import NumberInput from '@/components/NumberInput';
 
 const paths = shopPaths(true);
 
@@ -110,7 +111,7 @@ export default function CustomerCart() {
                           <div className={styles.actions}>
                             <div className={styles.qtyCtl}>
                               <button type="button" onClick={() => updateQty(item.slug, item.qty - 1)} disabled={item.qty <= item.moq} aria-label={t('Kurangi', 'Decrease')}>-</button>
-                              <input type="number" readOnly value={item.qty} aria-label={t('Jumlah', 'Quantity')} />
+                              <NumberInput readOnly value={item.qty} aria-label={t('Jumlah', 'Quantity')} />
                               <button type="button" onClick={() => updateQty(item.slug, item.qty + 1)} aria-label={t('Tambah', 'Increase')}>+</button>
                             </div>
                             <button type="button" onClick={() => remove(item.slug)} className={styles.removeBtn} aria-label={`${t('Hapus', 'Remove')} ${name}`}>

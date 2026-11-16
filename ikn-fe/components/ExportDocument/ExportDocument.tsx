@@ -127,6 +127,23 @@ export default function ExportDocument({ number, site, config, order: preloaded,
   const taxRate = order.taxRate ?? 0;
   const taxLabel = taxRate === 0 ? 'VAT 0% (export)' : `VAT ${taxRate}%${order.priceIncludesTax ? ' (included)' : ''}`;
   const blDateText = longDateEn(order.shipmentDetails?.blDate);
+  // Jadwal termin (ASUMSI A-97): dicetak hanya untuk order bertermin, beserta jumlah terbayar dan sisa tagihan.
+  const installments = order.installments || [];
+  const progress = order.paymentProgress || null;
+  const fullyPaid = installments.length > 0 ? progress?.status === 'paid' : !!order.paidAt;
+  const installmentStatusEn = (row: (typeof installments)[number]): string => {
+    if (row.status === 'paid') return row.paidAt ? `Paid ${longDateEn(row.paidAt)}` : 'Paid';
+    if (row.status === 'void') return 'Void';
+    if (row.status === 'awaiting_verification') return 'Payment under verification';
+    if (row.status === 'due') return row.overdue ? 'Overdue' : 'Awaiting payment';
+    return 'Not billed yet';
+  };
+  const installmentDueEn = (row: (typeof installments)[number], index: number): string => {
+    if (row.dueAt) return longDateEn(row.dueAt);
+    if (index === 0) return 'On order';
+    const when = row.trigger === 'shipped' ? 'after shipment' : row.trigger === 'delivered' ? 'after delivery' : 'after the first payment';
+    return row.dueDays > 0 ? `${row.dueDays} days ${when}` : `On billing, ${when}`;
+  };
 
   return (
     <div className={sheet.sheetWrap}>
@@ -175,7 +192,7 @@ export default function ExportDocument({ number, site, config, order: preloaded,
             ) : isProforma ? (
               revision > 1 && <p className={sheet.proforma}>Revision {revision}</p>
             ) : (
-              unpaid && <p className={sheet.proforma}>Unpaid</p>
+              unpaid ? <p className={sheet.proforma}>Unpaid</p> : !fullyPaid && <p className={sheet.proforma}>Partially paid</p>
             )}
           </div>
         </div>
@@ -416,6 +433,53 @@ export default function ExportDocument({ number, site, config, order: preloaded,
           </table>
         </section>
 
+        {installments.length > 0 && (
+          <section className={styles.section}>
+            <h3>Payment schedule</h3>
+            <table className={sheet.table}>
+              <thead>
+                <tr>
+                  <th className={styles.colNo}>No.</th>
+                  <th className={styles.colStage}>Installment</th>
+                  <th className={styles.colPercent}>%</th>
+                  <th className={styles.colStageAmount}>
+                    Amount
+                    <br />({currency})
+                  </th>
+                  <th className={styles.colDue}>Due</th>
+                  <th className={styles.colStatus}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {installments.map((row, index) => (
+                  <tr key={row.id} className={styles.itemRow}>
+                    <td className={styles.center}>{row.seq}</td>
+                    <td>{tr(row.label, 'en')}</td>
+                    <td className={styles.num}>{Number(row.percent).toLocaleString('en-US', { maximumFractionDigits: 2 })}%</td>
+                    <td className={styles.num}>{money(row.amount)}</td>
+                    <td>{installmentDueEn(row, index)}</td>
+                    <td>{installmentStatusEn(row)}</td>
+                  </tr>
+                ))}
+                {progress && (
+                  <>
+                    <tr className={styles.sumRow}>
+                      <td colSpan={3}>Paid</td>
+                      <td className={styles.num}>{money(progress.paidTotal)}</td>
+                      <td colSpan={2} />
+                    </tr>
+                    <tr className={`${styles.sumRow} ${styles.totalRow}`}>
+                      <td colSpan={3}>BALANCE DUE ({currency})</td>
+                      <td className={styles.num}>{money(progress.outstandingTotal)}</td>
+                      <td colSpan={2} />
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+          </section>
+        )}
+
         <section className={styles.section}>
           <h3>Payment</h3>
           {bank ? (
@@ -454,7 +518,11 @@ export default function ExportDocument({ number, site, config, order: preloaded,
           <p className={styles.clause}>All bank charges outside Indonesia are for the buyer&apos;s account.</p>
           {order.paidAt && (
             <p className={styles.paidNote}>
-              {cancelled ? `Paid on ${longDateEn(order.paidAt)}; order cancelled.` : `Paid in full on ${longDateEn(order.paidAt)}.`}
+              {cancelled
+                ? `Paid on ${longDateEn(order.paidAt)}; order cancelled.`
+                : fullyPaid
+                  ? `Paid in full${installments.length > 0 ? '' : ` on ${longDateEn(order.paidAt)}`}.`
+                  : `First installment received on ${longDateEn(order.paidAt)}; balance due as per the payment schedule.`}
             </p>
           )}
         </section>

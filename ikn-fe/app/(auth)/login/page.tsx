@@ -393,7 +393,7 @@ function AuthCard() {
                 <span>{t('Negara', 'Country')}</span>
                 <Select name="countryCode" value={countryCode} onChange={(e) => setCountryCode(e.target.value)} searchPlaceholder={t('Cari negara', 'Search country')}>
                   {(countries.length > 0 ? countries : [{ code: DEFAULT_COUNTRY, name: { id: 'Indonesia', en: 'Indonesia' } }]).map((c) => (
-                    <option key={c.code} value={c.code}>
+                    <option key={c.code} value={c.code} data-keywords={`${c.name.en} ${c.name.id}`}>
                       {c.name[lang] || c.name.id}
                     </option>
                   ))}

@@ -678,3 +678,25 @@
     animation: none;
   }
 }
+
+/* 2026-11-15: tombol teks dibuat pil berbingkai agar jelas bisa diklik (sama dengan button.link di app/styles/polish.css). */
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 38%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease), color 0.16s var(--ease);
+}
+.linkButton:hover:not(:disabled) { border-color: var(--primary); background: var(--primary); color: var(--on-primary); text-decoration: none; }
+.linkButton:disabled { opacity: 0.5; cursor: not-allowed; }

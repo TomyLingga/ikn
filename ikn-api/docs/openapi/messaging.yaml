@@ -2,7 +2,7 @@
 # (ASUMSI A-70, A-71, A-73). Digabung oleh docs/openapi/merge.py.
 tags:
   - name: notifications
-    description: Notifikasi dalam aplikasi untuk customer (lonceng portal) dan penghitung badge
+    description: Notifikasi dalam aplikasi untuk customer (lonceng portal) dan admin (lonceng panel admin), serta penghitung badge
   - name: chat
     description: Live chat customer dengan penjual (polling, tanpa websocket)
   - name: admin-chat
@@ -55,11 +55,16 @@ paths:
       security: [{ cookieAuth: [] }]
       summary: Percakapan customer dengan penjual (satu per customer; null bila belum pernah mengirim pesan)
       description: |
-        Tanpa parameter = 50 pesan terakhir. `after` = pesan dengan id lebih besar (polling), `before` = halaman lebih lama.
+        Tanpa parameter = halaman terbaru (30 pesan) + `hasMore`. `before` = halaman lebih lama (30 pesan sebelum id itu;
+        FE memintanya saat pengguna menggulir ke puncak utas, sampai `hasMore` false).
+        `after` = pesan dengan id lebih besar (polling, maks. 200). Bila `rev` (revisi terakhir yang diketahui klien,
+        dari `conversation.revision`) ikut dikirim, respons juga memuat `changed`: pesan dengan id ≤ `after` yang diedit
+        atau ditarik sejak revisi itu (ASUMSI A-99). `conversation.revision` naik tiap kirim/edit/tarik.
         `senderName` pesan admin selalu null untuk customer (penjual tampil sebagai satu pihak).
       parameters:
         - { name: after, in: query, schema: { type: integer } }
         - { name: before, in: query, schema: { type: integer } }
+        - { name: rev, in: query, schema: { type: integer, minimum: 0 }, description: revisi percakapan terakhir yang diketahui klien; mengaktifkan `changed` }
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/CustomerChat' } } } } } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
@@ -89,6 +94,44 @@ paths:
         '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { description: Terlalu banyak pesan }
+  /customer/chat/messages/{message}:
+    put:
+      tags: [chat]
+      security: [{ cookieAuth: [] }]
+      summary: Edit isi pesan sendiri selama jendela edit (ikn.chat.edit_window_seconds, bawaan 60 detik)
+      description: |
+        Hanya pesan sisi customer di percakapannya sendiri. Rujukan produk/order pada pesan tidak berubah. Isi yang sama
+        = tidak ada perubahan (tanpa tanda edit). Pesan lain di percakapan itu (milik admin) → 403; pesan percakapan
+        lain → 404. Tidak ada metode DELETE: chat tidak bisa dihapus (ASUMSI A-99).
+      parameters:
+        - { name: message, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [body], properties: { body: { type: string, maxLength: 2000 } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds): batas waktu lewat; CHAT_MESSAGE_RETRACTED: pesan sudah ditarik' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /customer/chat/messages/{message}/retract:
+    post:
+      tags: [chat]
+      security: [{ cookieAuth: [] }]
+      summary: Tarik pesan sendiri selama jendela edit
+      description: |
+        Baris pesan tetap tersimpan (`retracted_at`); semua respons sesudahnya mengirim pesan itu dengan `retracted: true`,
+        `body` kosong, dan `context` null untuk kedua pihak. Bila pesan belum dibaca admin, penghitung belum-dibaca
+        admin turun satu; bila itu pesan terakhir, pratinjau percakapan dikosongkan (`lastMessageRetracted`).
+      parameters:
+        - { name: message, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED' }
   /customer/chat/read:
     post:
       tags: [chat]
@@ -130,16 +173,17 @@ paths:
                 phone: { type: string, maxLength: 40, nullable: true, description: 'E.164 dengan kode negara, mis. +6281234567890 atau +60123456789 (8-15 digit; spasi/strip/titik/kurung boleh); tanpa + hanya nomor Indonesia 0.../62...; rule PhoneNumber (A-78)' }
                 body: { type: string, maxLength: 2000 }
       responses:
-        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { token: { type: string }, conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { token: { type: string }, conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' }, editWindowSeconds: { type: integer } } } } } } } }
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { description: Terlalu banyak percakapan baru }
     get:
       tags: [chat]
-      summary: Percakapan tamu (token wajib; salah → 404), parameter after/before seperti /customer/chat
+      summary: Percakapan tamu (token wajib; salah → 404), parameter after/before/rev seperti /customer/chat
       parameters:
         - { name: token, in: query, required: true, schema: { type: string } }
         - { name: after, in: query, schema: { type: integer } }
         - { name: before, in: query, schema: { type: integer } }
+        - { name: rev, in: query, schema: { type: integer, minimum: 0 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/CustomerChat' } } } } } }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -156,6 +200,39 @@ paths:
         '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /chat/guest/messages/{message}:
+    put:
+      tags: [chat]
+      summary: Tamu mengedit pesannya sendiri selama jendela edit (aturan sama dengan sisi customer)
+      parameters:
+        - { name: message, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token, body], properties: { token: { type: string }, body: { type: string, maxLength: 2000 } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: 'Token salah, atau pesan bukan bagian percakapan token itu' }
+        '409': { description: 'CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /chat/guest/messages/{message}/retract:
+    post:
+      tags: [chat]
+      summary: Tamu menarik pesannya sendiri selama jendela edit (baris tetap tersimpan, isi tidak lagi dikirim)
+      parameters:
+        - { name: message, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/CustomerChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: 'Token salah, atau pesan bukan bagian percakapan token itu' }
+        '409': { description: 'CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED' }
   /chat/guest/read:
     post:
       tags: [chat]
@@ -174,7 +251,7 @@ paths:
     get:
       tags: [admin-dashboard]
       security: [{ cookieAuth: [] }]
-      summary: Penghitung badge sidebar admin; null = admin tidak punya modulnya
+      summary: Penghitung badge sidebar dan lonceng admin; null = admin tidak punya modulnya
       responses:
         '200':
           description: OK
@@ -186,23 +263,65 @@ paths:
                   data:
                     type: object
                     properties:
+                      notifications: { type: integer, description: notifikasi milik admin ini yang belum dibaca (lonceng top bar; tidak bergantung modul) }
                       orders: { type: integer, nullable: true, description: 'order yang menunggu tindakan admin modul orders: awaiting_freight (permintaan penawaran ongkir CIF, ASUMSI A-89) + paid, processing, shipped, delivered; payment_review dihitung di payments' }
                       payments: { type: integer, nullable: true, description: pembayaran awaiting_verification (modul payments) }
                       customers: { type: integer, nullable: true, description: customer berstatus pending (modul customers) }
-                      chat: { type: integer, nullable: true, description: percakapan dengan pesan customer belum dibaca (modul chat) }
+                      chat: { type: integer, nullable: true, description: percakapan aktif (tidak diarsipkan) dengan pesan customer belum dibaca (modul chat) }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/notifications:
+    get:
+      tags: [notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Daftar notifikasi milik admin yang login (terbaru dulu); meta.unread = jumlah belum dibaca
+      description: |
+        Lonceng panel admin. Satu baris per admin aktif yang boleh mengakses modul kejadiannya (super_admin selalu):
+        modul orders = `admin.order_placed`, `admin.freight_requested`, `admin.freight_countered`, `admin.freight_accepted`,
+        `admin.freight_expired`, `admin.order_cancelled`, `admin.order_received`, `admin.order_completed`;
+        modul payments = `admin.payment_proof`; modul customers = `admin.customer_registered`.
+        `url` = path halaman admin (`/admin/orders/{number}`, `/admin/payments`, `/admin/customers`). Tanpa middleware audit.
+      parameters:
+        - { name: unread, in: query, schema: { type: boolean }, description: hanya yang belum dibaca }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: perPage, in: query, schema: { type: integer, default: 15, maximum: 50 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/UserNotification' } }, meta: { allOf: [{ $ref: '#/components/schemas/PageMeta' }, { type: object, properties: { unread: { type: integer } } }] } } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/notifications/read-all:
+    post:
+      tags: [notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Tandai semua notifikasi admin ini sudah dibaca
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { updated: { type: integer }, unread: { type: integer } } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/notifications/{id}/read:
+    post:
+      tags: [notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Tandai satu notifikasi sudah dibaca (milik admin lain → 404)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/UserNotification' }, meta: { type: object, properties: { unread: { type: integer } } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
   /admin/chats:
     get:
       tags: [admin-chat]
       security: [{ cookieAuth: [] }]
       summary: Kotak masuk percakapan (pesan terbaru dulu); meta.unreadConversations untuk badge
+      description: |
+        Bawaan = percakapan aktif saja; `archived=1` = tab Arsip. Percakapan yang diarsipkan tidak dihitung di
+        `meta.unreadConversations` maupun badge `GET /admin/badges`. `meta.archivedConversations` = jumlah di arsip.
       parameters:
         - { name: q, in: query, schema: { type: string, maxLength: 120 }, description: nama, email, atau perusahaan customer }
         - { name: unread, in: query, schema: { type: boolean } }
+        - { name: archived, in: query, schema: { type: boolean }, description: 'true = hanya percakapan yang diarsipkan; kosong/false = hanya yang aktif' }
         - { name: page, in: query, schema: { type: integer, default: 1 } }
         - { name: perPage, in: query, schema: { type: integer, default: 30, maximum: 100 } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminChatConversation' } }, meta: { allOf: [{ $ref: '#/components/schemas/PageMeta' }, { type: object, properties: { unreadConversations: { type: integer } } }] } } } } } }
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/AdminChatConversation' } }, meta: { allOf: [{ $ref: '#/components/schemas/PageMeta' }, { type: object, properties: { unreadConversations: { type: integer }, archivedConversations: { type: integer } } }] } } } } } }
         '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [admin-chat]
@@ -220,19 +339,21 @@ paths:
     get:
       tags: [admin-chat]
       security: [{ cookieAuth: [] }]
-      summary: Pesan dalam satu percakapan (after/before seperti sisi customer)
+      summary: Pesan dalam satu percakapan (after/before/rev seperti sisi customer; percakapan arsip tetap bisa dibuka)
       parameters:
         - { name: conversation, in: path, required: true, schema: { type: integer } }
         - { name: after, in: query, schema: { type: integer } }
         - { name: before, in: query, schema: { type: integer } }
+        - { name: rev, in: query, schema: { type: integer, minimum: 0 } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/AdminChatConversation' }, messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }, hasMore: { type: boolean } } } } } } } }
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/AdminChatConversation' }, messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }, hasMore: { type: boolean }, changed: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }, editWindowSeconds: { type: integer } } } } } } } }
         '404': { $ref: '#/components/responses/NotFound' }
   /admin/chats/{conversation}/messages:
     post:
       tags: [admin-chat]
       security: [{ cookieAuth: [] }]
       summary: Balas customer (tidak dicatat audit log; pesan itu sendiri catatannya)
+      description: Membalas percakapan yang diarsipkan diperbolehkan dan tidak mengeluarkannya dari arsip.
       parameters:
         - { name: conversation, in: path, required: true, schema: { type: integer } }
       requestBody:
@@ -243,6 +364,66 @@ paths:
       responses:
         '201': { description: Created, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/AdminChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/chats/{conversation}/messages/{message}:
+    put:
+      tags: [admin-chat]
+      security: [{ cookieAuth: [] }]
+      summary: Edit pesan yang dikirim admin ini sendiri selama jendela edit
+      description: Pesan customer atau pesan admin lain → 403; pesan percakapan lain → 404. Tidak ada metode DELETE.
+      parameters:
+        - { name: conversation, in: path, required: true, schema: { type: integer } }
+        - { name: message, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [body], properties: { body: { type: string, maxLength: 2000 } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/AdminChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/chats/{conversation}/messages/{message}/retract:
+    post:
+      tags: [admin-chat]
+      security: [{ cookieAuth: [] }]
+      summary: Tarik pesan yang dikirim admin ini sendiri selama jendela edit (baris tetap tersimpan)
+      description: Bila pesan belum dibaca customer, penghitung belum-dibaca customer turun satu.
+      parameters:
+        - { name: conversation, in: path, required: true, schema: { type: integer } }
+        - { name: message, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: object, properties: { conversation: { $ref: '#/components/schemas/AdminChatConversation' }, message: { $ref: '#/components/schemas/ChatMessage' } } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'CHAT_EDIT_WINDOW_PASSED (meta.windowSeconds) | CHAT_MESSAGE_RETRACTED' }
+  /admin/chats/{conversation}/archive:
+    post:
+      tags: [admin-chat]
+      security: [{ cookieAuth: [] }]
+      summary: Arsipkan percakapan (dicatat audit log); tidak ada endpoint hapus percakapan
+      description: |
+        Mengisi `archived_at` + `archived_by`. Percakapan hilang dari daftar bawaan, dock, dan badge, tetapi tetap bisa
+        dibuka dan dibalas dari tab Arsip. Pesan baru dari customer/tamu mengeluarkannya dari arsip otomatis.
+        Mengarsipkan ulang tidak mengubah pencatatnya.
+      parameters:
+        - { name: conversation, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminChatConversation' }, meta: { type: object, properties: { unreadConversations: { type: integer } } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/chats/{conversation}/unarchive:
+    post:
+      tags: [admin-chat]
+      security: [{ cookieAuth: [] }]
+      summary: Keluarkan percakapan dari arsip (dicatat audit log)
+      parameters:
+        - { name: conversation, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/AdminChatConversation' }, meta: { type: object, properties: { unreadConversations: { type: integer } } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /admin/chats/{conversation}/read:
     post:
       tags: [admin-chat]
@@ -318,10 +499,10 @@ components:
       type: object
       properties:
         id: { type: integer }
-        type: { type: string, example: order.shipped, description: 'order.placed | order.payment_accepted | order.payment_rejected | order.payment_reminder | order.expired | order.cancelled | order.shipped | order.tracking | order.delivered | order.completed | account.approved | account.rejected | voucher.assigned' }
+        type: { type: string, example: order.shipped, description: 'customer: order.placed | order.payment_accepted | order.payment_rejected | order.payment_reminder | order.expired | order.cancelled | order.processing | order.shipped | order.tracking | order.delivered | order.delivered_balance_due | order.picked_up_balance_due | order.completed | account.approved | account.rejected | voucher.assigned (dan varian order lain di notifications.php); admin: admin.order_placed | admin.freight_requested | admin.payment_proof | admin.freight_countered | admin.freight_accepted | admin.freight_expired | admin.order_cancelled | admin.order_received | admin.order_completed | admin.customer_registered' }
         title: { $ref: '#/components/schemas/I18n' }
         body: { $ref: '#/components/schemas/I18n' }
-        url: { type: string, nullable: true, description: path FE tujuan, example: /dashboard/pesanan/IKN-20260922-00001 }
+        url: { type: string, nullable: true, description: 'path FE tujuan: portal untuk customer, halaman admin untuk notifikasi admin.*', example: /dashboard/pesanan/IKN-20260922-00001 }
         data: { type: object, nullable: true }
         read: { type: boolean }
         readAt: { type: string, format: date-time, nullable: true }
@@ -331,13 +512,17 @@ components:
       properties:
         id: { type: integer }
         role: { type: string, enum: [customer, admin] }
-        body: { type: string }
+        body: { type: string, description: 'string kosong bila retracted (isi pesan yang ditarik tidak pernah dikirim lagi)' }
         context:
           type: object
           nullable: true
-          description: 'snapshot rujukan: { type: product, slug, code, name, image, price (satuan terkecil currency), currency, unit } atau { type: order, number, status, grandTotal (satuan terkecil currency), currency, family (pickup|door|port, null untuk order lama) }; snapshot lama bisa tanpa currency/family (anggap IDR)'
+          description: 'snapshot rujukan: { type: product, slug, code, name, image, price (satuan terkecil currency), currency, unit } atau { type: order, number, status, grandTotal (satuan terkecil currency), currency, family (pickup|door|port, null untuk order lama) }; snapshot lama bisa tanpa currency/family (anggap IDR); null bila retracted'
         senderName: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
+        editedAt: { type: string, format: date-time, nullable: true, description: 'terisi bila pengirim mengedit pesan (FE menampilkan tanda "diedit")' }
+        retracted: { type: boolean, description: 'pesan ditarik pengirimnya; tampil sebagai "Pesan ditarik" di kedua sisi' }
+        retractedAt: { type: string, format: date-time, nullable: true }
+        editableSeconds: { type: integer, description: 'sisa detik pemirsa masih boleh mengedit/menarik pesan ini; 0 = bukan pesannya (admin: bukan ia pengirimnya), sudah ditarik, atau lewat batas. FE menghitung tenggat dari saat respons diterima' }
     CustomerChatConversation:
       type: object
       nullable: true
@@ -345,12 +530,15 @@ components:
         id: { type: integer }
         unread: { type: integer, description: pesan admin yang belum dibaca customer }
         lastMessageAt: { type: string, format: date-time, nullable: true }
+        revision: { type: integer, description: 'naik tiap kirim/edit/tarik; dikirim balik sebagai `rev` saat polling. Klien mengambilnya dari respons GET, bukan dari respons kirim/edit' }
     CustomerChat:
       type: object
       properties:
         conversation: { $ref: '#/components/schemas/CustomerChatConversation' }
         messages: { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }
-        hasMore: { type: boolean }
+        hasMore: { type: boolean, description: masih ada pesan lebih lama dari halaman ini (selalu false pada polling `after`) }
+        changed: { type: array, items: { $ref: '#/components/schemas/ChatMessage' }, description: 'hanya terisi bila `rev` dikirim: pesan lama (id ≤ after) yang diedit/ditarik sejak revisi itu, maks. 200' }
+        editWindowSeconds: { type: integer, example: 60, description: 'ikn.chat.edit_window_seconds (env CHAT_EDIT_WINDOW_SECONDS); 0 = edit/tarik dimatikan' }
     AdminChatConversation:
       type: object
       properties:
@@ -374,7 +562,18 @@ components:
             email: { type: string }
             status: { type: string }
         unread: { type: integer, description: pesan customer yang belum dibaca admin }
-        lastMessagePreview: { type: string, nullable: true }
+        lastMessagePreview: { type: string, nullable: true, description: mengikuti isi terbaru bila pesan terakhir diedit; null bila pesan terakhir ditarik }
+        lastMessageRetracted: { type: boolean, description: 'pesan terakhir ditarik pengirimnya (FE menampilkan "Pesan ditarik" sebagai pratinjau)' }
         lastSenderRole: { type: string, enum: [customer, admin], nullable: true }
         lastMessageAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time, nullable: true }
+        revision: { type: integer, description: naik tiap kirim/edit/tarik (lihat CustomerChatConversation.revision) }
+        archived: { type: boolean }
+        archivedAt: { type: string, format: date-time, nullable: true }
+        archivedBy:
+          type: object
+          nullable: true
+          description: admin yang mengarsipkan
+          properties:
+            id: { type: integer }
+            name: { type: string }

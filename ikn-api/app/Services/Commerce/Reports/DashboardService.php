@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\Auth\ModuleAccess;
 use App\Services\Chat\ChatService;
+use App\Services\Commerce\InstallmentService;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,7 @@ class DashboardService
 
     private const LIST_LIMIT = 6;
 
-    public function __construct(private ModuleAccess $access, private ChatService $chat)
+    public function __construct(private ModuleAccess $access, private ChatService $chat, private InstallmentService $installments)
     {
     }
 
@@ -87,6 +88,10 @@ class DashboardService
             'lowStock' => $this->lowStock(),
             'paymentDue' => $this->paymentDue($now),
             'exportKpis' => $this->exportKpis($monthStart, $now),
+            // Termin (ASUMSI A-97): sisa tagihan termin per mata uang dari order yang sudah dibayar sebagian dan masih
+            // berjalan: [{ currency, total, count, overdue }]; [] bila tidak ada. Pendapatan (kpis/exportKpis) tetap
+            // menghitung order secara penuh sejak termin pertama diverifikasi.
+            'outstandingInstallments' => $this->installments->outstandingByCurrency($now),
             // Tambahan 2026-11-04 (additive): ringkasan hari ini, tren 30 hari (sparkline), sebaran status order
             // bulan ini, kategori dan pelanggan teratas bulan ini. Uang IDR saja seperti kpis.
             'today' => $this->today($todayStart, $now),
@@ -291,6 +296,8 @@ class DashboardService
             'ordersInTransit' => $orders(Order::STATUS_SHIPPED),
             'ordersDelivered' => $orders(Order::STATUS_DELIVERED),
             'paymentsOverdue' => $overdue,
+            // Termin lanjutan yang sedang ditagih, termasuk yang terlambat (ASUMSI A-97); tautan /admin/orders?installments=due.
+            'installmentsDue' => $allows('payments') ? $this->installments->dueCount() : null,
             'customersToApprove' => $allows('customers')
                 ? User::customers()->where('status', User::STATUS_PENDING)->count()
                 : null,

@@ -11,8 +11,9 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { tr, type PagedMeta } from '@/lib/cms';
 import { stockLabels } from '@/lib/commerce';
 import { stockMovementLabels, type AdminProduct, type StockSummary } from '@/lib/admin';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import Select from '@/components/Select';
+import NumberInput from '@/components/NumberInput';
 
 interface StockPanelProps {
   product: AdminProduct;
@@ -99,15 +100,15 @@ export default function StockPanel({ product, onClose, onChanged }: StockPanelPr
         <div className="admin-stat-grid">
           <div className="admin-stat">
             <span>{t('Stok fisik', 'On hand')}</span>
-            <strong>{summary ? summary.stock : '—'}</strong>
+            <strong>{summary ? formatNumber(summary.stock, lang) : '—'}</strong>
           </div>
           <div className="admin-stat">
             <span>{t('Direservasi (order aktif)', 'Reserved (active orders)')}</span>
-            <strong>{summary ? summary.reserved : '—'}</strong>
+            <strong>{summary ? formatNumber(summary.reserved, lang) : '—'}</strong>
           </div>
           <div className="admin-stat">
             <span>{t('Tersedia', 'Available')}</span>
-            <strong>{summary ? summary.available : '—'}</strong>
+            <strong>{summary ? formatNumber(summary.available, lang) : '—'}</strong>
           </div>
           <div className="admin-stat">
             <span>{t('Status', 'Status')}</span>
@@ -126,7 +127,7 @@ export default function StockPanel({ product, onClose, onChanged }: StockPanelPr
             </label>
             <label>
               <span className="field-label">{t('Jumlah', 'Quantity')} ({product.unit})</span>
-              <input type="number" step={1} value={qty} onChange={(e) => setQty(e.target.value)} placeholder={type === 'adjust' ? t('mis. -5 atau 20', 'e.g. -5 or 20') : t('mis. 100', 'e.g. 100')} required />
+              <NumberInput step={1} value={qty} onChange={(e) => setQty(e.target.value)} placeholder={type === 'adjust' ? t('mis. -5 atau 20', 'e.g. -5 or 20') : t('mis. 100', 'e.g. 100')} required />
             </label>
             <label>
               <span className="field-label">{t('Catatan', 'Note')}</span>
@@ -179,7 +180,7 @@ export default function StockPanel({ product, onClose, onChanged }: StockPanelPr
                         <StatusBadge label={label[lang]} tone={label.tone} small />
                       </td>
                       <td style={{ textAlign: 'right' }} className="mono">
-                        {signed > 0 ? `+${signed}` : signed}
+                        {signed > 0 ? `+${formatNumber(signed, lang)}` : formatNumber(signed, lang)}
                       </td>
                       <td>
                         {movement.referenceType === 'order' && movement.referenceId ? (

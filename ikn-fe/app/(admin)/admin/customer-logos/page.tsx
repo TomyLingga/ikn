@@ -9,6 +9,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import type { CustomerLogoData, MediaSummary } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
+import NumberInput from '@/components/NumberInput';
 
 interface LogoForm {
   name: string;
@@ -219,7 +220,7 @@ export default function AdminCustomerLogos() {
             <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Urutan', 'Sort order')}</span>
-                <input type="number" min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
+                <NumberInput min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
               </label>
               <label className="cms-check" style={{ alignSelf: 'end' }}>
                 <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />

@@ -1,0 +1,18 @@
+/* Logo penyedia tile di atas peta (kontrol Leaflet). Aturan Google: tinggi 16–19px, tidak diubah bentuknya,
+   ruang kosong minimal 10px di kiri/kanan/atas dan 5px di bawah. */
+.brand {
+  margin: 10px 10px 5px !important;
+  line-height: 0;
+  pointer-events: none;
+}
+
+.brand img {
+  display: block;
+  width: auto;
+  height: 18px;
+}
+
+/* Logo di kiri bawah: baris atribusi (kanan bawah) berhenti sebelum logo (86px + ruang kosong 10px di kiri-kanan). */
+.brandBottomLeft :global(.leaflet-bottom.leaflet-right) {
+  max-width: calc(100% - 112px);
+}

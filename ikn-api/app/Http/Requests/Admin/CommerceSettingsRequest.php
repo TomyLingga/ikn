@@ -30,6 +30,9 @@ class CommerceSettingsRequest extends FormRequest
             // Penawaran ongkir CIF (ASUMSI A-89): masa berlaku bawaan (hari) dan batas tunggu sebelum batal otomatis (hari).
             'freightQuoteValidDays' => ['sometimes', 'required', 'integer', 'min:1', 'max:90'],
             'freightQuoteMaxDays' => ['sometimes', 'required', 'integer', 'min:1', 'max:365'],
+            // Termin pembayaran (ASUMSI A-97): pengingat N hari sebelum jatuh tempo dan tiap N hari selama terlambat (0 = mati).
+            'installmentRemindBeforeDays' => ['sometimes', 'required', 'integer', 'min:0', 'max:60'],
+            'installmentRemindOverdueDays' => ['sometimes', 'required', 'integer', 'min:0', 'max:60'],
             'invoicePrefix' => ['sometimes', 'required', 'string', 'max:40', 'regex:/^[A-Za-z0-9.\-\/ ]+$/'],
             'invoiceSignerName' => ['sometimes', 'nullable', 'string', 'max:120'],
             'invoiceSignerTitle' => ['sometimes', 'nullable', 'string', 'max:120'],

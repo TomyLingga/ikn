@@ -81,6 +81,14 @@ paths:
         '200': { $ref: '#/components/responses/UserSession' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
 
+  # ---------------------------------------------------------------- tile peta
+  /geo/map-config:
+    get:
+      tags: [content]
+      summary: 'Lapisan tile siap pakai untuk semua peta Leaflet (ASUMSI A-98). Publik (tanpa login). Penyedia dipilih admin di site-settings grup maps: default (OSM + Esri), google (Map Tiles API 2D, token sesi dibuat server), custom (templat XYZ). Hasil di-cache server (bawaan 6 jam; 5 menit saat fallback) dan dikosongkan saat grup maps disimpan. Bila penyedia gagal, lapisan bawaan disajikan dengan fallback true; alasan gagal tidak pernah dikirim ke publik.'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/MapTileConfig' } } } } } }
+
   # ---------------------------------------------------------------- batas unggahan
   /upload-limits:
     get:
@@ -446,6 +454,23 @@ paths:
       responses:
         '200': { description: '{ data: MailTestResult, message }', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/MailTestResult' }, message: { type: string } } } } } }
         '422': { description: 'ValidationError (to / mail.*), MAIL_TEST_FAILED (alasan dari server SMTP di message), MAIL_DISABLED (mode off)' }
+  /admin/site-settings/maps-test:
+    post:
+      tags: [admin-settings]
+      security: [{ cookieAuth: [] }]
+      summary: 'Uji penyedia tile peta (modul settings, ASUMSI A-98) memakai `maps` dari form (belum disimpan) atau pengaturan tersimpan bila `maps` tidak dikirim; `maps.google_api_key` "********" = key tersimpan. google: buat token sesi (createSession) lalu ambil satu tile zoom 0 untuk tiap lapisan (street, satellite, hybrid). custom: ambil satu tile z=1 dari tiap URL yang diisi. default: tanpa permintaan keluar. Selalu 200 bila input valid; lihat data.ok dan data.results. Tidak menyimpan apa pun dan tidak mengubah cache GET /geo/map-config.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maps: { $ref: '#/components/schemas/SiteSettings/properties/maps' }
+      responses:
+        '200': { description: '{ data: MapTestResult, message }', content: { application/json: { schema: { type: object, properties: { data: { $ref: '#/components/schemas/MapTestResult' }, message: { type: string } } } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: FORBIDDEN (bukan admin atau tanpa modul settings) }
+        '422': { $ref: '#/components/responses/ValidationError' }
 
   # ---------------------------------------------------------------- admin: CMS
   /admin/cms/section-types:
@@ -1216,6 +1241,52 @@ components:
             password: { type: string, description: 'Disimpan terenkripsi (APP_KEY). Respons selalu "********" bila terisi; PUT dengan "********" = tidak mengubah, "" = hapus.' }
             from_address: { type: string, format: email, description: 'lowercase; wajib pada mode smtp' }
             from_name: { type: string, maxLength: 120 }
+        maps:
+          type: object
+          description: 'Penyedia tile peta (A-98), privat; publik hanya membaca hasil jadinya di GET /geo/map-config. provider google mewajibkan google_api_key (422 maps.google_api_key); custom mewajibkan minimal satu URL (422 maps.custom_street_url). Menyimpan grup ini mengosongkan cache GET /geo/map-config.'
+          properties:
+            provider: { type: string, enum: [default, google, custom], description: 'default = OpenStreetMap + Esri tanpa key; google = Google Maps Platform Map Tiles API; custom = layanan tile XYZ lain' }
+            google_api_key: { type: string, description: 'Tipe secret: disimpan terenkripsi (APP_KEY); respons selalu "********" bila terisi; PUT "********" = tidak mengubah, "" = hapus. Key harus punya Map Tiles API aktif dan dibatasi HTTP referrer, karena ikut di URL tile yang dibaca browser.' }
+            custom_street_url: { type: string, maxLength: 500, example: 'https://api.maptiler.com/maps/streets-v4/256/{z}/{x}/{y}.png?key=KEY', description: 'Templat tile peta jalan: https, wajib memuat {z} {x} {y}; boleh {s} (a/b/c) dan {r}; placeholder lain, host lokal/privat, dan http ditolak. Tile 256 px. Kosong = lapisan bawaan.' }
+            custom_satellite_url: { type: string, maxLength: 500, description: 'Templat tile citra satelit, aturan sama. Kosong = citra bawaan + label Esri.' }
+            custom_attribution: { type: string, maxLength: 300, description: 'Teks polos; di-escape server sebelum dikirim sebagai atribusi.' }
+            custom_max_zoom: { type: integer, minimum: 1, maximum: 22, default: 19 }
+    MapTileLayer:
+      type: object
+      properties:
+        url: { type: string, description: 'Templat tile Leaflet ({z}, {x}, {y}, opsional {s}/{r}). Google: https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=...&key=...' }
+        attribution: { type: string, description: 'HTML atribusi siap pasang' }
+        maxZoom: { type: integer }
+        subdomains: { type: string, nullable: true, example: abc }
+        brand: { type: string, nullable: true, enum: [google, null], description: 'Merek yang wajib ditampilkan di atas peta (logo Google Maps)' }
+        attributionUrl: { type: string, nullable: true, description: 'Endpoint viewport penyedia; FE menambah zoom, north, south, east, west dan menampilkan field copyright dari jawabannya' }
+        attributionRequired: { type: boolean, description: 'Atribusi wajib tampil juga di peta kecil tanpa kontrol atribusi' }
+    MapTileConfig:
+      type: object
+      properties:
+        provider: { type: string, enum: [default, google, custom], description: 'Penyedia yang dipilih admin' }
+        fallback: { type: boolean, description: 'true = penyedia pilihan gagal dan layers berisi lapisan bawaan' }
+        layers:
+          type: object
+          properties:
+            street: { $ref: '#/components/schemas/MapTileLayer' }
+            satellite: { $ref: '#/components/schemas/MapTileLayer' }
+            satelliteLabels: { allOf: [{ $ref: '#/components/schemas/MapTileLayer' }], nullable: true, description: 'Lapisan transparan nama tempat di atas satellite; null untuk google dan custom satelit' }
+            hybrid: { allOf: [{ $ref: '#/components/schemas/MapTileLayer' }], nullable: true, description: 'Citra + label dalam satu tile (google); bila ada, menggantikan satellite + satelliteLabels' }
+    MapTestResult:
+      type: object
+      properties:
+        provider: { type: string, enum: [default, google, custom] }
+        ok: { type: boolean, description: 'true bila semua lapisan lolos' }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              layer: { type: string, enum: [street, satellite, hybrid] }
+              ok: { type: boolean }
+              message: { type: string, description: 'Penjelasan untuk admin (bahasa mengikuti Accept-Language), mis. alasan penolakan dari Google; tidak pernah memuat API key' }
+        config: { allOf: [{ $ref: '#/components/schemas/MapTileConfig' }], description: 'Lapisan untuk pratinjau: milik penyedia yang diuji, atau bawaan (fallback true) bila gagal' }
     MailTestResult:
       type: object
       properties:

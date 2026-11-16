@@ -69,12 +69,21 @@ interface NextStepInput {
   port?: boolean;
   /** Order CIF awaiting_freight (ASUMSI A-89): true bila penawaran admin yang masih berlaku menunggu tanggapan customer. */
   canAcceptFreightQuote?: boolean;
+  /** Order bertermin (ASUMSI A-97): sisa tagihan > 0 menahan penyelesaian pesanan (otomatis maupun manual). */
+  paymentProgress?: { outstandingTotal: number } | null;
 }
 
 /** Short "what happens next" copy per status, shared by the order list cards and the detail banner. */
 export function orderNextStep(order: NextStepInput, lang: Lang): OrderNextStep {
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
   const place = order.pickupLabel || t('pabrik', 'the factory');
+  // Termin belum lunas: pesanan tidak diselesaikan otomatis sampai sisa tagihan dibayar.
+  const balanceDue = (order.paymentProgress?.outstandingTotal ?? 0) > 0;
+  const deliveredBody = order.canComplete
+    ? t('Selesaikan pesanan bila semuanya sesuai, lalu beri ulasan.', 'Complete the order if everything is right, then leave a review.')
+    : balanceDue
+      ? t('Pesanan diselesaikan setelah sisa termin pembayaran lunas.', 'The order is completed once the remaining installment is paid.')
+      : t('Pesanan akan diselesaikan otomatis.', 'The order will be completed automatically.');
   if (order.status === 'awaiting_freight') {
     return order.canAcceptFreightQuote
       ? {
@@ -134,12 +143,10 @@ export function orderNextStep(order: NextStepInput, lang: Lang): OrderNextStep {
         };
       case 'delivered':
         return {
-          tone: 'ok',
+          tone: balanceDue && !order.canComplete ? 'warn' : 'ok',
           icon: 'checkCircle',
           title: t('Barang sudah diambil', 'Goods picked up'),
-          body: order.canComplete
-            ? t('Selesaikan pesanan bila semuanya sesuai, lalu beri ulasan.', 'Complete the order if everything is right, then leave a review.')
-            : t('Pesanan akan diselesaikan otomatis.', 'The order will be completed automatically.'),
+          body: deliveredBody,
         };
       default:
         break;
@@ -181,12 +188,10 @@ export function orderNextStep(order: NextStepInput, lang: Lang): OrderNextStep {
       };
     case 'delivered':
       return {
-        tone: 'ok',
+        tone: balanceDue && !order.canComplete ? 'warn' : 'ok',
         icon: 'checkCircle',
         title: t('Barang sudah diterima', 'Goods received'),
-        body: order.canComplete
-          ? t('Selesaikan pesanan bila semuanya sesuai, lalu beri ulasan.', 'Complete the order if everything is right, then leave a review.')
-          : t('Pesanan akan diselesaikan otomatis.', 'The order will be completed automatically.'),
+        body: deliveredBody,
       };
     case 'completed':
       return order.canReview

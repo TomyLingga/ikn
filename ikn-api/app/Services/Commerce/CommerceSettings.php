@@ -36,6 +36,10 @@ class CommerceSettings
         // awaiting_freight tanpa kesepakatan sebelum dibatalkan otomatis (hari).
         'freight_quote_valid_days' => ['int', 1, 90],
         'freight_quote_max_days' => ['int', 1, 365],
+        // Termin pembayaran (ASUMSI A-97): pengingat otomatis orders:installment-remind. N hari sebelum jatuh tempo
+        // (sekali) dan tiap N hari selama terlambat; 0 = pengingat jenis itu dimatikan.
+        'installment_remind_before_days' => ['int', 0, 60],
+        'installment_remind_overdue_days' => ['int', 0, 60],
     ];
 
     /** Nama kunci di JSON (camelCase) ↔ kunci setting (snake_case). */
@@ -55,6 +59,8 @@ class CommerceSettings
         'exportPaymentDueHours' => 'export_payment_due_hours',
         'freightQuoteValidDays' => 'freight_quote_valid_days',
         'freightQuoteMaxDays' => 'freight_quote_max_days',
+        'installmentRemindBeforeDays' => 'installment_remind_before_days',
+        'installmentRemindOverdueDays' => 'installment_remind_overdue_days',
     ];
 
     /** @var array<string, mixed>|null cache per request */

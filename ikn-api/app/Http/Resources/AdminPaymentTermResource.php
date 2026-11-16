@@ -5,7 +5,8 @@ namespace App\Http\Resources;
 use App\Models\PaymentTerm;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-// Bentuk admin syarat pembayaran (kontrak 11.10): bentuk publik + id, isActive, sortOrder, ordersCount, waktu.
+// Bentuk admin syarat pembayaran (kontrak 11.10): bentuk publik (termasuk installments[], ASUMSI A-97) + id, isActive,
+// sortOrder, ordersCount, waktu.
 class AdminPaymentTermResource extends JsonResource
 {
     public function toArray($request): array

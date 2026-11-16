@@ -900,6 +900,7 @@ components:
         voucher: { type: object, nullable: true, properties: { id: { type: integer }, code: { type: string }, type: { type: string, enum: [percent, fixed] }, value: { type: number } } }
         deliveryTerm: { allOf: [{ $ref: '#/components/schemas/DeliveryTerm' }], nullable: true, description: 'cara serah terima yang dipakai quote (ASUMSI A-85)' }
         paymentTerm: { allOf: [{ $ref: '#/components/schemas/PaymentTerm' }], nullable: true, description: 'syarat pembayaran yang dikirim (ASUMSI A-87); null bila tidak dikirim' }
+        installments: { type: array, items: { $ref: '#/components/schemas/InstallmentScheduleRow' }, description: 'pratinjau termin syarat pembayaran dengan amount dari grandTotal quote (ASUMSI A-97); [] untuk bayar penuh dan order IDR. CIF: belum termasuk ongkir, dihitung ulang saat penawaran ongkir disepakati' }
         shipping: { $ref: '#/components/schemas/ShippingRateQuote', nullable: true }
         availableShippingRates: { type: array, items: { $ref: '#/components/schemas/ShippingRateQuote' } }
         shippingTotal: { type: integer }
@@ -1166,12 +1167,24 @@ components:
         sortOrder: { type: integer, minimum: -1000, maximum: 1000, default: 0 }
     PaymentTerm:
       type: object
-      description: 'Syarat pembayaran, bentuk publik (GET /commerce/config, QuoteResult.paymentTerm; ASUMSI A-87). Informasi untuk dokumen; aplikasi tetap menerima satu pembayaran sebesar grand total'
+      description: 'Syarat pembayaran, bentuk publik (GET /commerce/config, QuoteResult.paymentTerm; ASUMSI A-87). installments[] kosong = satu pembayaran sebesar grand total; terisi = order ditagih bertahap (ASUMSI A-97, kontrak 11.13)'
       properties:
         code: { type: string, example: tt_advance }
         name: { $ref: '#/components/schemas/I18n' }
         description: { $ref: '#/components/schemas/I18n', nullable: true }
         market: { type: string, enum: [local, export] }
+        installments: { type: array, items: { $ref: '#/components/schemas/InstallmentScheduleRow' }, description: 'jadwal termin (ASUMSI A-97); [] = bayar penuh' }
+    InstallmentScheduleRow:
+      type: object
+      description: 'Satu baris jadwal termin (ASUMSI A-97). Aturan: 2..6 baris, percent > 0 dan jumlahnya tepat 100, baris pertama trigger order (dueDays dipaksa 0, jatuh tempo = batas bayar order), key unik. Satu baris 100% = tanpa jadwal'
+      required: [label, percent, trigger]
+      properties:
+        key: { type: string, maxLength: 40, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]*$', example: balance, description: 'kosong = dibuat dari label' }
+        label: { $ref: '#/components/schemas/I18n', description: 'id wajib (maks 80), en diisi dari id bila kosong' }
+        percent: { type: number, minimum: 0.01, maximum: 100, multipleOf: 0.01, example: 70 }
+        trigger: { type: string, enum: [order, shipped, delivered], description: 'kapan termin ditagih: saat order dibuat (termin lanjutan: setelah termin pertama lunas), saat dikirim/dimuat ke kapal, saat diterima' }
+        dueDays: { type: integer, minimum: 0, maximum: 365, example: 14, description: 'hari dari saat ditagih sampai jatuh tempo' }
+        amount: { type: integer, description: 'hanya di QuoteResult.installments: nominal satuan terkecil dari grandTotal quote; baris terakhir mengambil sisa pembulatan' }
     AdminPaymentTerm:
       allOf:
         - { $ref: '#/components/schemas/PaymentTerm' }
@@ -1193,6 +1206,7 @@ components:
         market: { type: string, enum: [local, export], default: export }
         isActive: { type: boolean, default: true }
         sortOrder: { type: integer, minimum: -1000, maximum: 1000, default: 0 }
+        installments: { type: array, nullable: true, maxItems: 6, items: { $ref: '#/components/schemas/InstallmentScheduleRow' }, description: 'ASUMSI A-97. Tidak dikirim = jadwal lama dipertahankan; [] atau null = bayar penuh. 422 installments bila jumlah persen bukan 100, baris pertama bukan trigger order, key kembar, lebih dari 6 baris, atau syarat pasar local. Order yang sudah dibuat tidak terpengaruh (jadwal dibekukan per order)' }
     ShippingBreakdown:
       type: object
       properties:
@@ -1320,3 +1334,5 @@ components:
         exportPaymentDueHours: { type: integer, minimum: 1, maximum: 720, example: 120, description: 'batas bayar order USD (jam)' }
         freightQuoteValidDays: { type: integer, minimum: 1, maximum: 90, example: 7, description: 'masa berlaku bawaan penawaran ongkir CIF bila admin tidak mengisi validUntil (hari), ASUMSI A-89' }
         freightQuoteMaxDays: { type: integer, minimum: 1, maximum: 365, example: 30, description: 'batas tunggu order awaiting_freight tanpa penawaran yang masih berlaku sebelum dibatalkan otomatis oleh orders:freight-expire (hari)' }
+        installmentRemindBeforeDays: { type: integer, minimum: 0, maximum: 60, example: 3, description: 'ASUMSI A-97: orders:installment-remind mengingatkan sekali N hari sebelum termin lanjutan jatuh tempo; 0 = mati' }
+        installmentRemindOverdueDays: { type: integer, minimum: 0, maximum: 60, example: 3, description: 'ASUMSI A-97: selama termin terlambat, pengingat tiap N hari sejak pengingat terakhir; 0 = mati' }

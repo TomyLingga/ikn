@@ -1,0 +1,18 @@
+/* Elemen SVG Leaflet di atas citra satelit. Kelas dipasang lewat pathOptions.className. */
+
+/* Bayangan di bawah garis rute: memisahkan garis berwarna dari laut gelap dan daratan terang. */
+.halo {
+  stroke: #04101f;
+  stroke-opacity: 0.55;
+  stroke-linecap: round;
+  fill: none;
+}
+
+/* Titik negara/pelanggan: cincin putih + bayangan agar tidak tenggelam di citra. */
+.dot {
+  filter: drop-shadow(0 0 2px rgba(4, 16, 31, 0.95)) drop-shadow(0 1px 3px rgba(4, 16, 31, 0.6));
+}
+
+.origin {
+  fill: var(--tm-accent, #ff6b5b);
+}

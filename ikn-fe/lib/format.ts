@@ -78,6 +78,11 @@ export function currencyStep(currency: string | null | undefined): number {
   return currencyDecimals(currency) > 0 ? 1 / 10 ** currencyDecimals(currency) : 1;
 }
 
+/** Plain (non-money) number with thousands separators in the UI language: ID "1.234,5", EN "1,234.5". */
+export function formatNumber(value: number, lang: Lang = 'id'): string {
+  return value.toLocaleString(lang === 'en' ? 'en-US' : 'id-ID');
+}
+
 export function isUsd(currency: Currency | string | null | undefined): boolean {
   return (currency || 'IDR').toUpperCase() === 'USD';
 }

@@ -10,6 +10,7 @@ import EmptyState from '@/components/EmptyState';
 import OrderTracking from '@/components/OrderTracking';
 import PaymentProof from '@/components/PaymentProof';
 import PaymentInstructions from '@/components/PaymentInstructions';
+import InstallmentPayments from '@/components/customer/InstallmentPayments';
 import StatusBadge from '@/components/StatusBadge';
 import StarInput from '@/components/StarInput';
 import StarRating from '@/components/StarRating';
@@ -34,9 +35,12 @@ import {
   isPickupOrder,
   isPortAddress,
   isPortOrder,
+  isPartiallyPaid,
   isQuotedFreightOrder,
+  orderInstallments,
   orderLabel,
   orderVariant,
+  partiallyPaidLabel,
   paymentLabel,
   shipmentDetailsText,
   shipmentMetricsText,
@@ -52,12 +56,13 @@ import PickupPointCard from '@/components/customer/PickupPointCard';
 import { countryName, useCountries } from '@/lib/countries';
 import { currencyStep, formatDate, formatDateTime, formatMoney, toMinorInput } from '@/lib/format';
 import { openChat, shopPaths } from '@/lib/shop';
-import type { CommerceConfig, Order, Payment, ReviewInput } from '@/lib/types';
+import type { CommerceConfig, Order, OrderInstallment, Payment, ReviewInput } from '@/lib/types';
 import styles from './CustomerOrderDetail.module.css';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import OrderProgress, { orderNextStep } from '@/components/customer/OrderProgress';
 import Select from '@/components/Select';
 import { FileLink } from '@/components/FileViewer';
+import NumberInput from '@/components/NumberInput';
 
 const paths = shopPaths(true);
 const RATING_LABELS_ID: [string, string, string, string, string] = ['Buruk', 'Kurang', 'Cukup', 'Baik', 'Sangat baik'];
@@ -266,7 +271,17 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
   const port = isPortOrder(order);
   const portAddress = isPortAddress(order.shippingAddress) ? order.shippingAddress : null;
   const st = orderLabel(order.status, orderVariant(order));
-  const pay = paymentLabel(order.paymentStatus);
+  // Order bertermin yang baru dibayar sebagian (ASUMSI A-97): lencana "Dibayar sebagian" menggantikan status payment terakhir.
+  const pay = isPartiallyPaid(order) ? partiallyPaidLabel : paymentLabel(order.paymentStatus);
+  const hasInstallments = (order.installments?.length ?? 0) > 0;
+  // Termin lanjutan yang sedang ditagih dan bisa dibayar sekarang (termin pertama memakai alur "Bayar sekarang").
+  const payableRow = orderInstallments(order).find((row) => row.seq > 1 && row.canUploadProof) || null;
+  const uploadInstallmentProof = (row: OrderInstallment, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('installmentId', String(row.id));
+    return run(() => apiUpload(path('/proof'), fd), t('Bukti pembayaran terkirim.', 'Payment proof submitted.'), true);
+  };
   const payment = activePayment(order);
   const address = deliveryAddress(order.shippingAddress);
   // Semua angka order dalam mata uangnya (IDR/USD).
@@ -297,11 +312,84 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
       ? { href: '#freight', label: canAcceptQuote ? t('Tanggapi penawaran', 'Respond to the quote') : t('Lihat penawaran ongkir', 'View freight quote') }
       : order.status === 'pending_payment' && order.canUploadProof
       ? { href: '#payment', label: t('Bayar sekarang', 'Pay now') }
+      : payableRow
+      ? { href: '#payment', label: t(`Bayar ${tr(payableRow.label, 'id')}`, `Pay the ${tr(payableRow.label, 'en')}`) }
       : canConfirmReceived(order) || canComplete(order)
         ? { href: '#tracking', label: canConfirmReceived(order) ? confirmLabel : t('Selesaikan pesanan', 'Complete order') }
         : showReviews && reviewable.length > 0 && canReview(order)
           ? { href: '#review', label: t('Beri ulasan', 'Write a review') }
           : null;
+
+  // Blok pembayaran order (instruksi, unggah bukti, ganti metode). Order bertermin (ASUMSI A-97) menampilkannya sebagai
+  // isi termin pertama di kartu "Jadwal pembayaran".
+  const orderPaymentBlock = (
+    <>
+      {(order.status === 'pending_payment' || order.status === 'payment_review') && <PaymentInstructions order={order} config={config} />}
+      <PaymentProof
+        order={order}
+        payment={payment}
+        onUpload={(file) => {
+          const fd = new FormData();
+          fd.append('file', file);
+          if (payment?.id && payment.status === 'pending') fd.append('paymentId', String(payment.id));
+          return run(() => apiUpload(path('/proof'), fd), t('Bukti pembayaran terkirim.', 'Payment proof submitted.'), true);
+        }}
+      />
+      {canChangePaymentMethod(order) && paymentMethods.length > 1 && order.currency !== 'USD' && (
+        <div className="pay-change">
+          {!changeMethod ? (
+            <button
+              type="button"
+              className={styles.textBtn}
+              onClick={() => {
+                setChangeMethod(true);
+                setNewMethod(paymentMethods.find((m) => m.code !== payment?.method)?.code || '');
+              }}
+            >
+              {t('Ganti metode pembayaran', 'Change payment method')}
+            </button>
+          ) : (
+            <div className="co-ship">
+              {paymentMethods.map((m) => (
+                <label key={m.code} className={`co-ship-opt ${newMethod === m.code ? 'is-active' : ''}`}>
+                  <input type="radio" name="newMethod" value={m.code} checked={newMethod === m.code} onChange={() => setNewMethod(m.code)} />
+                  <span className="co-ship-label">{tr(m.name, lang)}</span>
+                </label>
+              ))}
+              {selectedMethod?.type === 'manual_transfer' && (config?.bankAccounts || []).length > 0 && (
+                <Select className="cat-sort" value={newBank} onChange={(e) => setNewBank(e.target.value ? Number(e.target.value) : '')}>
+                  <option value="">{t('Pilih rekening tujuan', 'Choose bank account')}</option>
+                  {(config?.bankAccounts || []).filter((b) => (b.currency || 'IDR') === order.currency).map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.bankName} · {b.accountNumber}
+                    </option>
+                  ))}
+                </Select>
+              )}
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  disabled={busy || !newMethod}
+                  onClick={() =>
+                    void run(
+                      () => api(path('/payments'), { method: 'POST', body: { paymentMethodCode: newMethod, bankAccountId: newBank || undefined } }),
+                      t('Metode pembayaran diperbarui.', 'Payment method updated.'),
+                    ).then(() => setChangeMethod(false))
+                  }
+                >
+                  {t('Simpan', 'Save')}
+                </button>
+                <button type="button" className={styles.textBtn} onClick={() => setChangeMethod(false)}>
+                  {t('Batal', 'Cancel')}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className={styles.page}>
@@ -484,8 +572,8 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                       <form className={styles.counterForm} onSubmit={submitCounter}>
                         <label>
                           {t('Harga balasan', 'Counter price')} ({order.currency})
-                          <input
-                            type="number"
+                          <NumberInput
+                            currency={order.currency}
                             inputMode="decimal"
                             min={currencyStep(order.currency)}
                             step={currencyStep(order.currency)}
@@ -632,6 +720,14 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                     </button>
                   )}
                 </div>
+              )}
+              {order.status === 'delivered' && !canComplete(order) && hasInstallments && (
+                <p className={styles.muted}>
+                  {t('Pesanan bisa diselesaikan setelah semua termin pembayaran lunas.', 'The order can be completed once every payment installment is paid.')}{' '}
+                  <a href="#payment" className={styles.textBtn}>
+                    {t('Lihat jadwal pembayaran', 'View payment schedule')}
+                  </a>
+                </p>
               )}
             </div>
           </section>
@@ -849,7 +945,15 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                 <div className={styles.invoiceRow}>
                   <span className={styles.invoiceMeta}>
                     <strong className="mono">{order.invoiceNumber || t('Terbit setelah pembayaran diverifikasi', 'Issued once the payment is verified')}</strong>
-                    {order.paidAt && <small>{t('Dibayar', 'Paid')} {formatDateTime(order.paidAt, lang)}</small>}
+                    {order.paidAt &&
+                      (isPartiallyPaid(order) && order.paymentProgress ? (
+                        // Order bertermin (ASUMSI A-97): paidAt = termin pertama lunas, bukan seluruh tagihan.
+                        <small>
+                          {t('Dibayar sebagian', 'Partially paid')} · {t('sisa', 'balance')} {formatMoney(order.paymentProgress.outstandingTotal, order.paymentProgress.currency)}
+                        </small>
+                      ) : (
+                        <small>{t('Dibayar', 'Paid')} {formatDateTime(order.paidAt, lang)}</small>
+                      ))}
                   </span>
                   <a href={`/print/invoice/${encodeURIComponent(order.number)}`} target="_blank" rel="noopener" className={styles.lineBtn}>
                     <Icon name="arrowDown" size={16} /> {t('Cetak / simpan PDF', 'Print / save PDF')}
@@ -891,9 +995,12 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
 
         <aside className="acct-detail-side no-print">
           <section id="payment" className={styles.card}>
-            <h2 className={styles.cardTitle}>{t('Pembayaran', 'Payment')}</h2>
+            <h2 className={styles.cardTitle}>{hasInstallments ? t('Jadwal pembayaran', 'Payment schedule') : t('Pembayaran', 'Payment')}</h2>
             <div className={styles.cardBody}>
-              {order.paymentStatus === 'paid' || order.paidAt ? (
+              {hasInstallments ? (
+                // Order bertermin (ASUMSI A-97): termin yang ditagih menampilkan instruksi + unggah bukti; lunas = tanggal lunas.
+                <InstallmentPayments order={order} config={config} first={orderPaymentBlock} onUpload={uploadInstallmentProof} />
+              ) : order.paymentStatus === 'paid' || order.paidAt ? (
                 <p className={styles.ok}>
                   <Icon name="check" size={18} /> {t('Pembayaran telah diverifikasi.', 'Payment verified.')}
                   {order.paidAt && <> {formatDateTime(order.paidAt, lang)}</>}
@@ -910,72 +1017,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                   )}
                 </p>
               ) : (
-                <>
-                  {(order.status === 'pending_payment' || order.status === 'payment_review') && <PaymentInstructions order={order} config={config} />}
-                  <PaymentProof
-                    order={order}
-                    payment={payment}
-                    onUpload={(file) => {
-                      const fd = new FormData();
-                      fd.append('file', file);
-                      if (payment?.id && payment.status === 'pending') fd.append('paymentId', String(payment.id));
-                      return run(() => apiUpload(path('/proof'), fd), t('Bukti pembayaran terkirim.', 'Payment proof submitted.'), true);
-                    }}
-                  />
-                  {canChangePaymentMethod(order) && paymentMethods.length > 1 && order.currency !== 'USD' && (
-                    <div className="pay-change">
-                      {!changeMethod ? (
-                        <button
-                          type="button"
-                          className={styles.textBtn}
-                          onClick={() => {
-                            setChangeMethod(true);
-                            setNewMethod(paymentMethods.find((m) => m.code !== payment?.method)?.code || '');
-                          }}
-                        >
-                          {t('Ganti metode pembayaran', 'Change payment method')}
-                        </button>
-                      ) : (
-                        <div className="co-ship">
-                          {paymentMethods.map((m) => (
-                            <label key={m.code} className={`co-ship-opt ${newMethod === m.code ? 'is-active' : ''}`}>
-                              <input type="radio" name="newMethod" value={m.code} checked={newMethod === m.code} onChange={() => setNewMethod(m.code)} />
-                              <span className="co-ship-label">{tr(m.name, lang)}</span>
-                            </label>
-                          ))}
-                          {selectedMethod?.type === 'manual_transfer' && (config?.bankAccounts || []).length > 0 && (
-                            <Select className="cat-sort" value={newBank} onChange={(e) => setNewBank(e.target.value ? Number(e.target.value) : '')}>
-                              <option value="">{t('Pilih rekening tujuan', 'Choose bank account')}</option>
-                              {(config?.bankAccounts || []).filter((b) => (b.currency || 'IDR') === order.currency).map((b) => (
-                                <option key={b.id} value={b.id}>
-                                  {b.bankName} · {b.accountNumber}
-                                </option>
-                              ))}
-                            </Select>
-                          )}
-                          <div className={styles.inlineActions}>
-                            <button
-                              type="button"
-                              className={styles.primaryBtn}
-                              disabled={busy || !newMethod}
-                              onClick={() =>
-                                void run(
-                                  () => api(path('/payments'), { method: 'POST', body: { paymentMethodCode: newMethod, bankAccountId: newBank || undefined } }),
-                                  t('Metode pembayaran diperbarui.', 'Payment method updated.'),
-                                ).then(() => setChangeMethod(false))
-                              }
-                            >
-                              {t('Simpan', 'Save')}
-                            </button>
-                            <button type="button" className={styles.textBtn} onClick={() => setChangeMethod(false)}>
-                              {t('Batal', 'Cancel')}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
+                orderPaymentBlock
               )}
 
               <button type="button" className={styles.textBtn} style={{ marginTop: 14 }} onClick={loadPayments} aria-expanded={showPayments}>
@@ -989,6 +1031,7 @@ export default function CustomerOrderDetail({ number }: { number: string }) {
                       <li key={p.id}>
                         <div>
                           <strong>{tr(p.methodName, lang) || p.method}</strong> · {formatIDR(p.amount)}
+                          {p.installment ? ` · ${tr(p.installment.label, lang)}` : ''}
                           {p.createdAt && <span className="acct-order-date">{formatDateTime(p.createdAt, lang)}</span>}
                           {p.rejectReason && (
                             <span className="acct-order-date">

@@ -24,6 +24,11 @@ export type Tone = 'ok' | 'warn' | 'bad' | 'info';
 // Nama ikon yang tersedia di komponen Icon.
 export type IconName =
   | 'refresh'
+  | 'ship'
+  | 'plane'
+  | 'edit'
+  | 'alert'
+  | 'help'
   | 'pause'
   | 'eye'
   | 'eyeOff'
@@ -489,12 +494,30 @@ export interface QuoteFee {
   currency?: Currency;
 }
 
+/** Kapan sebuah termin ditagih: saat pesanan dibuat, saat dikirim, atau saat diterima (ASUMSI A-97). */
+export type InstallmentTrigger = 'order' | 'shipped' | 'delivered';
+
+/** Baris jadwal termin pada syarat pembayaran (ASUMSI A-97). Baris pertama selalu `order` dengan `dueDays` 0. */
+export interface InstallmentScheduleRow {
+  key: string;
+  label: I18n;
+  /** Persen dari grand total (2 desimal); jumlah semua baris = 100. */
+  percent: number;
+  trigger: InstallmentTrigger;
+  /** Hari setelah pemicu sampai jatuh tempo. */
+  dueDays: number;
+  /** Hanya di pratinjau quote (`QuoteResult.installments`): nominal dari grand total saat ini, satuan terkecil. */
+  amount?: number;
+}
+
 /** Syarat pembayaran ekspor (ASUMSI A-87): GET /commerce/config `paymentTerms[]`, `QuoteResult.paymentTerm`. */
 export interface PaymentTerm {
   code: string;
   name: I18n;
   description: I18n | null;
   market: DeliveryTermMarket;
+  /** Jadwal termin (ASUMSI A-97); [] = satu pembayaran penuh. */
+  installments?: InstallmentScheduleRow[];
 }
 
 /**
@@ -532,6 +555,8 @@ export interface QuoteResult {
   deliveryTerm?: DeliveryTerm | null;
   /** Syarat pembayaran yang dikirim di `paymentTermCode` (null bila tidak dikirim). */
   paymentTerm?: PaymentTerm | null;
+  /** Pratinjau termin dengan nominal dari `grandTotal` (ASUMSI A-97); [] untuk bayar penuh. */
+  installments?: InstallmentScheduleRow[];
   shipping: ShippingRateQuote | null;
   availableShippingRates: ShippingRateQuote[];
   shippingTotal: number;
@@ -747,9 +772,22 @@ export interface PaymentProofInfo {
   uploadedAt: string;
 }
 
+/** Termin ringkas pada sebuah payment (ASUMSI A-97): termin mana yang dibayar. */
+export interface PaymentInstallmentBrief {
+  id: number;
+  seq: number;
+  key: string;
+  label: I18n;
+  percent: number;
+  status: InstallmentStatusKey;
+}
+
 export interface Payment {
   id: number;
   orderId?: number;
+  /** Termin yang dibayar payment ini; null untuk order tanpa termin. */
+  installmentId?: number | null;
+  installment?: PaymentInstallmentBrief | null;
   method: string;
   type?: PaymentMethodType | null;
   methodName?: I18n | null;
@@ -963,6 +1001,61 @@ export interface OrderPaymentTerm {
   code: string;
   name: I18n;
   description: I18n | null;
+  /** Jadwal termin yang dibekukan (ASUMSI A-97); [] = satu pembayaran penuh. */
+  installments?: InstallmentScheduleRow[];
+}
+
+/**
+ * Status termin (ASUMSI A-97): scheduled = pemicu belum tercapai, due = ditagih dan menunggu pembayaran,
+ * awaiting_verification = bukti menunggu admin, paid = lunas, void = order dibatalkan sebelum lunas.
+ * Terlambat tidak disimpan: lihat `OrderInstallment.overdue`.
+ */
+export type InstallmentStatusKey = 'scheduled' | 'due' | 'awaiting_verification' | 'paid' | 'void';
+
+/** Satu termin order (`Order.installments[]`). Uang dalam satuan terkecil `currency`. */
+export interface OrderInstallment {
+  id: number;
+  seq: number;
+  key: string;
+  label: I18n;
+  percent: number;
+  amount: number;
+  currency: Currency;
+  trigger: InstallmentTrigger;
+  dueDays: number;
+  status: InstallmentStatusKey;
+  /** Sedang ditagih dan tanggal jatuh tempo sudah lewat. */
+  overdue: boolean;
+  dueAt: string | null;
+  billedAt: string | null;
+  paidAt: string | null;
+  remindedAt: string | null;
+  reminderCount: number;
+  activePayment: Payment | null;
+  /** Semua percobaan bayar termin ini (termasuk yang ditolak). */
+  payments: Payment[];
+  /** Customer boleh mengunggah bukti untuk termin ini. */
+  canUploadProof: boolean;
+  /** Admin: tagih lebih awal, ubah jatuh tempo, kirim pengingat. */
+  canBill: boolean;
+  canChangeDue: boolean;
+  canRemind: boolean;
+}
+
+/** Kemajuan pembayaran order; `partial` = order bertermin yang baru dibayar sebagian. */
+export interface PaymentProgress {
+  currency: Currency;
+  paidTotal: number;
+  outstandingTotal: number;
+  status: 'unpaid' | 'partial' | 'paid';
+}
+
+/** Termin lanjutan yang sedang ditagih atau menunggu verifikasi, ringkas untuk baris daftar order. */
+export interface NextInstallment extends PaymentInstallmentBrief {
+  amount: number;
+  currency: Currency;
+  dueAt: string | null;
+  overdue: boolean;
 }
 
 /** Bentuk penuh order (OrderResource): GET /customer/orders/{number}, respons checkout dan aksi. */
@@ -1031,6 +1124,9 @@ export interface Order {
   activePayment?: Payment | null;
   payment?: Payment | null;
   payments: Payment[];
+  /** Termin pembayaran (ASUMSI A-97); [] untuk order satu pembayaran penuh. */
+  installments?: OrderInstallment[];
+  paymentProgress?: PaymentProgress;
   timeline: TimelineEntry[];
   trackingUpdates?: TrackingUpdate[];
   canAddTracking?: boolean;
@@ -1072,6 +1168,10 @@ export interface OrderSummary {
   items: OrderSummaryItem[];
   subtotal: number;
   grandTotal: number;
+  /** Kemajuan pembayaran + termin lanjutan yang sedang ditagih (ASUMSI A-97). */
+  paymentProgress?: PaymentProgress;
+  hasInstallments?: boolean;
+  nextInstallment?: NextInstallment | null;
   paymentMethod: string | null;
   paymentDueAt: string | null;
   paidAt: string | null;
@@ -1176,15 +1276,32 @@ export type ChatContext =
 export interface ChatMessage {
   id: number;
   role: ChatRole;
+  /** Kosong bila pesan sudah ditarik (`retracted`): API tidak lagi mengirim isinya. */
   body: string;
   context: ChatContext | null;
   senderName: string | null;
   createdAt: string;
+  /** Terisi bila pengirim mengedit pesannya (ASUMSI A-99). */
+  editedAt?: string | null;
+  /** Pesan ditarik pengirimnya: tampil sebagai "Pesan ditarik". */
+  retracted?: boolean;
+  /** Sisa detik pemirsa masih boleh mengedit/menarik pesan ini; 0 = bukan pesannya atau lewat batas. */
+  editableSeconds?: number;
+  /** Diisi klien saat pesan diterima (lib chat `stampMessage`): tenggat edit/tarik menurut jam browser, ms. */
+  editableUntil?: number;
 }
 
-/** GET /customer/chat. */
-export interface CustomerChat {
-  conversation: { id: number; unread: number; lastMessageAt: string | null } | null;
+/** Bagian bersama respons GET utas chat (customer, tamu, admin). */
+export interface ChatThreadPage {
   messages: ChatMessage[];
   hasMore: boolean;
+  /** Hanya pada polling `?after=&rev=`: pesan lama yang diedit/ditarik sejak revisi klien. */
+  changed?: ChatMessage[];
+  /** Lama pengirim boleh mengedit/menarik pesannya, detik (`ikn.chat.edit_window_seconds`). */
+  editWindowSeconds?: number;
+}
+
+/** GET /customer/chat dan GET /chat/guest. */
+export interface CustomerChat extends ChatThreadPage {
+  conversation: { id: number; unread: number; lastMessageAt: string | null; revision?: number } | null;
 }

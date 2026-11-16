@@ -9,6 +9,7 @@ use App\Http\Resources\AdminPaymentTermResource;
 use App\Models\PaymentTerm;
 
 // Syarat pembayaran (kontrak 11.10, ASUMSI A-87), modul payment_methods. Hapus ditolak bila sudah dipakai order.
+// installments[] = jadwal termin (ASUMSI A-97); mengubahnya tidak memengaruhi order yang sudah dibuat (snapshot).
 class PaymentTermController extends ApiController
 {
     public function index()
@@ -48,6 +49,8 @@ class PaymentTermController extends ApiController
         return [
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
+            // Tidak dikirim = jadwal lama dipertahankan; [] atau null = kembali ke satu pembayaran penuh.
+            'installments' => array_key_exists('installments', $data) ? $data['installments'] : $existing?->installments,
             'market' => $data['market'] ?? ($existing?->market ?? PaymentTerm::MARKET_EXPORT),
             'is_active' => array_key_exists('isActive', $data) && $data['isActive'] !== null ? (bool) $data['isActive'] : ($existing?->is_active ?? true),
             'sort_order' => array_key_exists('sortOrder', $data) && $data['sortOrder'] !== null ? (int) $data['sortOrder'] : ($existing?->sort_order ?? 0),

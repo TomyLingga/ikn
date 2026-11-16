@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { emailError, isEmail, isPhone, phoneError, validationText } from '@/lib/validation';
 import PhoneInput from '@/components/PhoneInput';
 import Image from 'next/image';
 import Icon from '@/components/Icon';
-import { ChatComposer, ChatThread } from '@/components/chat';
+import { ChatComposer, ChatThread, useChatEditing, useChatMessages } from '@/components/chat';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api, errorMessage, ApiError } from '@/lib/api';
@@ -50,6 +50,8 @@ function writeGuestToken(token: string): void {
 // pengunjung yang belum login mengisi nama/email/telepon dulu (POST /chat/guest) dan dikenali lewat token di
 // browser. Setelah login, percakapan tamu diambil alih akun (POST /customer/chat/claim).
 // Panel dibuka dari tombol melayang (FloatingContacts) atau openChat() dari halaman produk/pesanan.
+// Hanya halaman pesan terbaru yang dimuat; yang lebih lama dimuat saat menggulir ke atas. Pesan sendiri bisa diedit
+// atau ditarik selama batas waktu dari server, dan perubahan pihak penjual ikut pada polling (ASUMSI A-99).
 export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onGuestUnread }: ChatWidgetProps) {
   const { lang } = useLang();
   const { customer, ready } = useAuth();
@@ -59,8 +61,7 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
 
   const [guestToken, setGuestToken] = useState('');
   const [stage, setStage] = useState<Stage>('thread');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [hasMore, setHasMore] = useState(false);
+  const { messages, hasMore, loadingOlder, editWindow, reset: resetMessages, token: threadToken, upsert, applyPage, pollQuery, loadOlder: loadOlderPage } = useChatMessages();
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState('');
@@ -70,7 +71,6 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
   const [form, setForm] = useState({ name: '', email: '', phone: '', body: '' });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [guestUnread, setGuestUnread] = useState(0);
-  const lastId = useRef(0);
 
   // Token tamu dibaca sekali di browser; tahap awal mengikuti keadaan sesi.
   useEffect(() => {
@@ -92,24 +92,24 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
   );
   const guestBody = useCallback((body: Record<string, unknown> = {}) => (customer ? body : { token: guestToken, ...body }), [customer, guestToken]);
 
-  const reset = useCallback(() => {
-    setMessages([]);
-    setHasMore(false);
-    setLoaded(false);
-    lastId.current = 0;
-  }, []);
+  const messagePath = (id: number) => (customer ? `/customer/chat/messages/${id}` : `/chat/guest/messages/${id}`);
 
-  const merge = useCallback((incoming: ChatMessage[], prepend = false) => {
-    if (incoming.length === 0) return;
-    setMessages((prev) => {
-      const known = new Set(prev.map((m) => m.id));
-      const fresh = incoming.filter((m) => !known.has(m.id));
-      if (fresh.length === 0) return prev;
-      const next = prepend ? [...fresh, ...prev] : [...prev, ...fresh];
-      lastId.current = Math.max(lastId.current, ...next.map((m) => m.id));
-      return next;
-    });
-  }, []);
+  // Edit/tarik pesan sendiri: kotak tulis yang sama dipakai untuk mengedit; tarik meminta konfirmasi.
+  const { editing, busy: editBusy, startEdit, cancelEdit, submitEdit, retract, resetEditing } = useChatEditing({
+    lang,
+    draft,
+    setDraft,
+    editRequest: async (message, body) => (await api<{ message: ChatMessage }>(messagePath(message.id), { method: 'PUT', body: guestBody({ body }) })).message,
+    retractRequest: async (message) => (await api<{ message: ChatMessage }>(`${messagePath(message.id)}/retract`, { method: 'POST', body: guestBody() })).message,
+    onChanged: (message) => upsert([message]),
+    onError: setError,
+  });
+
+  const reset = useCallback(() => {
+    resetMessages();
+    resetEditing();
+    setLoaded(false);
+  }, [resetMessages, resetEditing]);
 
   const reportGuestUnread = useCallback(
     (unread: number) => {
@@ -176,12 +176,11 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
   useEffect(() => {
     if (!canLoad || loaded || (!open && !!customer)) return;
     let cancelled = false;
+    const forThread = threadToken();
     setLoading(true);
     api<CustomerChat>(endpoint('show'))
       .then((res) => {
-        if (cancelled) return;
-        merge(res.messages);
-        setHasMore(res.hasMore);
+        if (cancelled || !applyPage(res, 'initial', forThread)) return;
         setLoaded(true);
         const unread = res.conversation?.unread ?? 0;
         if (open && unread > 0) void markRead();
@@ -198,17 +197,19 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
     return () => {
       cancelled = true;
     };
-  }, [canLoad, loaded, open, customer, endpoint, merge, markRead, reportGuestUnread, dropGuestToken]);
+  }, [canLoad, loaded, open, customer, endpoint, threadToken, applyPage, markRead, reportGuestUnread, dropGuestToken]);
 
   // Polling: tiap 4 detik saat panel terbuka; tamu dengan token juga memolling pelan saat tertutup (lencana).
+  // `after` membawa pesan baru, `rev` membawa pesan lama yang diedit/ditarik penjual sejak polling terakhir.
   useEffect(() => {
     if (!canLoad || !loaded) return;
     if (!open && customer) return;
     const tick = async () => {
       if (document.hidden) return;
+      const forThread = threadToken();
       try {
-        const res = await api<CustomerChat>(endpoint('show', `?after=${lastId.current}`));
-        merge(res.messages);
+        const res = await api<CustomerChat>(endpoint('show', `?${pollQuery()}`));
+        if (!applyPage(res, 'poll', forThread)) return;
         if (open && res.messages.some((m) => m.role === 'admin')) void markRead();
         else if (!open && !customer) reportGuestUnread(res.conversation?.unread ?? 0);
       } catch {
@@ -217,7 +218,7 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
     };
     const timer = window.setInterval(tick, open ? POLL_OPEN_MS : POLL_CLOSED_MS);
     return () => window.clearInterval(timer);
-  }, [canLoad, loaded, open, customer, endpoint, merge, markRead, reportGuestUnread]);
+  }, [canLoad, loaded, open, customer, endpoint, threadToken, pollQuery, applyPage, markRead, reportGuestUnread]);
 
   // Panel dibuka ketika ada pesan belum dibaca: tandai dibaca.
   useEffect(() => {
@@ -235,19 +236,9 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  async function loadOlder() {
-    const oldest = messages[0];
-    if (loading || !oldest) return;
-    setLoading(true);
-    try {
-      const res = await api<CustomerChat>(endpoint('show', `?before=${oldest.id}`));
-      merge(res.messages, true);
-      setHasMore(res.hasMore);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
+  // Dipanggil ChatThread saat menggulir ke puncak (dan dari tombol cadangan): satu halaman lebih lama per panggilan.
+  function loadOlder() {
+    loadOlderPage((before) => api<CustomerChat>(endpoint('show', `?before=${before}`))).catch((err) => setError(errorMessage(err)));
   }
 
   async function send() {
@@ -258,7 +249,7 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
     try {
       const context = customer && attachment ? (attachment.type === 'product' ? { type: 'product', slug: attachment.slug } : { type: 'order', number: attachment.number }) : undefined;
       const res = await api<{ message: ChatMessage }>(endpoint('send'), { method: 'POST', body: guestBody({ body, context }) });
-      merge([res.message]);
+      upsert([res.message]);
       setDraft('');
       setAttachment(null);
     } catch (err) {
@@ -289,7 +280,7 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
       writeGuestToken(res.token);
       setGuestToken(res.token);
       reset();
-      merge([res.message]);
+      upsert([res.message]);
       setLoaded(true);
       setStage('thread');
       setForm((f) => ({ ...f, body: '' }));
@@ -407,7 +398,13 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
                 orderHref={paths.order}
                 loading={loading}
                 hasMore={hasMore}
-                onLoadOlder={() => void loadOlder()}
+                loadingOlder={loadingOlder}
+                onLoadOlder={loadOlder}
+                onEdit={startEdit}
+                onRetract={(message) => void retract(message)}
+                editingId={editing?.id ?? null}
+                actionsDisabled={editBusy}
+                editWindowSeconds={editWindow}
                 otherName="PT IKN"
                 emptyText={t(
                   'Tanyakan stok, harga, atau status pesanan Anda di sini.',
@@ -419,7 +416,7 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
                   {error}
                 </p>
               )}
-              {attachment && (
+              {attachment && !editing && (
                 <div className={styles.attachment}>
                   <Icon name={attachment.type === 'product' ? 'package' : 'orders'} size={16} />
                   <span>
@@ -431,7 +428,15 @@ export default function ChatWidget({ open, onClose, onOpen, badgeUnread = 0, onG
                   </button>
                 </div>
               )}
-              <ChatComposer value={draft} onChange={setDraft} onSend={() => void send()} sending={sending} lang={lang} />
+              <ChatComposer
+                value={draft}
+                onChange={setDraft}
+                onSend={() => void (editing ? submitEdit() : send())}
+                sending={sending || editBusy}
+                lang={lang}
+                editing={editing}
+                onCancelEdit={cancelEdit}
+              />
             </>
           )}
         </>

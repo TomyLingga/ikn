@@ -81,6 +81,13 @@
 .colPrice { width: 17%; }
 .colAmount { width: 19%; }
 
+/* Jadwal termin (ASUMSI A-97) */
+.colStage { width: 28%; }
+.colPercent { width: 9%; }
+.colStageAmount { width: 17%; }
+.colDue { width: 18%; }
+.colStatus { width: 22%; }
+
 .num {
   text-align: right;
   white-space: nowrap;

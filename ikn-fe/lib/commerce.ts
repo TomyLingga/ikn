@@ -8,7 +8,11 @@ import type {
   FactoryPickupPoint,
   FreightQuote,
   FreightQuoteStatus,
+  InstallmentStatusKey,
+  InstallmentTrigger,
   Order,
+  OrderInstallment,
+  PaymentProgress,
   OrderAddressSnapshot,
   OrderDestinationPort,
   OrderStatusKey,
@@ -354,4 +358,66 @@ export function pickupItemNames(point: Pick<FactoryPickupPoint, 'items'>, items:
     const item = items.find((entry) => entry.productSlug === slug);
     return item ? item.name[lang] || item.name.id : slug;
   });
+}
+
+// ---- Termin pembayaran (ASUMSI A-97) ----
+
+export const installmentStatus: Record<InstallmentStatusKey, StatusLabel> = {
+  scheduled: { id: 'Belum ditagih', en: 'Not billed yet', tone: 'info' },
+  due: { id: 'Menunggu pembayaran', en: 'Awaiting payment', tone: 'warn' },
+  awaiting_verification: { id: 'Menunggu verifikasi', en: 'Awaiting verification', tone: 'warn' },
+  paid: { id: 'Lunas', en: 'Paid', tone: 'ok' },
+  void: { id: 'Batal', en: 'Void', tone: 'bad' },
+};
+
+const installmentOverdue: StatusLabel = { id: 'Terlambat', en: 'Overdue', tone: 'bad' };
+
+/** Label status termin; termin yang sedang ditagih dan lewat jatuh tempo tampil "Terlambat". */
+export function installmentLabel(row: { status: string; overdue?: boolean }): StatusLabel {
+  if (row.status === 'due' && row.overdue) return installmentOverdue;
+  return installmentStatus[row.status as InstallmentStatusKey] || { id: row.status, en: row.status, tone: 'info' };
+}
+
+/** Pilihan "Ditagih" di form jadwal termin admin. */
+export const installmentTriggerLabels: Record<InstallmentTrigger, { id: string; en: string }> = {
+  order: { id: 'Saat pesanan dibuat', en: 'When the order is placed' },
+  shipped: { id: 'Saat pesanan dikirim', en: 'When the order ships' },
+  delivered: { id: 'Saat pesanan diterima', en: 'When the order is delivered' },
+};
+
+/**
+ * Kapan sebuah termin ditagih, untuk customer: "Dibayar saat pesanan dibuat", "Ditagih saat pesanan dikirim, jatuh
+ * tempo 14 hari kemudian". `first` = baris pertama jadwal (mengikuti batas bayar pesanan).
+ */
+export function installmentTriggerText(row: { trigger: InstallmentTrigger; dueDays: number }, first: boolean, lang: 'id' | 'en'): string {
+  if (first) return lang === 'en' ? 'Paid when the order is placed' : 'Dibayar saat pesanan dibuat';
+  const when: Record<InstallmentTrigger, { id: string; en: string }> = {
+    order: { id: 'Ditagih setelah pembayaran pertama diterima', en: 'Billed after the first payment is received' },
+    shipped: { id: 'Ditagih saat pesanan dikirim', en: 'Billed when the order ships' },
+    delivered: { id: 'Ditagih saat pesanan diterima', en: 'Billed when the order is delivered' },
+  };
+  const days = Number(row.dueDays) || 0;
+  const due = days > 0 ? (lang === 'en' ? `, due ${days} ${days === 1 ? 'day' : 'days'} later` : `, jatuh tempo ${days} hari kemudian`) : lang === 'en' ? ', due on the same day' : ', jatuh tempo hari itu juga';
+  return when[row.trigger][lang] + due;
+}
+
+/** "30%" atau "33,33%" (EN "33.33%"). */
+export function formatPercent(value: number, lang: 'id' | 'en'): string {
+  return `${Number(value).toLocaleString(lang === 'en' ? 'en-US' : 'id-ID', { maximumFractionDigits: 2 })}%`;
+}
+
+export const partiallyPaidLabel: StatusLabel = { id: 'Dibayar sebagian', en: 'Partially paid', tone: 'warn' };
+
+/** Order bertermin yang baru dibayar sebagian (masih ada sisa tagihan). */
+export function isPartiallyPaid(order: { paymentProgress?: PaymentProgress | null } | null | undefined): boolean {
+  return order?.paymentProgress?.status === 'partial' && order.paymentProgress.outstandingTotal > 0;
+}
+
+export function orderInstallments(order: Pick<Order, 'installments'> | null | undefined): OrderInstallment[] {
+  return order?.installments || [];
+}
+
+/** Termin yang sedang ditagih dan boleh dibayar customer (yang paling awal). */
+export function payableInstallment(order: Pick<Order, 'installments'> | null | undefined): OrderInstallment | null {
+  return orderInstallments(order).find((row) => row.canUploadProof) || null;
 }

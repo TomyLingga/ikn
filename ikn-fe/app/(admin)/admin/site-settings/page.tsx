@@ -5,9 +5,11 @@ import Spinner from '@/components/Spinner';
 import { AdminCard, AdminPageHead } from '@/components/admin/AdminPage';
 import { ColorInput, I18nInput, ListField, MediaPicker, firstError, type FieldErrors } from '@/components/admin/cms';
 import MailSettingsCard from '@/components/admin/MailSettingsCard';
+import MapSettingsCard from '@/components/admin/MapSettingsCard';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { EMPTY_MAIL_SETTINGS, type MailSettings, type SiteSettings, type WhatsAppContact, type AuthSlide } from '@/lib/cms';
+import { EMPTY_MAP_SETTINGS, resetMapTiles, type MapSettings } from '@/lib/map-tiles';
 import { THEME_DEFAULTS, THEME_KEYS, THEME_VARIABLES, themeColor, type ThemeSettings } from '@/lib/theme';
 
 type CompanyPatch = Partial<SiteSettings['company']>;
@@ -31,6 +33,8 @@ export default function AdminSiteSettings() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
+  // Naik tiap simpan berhasil: kartu Peta memuat ulang lapisan yang berlaku di situs.
+  const [mapsVersion, setMapsVersion] = useState(0);
 
   const load = useCallback(async () => {
     setError('');
@@ -81,6 +85,8 @@ export default function AdminSiteSettings() {
     setSettings((current) => (current ? { ...current, invoice: { header_image: null, footer_image: null, ...(current.invoice ?? {}), ...patch } } : current));
   const patchMail = (patch: Partial<MailSettings>) =>
     setSettings((current) => (current ? { ...current, mail: { ...(current.mail ?? EMPTY_MAIL_SETTINGS), ...patch } } : current));
+  const patchMaps = (patch: Partial<MapSettings>) =>
+    setSettings((current) => (current ? { ...current, maps: { ...(current.maps ?? EMPTY_MAP_SETTINGS), ...patch } } : current));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -99,11 +105,15 @@ export default function AdminSiteSettings() {
           analytics: settings.analytics ?? emptyAnalytics,
           theme: settings.theme ?? emptyTheme,
           mail: settings.mail ?? EMPTY_MAIL_SETTINGS,
+          maps: settings.maps ?? EMPTY_MAP_SETTINGS,
           invoice: { header_image: settings.invoice?.header_image?.id ?? null, footer_image: settings.invoice?.footer_image?.id ?? null },
           auth: { slides: (settings.auth?.slides ?? []).filter((s) => s.media?.id).map((s) => ({ mediaId: s.media.id, caption: s.caption, frame: s.frame ?? null })) },
         },
       });
       setSettings(saved);
+      // Peta di panel admin langsung memakai penyedia yang baru disimpan.
+      resetMapTiles();
+      setMapsVersion((n) => n + 1);
       setNotice(t('Pengaturan situs tersimpan.', 'Site settings saved.'));
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
@@ -170,7 +180,7 @@ export default function AdminSiteSettings() {
     <div>
       <AdminPageHead
         title={t('Pengaturan Situs', 'Site Settings')}
-        desc={t('Identitas perusahaan, teks footer, SEO bawaan, kanal chat, tema warna, dan email notifikasi.', 'Company identity, footer texts, default SEO, chat channel, colour theme, and notification email.')}
+        desc={t('Identitas perusahaan, teks footer, SEO bawaan, kanal chat, tema warna, email notifikasi, dan penyedia peta.', 'Company identity, footer texts, default SEO, chat channel, colour theme, notification email, and map provider.')}
       />
 
       {notice && (
@@ -481,6 +491,8 @@ export default function AdminSiteSettings() {
         </AdminCard>
 
         <MailSettingsCard value={settings.mail ?? EMPTY_MAIL_SETTINGS} onChange={patchMail} errors={errors} />
+
+        <MapSettingsCard value={settings.maps ?? EMPTY_MAP_SETTINGS} onChange={patchMaps} errors={errors} version={mapsVersion} />
 
         <div className="row-actions">
           <button type="submit" className="btn btn-solid btn-sm" disabled={saving}>

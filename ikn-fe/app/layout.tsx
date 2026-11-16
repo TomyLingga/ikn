@@ -2,6 +2,7 @@ import './globals.css';
 import './shared.css';
 // Tema Navy · Cream · Coral (A-91): aturan lintas area (ikon, CTA, sidebar admin); token di globals.css.
 import './styles/theme.css';
+import './styles/polish.css';
 import { Archivo, IBM_Plex_Mono } from 'next/font/google';
 import { LanguageProvider } from '@/components/LanguageProvider';
 import { CartProvider } from '@/components/CartProvider';
@@ -13,6 +14,7 @@ import NavProgress from '@/components/NavProgress';
 import ConfirmHost from '@/components/ConfirmDialog';
 import FileViewerHost from '@/components/FileViewer';
 import UploadProgressHost from '@/components/UploadProgress';
+import ToastHost from '@/components/Toast';
 import type { Metadata, Viewport } from 'next';
 import { DEFAULT_OG_IMAGE, SITE_URL } from '@/lib/seo';
 
@@ -113,6 +115,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ConfirmHost />
         <FileViewerHost />
         <UploadProgressHost />
+        <ToastHost />
         <LanguageProvider>
           <AuthProvider>
             <CartProvider>{children}</CartProvider>

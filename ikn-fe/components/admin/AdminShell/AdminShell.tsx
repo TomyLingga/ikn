@@ -11,6 +11,7 @@ import SidebarToggle from '@/components/SidebarToggle';
 import SessionLoader from '@/components/SessionLoader';
 import AdminFieldHelp from '@/components/admin/AdminFieldHelp';
 import AdminChatDock from '@/components/admin/AdminChatDock';
+import NotificationBell from '@/components/customer/NotificationBell';
 import { useAuth } from '@/components/AuthProvider';
 import { useLang } from '@/components/LanguageProvider';
 import { api } from '@/lib/api';
@@ -198,6 +199,9 @@ const navSections: NavSection[] = [
   },
 ];
 
+// Jeda polling GET /admin/badges; lonceng menampilkan toast notifikasi baru paling lambat selama ini.
+const BADGE_POLL_MS = 20000;
+
 // Aktif bila persis sama atau berada di bawahnya ("/admin/news" tidak ikut aktif di "/admin/news-categories").
 function isActivePath(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -213,6 +217,8 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const [allowed, setAllowed] = useState<string[] | null>(null);
   // Badge jumlah per href menu: pembayaran menunggu verifikasi, customer menunggu persetujuan, chat belum dibaca.
   const [badges, setBadges] = useState<Record<string, number>>({});
+  // Notifikasi admin yang belum dibaca (lonceng top bar), dari panggilan badge yang sama.
+  const [notifications, setNotifications] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [helpGuideData, setHelpGuideData] = useState<HelpGuide | null>(null);
@@ -257,21 +263,24 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   }, [admin]);
 
   // Badge sidebar dari GET /admin/badges: order dibayar yang masih berjalan, bukti bayar menunggu verifikasi, customer menunggu persetujuan, dan
-  // percakapan chat yang belum dibaca (null = admin tidak punya modulnya). Dihitung ulang saat pindah halaman,
-  // tiap 30 detik, saat jendela kembali aktif, dan ketika halaman lain memanggil refreshAdminBadges().
+  // percakapan chat yang belum dibaca (null = admin tidak punya modulnya), ditambah `notifications` untuk lonceng top bar.
+  // Dihitung ulang saat pindah halaman, tiap 20 detik, saat jendela kembali aktif, dan ketika halaman lain memanggil
+  // refreshAdminBadges().
   const loadBadges = useCallback(async () => {
     if (!admin) {
       setBadges({});
+      setNotifications(0);
       return;
     }
     try {
-      const result = await api<{ orders?: number | null; payments: number | null; customers: number | null; chat: number | null }>('/admin/badges');
+      const result = await api<{ notifications?: number; orders?: number | null; payments: number | null; customers: number | null; chat: number | null }>('/admin/badges');
       setBadges({
         '/admin/orders': result.orders ?? 0,
         '/admin/payments': result.payments ?? 0,
         '/admin/customers': result.customers ?? 0,
         '/admin/chat': result.chat ?? 0,
       });
+      setNotifications(result.notifications ?? 0);
     } catch {
       // Badge bukan fitur kritis: biarkan nilai terakhir bila API sedang gagal.
     }
@@ -283,7 +292,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const refresh = () => void loadBadges();
-    const timer = window.setInterval(refresh, 30000);
+    const timer = window.setInterval(refresh, BADGE_POLL_MS);
     window.addEventListener(ADMIN_BADGES_EVENT, refresh);
     window.addEventListener('focus', refresh);
     return () => {
@@ -546,6 +555,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             <Link href="/" className={styles.siteLink}>
               {lang === 'en' ? 'View site' : 'Lihat situs'}
             </Link>
+            <NotificationBell area="admin" unread={notifications} />
             <div ref={profileRef} style={{ position: 'relative' }}>
               <button
                 type="button"

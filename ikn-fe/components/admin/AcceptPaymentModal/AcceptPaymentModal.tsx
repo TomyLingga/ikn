@@ -7,9 +7,11 @@ import { useState, type FormEvent } from 'react';
 import AdminModal from '@/components/admin/AdminModal';
 import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
+import { tr } from '@/lib/cms';
 import { paymentMethodSummary, type AcceptPaymentPayload } from '@/lib/admin';
 import { currencyStep, formatMoney, fromMinorInput, toMinorInput } from '@/lib/format';
 import type { Payment } from '@/lib/types';
+import NumberInput from '@/components/NumberInput';
 
 interface AcceptPaymentModalProps {
   payment: Payment;
@@ -72,14 +74,20 @@ export default function AcceptPaymentModal({ payment, orderNumber, onClose, onAc
     <AdminModal title={`${t('Terima pembayaran', 'Accept payment')} ${orderNumber || `#${payment.id}`}`} onClose={onClose} small>
       <form className="admin-form" onSubmit={(e) => void submit(e)}>
         <p className="admin-field-hint">
-          {t('Tagihan', 'Amount due')}: <strong>{formatMoney(payment.amount, currency)}</strong> · {paymentMethodSummary(payment, lang)}.{' '}
-          {t('Order berubah menjadi Dibayar dan customer mendapat notifikasi. Isian di bawah hanya catatan untuk keuangan.', 'The order becomes Paid and the customer is notified. The fields below are notes for finance only.')}
+          {t('Tagihan', 'Amount due')}
+          {payment.installment ? ` ${tr(payment.installment.label, lang)}` : ''}: <strong>{formatMoney(payment.amount, currency)}</strong> · {paymentMethodSummary(payment, lang)}.{' '}
+          {/* Order bertermin (ASUMSI A-97): termin pertama membuat order Dibayar; termin lanjutan hanya melunasi terminnya. */}
+          {(payment.installment?.seq ?? 1) > 1
+            ? t('Termin ini ditandai lunas dan customer mendapat notifikasi; status order tidak berubah. Isian di bawah hanya catatan untuk keuangan.', 'This installment is marked paid and the customer is notified; the order status does not change. The fields below are notes for finance only.')
+            : payment.installment
+              ? t('Order berubah menjadi Dibayar dan customer mendapat notifikasi; termin berikutnya ditagih sesuai jadwal. Isian di bawah hanya catatan untuk keuangan.', 'The order becomes Paid and the customer is notified; later installments are billed as scheduled. The fields below are notes for finance only.')
+              : t('Order berubah menjadi Dibayar dan customer mendapat notifikasi. Isian di bawah hanya catatan untuk keuangan.', 'The order becomes Paid and the customer is notified. The fields below are notes for finance only.')}
         </p>
         <div className="admin-form-row">
           <label>
             <span className="field-label">{t('Jumlah diterima', 'Amount received')}</span>
             <div className="admin-input-suffix">
-              <input type="number" min={0} step={currencyStep(currency)} inputMode="decimal" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} />
+              <NumberInput currency={currency} min={0} step={currencyStep(currency)} inputMode="decimal" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} />
               <span>{currency}</span>
             </div>
             {shortfall > 0 && receivedMinor !== null && (
@@ -91,7 +99,7 @@ export default function AcceptPaymentModal({ payment, orderNumber, onClose, onAc
           <label>
             <span className="field-label">{t('Biaya bank', 'Bank charges')}</span>
             <div className="admin-input-suffix">
-              <input type="number" min={0} step={currencyStep(currency)} inputMode="decimal" value={bankCharges} onChange={(e) => setBankCharges(e.target.value)} placeholder={usd ? '0.00' : '0'} />
+              <NumberInput currency={currency} min={0} step={currencyStep(currency)} inputMode="decimal" value={bankCharges} onChange={(e) => setBankCharges(e.target.value)} placeholder={usd ? '0.00' : '0'} />
               <span>{currency}</span>
             </div>
           </label>

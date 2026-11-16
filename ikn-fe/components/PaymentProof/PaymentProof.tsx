@@ -5,19 +5,23 @@ import Icon from '@/components/Icon';
 import { useLang } from '@/components/LanguageProvider';
 import { errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
-import type { Order, Payment } from '@/lib/types';
+import type { Order, OrderInstallment, Payment } from '@/lib/types';
 import styles from './PaymentProof.module.css';
 
 // Unggah bukti bayar (POST /customer/orders/{number}/proof, multipart `file`). Tombol hanya tampil
 // bila API memberi flag `canUploadProof`; state lain (menunggu verifikasi, ditolak, kedaluwarsa) dibaca dari payment.
+// Order bertermin (ASUMSI A-97): dengan `installment` (termin lanjutan) semua state dibaca dari termin itu, bukan dari
+// status order; pemanggil mengirim `installmentId` di `onUpload`.
 export default function PaymentProof({
   order,
   payment,
   onUpload,
+  installment = null,
 }: {
   order: Order;
   payment: Payment | null;
   onUpload: (file: File) => Promise<unknown>;
+  installment?: OrderInstallment | null;
 }) {
   const { lang } = useLang();
   const t = (id: string, en: string) => (lang === 'en' ? en : id);
@@ -25,9 +29,17 @@ export default function PaymentProof({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const rejected = payment?.status === 'rejected' ? payment : (order.payments || []).find((p) => p.status === 'rejected') || null;
+  const balance = !!installment && installment.seq > 1;
+  // Termin lanjutan: bukti terakhir yang ditolak milik termin ini (bukan payment termin lain).
+  const lastOfInstallment = balance ? installment.payments[installment.payments.length - 1] || null : null;
+  const rejected = balance
+    ? (lastOfInstallment?.status === 'rejected' ? lastOfInstallment : [...installment.payments].reverse().find((p) => p.status === 'rejected') || null)
+    : payment?.status === 'rejected' ? payment : (order.payments || []).find((p) => p.status === 'rejected' && (p.installment?.seq ?? 1) === 1) || null;
+  const awaiting = balance ? installment.status === 'awaiting_verification' : payment?.status === 'awaiting_verification' || order.status === 'payment_review';
+  const canUpload = balance ? installment.canUploadProof : order.canUploadProof;
+  const dueAt = balance ? installment.dueAt : order.paymentDueAt;
 
-  if (payment?.status === 'awaiting_verification' || order.status === 'payment_review') {
+  if (awaiting) {
     return (
       <div className={styles.done}>
         <Icon name="check" size={18} />
@@ -39,7 +51,7 @@ export default function PaymentProof({
     );
   }
 
-  if (order.status === 'expired' || payment?.status === 'expired') {
+  if (!balance && (order.status === 'expired' || payment?.status === 'expired')) {
     return (
       <div className={styles.rejected}>
         <Icon name="cancelCircle" size={18} /> {t('Batas waktu pembayaran terlewati dan pesanan kedaluwarsa.', 'The payment deadline has passed and the order expired.')}
@@ -47,7 +59,7 @@ export default function PaymentProof({
     );
   }
 
-  if (!order.canUploadProof) {
+  if (!canUpload) {
     return null;
   }
 
@@ -78,9 +90,10 @@ export default function PaymentProof({
         </div>
       )}
 
-      {order.paymentDueAt && (
+      {/* Termin lanjutan: jatuh tempo sudah tampil di kotak instruksi (PaymentInstructions), tidak diulang di sini. */}
+      {dueAt && !balance && (
         <p className={styles.due}>
-          {t('Batas waktu pembayaran', 'Payment deadline')}: <strong>{formatDateTime(order.paymentDueAt, lang)}</strong>
+          {t('Batas waktu pembayaran', 'Payment deadline')}: <strong>{formatDateTime(dueAt, lang)}</strong>
         </p>
       )}
 

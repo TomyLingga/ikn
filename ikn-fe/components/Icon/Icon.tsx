@@ -166,6 +166,26 @@ const paths: Record<IconName, ReactNode> = {
       <circle cx="18" cy="18" r="2" />
     </>
   ),
+  ship: (
+    <>
+      <path d="M3 16l2 4h14l2-4-9-3-9 3Z" />
+      <path d="M6 14.9V9h12v5.9M9 9V5h6v4M12 5V3" />
+    </>
+  ),
+  plane: <path d="M12 2.5c.83 0 1.5 1 1.5 2.5v4l7 4v2l-7-2v4l2 1.5V20L12 19l-3.5 1v-1.5l2-1.5v-4l-7 2v-2l7-4V5c0-1.5.67-2.5 1.5-2.5Z" />,
+  edit: <path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4" />,
+  alert: (
+    <>
+      <path d="M12 4 2.5 20h19L12 4Z" />
+      <path d="M12 10v4.5M12 17.2v.3" />
+    </>
+  ),
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.8M12 16.8v.2" />
+    </>
+  ),
   checkCircle: (
     <>
       <circle cx="12" cy="12" r="9" />

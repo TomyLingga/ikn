@@ -11,6 +11,7 @@ import { useLang } from '@/components/LanguageProvider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type I18n } from '@/lib/cms';
 import type { AdminFactoryLocation, FactoryLocationPayload } from '@/lib/admin';
+import NumberInput from '@/components/NumberInput';
 
 interface FactoryForm {
   code: string;
@@ -247,7 +248,7 @@ export default function FactoryLocations() {
               </label>
               <label>
                 <span className="field-label">{t('Urutan pabrik', 'Factory order')}</span>
-                <input type="number" min={0} max={1000} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} placeholder={t('kosong = di akhir', 'empty = last')} />
+                <NumberInput min={0} max={1000} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} placeholder={t('kosong = di akhir', 'empty = last')} />
                 <small className="admin-field-hint">{t('Urutan pertama menjadi pabrik bawaan.', 'The first one becomes the default factory.')}</small>
                 {firstError(formErrors, 'sortOrder') && <small className="cms-field-error">{firstError(formErrors, 'sortOrder')}</small>}
               </label>

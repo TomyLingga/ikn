@@ -9,6 +9,9 @@ use App\Mail\Commerce\FreightQuoted;
 use App\Mail\Commerce\FreightQuoteExpiredAdmin;
 use App\Mail\Commerce\FreightRequested;
 use App\Mail\Commerce\FreightRequestedAdmin;
+use App\Mail\Commerce\InstallmentDue;
+use App\Mail\Commerce\InstallmentPaid;
+use App\Mail\Commerce\InstallmentReminder;
 use App\Mail\Commerce\OrderCancelled;
 use App\Mail\Commerce\OrderCompleted;
 use App\Mail\Commerce\OrderDelivered;
@@ -25,6 +28,7 @@ use App\Mail\Commerce\ProformaUpdated;
 use App\Models\Order;
 use App\Models\OrderAttachment;
 use App\Models\OrderFreightQuote;
+use App\Models\OrderInstallment;
 use App\Models\OrderProforma;
 use App\Models\OrderTrackingUpdate;
 use App\Models\Payment;
@@ -40,6 +44,7 @@ use Throwable;
 
 /**
  * Satu titik semua notifikasi order: email + notifikasi dalam aplikasi untuk customer (ASUMSI A-26, A-71).
+ * Kejadian yang perlu ditindak atau diketahui admin juga masuk lonceng panel admin (toAdmins, kunci "admin.*").
  * Semua Mailable ShouldQueue: dengan QUEUE_CONNECTION=database baris job ikut transaksi pemanggil;
  * dengan sync (dev/test) email dirender langsung. Kegagalan kirim tidak menggagalkan transisi order.
  */
@@ -56,6 +61,7 @@ class OrderNotifier
         foreach ($this->admins('orders') as $admin) {
             $this->toUser($admin, new OrderPlacedAdmin($order, $admin));
         }
+        $this->toAdmins($order, 'order_placed', ['total' => Money::format($order->grandTotalInt(), $order->currencyCode())]);
     }
 
     public function paymentReceived(Order $order, Payment $payment): void
@@ -63,18 +69,94 @@ class OrderNotifier
         foreach ($this->admins('payments') as $admin) {
             $this->toUser($admin, new PaymentReceived($order, $payment, $admin));
         }
+        // Lonceng admin hanya untuk bukti transfer yang harus diverifikasi; pembayaran gateway lunas tanpa tindakan admin.
+        if ($payment->isManual()) {
+            // Order bertermin (ASUMSI A-97): sebut termin mana yang dibayar.
+            $installment = $payment->installment;
+            $installment
+                ? $this->toAdmins($order, 'payment_proof_installment', ['label' => $installment->label], 'payments', '/admin/payments')
+                : $this->toAdmins($order, 'payment_proof', [], 'payments', '/admin/payments');
+        }
     }
 
+    /** Admin mulai menyiapkan pesanan (paid → processing): hanya notifikasi dalam aplikasi. */
+    public function orderProcessing(Order $order): void
+    {
+        $this->inApp->order($order, 'order.processing');
+    }
+
+    /** Order → paid. Order bertermin (ASUMSI A-97): yang lunas baru termin pertama, notifikasi menyebut sisa tagihan. */
     public function paymentAccepted(Order $order): void
     {
         $this->toCustomer($order, new PaymentAccepted($order));
+        $first = $order->firstInstallment();
+        if ($first && $order->hasUnpaidInstallments()) {
+            $this->inApp->order($order, 'order.installment_paid', $this->installmentParams($order, $first));
+
+            return;
+        }
         $this->inApp->order($order, 'order.payment_accepted');
     }
 
     public function paymentRejected(Order $order, Payment $payment, string $reason): void
     {
         $this->toCustomer($order, new PaymentRejected($order, $payment, $reason));
-        $this->inApp->order($order, 'order.payment_rejected', ['reason' => $reason !== '' ? $reason : '-']);
+        $reason = $reason !== '' ? $reason : '-';
+        if ($payment->installment) {
+            $this->inApp->order($order, 'order.installment_rejected', ['reason' => $reason, 'label' => $payment->installment->label]);
+
+            return;
+        }
+        $this->inApp->order($order, 'order.payment_rejected', ['reason' => $reason]);
+    }
+
+    // ---- Termin pembayaran (ASUMSI A-97) ----
+
+    /** Termin lanjutan ditagih (pemicu tercapai atau ditagih admin): email dengan instruksi bayar + notifikasi dalam aplikasi. */
+    public function installmentDue(Order $order, OrderInstallment $installment): void
+    {
+        $this->toCustomer($order, new InstallmentDue($order, $installment, $this->installmentPayment($installment)));
+        $this->inApp->order($order, 'order.installment_due', $this->installmentParams($order, $installment));
+    }
+
+    /** Admin mengubah tanggal jatuh tempo termin yang sudah ditagih: hanya notifikasi dalam aplikasi. */
+    public function installmentDueChanged(Order $order, OrderInstallment $installment): void
+    {
+        $this->inApp->order($order, 'order.installment_due_changed', $this->installmentParams($order, $installment));
+    }
+
+    /** Pengingat termin (scheduler atau tombol admin); $overdue = sudah melewati jatuh tempo. */
+    public function installmentReminder(Order $order, OrderInstallment $installment, bool $overdue = false): void
+    {
+        $this->toCustomer($order, new InstallmentReminder($order, $installment, $overdue, $this->installmentPayment($installment)));
+        $this->inApp->order($order, $overdue ? 'order.installment_overdue' : 'order.installment_reminder', $this->installmentParams($order, $installment));
+    }
+
+    /** Pembayaran termin lanjutan diverifikasi; $fullyPaid = semua termin order lunas. */
+    public function installmentPaid(Order $order, OrderInstallment $installment, bool $fullyPaid = false): void
+    {
+        $this->toCustomer($order, new InstallmentPaid($order, $installment, $fullyPaid));
+        $this->inApp->order($order, $fullyPaid ? 'order.fully_paid' : 'order.installment_paid', $this->installmentParams($order, $installment));
+    }
+
+    /** Parameter teks notifikasi termin; label {id,en} dirender per bahasa oleh InAppNotifier. */
+    private function installmentParams(Order $order, OrderInstallment $installment): array
+    {
+        $progress = $order->paymentProgress();
+
+        return [
+            'label' => $installment->label,
+            'amount' => Money::format($installment->amountInt(), $installment->currencyCode()),
+            'due' => OrderMailable::dateTime($installment->due_at),
+            'outstanding' => Money::format($progress['outstandingTotal'], $progress['currency']),
+        ];
+    }
+
+    /** Payment yang sedang menunggu pembayaran untuk termin ini (instruksi bayar di email). */
+    private function installmentPayment(OrderInstallment $installment): ?Payment
+    {
+        return Payment::with(['paymentMethod', 'bankAccount'])->where('installment_id', $installment->id)
+            ->whereIn('status', Payment::ACTIVE_STATUSES)->orderByDesc('id')->first();
     }
 
     public function orderExpired(Order $order): void
@@ -123,16 +205,32 @@ class OrderNotifier
         $this->inApp->order($order, 'order.tracking', ['note' => $update->note]);
     }
 
-    public function orderDelivered(Order $order): void
+    /** @param  bool  $byCustomer  customer sendiri yang mengonfirmasi barang diterima (admin diberi tahu) */
+    public function orderDelivered(Order $order, bool $byCustomer = false): void
     {
         $this->toCustomer($order, new OrderDelivered($order, (int) $this->settings->get('auto_complete_days')));
-        $this->inApp->order($order, $order->isPickup() ? 'order.picked_up' : 'order.delivered');
+        // Order bertermin (ASUMSI A-97): selama ada termin belum lunas, jangan ajak customer menyelesaikan pesanan.
+        if ($order->hasUnpaidInstallments()) {
+            $progress = $order->paymentProgress();
+            $this->inApp->order($order, $order->isPickup() ? 'order.picked_up_balance_due' : 'order.delivered_balance_due', [
+                'outstanding' => Money::format($progress['outstandingTotal'], $progress['currency']),
+            ]);
+        } else {
+            $this->inApp->order($order, $order->isPickup() ? 'order.picked_up' : 'order.delivered');
+        }
+        if ($byCustomer) {
+            $this->toAdmins($order, 'order_received');
+        }
     }
 
-    public function orderCompleted(Order $order): void
+    /** @param  bool  $byCustomer  diselesaikan customer, bukan selesai otomatis oleh scheduler (admin diberi tahu) */
+    public function orderCompleted(Order $order, bool $byCustomer = false): void
     {
         $this->toCustomer($order, new OrderCompleted($order));
         $this->inApp->order($order, 'order.completed');
+        if ($byCustomer) {
+            $this->toAdmins($order, 'order_completed');
+        }
     }
 
     public function paymentReminder(Order $order): void
@@ -141,11 +239,17 @@ class OrderNotifier
         $this->inApp->order($order, 'order.payment_reminder');
     }
 
-    /** @param  bool  $freightTimeout  batal otomatis karena batas tunggu penawaran ongkir CIF terlewati (ASUMSI A-89) */
-    public function orderCancelled(Order $order, ?string $reason, bool $wasPaid, bool $freightTimeout = false): void
+    /**
+     * @param  bool  $freightTimeout  batal otomatis karena batas tunggu penawaran ongkir CIF terlewati (ASUMSI A-89)
+     * @param  bool  $byCustomer  dibatalkan customer sendiri (admin diberi tahu)
+     */
+    public function orderCancelled(Order $order, ?string $reason, bool $wasPaid, bool $freightTimeout = false, bool $byCustomer = false): void
     {
         $this->toCustomer($order, new OrderCancelled($order, $reason, $wasPaid));
         $this->inApp->order($order, $freightTimeout ? 'order.freight_cancelled' : 'order.cancelled');
+        if ($byCustomer) {
+            $this->toAdmins($order, 'order_cancelled');
+        }
     }
 
     // ---- Penawaran ongkir CIF (ASUMSI A-89) ----
@@ -158,6 +262,7 @@ class OrderNotifier
         foreach ($this->admins('orders') as $admin) {
             $this->toUser($admin, new FreightRequestedAdmin($order, $admin));
         }
+        $this->toAdmins($order, 'freight_requested', ['port' => $this->portName($order)]);
     }
 
     /** Admin mengirim penawaran baru, atau memperpanjang masa berlakunya ($extended). */
@@ -170,12 +275,13 @@ class OrderNotifier
         ]);
     }
 
-    /** Customer mengajukan harga balasan: hanya admin yang perlu tahu (email). */
+    /** Customer mengajukan harga balasan: hanya admin yang perlu tahu (email + lonceng admin). */
     public function freightCountered(Order $order, OrderFreightQuote $quote): void
     {
         foreach ($this->admins('orders') as $admin) {
             $this->toUser($admin, new FreightCounteredAdmin($order, $quote, $admin));
         }
+        $this->toAdmins($order, 'freight_countered', ['total' => Money::format($quote->totalMinor(), $order->currencyCode())]);
     }
 
     /** Ongkir disepakati (customer menerima penawaran, atau admin menerima balasan): instruksi bayar ke customer + kabar ke admin. */
@@ -186,6 +292,10 @@ class OrderNotifier
         foreach ($this->admins('orders') as $admin) {
             $this->toUser($admin, new FreightAcceptedAdmin($order, $quote, $admin, $acceptedBy));
         }
+        // Lonceng admin hanya bila customer yang menyetujui; admin yang menerima harga balasan sudah tahu.
+        if ($acceptedBy === OrderFreightQuote::BY_CUSTOMER) {
+            $this->toAdmins($order, 'freight_accepted', ['total' => Money::format($order->shippingTotalInt(), $order->currencyCode())]);
+        }
     }
 
     /** Penawaran admin lewat masa berlaku (scheduler): customer in-app, admin email agar memperpanjang/menawar ulang. */
@@ -195,6 +305,7 @@ class OrderNotifier
         foreach ($this->admins('orders') as $admin) {
             $this->toUser($admin, new FreightQuoteExpiredAdmin($order, $quote, $admin));
         }
+        $this->toAdmins($order, 'freight_expired', ['round' => (int) $quote->round]);
     }
 
     private function portName(Order $order): string
@@ -205,9 +316,22 @@ class OrderNotifier
     /** Admin aktif yang punya modul tertentu (super_admin selalu termasuk). */
     public function admins(string $module): Collection
     {
-        return User::admins()->where('status', User::STATUS_ACTIVE)->orderBy('id')->get()
-            ->filter(fn (User $user) => $this->access->allows($user, $module))
-            ->values();
+        return $this->access->adminsWith($module);
+    }
+
+    /**
+     * Notifikasi lonceng admin bermodul $module tentang order ini (kunci "admin.$type"); tautan bawaan = detail order.
+     * Customer disebut dengan nama perusahaannya bila ada.
+     */
+    private function toAdmins(Order $order, string $type, array $params = [], string $module = 'orders', ?string $url = null): void
+    {
+        $this->inApp->admins(
+            $module,
+            'admin.'.$type,
+            ['number' => $order->number, 'customer' => $order->customerCompany() ?: $order->customerName()] + $params,
+            $url ?? '/admin/orders/'.$order->number,
+            ['orderNumber' => $order->number]
+        );
     }
 
     private function toCustomer(Order $order, Mailable $mail): void

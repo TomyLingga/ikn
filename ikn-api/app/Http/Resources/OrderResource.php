@@ -9,8 +9,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * Bentuk `Order` lengkap (kontrak bagian 9, superset tipe FE): items, payments[], activePayment (+ alias `payment`),
  * timeline[], shippingAddress, shippingMethod (+ origins[]), deliveryTerm, paymentTerm, pickup, pickupPoints[], proforma, shipmentDetails, destinationPort,
- * freightQuotes[] + activeFreightQuote (CIF, A-89), flag can*. Semua uang integer satuan terkecil
- * `currency` (IDR rupiah, USD sen; ASUMSI A-86), tanggal ISO-8601 +07:00.
+ * freightQuotes[] + activeFreightQuote (CIF, A-89), installments[] + paymentProgress (termin, A-97), flag can*.
+ * Semua uang integer satuan terkecil `currency` (IDR rupiah, USD sen; ASUMSI A-86), tanggal ISO-8601 +07:00.
  */
 class OrderResource extends JsonResource
 {
@@ -125,6 +125,10 @@ class OrderResource extends JsonResource
             'activePayment' => $active ? (new PaymentResource($active))->resolve() : null,
             'payment' => $active ? (new PaymentResource($active))->resolve() : null, // alias kontrak bagian 9 (contoh 201)
             'payments' => PaymentResource::collection($order->payments)->resolve(),
+            // Termin pembayaran (ASUMSI A-97): [] untuk order satu pembayaran penuh. paymentProgress selalu ada:
+            // { currency, paidTotal, outstandingTotal, status unpaid|partial|paid }.
+            'installments' => self::installments($order),
+            'paymentProgress' => $order->paymentProgress(),
             'timeline' => $order->histories->map(fn ($h) => [
                 'id' => $h->id,
                 'status' => $h->to_status,
@@ -166,11 +170,24 @@ class OrderResource extends JsonResource
         ];
     }
 
+    /** installments[] dengan payment per termin diambil dari payments order yang sudah dimuat (tanpa query per baris). */
+    public static function installments(Order $order): array
+    {
+        $byInstallment = $order->payments->groupBy('installment_id');
+
+        return $order->installments->map(function ($row) use ($order, $byInstallment) {
+            $row->setRelation('order', $order);
+            $row->setRelation('payments', $byInstallment->get($row->id, collect())->values());
+
+            return (new OrderInstallmentResource($row))->resolve();
+        })->values()->all();
+    }
+
     public static function eager(): array
     {
         return [
             'items', 'reviews', 'histories.actor', 'trackingUpdates.author', 'attachments.media', 'attachments.author', 'proforma.editor', 'freightQuotes.creator',
-            'payments.paymentMethod', 'payments.bankAccount', 'payments.proof', 'payments.verifier',
+            'payments.paymentMethod', 'payments.bankAccount', 'payments.proof', 'payments.verifier', 'payments.installment', 'installments',
         ];
     }
 }

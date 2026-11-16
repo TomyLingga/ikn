@@ -93,10 +93,12 @@ export default function GeoPicker({ value, onChange }: GeoPickerProps) {
       <div className="geo-picker-row">
         <label>
           <span className="field-label">Lat</span>
+          {/* eslint-disable-next-line no-restricted-syntax -- coordinates are not grouped by thousands */}
           <input type="number" step="any" min={-90} max={90} value={lat ?? ''} onChange={(e) => onChange({ lat: e.target.value === '' ? null : Number(e.target.value), lng })} className="mono" />
         </label>
         <label>
           <span className="field-label">Lng</span>
+          {/* eslint-disable-next-line no-restricted-syntax -- coordinates are not grouped by thousands */}
           <input type="number" step="any" min={-180} max={180} value={lng ?? ''} onChange={(e) => onChange({ lat, lng: e.target.value === '' ? null : Number(e.target.value) })} className="mono" />
         </label>
         <button type="button" className="row-act" onClick={() => onChange({ lat: null, lng: null })} disabled={lat === null && lng === null}>

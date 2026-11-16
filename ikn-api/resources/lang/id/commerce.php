@@ -50,6 +50,23 @@ return [
     'freight_accept_not_allowed' => 'Penawaran ini sedang menunggu tanggapan pihak lain, jadi belum bisa Anda setujui.',
     'freight_counter_label' => 'Penawaran customer',
     'freight_max_wait_reason' => 'Batas tunggu penawaran ongkir terlewati.',
+    // Termin pembayaran (ASUMSI A-97).
+    'installments' => [
+        'unpaid' => 'Pesanan belum bisa diselesaikan karena masih ada termin pembayaran yang belum lunas.',
+        'not_found' => 'Termin tidak ditemukan pada pesanan ini.',
+        'not_due' => 'Termin ini tidak sedang ditagih.',
+        'not_billable' => 'Termin ini belum bisa ditagih. Termin lanjutan ditagih setelah termin pertama lunas dan selama pesanan masih berjalan.',
+        'already_billed' => 'Termin ini sudah ditagih. Isi tanggal jatuh tempo baru bila ingin mengubahnya.',
+        'reminder_too_soon' => 'Pengingat untuk termin ini sudah dikirim kurang dari :hours jam yang lalu.',
+        'due_in_past' => 'Tanggal jatuh tempo harus di masa depan.',
+        'payment_unavailable' => 'Belum ada metode transfer manual yang aktif untuk menagih termin ini.',
+        'too_many' => 'Jadwal termin paling banyak :max baris.',
+        'first_trigger' => 'Termin pertama harus ditagih saat pesanan dibuat.',
+        'percent_range' => 'Persentase tiap termin harus lebih dari 0 dan paling banyak 100.',
+        'percent_sum' => 'Jumlah persentase semua termin harus tepat 100.',
+        'duplicate_key' => 'Kunci termin tidak boleh sama.',
+        'export_only' => 'Jadwal termin hanya untuk syarat pembayaran pasar ekspor.',
+    ],
 
     'status' => [
         'awaiting_freight' => 'Menunggu penawaran ongkir',
@@ -128,6 +145,8 @@ return [
             'bank' => 'Rekening tujuan',
             'amount' => 'Nominal transfer (sudah termasuk kode unik)',
             'amount_plain' => 'Nominal pembayaran',
+            // Order non-IDR tanpa kode unik (ASUMSI A-86): pengganti teks metode bayar yang ditulis untuk transfer rupiah.
+            'instructions_foreign' => 'Transfer tepat sebesar nominal di bawah ke rekening tujuan, lalu unggah bukti transfer di halaman pesanan.',
             'correspondent' => 'Bank koresponden',
         ],
         'placed_admin' => [
@@ -137,17 +156,67 @@ return [
         'payment_received' => [
             'subject' => 'Bukti pembayaran :number menunggu verifikasi',
             'intro' => ':customer mengunggah bukti pembayaran untuk order :number (:method) senilai :total. Verifikasi di panel admin.',
+            'intro_installment' => ':customer mengunggah bukti pembayaran :label untuk order :number (:method) senilai :total. Verifikasi di panel admin.',
         ],
         'payment_accepted' => [
             'subject' => 'Pembayaran :number diterima',
             'intro' => 'Pembayaran Anda sudah kami terima. Pesanan Anda akan segera kami proses.',
+            'intro_installment' => ':label sebesar :amount sudah kami terima. Pesanan Anda akan segera kami proses. Sisa tagihan mengikuti jadwal di bawah.',
             'invoice' => 'Nomor invoice: :invoice',
         ],
         'payment_rejected' => [
             'subject' => 'Bukti pembayaran :number ditolak',
             'intro' => 'Bukti pembayaran Anda belum bisa kami terima.',
+            'intro_installment' => 'Bukti pembayaran :label belum bisa kami terima.',
             'reason' => 'Alasan:',
             'retry' => 'Unggah ulang bukti pembayaran sebelum :due.',
+            'retry_installment' => 'Unggah ulang bukti pembayaran di halaman pesanan.',
+        ],
+        // Termin pembayaran (ASUMSI A-97).
+        'installment' => [
+            'schedule_label' => 'Jadwal pembayaran',
+            'placed_intro' => 'Pesanan ini dibayar bertahap. Yang perlu dibayar sekarang: :label sebesar :amount.',
+            'col_label' => 'Termin',
+            'col_amount' => 'Nominal',
+            'col_due' => 'Jatuh tempo',
+            'col_status' => 'Status',
+            'status' => [
+                'scheduled' => 'Belum ditagih',
+                'due' => 'Menunggu pembayaran',
+                'overdue' => 'Terlambat',
+                'awaiting_verification' => 'Menunggu verifikasi',
+                'paid' => 'Lunas',
+                'void' => 'Batal',
+            ],
+            'billed_on' => [
+                'order' => 'ditagih setelah uang muka diterima',
+                'shipped' => 'ditagih saat pesanan dikirim',
+                'delivered' => 'ditagih saat pesanan diterima',
+            ],
+            'paid_total' => 'Sudah dibayar',
+            'outstanding' => 'Sisa tagihan',
+            'due_label' => 'Jatuh tempo',
+            'due' => [
+                'subject' => 'Tagihan :label pesanan :number',
+                'intro' => ':label sebesar :amount untuk pesanan Anda sudah bisa dibayar. Jatuh tempo :due.',
+                'upload' => 'Setelah transfer, unggah bukti pembayaran di halaman pesanan.',
+            ],
+            'reminder' => [
+                'subject' => 'Pengingat: :label pesanan :number jatuh tempo :due',
+                'intro' => ':label sebesar :amount untuk pesanan Anda belum dibayar. Jatuh tempo :due.',
+            ],
+            'overdue' => [
+                'subject' => ':label pesanan :number melewati jatuh tempo',
+                'intro' => ':label sebesar :amount untuk pesanan Anda melewati jatuh tempo :due. Mohon segera selesaikan pembayaran.',
+            ],
+            'paid' => [
+                'subject' => 'Pembayaran :label pesanan :number diterima',
+                'intro' => 'Pembayaran :label sebesar :amount sudah kami terima. Sisa tagihan :outstanding mengikuti jadwal di bawah.',
+            ],
+            'fully_paid' => [
+                'subject' => 'Pesanan :number lunas',
+                'intro' => 'Pembayaran :label sebesar :amount sudah kami terima. Seluruh tagihan pesanan Anda sudah lunas.',
+            ],
         ],
         'expired' => [
             'subject' => 'Pesanan :number kedaluwarsa',
@@ -193,6 +262,8 @@ return [
             'auto' => 'Pesanan akan diselesaikan otomatis dalam :days hari.',
             'subject_pickup' => 'Pesanan :number sudah diambil',
             'intro_pickup' => 'Pesanan Anda tercatat sudah diambil. Bila sudah sesuai, selesaikan pesanan dan beri ulasan produk.',
+            // Termin (ASUMSI A-97): pengganti ajakan menyelesaikan pesanan dan kalimat selesai otomatis selama sisa tagihan belum lunas.
+            'balance_due' => 'Pesanan bisa diselesaikan setelah sisa tagihan :outstanding lunas. Instruksi pembayaran ada di halaman pesanan.',
         ],
         'completed' => [
             'subject' => 'Pesanan :number selesai',
@@ -267,6 +338,16 @@ return [
         'voucherCode' => 'kode voucher',
         'note' => 'catatan',
         'file' => 'berkas bukti',
+        'installmentId' => 'termin',
+        'dueAt' => 'tanggal jatuh tempo',
+        'installments' => 'jadwal termin',
+        'installments.*.key' => 'kunci termin',
+        'installments.*.label' => 'nama termin',
+        'installments.*.label.id' => 'nama termin (ID)',
+        'installments.*.label.en' => 'nama termin (EN)',
+        'installments.*.percent' => 'persentase termin',
+        'installments.*.trigger' => 'waktu tagih termin',
+        'installments.*.dueDays' => 'hari jatuh tempo termin',
         'receivedAmount' => 'jumlah diterima',
         'bankCharges' => 'biaya bank',
         'receivedNote' => 'catatan penerimaan',

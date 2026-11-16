@@ -10,6 +10,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { emptyI18n, tr, type BrochureData, type I18n, type MediaSummary } from '@/lib/cms';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import { FileLink } from '@/components/FileViewer';
+import NumberInput from '@/components/NumberInput';
 
 interface BrochureForm {
   title: I18n;
@@ -229,7 +230,7 @@ export default function AdminBrochures() {
             <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Urutan', 'Sort order')}</span>
-                <input type="number" min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
+                <NumberInput min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
               </label>
               <label className="cms-check" style={{ alignSelf: 'end' }}>
                 <input type="checkbox" checked={form.isPublished} onChange={(e) => setForm({ ...form, isPublished: e.target.checked })} />

@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Exceptions\ApiException;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Requests\Admin\MailTestRequest;
+use App\Http\Requests\Admin\MapsTestRequest;
 use App\Mail\TestMail;
 use App\Services\Cms\SettingsService;
+use App\Services\Geo\MapConfigService;
 use App\Services\Mail\MailConfigurator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -53,5 +55,18 @@ class SettingController extends ApiController
         }
 
         return $this->data($info + ['to' => $to], 200, ['message' => __('api.mail_test_sent', ['to' => $to])]);
+    }
+
+    /**
+     * Uji penyedia tile peta (ASUMSI A-98) memakai isian form (`maps`, belum disimpan) atau yang tersimpan.
+     * Google: buat token sesi + ambil satu tile per lapisan; custom: ambil satu tile zoom rendah per URL.
+     * Selalu 200: `data.ok` + `data.results[{layer, ok, message}]` menjelaskan tiap lapisan, `data.config`
+     * berisi lapisan untuk pratinjau (bawaan bila gagal). Tidak menyimpan apa pun.
+     */
+    public function testMaps(MapsTestRequest $request, MapConfigService $maps)
+    {
+        $result = $maps->test($request->validated()['maps'] ?? null);
+
+        return $this->data($result, 200, ['message' => __($result['ok'] ? 'maps.test_ok' : 'maps.test_failed')]);
     }
 }

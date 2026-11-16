@@ -1,11 +1,15 @@
 'use client';
 
-// Peta dunia pelanggan (Leaflet + tile Esri World Light Gray, tanpa API key): titik per negara/pelanggan berwarna menurut
-// kawasan dan garis putus-putus melengkung dari titik asal (Pelabuhan Belawan). Selalu dimuat lewat dynamic import
-// ssr:false (index.tsx) karena Leaflet menyentuh `window` saat diimpor.
+// Peta dunia pelanggan (Leaflet + citra satelit; bawaan Esri World Imagery tanpa API key, penyedia bisa diganti admin,
+// lihat components/MapTiles): titik per negara/pelanggan berwarna menurut kawasan dan garis putus-putus melengkung dari
+// titik asal (Pelabuhan Belawan). Di atas citra yang gelap, tiap rute dan titik diberi bayangan gelap di bawahnya
+// supaya warnanya tetap terbaca di laut maupun daratan. Selalu dimuat lewat dynamic import ssr:false (index.tsx)
+// karena Leaflet menyentuh `window` saat diimpor.
 import { useEffect } from 'react';
-import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
+import { CircleMarker, MapContainer, Polyline, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import MapTiles from '@/components/MapTiles';
+import styles from './CustomerWorldMap.module.css';
 
 export interface MapPoint {
   key: string;
@@ -57,6 +61,7 @@ export default function CustomerWorldMap({ points, origin }: CustomerWorldMapPro
   const placed = points.map((c) => ({ ...c, lng: c.lng < -30 ? c.lng + 360 : c.lng }));
   const lngs = [origin.lng, ...placed.map((c) => c.lng)];
   const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+  const routes = placed.map((c) => ({ ...c, path: arc([origin.lat, origin.lng], [c.lat, c.lng]) }));
 
   return (
     <div className="cmap-map">
@@ -71,24 +76,31 @@ export default function CustomerWorldMap({ points, origin }: CustomerWorldMapPro
         style={{ width: '100%', height: '100%' }}
       >
         <Fit points={[[origin.lat, origin.lng], ...placed.map((c) => [c.lat, c.lng] as [number, number])]} />
-        <TileLayer
-          attribution="Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors"
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={16}
-        />
-        {placed.map((c) => (
+        {/* Legenda kawasan menempati kiri bawah (CustomerMapSection): logo penyedia tile, bila ada, di kanan atas. */}
+        <MapTiles kind="satellite" maxZoom={16} brandPosition="topright" />
+        {/* Bayangan rute digambar dulu supaya semua garis berwarna berada di atasnya. */}
+        {routes.map((c) => (
+          <Polyline
+            key={`halo-${c.key}`}
+            positions={c.path}
+            interactive={false}
+            pathOptions={{ className: styles.halo, weight: c.size === 'sm' ? 3.6 : 4.4 }}
+          />
+        ))}
+        {routes.map((c) => (
           <Polyline
             key={`arc-${c.key}`}
-            positions={arc([origin.lat, origin.lng], [c.lat, c.lng])}
-            pathOptions={{ color: c.color, weight: c.size === 'sm' ? 1.1 : 1.4, opacity: 0.65, dashArray: '3 6' }}
+            positions={c.path}
+            interactive={false}
+            pathOptions={{ color: c.color, weight: c.size === 'sm' ? 1.6 : 2, opacity: 0.95, dashArray: '5 6', lineCap: 'round' }}
           />
         ))}
         {placed.map((c) => (
           <CircleMarker
             key={c.key}
             center={[c.lat, c.lng]}
-            radius={c.size === 'sm' ? 5 : 7}
-            pathOptions={{ color: '#ffffff', weight: 2, fillColor: c.color, fillOpacity: 1 }}
+            radius={c.size === 'sm' ? 5.5 : 7.5}
+            pathOptions={{ className: styles.dot, color: '#ffffff', weight: 2, fillColor: c.color, fillOpacity: 1 }}
           >
             <Tooltip direction="top" offset={[0, -6]} className="cmap-tip">
               {c.logo && (
@@ -105,7 +117,8 @@ export default function CustomerWorldMap({ points, origin }: CustomerWorldMapPro
             </Tooltip>
           </CircleMarker>
         ))}
-        <CircleMarker center={[origin.lat, origin.lng]} radius={9} pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#102d50', fillOpacity: 1 }}>
+        {/* Titik asal: warna aksen tema (lewat CSS, bukan atribut fill) dengan cincin putih tebal. */}
+        <CircleMarker center={[origin.lat, origin.lng]} radius={9} pathOptions={{ className: `${styles.dot} ${styles.origin}`, color: '#ffffff', weight: 3, fillOpacity: 1 }}>
           <Tooltip direction="right" offset={[8, 0]} permanent className="cmap-origin-tip">
             {origin.label}
           </Tooltip>

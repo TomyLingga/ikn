@@ -7,7 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Baris GET /admin/payments dan detail GET /admin/payments/{id} (kontrak 11.2): payment + order ringkas
- * { number, status, customer{name,company,email}, grandTotal, paymentDueAt } + proofUrl (/api/v1/files/{mediaId}).
+ * { number, status, customer{name,company,email}, grandTotal, paymentDueAt, paymentProgress } + proofUrl (/api/v1/files/{mediaId}).
  */
 class AdminPaymentResource extends JsonResource
 {
@@ -34,6 +34,8 @@ class AdminPaymentResource extends JsonResource
                 ],
                 'currency' => $order->currencyCode(),
                 'grandTotal' => $order->grandTotalInt(),
+                // Kemajuan pembayaran order (ASUMSI A-97): "partial" = order bertermin yang baru dibayar sebagian.
+                'paymentProgress' => $order->paymentProgress(),
                 'uniqueCode' => (int) $order->unique_code,
                 'paymentDueAt' => optional($order->payment_due_at)->toApiString(),
                 'paidAt' => optional($order->paid_at)->toApiString(),
@@ -44,6 +46,6 @@ class AdminPaymentResource extends JsonResource
 
     public static function eager(): array
     {
-        return array_merge(PaymentResource::eager(), ['order']);
+        return array_merge(PaymentResource::eager(), ['order.installments']);
     }
 }

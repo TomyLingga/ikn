@@ -11,6 +11,7 @@ import { currencyLabels, type BankAccountRow } from '@/lib/admin';
 import { confirmDialog } from '@/components/ConfirmDialog';
 import Select from '@/components/Select';
 import type { Currency } from '@/lib/types';
+import NumberInput from '@/components/NumberInput';
 
 interface BankForm {
   bankName: string;
@@ -248,7 +249,7 @@ export default function AdminBankAccounts() {
             <div className="admin-form-row">
               <label>
                 <span className="field-label">{t('Urutan tampil', 'Display order')}</span>
-                <input type="number" min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
+                <NumberInput min={0} value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) || 0 })} />
               </label>
               <label className="cms-check" style={{ alignSelf: 'end' }}>
                 <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
