@@ -25,6 +25,7 @@ Proses yang berhenti dinyalakan lagi dalam 15 detik. Semua hanya mendengar di 12
    Salin `php.ini-production` menjadi `php.ini`, lalu ubah:
    - aktifkan (hapus `;`): `extension_dir = "ext"`, `extension=bcmath`, `curl`, `fileinfo`, `gd`, `mbstring`, `openssl`, `pdo_pgsql`, `pgsql`, `zip`, `exif`
    - `upload_max_filesize = 102M`, `post_max_size = 105M`, `memory_limit = 512M`
+   - unduh https://curl.se/ca/cacert.pem ke `C:\php\extras\ssl\cacert.pem`, lalu isi `curl.cainfo` dan `openssl.cafile` dengan path itu. Tanpa ini PHP gagal membuka HTTPS (kurs JISDOR, pencarian peta).
 3. **Composer**: https://getcomposer.org/Composer-Setup.exe (pilih `C:\php\php.exe` saat ditanya).
 4. **Node.js 20 LTS**: https://nodejs.org
 5. **PostgreSQL 17**: https://www.postgresql.org/download/windows/ dan **catat password user `postgres`**.
