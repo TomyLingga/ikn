@@ -10,19 +10,41 @@ param(
     [string]$DbHost = '127.0.0.1',
     [int]$DbPort = 5432,
     [string]$AdminPassword = '',   # password for superadmin@ptikn.com on first seed (default: "password")
-    [switch]$Fresh
+    [switch]$Fresh,
+    # PC that also runs other apps: own ports (0 = default 3000/8000/8080/443) and tool paths.
+    [int]$FePort = 0,
+    [int]$ApiPort = 0,
+    [int]$ProxyPort = 0,
+    [int]$HttpsPort = 0,
+    [string]$Php = '',
+    [string]$Psql = ''
 )
+# common.ps1 assigns $FePort/$ApiPort/$ProxyPort/$HttpsPort: keep the parameters before dot-sourcing it.
+$portArgs = @{ FePort = $FePort; ApiPort = $ApiPort; ProxyPort = $ProxyPort; HttpsPort = $HttpsPort }
 . "$PSScriptRoot\common.ps1"
+foreach ($k in @($portArgs.Keys)) { if ($portArgs[$k] -gt 0) { Set-Variable -Name $k -Value $portArgs[$k] } }
+if (@(443, 8443, 10000) -notcontains $HttpsPort) { throw "HttpsPort harus 443, 8443, atau 10000 (port yang diizinkan Tailscale Funnel), bukan $HttpsPort." }
 Assert-Admin
 
 Write-Step 'Cek program yang dibutuhkan'
+# Order per tool: explicit parameter, then the path saved by an earlier setup (if it still exists), then PATH/fallbacks.
+$prev = $null
+if (Test-Path $ConfigFile) { $prev = Get-Content $ConfigFile -Raw | ConvertFrom-Json }
+function Resolve-Tool([string]$key, [string]$explicit, [string]$name, [string[]]$fallbacks) {
+    if ($explicit) {
+        if (-not (Test-Path $explicit)) { throw "Tidak ditemukan: $explicit" }
+        return (Resolve-Path $explicit).Path
+    }
+    if ($prev -and $prev.$key -and (Test-Path $prev.$key)) { return $prev.$key }
+    return Find-Exe $name $fallbacks
+}
 $cfg = [ordered]@{
-    php      = Find-Exe 'php' @('C:\php\php.exe', 'C:\tools\php*\php.exe')
-    composer = Find-Exe 'composer.bat' @('C:\ProgramData\ComposerSetup\bin\composer.bat')
-    node     = Find-Exe 'node' @('C:\Program Files\nodejs\node.exe')
-    npm      = Find-Exe 'npm.cmd' @('C:\Program Files\nodejs\npm.cmd')
-    psql     = Find-Exe 'psql' @('C:\Program Files\PostgreSQL\*\bin\psql.exe')
-    git      = Find-Exe 'git' @('C:\Program Files\Git\cmd\git.exe')
+    php      = Resolve-Tool 'php' $Php 'php' @('C:\php\php.exe', 'C:\tools\php*\php.exe')
+    composer = Resolve-Tool 'composer' '' 'composer.bat' @('C:\ProgramData\ComposerSetup\bin\composer.bat')
+    node     = Resolve-Tool 'node' '' 'node' @('C:\Program Files\nodejs\node.exe')
+    npm      = Resolve-Tool 'npm' '' 'npm.cmd' @('C:\Program Files\nodejs\npm.cmd')
+    psql     = Resolve-Tool 'psql' $Psql 'psql' @('C:\Program Files\PostgreSQL\*\bin\psql.exe')
+    git      = Resolve-Tool 'git' '' 'git' @('C:\Program Files\Git\cmd\git.exe')
 }
 $missing = @($cfg.Keys | Where-Object { -not $cfg[$_] })
 if ($missing.Count) { throw "Belum terpasang / tidak ada di PATH: $($missing -join ', '). Lihat README.md bagian 1." }
@@ -34,9 +56,15 @@ if ($noExt.Count) { throw "Extension PHP belum aktif di php.ini: $($noExt -join 
 
 Write-Step 'Alamat Tailscale'
 $hostName = Get-PreviewHost
-$url = "https://$hostName"
+$publicHost = $hostName
+if ($HttpsPort -ne 443) { $publicHost = "${hostName}:$HttpsPort" }
+$url = "https://$publicHost"
 Write-Host "  $url"
-$cfg['host'] = $hostName
+$cfg['host'] = $publicHost
+$cfg['fePort'] = $FePort
+$cfg['apiPort'] = $ApiPort
+$cfg['proxyPort'] = $ProxyPort
+$cfg['httpsPort'] = $HttpsPort
 $cfg | ConvertTo-Json | Set-Content $ConfigFile
 $cfg = Read-Config
 
@@ -54,7 +82,7 @@ $apiEnv = Join-Path $Api '.env'
 if (-not (Test-Path $apiEnv)) { Copy-Item (Join-Path $Api '.env.example') $apiEnv }
 $apiValues = [ordered]@{
     APP_ENV = 'staging'; APP_DEBUG = 'false'; APP_URL = $url; FRONTEND_URL = $url
-    CORS_ALLOWED_ORIGINS = $url; SANCTUM_STATEFUL_DOMAINS = $hostName; SESSION_DOMAIN = ''
+    CORS_ALLOWED_ORIGINS = $url; SANCTUM_STATEFUL_DOMAINS = $publicHost; SESSION_DOMAIN = ''
     SESSION_SECURE_COOKIE = 'true'; TRUSTED_PROXIES = '*'
     DB_HOST = $DbHost; DB_PORT = "$DbPort"; DB_DATABASE = $DbName; DB_USERNAME = $DbUser; DB_PASSWORD = $DbPassword
     JISDOR_USER_AGENT = "`"IKN-Preview/1.0 (+$url)`""
@@ -106,10 +134,10 @@ Start-Sleep -Seconds 20
 
 Write-Step 'Tailscale Funnel (publik)'
 $ts = Get-Tailscale
-& $ts funnel --bg $ProxyPort
+& $ts funnel --bg "--https=$HttpsPort" $ProxyPort
 if ($LASTEXITCODE -ne 0) {
     Write-Warning 'Funnel belum aktif. Buka tautan yang dicetak Tailscale di atas untuk mengizinkan Funnel, lalu jalankan:'
-    Write-Host "    tailscale funnel --bg $ProxyPort"
+    Write-Host "    tailscale funnel --bg --https=$HttpsPort $ProxyPort"
 }
 
 Write-Host ''

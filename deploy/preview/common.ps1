@@ -12,6 +12,16 @@ $TaskName = 'IKN Preview'
 $FePort = 3000
 $ApiPort = 8000
 $ProxyPort = 8080
+$HttpsPort = 443
+# A PC that also runs other apps keeps its own ports in preview.json (written by setup.ps1 -FePort/-ApiPort/...).
+if (Test-Path $ConfigFile) {
+    $saved = Get-Content $ConfigFile -Raw | ConvertFrom-Json
+    if ($saved.fePort) { $FePort = [int]$saved.fePort }
+    if ($saved.apiPort) { $ApiPort = [int]$saved.apiPort }
+    if ($saved.proxyPort) { $ProxyPort = [int]$saved.proxyPort }
+    if ($saved.httpsPort) { $HttpsPort = [int]$saved.httpsPort }
+    Remove-Variable saved
+}
 
 function Write-Step([string]$text) { Write-Host ''; Write-Host "==> $text" -ForegroundColor Cyan }
 
@@ -90,6 +100,8 @@ function Invoke-In([string]$dir, [string]$exe, [string[]]$arguments) {
 
 # Backend dependencies + migrations, then the Next standalone build (same layout as ikn-fe/Dockerfile).
 function Build-All($cfg) {
+    # composer.bat and Composer's @php scripts call "php" from PATH: put the configured PHP first.
+    $env:Path = (Split-Path $cfg.php -Parent) + ';' + $env:Path
     Write-Step 'Composer install (ikn-api)'
     Invoke-In $Api $cfg.composer @('install', '--no-interaction', '--prefer-dist', '--optimize-autoloader')
     Write-Step 'Migrasi database'

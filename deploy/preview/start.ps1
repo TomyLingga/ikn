@@ -5,5 +5,5 @@ param([switch]$Publish)
 Assert-Admin
 $cfg = Read-Config
 Start-ScheduledTask -TaskName $TaskName
-if ($Publish) { & (Get-Tailscale) funnel --bg $ProxyPort }
+if ($Publish) { & (Get-Tailscale) funnel --bg "--https=$HttpsPort" $ProxyPort }
 Write-Host "Pratinjau dinyalakan. Buka https://$($cfg.host) setelah kira-kira 20 detik."

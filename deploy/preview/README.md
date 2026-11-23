@@ -70,6 +70,20 @@ Setup akan:
 
 Di akhir, alamat pratinjau dicetak. `-AdminPassword` mengganti password `superadmin@ptikn.com` pada data awal. Bila dikosongkan, passwordnya `password`.
 
+### PC yang juga menjalankan aplikasi lain
+
+Bila port 3000, 8000, 8080, atau alamat HTTPS 443 sudah dipakai aplikasi lain di PC itu, beri setup port sendiri:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\preview\setup.ps1 -DbPassword "PASSWORD_POSTGRES" -DbPort 5433 `
+    -FePort 3310 -ApiPort 8310 -ProxyPort 8311 -HttpsPort 8443 -Php C:\php\php.exe -Psql C:\ikn-pg\17\bin\psql.exe
+```
+
+- `-FePort`, `-ApiPort`, `-ProxyPort`: port lokal Next, Laravel, dan proxy. Disimpan di `deploy\preview\preview.json`, jadi `update.ps1`, `start.ps1`, `stop.ps1`, dan task "IKN Preview" ikut memakainya.
+- `-HttpsPort`: port publik Funnel, hanya 443, 8443, atau 10000. Selain 443, port masuk ke alamat, misalnya `https://nama-pc.tailnet.ts.net:8443`.
+- `-Php`: dipakai bila PHP bawaan PC bukan 8.1/8.2. Setup, Composer, dan task memakai PHP itu, dan PATH PC tidak diubah. `-Psql` sama untuk `psql` PostgreSQL yang dipakai pratinjau.
+- `stop.ps1 -Unpublish` hanya menutup port HTTPS pratinjau. Alamat aplikasi lain di Tailscale tetap jalan.
+
 ## 5. Cek
 
 Buka alamat itu dari HP memakai **data seluler** (bukan Wi-Fi yang sama dengan PC):
